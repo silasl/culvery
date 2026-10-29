@@ -188,7 +188,15 @@ internal class FakeMusic(private val trace: Trace = Trace()) : HouseMusic {
 
     @Volatile var offered = MusicOptions(emptyList(), emptyList(), null)
 
-    override suspend fun options() = offered
+    /** Holds [options] until completed; [optionsThrow] makes it throw after that. */
+    @Volatile var optionsGate: CompletableDeferred<Unit>? = null
+    @Volatile var optionsThrow = false
+
+    override suspend fun options(): MusicOptions {
+        optionsGate?.await()
+        check(!optionsThrow) { "options threw" }
+        return offered
+    }
 
     override suspend fun before(): List<GroupBefore> {
         trace.hit("music.before")
@@ -227,7 +235,14 @@ internal class FakeLights(private val trace: Trace = Trace()) : HouseLights {
 
     @Volatile var offered = LightOptions(emptyList(), null)
 
-    override suspend fun partyOptions() = offered
+    @Volatile var optionsGate: CompletableDeferred<Unit>? = null
+    @Volatile var optionsThrow = false
+
+    override suspend fun partyOptions(): LightOptions {
+        optionsGate?.await()
+        check(!optionsThrow) { "partyOptions threw" }
+        return offered
+    }
 
     override suspend fun partyBefore(choices: List<SceneChoice>): List<RoomBefore> {
         trace.hit("lights.partyBefore")

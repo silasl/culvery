@@ -32,6 +32,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -286,6 +287,46 @@ class PartySettingsPageTest {
         host(waitFor = "party_plugs_line")
         compose.onNodeWithTag("party_music_line").assertTextEquals("Set up Sonos in Settings › Music to choose the music.")
         compose.onNodeWithTag("party_lights_line").assertTextEquals("Set up Hue in Settings › Lights to choose scenes.")
+    }
+
+    @Test
+    fun aReadStillRunningShowsNoSetUpLine() {
+        val gate = CompletableDeferred<Unit>()
+        music.optionsGate = gate
+        lights.optionsGate = gate
+        host(waitFor = "party_plugs_line")
+        compose.waitForIdle()
+        compose.onAllNodesWithTag("party_music_line").assertCountEquals(0)
+        compose.onAllNodesWithTag("party_lights_line").assertCountEquals(0)
+        compose.onAllNodesWithTag("party_music").assertCountEquals(0)
+        gate.complete(Unit)
+        compose.waitFor { count("party_music") > 0 }
+        compose.onAllNodesWithTag("party_music_line").assertCountEquals(0)
+    }
+
+    @Test
+    fun aReadThatThrowsShowsTheProblemLine() {
+        music.optionsThrow = true
+        lights.optionsThrow = true
+        host(waitFor = "party_music_line")
+        compose.onNodeWithTag("party_music_line")
+            .assertTextEquals("Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi.")
+        compose.waitFor { count("party_lights_line") > 0 }
+        compose.onNodeWithTag("party_lights_line").assertTextEquals("Hue didn’t do that. Try again.")
+    }
+
+    @Test
+    fun turningOffTheOnlyChosenRoomChangesNothing() {
+        val all = listOf(KITCHEN, LOUNGE, DINING)
+        val prefs = PartyPrefs(rooms = listOf(DINING))
+        assertThat(prefs.withSpeaker(all, DINING, on = false)).isEqualTo(prefs)
+    }
+
+    @Test
+    fun switchingOneOnWhenEverySavedRoomHasGoneSavesJustThatRoom() {
+        val all = listOf(KITCHEN, LOUNGE, DINING)
+        val prefs = PartyPrefs(rooms = listOf(HouseRoom("Gone-id", "Gone")))
+        assertThat(prefs.withSpeaker(all, LOUNGE, on = true).rooms).containsExactly(LOUNGE)
     }
 
     @Test

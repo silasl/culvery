@@ -63,8 +63,17 @@ class PartyPage internal constructor(private val content: @Composable () -> Unit
     override fun Content() = content()
 }
 
-/** What the page shows: null [music] or [lights] means that system isn't set up. [toString] leaves out the choices. */
-data class PartySettingsUi(val prefs: PartyPrefs, val music: MusicOptions?, val lights: LightOptions?) {
+/**
+ * What the page shows: null [music] or [lights] means that system isn't set up, or, with [musicReading] or
+ * [lightsReading], that its first read hasn't come back, when the section shows nothing. [toString] leaves out the choices.
+ */
+data class PartySettingsUi(
+    val prefs: PartyPrefs,
+    val music: MusicOptions?,
+    val lights: LightOptions?,
+    val musicReading: Boolean = false,
+    val lightsReading: Boolean = false,
+) {
     override fun toString() = "PartySettingsUi"
 }
 
@@ -89,7 +98,7 @@ private fun MusicSection(ui: PartySettingsUi, onMusic: (MusicPick?) -> Unit, onS
     HhSectionLabel(PartyWords.MUSIC_SECTION)
     val music = ui.music
     if (music == null) {
-        Line(PartyWords.SET_UP_SONOS, "party_music_line")
+        if (!ui.musicReading) Line(PartyWords.SET_UP_SONOS, "party_music_line")
         return
     }
     music.line?.let { Line(it, "party_music_line", problem = true) }
@@ -124,7 +133,7 @@ private fun LightsSection(ui: PartySettingsUi, onScene: (LightRoomOption, HouseS
     HhSectionLabel(PartyWords.LIGHTS_SECTION)
     val lights = ui.lights
     if (lights == null) {
-        Line(PartyWords.SET_UP_HUE, "party_lights_line")
+        if (!ui.lightsReading) Line(PartyWords.SET_UP_HUE, "party_lights_line")
         return
     }
     lights.line?.let { Line(it, "party_lights_line", problem = true) }
@@ -199,28 +208,28 @@ private fun ChoiceSheet(title: String, tag: String, rowTag: String, names: List<
 @Composable
 fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: HouseLights?) {
     val prefs by settings.prefs.collectAsStateWithLifecycle(null)
-    val musicReady by remember(music) { music?.ready ?: flowOf(false) }.collectAsStateWithLifecycle(false)
-    val lightsReady by remember(lights) { lights?.ready ?: flowOf(false) }.collectAsStateWithLifecycle(false)
+    val musicReady by remember(music) { music?.ready ?: flowOf(false) }.collectAsStateWithLifecycle<Boolean?>(null)
+    val lightsReady by remember(lights) { lights?.ready ?: flowOf(false) }.collectAsStateWithLifecycle<Boolean?>(null)
     var musicOptions by remember { mutableStateOf<MusicOptions?>(null) }
     var lightOptions by remember { mutableStateOf<LightOptions?>(null) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(music, musicReady) {
-        musicOptions = if (music == null || !musicReady) {
+        musicOptions = if (music == null || musicReady != true) {
             null
         } else {
             attempt({ music.options() }) { e ->
                 Log.w(TAG, "Couldn't read what the speakers offer (${e::class.simpleName})")
-                MusicOptions(emptyList(), emptyList(), null)
+                MusicOptions(emptyList(), emptyList(), PartyWords.CANT_REACH_SONOS)
             }
         }
     }
     LaunchedEffect(lights, lightsReady) {
-        lightOptions = if (lights == null || !lightsReady) {
+        lightOptions = if (lights == null || lightsReady != true) {
             null
         } else {
             attempt({ lights.partyOptions() }) { e ->
                 Log.w(TAG, "Couldn't read what the lights offer (${e::class.simpleName})")
-                LightOptions(emptyList(), null)
+                LightOptions(emptyList(), PartyWords.HUE_REFUSED)
             }
         }
     }
@@ -231,7 +240,11 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
         }
     }
     PartySettingsScreen(
-        PartySettingsUi(p, musicOptions, lightOptions),
+        PartySettingsUi(
+            p, musicOptions, lightOptions,
+            musicReading = music != null && musicReady != false && musicOptions == null,
+            lightsReading = lights != null && lightsReady != false && lightOptions == null,
+        ),
         onMusic = { pick -> save { it.withMusic(pick?.let { chosen -> MusicChoice(chosen.id, chosen.name) }) } },
         onSpeaker = { room, on -> save { it.withSpeaker(musicOptions?.rooms.orEmpty(), room, on) } },
         onScene = { room, scene ->

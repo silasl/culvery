@@ -51,6 +51,8 @@ object PartyWords {
     const val PLUGS_SECTION = "Plugs"
     const val PLUGS_LINE = "Choose what each plug does in Party mode on the Plugs tab."
     const val SET_UP_SONOS = "Set up Sonos in Settings › Music to choose the music."
+    const val CANT_REACH_SONOS = "Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi."
+    const val HUE_REFUSED = "Hue didn’t do that. Try again."
     const val SET_UP_HUE = "Set up Hue in Settings › Lights to choose scenes."
 
     /** What a tap on a light room's row does. */
