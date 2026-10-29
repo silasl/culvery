@@ -60,8 +60,8 @@ class PartySettingsTest {
         val store = MemoryStore()
         val settings = PartySettings(store, backgroundScope)
 
-        settings.update { it.withMusic(PARTY_MIX).withRooms(listOf(KITCHEN)) }
-        settings.update { it.withRooms(null) }
+        settings.update { it.copy(music = PARTY_MIX, rooms = listOf(KITCHEN)) }
+        settings.update { it.copy(rooms = null) }
 
         assertThat(store.state.value!!.asMap().keys.map { it.name }).doesNotContain("music.rooms")
         assertThat(settings.prefs.first()).isEqualTo(PartyPrefs(music = PARTY_MIX))
@@ -72,11 +72,11 @@ class PartySettingsTest {
     fun theRoomsAreKeptWithNoPick() = runTest {
         val settings = PartySettings(MemoryStore(), backgroundScope)
 
-        settings.update { it.withRooms(listOf(KITCHEN, LOUNGE)) }
+        settings.update { it.copy(rooms = listOf(KITCHEN, LOUNGE)) }
         assertThat(settings.prefs.first()).isEqualTo(PartyPrefs(rooms = listOf(KITCHEN, LOUNGE)))
 
-        settings.update { it.withMusic(PARTY_MIX) }
-        settings.update { it.withMusic(null) }
+        settings.update { it.copy(music = PARTY_MIX) }
+        settings.update { it.copy(music = null) }
 
         assertThat(settings.prefs.first()).isEqualTo(PartyPrefs(rooms = listOf(KITCHEN, LOUNGE)))
     }

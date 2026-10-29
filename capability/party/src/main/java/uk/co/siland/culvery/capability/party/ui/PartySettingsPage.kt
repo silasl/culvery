@@ -9,12 +9,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -42,7 +40,6 @@ import uk.co.siland.culvery.core.house.SceneChoice
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.attempt
-import uk.co.siland.culvery.core.ui.HouseModeDimens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhListRow
@@ -52,6 +49,7 @@ import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.HouseModeDimens
 
 private const val TAG = "PartySettingsPage"
 
@@ -171,27 +169,36 @@ private fun Line(text: String, tag: String, problem: Boolean = false) = Text(
 
 /** The music to play, "None" first; [chosenId] is the pick shown as chosen, null for "None". */
 @Composable
-internal fun PartyMusicSheet(picks: List<MusicPick>, chosenId: String?, onPick: (MusicPick?) -> Unit, onClose: () -> Unit) {
-    val chosen = if (chosenId == null) 0 else picks.indexOfFirst { it.id == chosenId }.let { if (it < 0) -1 else it + 1 }
-    ChoiceSheet(
-        PartyWords.MUSIC_SHEET_TITLE, "party_music_sheet", "party_music", listOf(PartyWords.NONE) + picks.map { it.name }, chosen,
-        onPick = { onPick(picks.getOrNull(it - 1)) }, onClose = onClose,
-    )
-}
+internal fun PartyMusicSheet(picks: List<MusicPick>, chosenId: String?, onPick: (MusicPick?) -> Unit, onClose: () -> Unit) = NoneFirstSheet(
+    PartyWords.MUSIC_SHEET_TITLE, "party_music_sheet", "party_music", PartyWords.NONE,
+    picks, picks.map { it.id }, picks.map { it.name }, chosenId, onPick, onClose,
+)
 
 /** A light room's scenes, "Leave alone" first; [chosenId] is the scene shown as chosen, null for "Leave alone". */
 @Composable
-internal fun PartySceneSheet(room: LightRoomOption, chosenId: String?, onPick: (HouseScene?) -> Unit, onClose: () -> Unit) {
-    val chosen = if (chosenId == null) 0 else room.scenes.indexOfFirst { it.id == chosenId }.let { if (it < 0) -1 else it + 1 }
-    ChoiceSheet(
-        room.name, "party_scene_sheet", "party_scene", listOf(PartyWords.LEAVE_ALONE) + room.scenes.map { it.name }, chosen,
-        onPick = { onPick(room.scenes.getOrNull(it - 1)) }, onClose = onClose,
-    )
-}
+internal fun PartySceneSheet(room: LightRoomOption, chosenId: String?, onPick: (HouseScene?) -> Unit, onClose: () -> Unit) = NoneFirstSheet(
+    room.name, "party_scene_sheet", "party_scene", PartyWords.LEAVE_ALONE,
+    room.scenes, room.scenes.map { it.id }, room.scenes.map { it.name }, chosenId, onPick, onClose,
+)
 
-/** [names] as radio rows tagged `{rowTag}_{i}`, the one at [chosen] selected (-1: none); [onPick] gets the row's index. */
+/**
+ * [none], then [items] by [names], as radio rows tagged `{rowTag}_{i}`: the item whose id in [ids] is [chosenId] is
+ * selected, [none] when that is null, and no row when it is an id no longer there. [onPick] gets the item, null for [none].
+ */
 @Composable
-private fun ChoiceSheet(title: String, tag: String, rowTag: String, names: List<String>, chosen: Int, onPick: (Int) -> Unit, onClose: () -> Unit) {
+private fun <T> NoneFirstSheet(
+    title: String,
+    tag: String,
+    rowTag: String,
+    none: String,
+    items: List<T>,
+    ids: List<String>,
+    names: List<String>,
+    chosenId: String?,
+    onPick: (T?) -> Unit,
+    onClose: () -> Unit,
+) {
+    val chosen = if (chosenId == null) 0 else ids.indexOf(chosenId).let { if (it < 0) -1 else it + 1 }
     HhSheet(
         padding = PaddingValues(horizontal = HouseModeDimens.sheetPaddingH, vertical = HouseModeDimens.sheetPaddingV),
         modifier = Modifier.testTag(tag).semantics { paneTitle = title },
@@ -201,7 +208,7 @@ private fun ChoiceSheet(title: String, tag: String, rowTag: String, names: List<
             HhCloseButton(onClose)
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(PartyDimens.rowGap), modifier = Modifier.weight(1f)) {
-            itemsIndexed(names) { i, name -> HhRadioRow(name, selected = i == chosen, tag = "${rowTag}_$i", onClick = { onPick(i) }) }
+            itemsIndexed(listOf(none) + names) { i, name -> HhRadioRow(name, selected = i == chosen, tag = "${rowTag}_$i", onClick = { onPick(items.getOrNull(i - 1)) }) }
         }
     }
 }
@@ -212,11 +219,8 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
     val prefs by settings.prefs.collectAsStateWithLifecycle(null)
     val musicReady by remember(music) { music?.ready ?: flowOf(false) }.collectAsStateWithLifecycle<Boolean?>(null)
     val lightsReady by remember(lights) { lights?.ready ?: flowOf(false) }.collectAsStateWithLifecycle<Boolean?>(null)
-    var musicOptions by remember { mutableStateOf<MusicOptions?>(null) }
-    var lightOptions by remember { mutableStateOf<LightOptions?>(null) }
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(music, musicReady) {
-        musicOptions = if (music == null || musicReady != true) {
+    val musicOptions by produceState<MusicOptions?>(null, music, musicReady) {
+        value = if (music == null || musicReady != true) {
             null
         } else {
             attempt({ music.options() }) { e ->
@@ -225,8 +229,8 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
             }
         }
     }
-    LaunchedEffect(lights, lightsReady) {
-        lightOptions = if (lights == null || lightsReady != true) {
+    val lightOptions by produceState<LightOptions?>(null, lights, lightsReady) {
+        value = if (lights == null || lightsReady != true) {
             null
         } else {
             attempt({ lights.partyOptions() }) { e ->
@@ -235,6 +239,7 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
             }
         }
     }
+    val scope = rememberCoroutineScope()
     val p = prefs ?: return
     fun save(change: (PartyPrefs) -> PartyPrefs) {
         scope.launch {
@@ -247,7 +252,7 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
             musicReading = music != null && musicReady != false && musicOptions == null,
             lightsReading = lights != null && lightsReady != false && lightOptions == null,
         ),
-        onMusic = { pick -> save { it.withMusic(pick?.let { chosen -> MusicChoice(chosen.id, chosen.name) }) } },
+        onMusic = { pick -> save { it.copy(music = pick?.let { chosen -> MusicChoice(chosen.id, chosen.name) }) } },
         onSpeaker = { room, on -> save { it.withSpeaker(musicOptions?.rooms.orEmpty(), room, on) } },
         onScene = { room, scene ->
             save { if (scene == null) it.withoutScene(room.id) else it.withScene(SceneChoice(room.id, room.name, scene.id, scene.name)) }
@@ -258,10 +263,10 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
 /** Every speaker saves as "all" (null); turning the last one off changes nothing, as an empty list would fail the music step. */
 internal fun PartyPrefs.withSpeaker(all: List<HouseRoom>, room: HouseRoom, on: Boolean): PartyPrefs {
     val chosen = rooms?.map { it.id }?.toSet() ?: all.map { it.id }.toSet()
-    val next = all.filter { (it.id in chosen || (on && it.id == room.id)) && (on || it.id != room.id) }
+    val next = all.filter { if (it.id == room.id) on else it.id in chosen }
     return when {
         next.isEmpty() -> this
-        next.size == all.size -> withRooms(null)
-        else -> withRooms(next)
+        next.size == all.size -> copy(rooms = null)
+        else -> copy(rooms = next)
     }
 }

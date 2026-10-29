@@ -47,10 +47,6 @@ data class PartyPrefs(
     val rooms: List<HouseRoom>? = null,
     val scenes: List<SceneChoice> = emptyList(),
 ) {
-    fun withMusic(choice: MusicChoice?) = copy(music = choice)
-
-    fun withRooms(rooms: List<HouseRoom>?) = copy(rooms = rooms)
-
     fun withScene(choice: SceneChoice) = copy(scenes = scenes.filterNot { it.roomId == choice.roomId } + choice)
 
     fun withoutScene(roomId: String) = copy(scenes = scenes.filterNot { it.roomId == roomId })
