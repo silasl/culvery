@@ -94,7 +94,7 @@ class DoorAlerts internal constructor(
         if (quietAt(now, z, p) || chimedRecently) return@withLock
         // Music and the like go quieter first, for half a second at most (6 §3.3).
         host.quieted()
-        if (chime.play(p.volume)) lastChimeMillis = now
+        if (chime.play(DoorSound.CLASSIC, p.volume)) lastChimeMillis = now
     }
 
     /** Got it on [eventId]'s card: that ring counts as seen, and the card goes if it still shows that ring (5 §4.7). */

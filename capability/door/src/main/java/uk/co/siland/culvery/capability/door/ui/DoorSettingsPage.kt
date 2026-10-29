@@ -24,6 +24,7 @@ import uk.co.siland.culvery.capability.door.CAPTURE_MS
 import uk.co.siland.culvery.capability.door.CHIME
 import uk.co.siland.culvery.capability.door.CHIME_VOLUME
 import uk.co.siland.culvery.capability.door.Chime
+import uk.co.siland.culvery.capability.door.DoorSound
 import uk.co.siland.culvery.capability.door.DONE
 import uk.co.siland.culvery.capability.door.DOOR
 import uk.co.siland.culvery.capability.door.DoorHealth
@@ -183,7 +184,7 @@ internal fun DoorSettingsHost(
         ),
         DoorSettingsActions(
             onVolume = { v -> change { settings.setVolume(v) } },
-            onPlayChime = { chime.play(p.volume) },
+            onPlayChime = { chime.play(DoorSound.CLASSIC, p.volume) },
             onQuietHours = { on, from, until -> change { settings.setQuietHours(on, from, until) } },
             onAllowAccess = { navigator.openSystemScreen(provider.accessScreens(), NOTIFICATION_ACCESS_MISSING) },
             onCapture = { on -> change { settings.setCapture(if (on) clock.nowMillis() + CAPTURE_MS else 0L) } },

@@ -43,7 +43,7 @@ val HalloweenDay = HhColors(
     border = Color(0xFFDDCFBF),
 )
 
-val HalloweenLook = SeasonalLook(night = HalloweenNight, day = HalloweenDay)
+val HalloweenLook = SeasonalLook(night = HalloweenNight, day = HalloweenDay, sound = SeasonalSound.HAUNTED_ORGAN)
 
 /** The drawings' colours, here so ContrastTest checks what can sit over them (14 §4.3). */
 object HalloweenInks {

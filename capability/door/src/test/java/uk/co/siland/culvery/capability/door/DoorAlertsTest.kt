@@ -43,6 +43,7 @@ class DoorAlertsTest {
         assertThat(host.shown).isEqualTo(1)
         assertThat(alerts.showing.value).isEqualTo(ShowingRing(1, DoorCardUi(false, "Front Door", "14:02", null)))
         assertThat(chime.volumes).containsExactly(0.4f)
+        assertThat(chime.plays.single().first).isEqualTo(DoorSound.CLASSIC)
     }
 
     @Test

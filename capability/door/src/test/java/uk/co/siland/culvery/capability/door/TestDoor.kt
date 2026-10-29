@@ -86,13 +86,14 @@ internal class FakeAlertHost(inFront: Boolean = true) : AlertHost {
 }
 
 internal class FakeChime : Chime {
-    val volumes = mutableListOf<Float>()
+    val plays = mutableListOf<Pair<DoorSound, Float>>()
+    val volumes: List<Float> get() = plays.map { it.second }
 
     /** What [play] reports: false for a chime that couldn't start. */
     var starts = true
 
-    override fun play(volume: Float): Boolean {
-        volumes += volume
+    override fun play(sound: DoorSound, volume: Float): Boolean {
+        plays += sound to volume
         return starts
     }
 }
