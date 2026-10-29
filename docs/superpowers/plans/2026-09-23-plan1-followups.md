@@ -763,6 +763,18 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - **Not done yet:** Settings › Party mode against the household's real speakers, rooms and scenes (read-only, with the user); a real party run (only on the user's go), which also checks the speakers' regroup timing and a coordinator that already leads others.
 - **The log scan:** no crash or ANR; the Party, Holiday, music and lights tags wrote nothing (a release logs only warnings and errors).
 
+## Plan 13 (Party mode): left for later (final review, 2026-10-29)
+- **For the end-of-v1 design review:** the tile's look copied from Holiday's, and its `celebration` icon; the sheet's full stops and the off sheet's wording; "Play {playlist} on {rooms}." when not every speaker is chosen; switch rows (not checkboxes) for the speakers, and the pickers as sheets; the speakers-not-regrouped line; the Settings "Speakers" sub-label.
+- **For the first real party:** how long the speakers take to show a regroup; how a speaker that already leads others behaves when it joins; whether the stricter settle in grouping costs time.
+- **Known, small:**
+  - a speaker group that held a party room and a room left out of the party goes back whole, undoing a hand change made during the party to the left-out room;
+  - speaker groups waiting to go back have no age limit, so if Sonos stays unreachable for days they go back days late;
+  - the off sheet says "Put the plugs back as they were." when Party's plugs step switched nothing (`leave` then does nothing);
+  - Settings › Party mode's fallback says "Hue didn't do that" where Music's says it can't reach Sonos (no real path reaches it);
+  - a speaker that doesn't answer reads as paused, so turning off leaves the party music as changed by hand;
+  - a music start that fails puts the groups back and drops that put-back's result quietly;
+  - spec §4.2 step 2 should say a room that was off goes back off before the remembered scene is tried.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
