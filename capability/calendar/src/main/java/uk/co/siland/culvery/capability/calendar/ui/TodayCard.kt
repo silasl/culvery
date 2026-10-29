@@ -83,11 +83,14 @@ fun TodayCard(
     } else {
         emptyList()
     }
+    val corner = Culvery.look?.cardCorner
+    val colors = Culvery.colors
     HhCard(
         modifier = modifier.fillMaxSize().testTag("calendar_today"),
         radius = CalendarDimens.cardRadius,
         // The foot is the list's: the scroll runs to the card's edge under the fade.
         padding = PaddingValues(start = CalendarDimens.todayPaddingH, end = CalendarDimens.todayPaddingH, top = CalendarDimens.todayPaddingV),
+        decoration = corner?.let { draw -> { draw(colors) } },
     ) {
         TodayBody(events, tomorrow?.copy(events = candidates), onOpen, onAdd)
     }

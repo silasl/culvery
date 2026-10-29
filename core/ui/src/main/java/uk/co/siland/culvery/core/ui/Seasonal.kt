@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.MonthDay
 import kotlinx.coroutines.flow.StateFlow
@@ -59,4 +60,10 @@ fun colorsFor(seasonal: SeasonalTheme?, dark: Boolean): HhColors = when {
     seasonal == null -> if (dark) DarkColors else LightColors
     dark -> seasonal.look.night
     else -> seasonal.look.day
+}
+
+object SeasonalDimens {
+    /** How far the Today card's cobweb reaches from the card's top-right corner. */
+    val webSpan = 88.dp
+    val webStroke = 1.dp
 }

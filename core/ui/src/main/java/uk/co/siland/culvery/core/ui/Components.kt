@@ -18,6 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -40,6 +42,7 @@ fun HhCard(
     radius: Dp = 24.dp,
     color: Color = Culvery.colors.surf,
     padding: PaddingValues = PaddingValues(22.dp),
+    decoration: (DrawScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(radius)
@@ -49,6 +52,7 @@ fun HhCard(
             .clip(shape)
             .border(CardTokens.edge, Culvery.colors.border, shape)
             .background(color)
+            .then(if (decoration != null) Modifier.drawBehind(decoration) else Modifier)
             .padding(padding),
         content = content,
     )

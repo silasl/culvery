@@ -43,7 +43,14 @@ val HalloweenDay = HhColors(
     border = Color(0xFFDDCFBF),
 )
 
-val HalloweenLook = SeasonalLook(night = HalloweenNight, day = HalloweenDay, clockFace = CreepsterClock, sound = SeasonalSound.HAUNTED_ORGAN)
+val HalloweenLook = SeasonalLook(
+    night = HalloweenNight,
+    day = HalloweenDay,
+    clockFace = CreepsterClock,
+    mark = { width -> PumpkinMark(width) },
+    cardCorner = { colors -> drawCobweb(HalloweenInks.web(colors), SeasonalDimens.webSpan) },
+    sound = SeasonalSound.HAUNTED_ORGAN,
+)
 
 /** The drawings' colours, here so ContrastTest checks what can sit over them (14 §4.3). */
 object HalloweenInks {

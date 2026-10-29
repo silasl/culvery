@@ -23,6 +23,7 @@ import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 
 /** Card sizes as the Home grid gives them on the 1280×800 canvas. */
@@ -38,10 +39,10 @@ private val TODAY_H = todayCardSize.height
 class CardScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private fun snap(name: String, dark: Boolean, width: Dp, height: Dp, content: @Composable () -> Unit) {
+    private fun snap(name: String, dark: Boolean, width: Dp, height: Dp, seasonal: SeasonalTheme? = null, content: @Composable () -> Unit) {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
-                CulveryTheme(dark = dark) {
+                CulveryTheme(dark = dark, seasonal = seasonal) {
                     Box(Modifier.testTag("shot").background(Culvery.colors.bg).padding(16.dp)) {
                         Box(Modifier.size(width, height)) { content() }
                     }
@@ -53,6 +54,8 @@ class CardScreenshotTest {
 
     @Test fun todayDark() = snap("today_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.today, onAdd = {}) }
     @Test fun todayLight() = snap("today_light", false, TODAY_W, TODAY_H) { TodayCard(SampleUi.today, onAdd = {}) }
+    @Test fun todayHalloweenDark() = snap("today_halloween_dark", true, TODAY_W, TODAY_H, SeasonalTheme.HALLOWEEN) { TodayCard(SampleUi.today, onAdd = {}) }
+    @Test fun todayHalloweenLight() = snap("today_halloween_light", false, TODAY_W, TODAY_H, SeasonalTheme.HALLOWEEN) { TodayCard(SampleUi.today, onAdd = {}) }
     @Test fun todayEmptyDark() = snap("today_empty_dark", true, TODAY_W, TODAY_H) { TodayCard(emptyList()) }
     @Test fun todaySharedDark() = snap("today_shared_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.shared, onAdd = {}, tomorrow = DayUi(SampleUi.TODAY.plusDays(1), SampleUi.shared)) }
     @Test fun todaySharedLight() = snap("today_shared_light", false, TODAY_W, TODAY_H) { TodayCard(SampleUi.shared, onAdd = {}, tomorrow = DayUi(SampleUi.TODAY.plusDays(1), SampleUi.shared)) }

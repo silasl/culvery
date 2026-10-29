@@ -11,7 +11,9 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.onNodeWithTag
@@ -19,12 +21,14 @@ import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.isReadAsOne
@@ -38,8 +42,10 @@ class NavRailTest {
     private val tab = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
     private val inAGroup = SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup)
 
+    private var seasonal by mutableStateOf<SeasonalTheme?>(null)
+
     private fun show() = compose.setContent {
-        CulveryTheme(dark = true) {
+        CulveryTheme(dark = true, seasonal = seasonal) {
             NavRail(listOf(TabItem("calendar", "Calendar", Icons.CALENDAR_MONTH)), selected, onSelect = { selected = it }, onOpenSettings = {})
         }
     }
@@ -67,6 +73,29 @@ class NavRailTest {
     @Test
     fun theRailDrawsTheMark() {
         show()
+        compose.onNodeWithTag("culvery_mark", useUnmergedTree = true).assertExists()
+    }
+
+    private fun markBounds() = compose.onNodeWithTag("culvery_mark", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+
+    @Test
+    fun thePumpkinTakesTheMarksPlace() {
+        show()
+        val normal = markBounds()
+        seasonal = SeasonalTheme.HALLOWEEN
+        compose.waitForIdle()
+        compose.onNode(hasTestTag("pumpkin_mark") and hasAnyAncestor(hasTestTag("culvery_mark")), useUnmergedTree = true).assertExists()
+        assertThat(markBounds()).isEqualTo(normal)
+    }
+
+    /** Pin: the Culvery mark is what shows without a theme. */
+    @Test
+    fun theMarkIsBackWithoutATheme() {
+        seasonal = SeasonalTheme.HALLOWEEN
+        show()
+        seasonal = null
+        compose.waitForIdle()
+        compose.onNodeWithTag("pumpkin_mark", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("culvery_mark", useUnmergedTree = true).assertExists()
     }
 

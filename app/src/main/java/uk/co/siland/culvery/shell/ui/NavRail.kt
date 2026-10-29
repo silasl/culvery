@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -67,7 +68,9 @@ fun NavRail(
             .padding(top = (RAIL_WIDTH - MARK_WIDTH) / 2, bottom = ShellDimens.railBottom),
     ) {
         // Padded like the rail's top, so both insets round to the same pixel.
-        CulveryMark(MARK_WIDTH, Modifier.align(Alignment.Start).padding(start = (RAIL_WIDTH - MARK_WIDTH) / 2).testTag("culvery_mark"))
+        Box(Modifier.align(Alignment.Start).padding(start = (RAIL_WIDTH - MARK_WIDTH) / 2).testTag("culvery_mark").semantics { hideFromAccessibility() }) {
+            Culvery.look?.mark?.invoke(MARK_WIDTH) ?: CulveryMark(MARK_WIDTH)
+        }
         Spacer(Modifier.height(ShellDimens.markGapBelow))
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

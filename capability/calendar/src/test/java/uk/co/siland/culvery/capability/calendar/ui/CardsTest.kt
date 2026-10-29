@@ -6,8 +6,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -51,12 +55,17 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.DarkColors
+import uk.co.siland.culvery.core.ui.HalloweenNight
+import uk.co.siland.culvery.core.ui.SeasonalDimens
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 import uk.co.siland.culvery.core.ui.test.onClickableShowing
 import uk.co.siland.culvery.core.ui.test.pixelAt
+import uk.co.siland.culvery.core.ui.test.windowBitmap
 
 // app's HomeGridTest pins the same size for Home's Today card.
 internal val todayCardSize = DpSize(400.dp, 586.dp)
@@ -77,9 +86,11 @@ class CardsTest {
         assertThat(compose.onNodeWithText("07:45–08:30 · Sam", useUnmergedTree = true).textLayout().layoutInput.style.fontSize).isEqualTo(16.sp)
     }
 
+    private var seasonal by mutableStateOf<SeasonalTheme?>(null)
+
     private fun show(content: @Composable () -> Unit) = compose.setContent {
         CompositionLocalProvider(LocalShellNavigator provides navigator) {
-            CulveryTheme(dark = true) { content() }
+            CulveryTheme(dark = true, seasonal = seasonal) { content() }
         }
     }
 
@@ -294,6 +305,79 @@ class CardsTest {
         compose.onNodeWithTag("today_add").assert(isButton).assertHeightIsEqualTo(48.dp).assertWidthIsEqualTo(48.dp).performClick()
         assertThat(added).isEqualTo(1)
         compose.onNodeWithText("See the week").assertExists()
+    }
+
+    /** The card's pixels in the [SeasonalDimens.webSpan] squares that aren't [surf], outside the buttons and the rounded corner. */
+    private inner class WebCorners(val surf: Color) {
+        private val card = compose.onNodeWithTag("calendar_today")
+        private val node = card.fetchSemanticsNode()
+        private val image = windowBitmap(card)
+        private val density = node.layoutInfo.density.density
+        private val bounds = node.boundsInWindow
+        private val buttons = listOf("today_add" to true, "See the week" to false).map { (name, tag) ->
+            (if (tag) compose.onNodeWithTag(name) else compose.onNodeWithText(name)).fetchSemanticsNode().boundsInWindow
+        }
+        private val span = (SeasonalDimens.webSpan.value * density).toInt()
+        private val arc = (CalendarDimens.cardRadius.value * density).toInt()
+
+        private fun differs(x: Int, y: Int) = image.getPixel(x, y) != surf.toArgb() && buttons.none { it.contains(Offset(x + 0.5f, y + 0.5f)) }
+
+        fun topRight(): Int {
+            val right = bounds.right.toInt()
+            val top = bounds.top.toInt()
+            return (top until top + span).sumOf { y ->
+                (right - span until right).count { x -> !(x >= right - arc && y < top + arc) && differs(x, y) }
+            }
+        }
+
+        fun bottomLeft(): Int {
+            val left = bounds.left.toInt()
+            val bottom = bounds.bottom.toInt()
+            return (bottom - span until bottom).sumOf { y ->
+                (left until left + span).count { x -> !(x < left + arc && y >= bottom - arc) && differs(x, y) }
+            }
+        }
+
+        /** Pixels on the corner's diagonal, 8 to 60 dp in. */
+        fun diagonal(): Int = (8..60).count { d ->
+            val x = bounds.right.toInt() - (d * density).toInt() - 1
+            val y = bounds.top.toInt() + (d * density).toInt()
+            (-1..1).any { differs(x + it, y) }
+        }
+    }
+
+    private fun emptyToday() = showSized { TodayCard(emptyList(), onAdd = {}) }
+
+    @Test
+    fun theWebSitsInTheTopRightCorner() {
+        seasonal = SeasonalTheme.HALLOWEEN
+        emptyToday()
+        val corners = WebCorners(HalloweenNight.surf)
+        assertThat(corners.topRight()).isGreaterThan(0)
+        assertThat(corners.diagonal()).isGreaterThan(0)
+        assertThat(corners.bottomLeft()).isEqualTo(0)
+    }
+
+    /** Pin: no theme, no web. */
+    @Test
+    fun noWebWithoutATheme() {
+        emptyToday()
+        assertThat(WebCorners(DarkColors.surf).topRight()).isEqualTo(0)
+    }
+
+    @Test
+    fun theButtonsStayWhereTheyAre() {
+        var added = 0
+        showSized { TodayCard(SampleUi.today, onAdd = { added++ }) }
+        fun spots() = listOf(compose.onNodeWithTag("today_add"), compose.onNodeWithText("See the week")).map { it.getUnclippedBoundsInRoot() }
+        val normal = spots()
+        seasonal = SeasonalTheme.HALLOWEEN
+        compose.waitForIdle()
+        assertThat(spots()).isEqualTo(normal)
+        compose.onNodeWithTag("today_add").performClick()
+        compose.onNodeWithText("See the week").performClick()
+        assertThat(added).isEqualTo(1)
+        assertThat(navigator.tabs).containsExactly(CALENDAR_TAB_ID)
     }
 
     @Test
