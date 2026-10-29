@@ -146,5 +146,5 @@ fun HhSectionLabel(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** 1–4 cards two to a row, more three (Lights' rooms, the Plugs tab). */
+/** 1–4 cards two to a row, more three (Lights' rooms). */
 fun gridColumns(count: Int): Int = if (count <= 4) 2 else 3

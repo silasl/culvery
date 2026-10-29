@@ -187,15 +187,6 @@ fun HhCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** A sheet's title row: [title] as the heading, with the close button at the end. */
-@Composable
-fun HhSheetHeader(title: String, onClose: () -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = HhType.sectionTitle, color = Culvery.colors.ink, modifier = Modifier.weight(1f).semantics { heading() })
-        HhCloseButton(onClose)
-    }
-}
-
 /**
  * The toast pill: `ink` background, `bg` text, 16 sp / 600, padding 14×22, radius 26. One spoken item, polite unless [urgent].
  * With a [countdown], a ring of the time left replaces the icon (9 §4.13). With an [actionLabel], a 48 dp text button in
