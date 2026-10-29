@@ -726,6 +726,16 @@ Fault found:
 - **The log scan:** no crash or ANR since the install; the plug, Holiday and capture tags wrote nothing (a release logs only warnings and errors); Culvery's lines hold no plug id, name, address or token. The logs are kept in `culvery-notes/plan12-tablet-log.txt` and `plan12-tablet-pid-log.txt`.
 - **From main (2026-10-29):** the release from the merged main at 136d5080 installed with `-r` (mapping `culvery-notes/mappings/mapping-136d508.txt`); Culvery opened again from the home screen, still not pinned. The Plugs tab: one plug, on (its morning schedule), "1 of 1 on · Home Assistant", Holiday on Ignore. No crash or ANR.
 
+## Adding a Tapo plug to Home Assistant (2026-10-29)
+Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link integration can't do yet. What worked for two new P100s:
+1. **Third-Party Compatibility on** in the Tapo app (Me › Third-Party Services) before setting the plug up. Without it, Home Assistant says "Unsupported device … encrypt_type='TPAP'".
+2. **Factory reset** if Home Assistant then rejects the right email and password: hold the button about 5 seconds until the light blinks amber quickly, remove the plug from the Tapo app, and set it up again with compatibility already on. Turning compatibility on after setup, or power-cycling, left the plug with sign-in details Home Assistant couldn't use. A reset keeps the firmware.
+3. **Add by IP address** in Home Assistant (Add Integration › TP-Link Smart Home) rather than from discovery, with the Tapo account's email exactly as registered.
+4. **Keep the firmware:** decline Tapo app updates on plugs that work; Tapo can't go back to older firmware.
+5. **Culvery:** open Settings › Other integrations and show the plug. If it isn't listed yet, close and reopen the screen once Home Assistant has finished adding it.
+- **Not used:** HACS Tapo integrations (the main one fails on TPAP too, and Culvery only lists plugs from the built-in TP-Link integration).
+- **For the next plug bought:** a Matter "M" model or a Kasa plug avoids TPAP; Matter would need Culvery to list plugs from the Matter integration.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
