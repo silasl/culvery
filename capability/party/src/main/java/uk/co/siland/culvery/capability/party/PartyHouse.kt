@@ -80,8 +80,6 @@ class PartyHouse internal constructor(
     private var plugsPending = false
     private var lastTry: Long? = null
 
-    // True while a restart's saved speaker groups wait for the music system to open.
-    private var groupsToPutBack = false
     private var lines = Lines()
     private var offLine: String? = null
     private var offAt = 0L
@@ -113,11 +111,12 @@ class PartyHouse internal constructor(
         exclusive(PartyRun.TURNING_ON) {
             if (load().on) return@exclusive
             orphansChecked = true
+            putGroupsBack()
             val prefs = settings.prefs.first()
             val plugs = readyPlugs()
             resetRun()
             offLine = null
-            set(PartyRecord(on = true, since = wall.nowMillis()))
+            set(PartyRecord(on = true, since = wall.nowMillis(), musicBefore = current.value?.let(::groupsWaiting)))
             if (plugs != null) {
                 plugsPending = true
                 plugs.begin(by)
@@ -136,13 +135,14 @@ class PartyHouse internal constructor(
         exclusive(PartyRun.TURNING_OFF) {
             val record = load()
             if (!record.on) return@exclusive
-            val musicLine = record.made?.let { stopMusic(it, record.musicBefore.orEmpty()) }
+            val musicLine = record.made?.let { stopMusic(it, record.musicBefore.orEmpty()) } ?: putGroupsBack()
             val lightsLine = record.lights?.takeIf { it.isNotEmpty() }?.let { putLightsBack(it) }
             val plugsLine = plugs?.leave()
             resetRun()
             offLine = Lines(musicLine, plugsLine, lightsLine).joined()
             offAt = wall.nowMillis()
-            set(PartyRecord())
+            // Groups still waiting for the music system stay saved, and the next tick puts them back.
+            set(PartyRecord(musicBefore = current.value?.let(::groupsWaiting)))
         }
     }
 
@@ -155,7 +155,7 @@ class PartyHouse internal constructor(
                 orphansChecked = true
                 if (!record.on) plugs?.leaveQuietly()
             }
-            putGroupsBack()
+            putGroupsBack()?.let(::showGroupsLine)
             if (unsaved) persist()
             if (current.value?.on == true) {
                 if (plugsPending && !wall.within(lastTry, HouseTimings.RETRY_MS)) enterPlugs()
@@ -177,28 +177,36 @@ class PartyHouse internal constructor(
         }
     }
 
-    /**
-     * The first read. A party that was on gets its plugs retry back, and speakers whose groups were saved but whose
-     * party group never was are put back, once, with nothing paused (13 §4.3).
-     */
+    /** The first read. A party that was on gets its plugs retry back. */
     private suspend fun load(): PartyRecord = current.value ?: settings.record.filterNotNull().first().also { record ->
         publish(record)
-        if (record.on) resume(record)
+        if (record.on) plugsPending = readyPlugs() != null
     }
 
-    private suspend fun resume(record: PartyRecord) {
-        plugsPending = readyPlugs() != null
-        groupsToPutBack = record.made == null && record.musicBefore != null
-        putGroupsBack()
+    /** Speaker groups saved for a party group that was never made: a restart or turn-off put them back (13 §4.3). */
+    private fun groupsWaiting(record: PartyRecord): List<GroupBefore>? = record.musicBefore.takeIf { record.made == null }
+
+    /**
+     * Puts the waiting groups back once, with nothing paused, and returns the line when they didn't go back. Waits for
+     * the music system to open: a put-back sent before then would fail and lose the snapshot.
+     */
+    private suspend fun putGroupsBack(): String? {
+        val record = current.value ?: return null
+        val before = groupsWaiting(record) ?: return null
+        if (music == null || !music.ready.isReady()) return null
+        val line = answer(PartyStep.MUSIC) { music.putBack(before) }.line(threw = HouseLines.SPEAKERS_NOT_BACK)
+        set(record.copy(musicBefore = null))
+        return line
     }
 
-    /** Waits for the music system to open: a put-back sent before then would fail and lose the snapshot. */
-    private suspend fun putGroupsBack() {
-        val before = current.value?.musicBefore
-        if (!groupsToPutBack || before == null || music == null || !music.ready.isReady()) return
-        groupsToPutBack = false
-        lines.music = answer(PartyStep.MUSIC) { music.putBack(before) }.line(threw = HouseLines.SPEAKERS_NOT_BACK)
-        set(current.value!!.copy(musicBefore = null))
+    private fun showGroupsLine(line: String) {
+        if (current.value?.on == true) {
+            lines.music = line
+        } else {
+            offLine = listOfNotNull(offLine, line).joinToString("\n")
+            offAt = wall.nowMillis()
+        }
+        showLine()
     }
 
     private suspend fun startMusic(prefs: PartyPrefs) {
@@ -282,7 +290,6 @@ class PartyHouse internal constructor(
 
     private fun resetRun() {
         plugsPending = false
-        groupsToPutBack = false
         lastTry = null
         lines = Lines()
     }
@@ -296,7 +303,7 @@ class PartyHouse internal constructor(
     private suspend fun persist() {
         val record = current.value ?: return
         unsaved = attempt({
-            if (record.on) settings.save(record) else settings.clearRecord()
+            if (record == PartyRecord()) settings.clearRecord() else settings.save(record)
             false
         }) { e ->
             Log.w(TAG, "Couldn't save the Party mode record (${e::class.simpleName}); trying again at the next tick")

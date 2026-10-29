@@ -56,7 +56,8 @@ data class PartyPrefs(
 
 /**
  * What Party changed and must put back (13 §4.3). [since] is wall millis. Each of [musicBefore], [made] and [lights]
- * is null until its step has read. [toString] leaves out all but [on].
+ * is null until its step has read. With no [made], [musicBefore] outlives [on] until the speakers go back. [toString]
+ * leaves out all but [on].
  */
 data class PartyRecord(
     val on: Boolean = false,

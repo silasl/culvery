@@ -467,6 +467,45 @@ class PartyHouseTest {
         assertThat(rig.saved().musicBefore).isNull()
     }
 
+    /** Fails if turning off before the music system opens drops the saved groups, so the speakers never go back. */
+    @Test
+    fun aTurnOffBeforeTheSpeakersOpenStillPutsTheSavedGroupsBack() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = false
+        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.music.readyNow.value = false
+        rig.restarted().turnOff(by())
+
+        assertThat(rig.music.putBacks).isEmpty()
+        assertThat(rig.saved().on).isFalse()
+        rig.music.readyNow.value = true
+        val house = rig.restarted()
+        house.tick()
+        house.tick()
+
+        assertThat(rig.music.putBacks).containsExactly(GROUPS_BEFORE)
+        assertThat(house.isOn.value).isFalse()
+        assertThat(rig.saved()).isEqualTo(PartyRecord())
+    }
+
+    /** Fails if a put-back after Party is off fails without saying so. */
+    @Test
+    fun aPutBackAfterTurningOffThatFailsShowsItsLine() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = false
+        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.music.readyNow.value = false
+        val house = rig.restarted()
+        house.turnOff(by())
+        rig.music.putBackAnswer = HouseStep.Failed(SPEAKERS_NOT_BACK_LINE)
+        rig.music.readyNow.value = true
+
+        house.tick()
+
+        assertThat(house.line.value).isEqualTo(SPEAKERS_NOT_BACK_LINE)
+        assertThat(rig.saved()).isEqualTo(PartyRecord())
+    }
+
     /** Fails if a regroup that the speakers refuse isn't said on the tile. */
     @Test
     fun aRestartPutBackThatFailsShowsItsLine() = runTest {
