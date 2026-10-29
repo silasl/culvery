@@ -776,6 +776,13 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
   - a music start that fails puts the groups back and drops that put-back's result quietly;
   - spec §4.2 step 2 should say a room that was off goes back off before the remembered scene is tried.
 
+## Plan 14 stage 1 (Halloween): on the tablet (2026-10-29)
+- **Installed:** the release from dded360e (branch plan-14-seasonal-themes) with `-r` (mapping `culvery-notes/mappings/mapping-dded360.txt`). Halloween shows by the date: pumpkin mark, Creepster clock, cobweb on Today, moon and bats in Home's header band.
+- **Seen with the user:** the look reads as finished across the room; the haunted organ plays from Settings › Door › Play chime with "Follow the theme" and sounds right.
+- **The bats' cost:** awake on Home, 632 frames in 48 s (about 13 fps); 50th percentile 19 ms, 90th 21 ms, 99th 65 ms, against a 16 ms aim for the 90th. Most frames count as "slow issue draw commands", which suggests more than the sky is redrawn each step. GPU 90th percentile 9 ms. Asleep (display off), no frames in 30 s. Left for after stage 2: a frame of 20 ms at 13 fps doesn't stutter, and the heat log stayed at thermal 0, battery 23.6 °C.
+- **The log scan:** no crash or ANR; no placeholders or addresses.
+- **Known:** a ring just after a restart, before the household clock is read, plays the classic chime even during Halloween; never silence.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
