@@ -715,7 +715,9 @@ Fault found:
 - **For the end-of-v1 design review:**
   - "Checking…" was never seen on the device (Home Assistant came back with the plug loaded); unit-tested;
   - the Settings Plugs section sits tight under the thermostat line, and plug names show as upper-case labels;
-  - the plug read "On · 0 W" all session, probably idle; check against a working load.
+  - the plug read "On · 0 W" all session, probably idle; check against a working load;
+  - a tap on a plug while a mode is switching it (up to 30 seconds) does nothing and says nothing; a toast or the row's "Switching…" would tell the family (final review, 2026-10-29).
+- **Known, from the final review (2026-10-29):** if a mode's own switch hasn't confirmed and someone switches the plug by hand to the mode's state before the 5-minute retry, ending the mode puts it back over their switch. The plug's state alone can't tell their switch from the mode's late one; a narrow window, left as it is.
 
 ## Plan 12 (smart plugs): on the tablet (2026-10-28)
 - **Installed:** the release from be27f7d8 with `-r` (mapping `culvery-notes/mappings/mapping-be27f7d.txt`). The tablet came back on its home screen; Culvery was opened again and is in front, not pinned (it pins only with setup complete and the kiosk not exited, so the kiosk was probably exited earlier; left as it was).
