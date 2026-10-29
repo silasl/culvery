@@ -93,20 +93,20 @@ class PartyActionsTest {
         rig.loaded()
         val actions = actions(access, rig)
         holiday.value = true
-        assertThat(actions.refusal.value).isNull()
+        assertThat(actions.refusal.current()).isNull()
 
         actions.toggle { by, on -> opened += by to on }
 
         assertThat(access.asked).isEmpty()
         assertThat(opened).isEmpty()
-        assertThat(actions.refusal.value).isEqualTo("Turn Holiday mode off first.")
+        assertThat(actions.refusal.current()).isEqualTo("Turn Holiday mode off first.")
 
         holiday.value = false
-        assertThat(actions.refusal.value).isNull()
+        assertThat(actions.refusal.current()).isNull()
         actions.toggle { by, on -> opened += by to on }
         assertThat(access.asked).hasSize(1)
         holiday.value = true
-        assertThat(actions.refusal.value).isNull()
+        assertThat(actions.refusal.current()).isNull()
     }
 
     /** The line is a state, not an event: it is on while Holiday mode is and off once it isn't, without another tap. */
@@ -116,7 +116,7 @@ class PartyActionsTest {
         rig.loaded()
         val actions = actions(TestAccess(Role.ADULT), rig)
         val seen = mutableListOf<String?>()
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { actions.refusal.toList(seen) }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { actions.refusal.line.toList(seen) }
         holiday.value = true
 
         actions.toggle { by, on -> opened += by to on }
@@ -140,7 +140,7 @@ class PartyActionsTest {
 
         assertThat(access.asked).containsExactly(listOf("party.mode"))
         assertThat(opened.map { it.second }).containsExactly(false)
-        assertThat(actions.refusal.value).isNull()
+        assertThat(actions.refusal.current()).isNull()
     }
 
     /** Review Focus 5. Fails if Holiday mode turned on while the sheet was open lets the confirm turn Party on. */
@@ -160,12 +160,12 @@ class PartyActionsTest {
         assertThat(turned).isFalse()
         assertThat(rig.trace.calls).isEmpty()
         assertThat(rig.house.isOn.value).isFalse()
-        assertThat(actions.refusal.value).isEqualTo("Turn Holiday mode off first.")
+        assertThat(actions.refusal.current()).isEqualTo("Turn Holiday mode off first.")
 
         holiday.value = false
         assertThat(actions.turnOn(by!!)).isTrue()
         assertThat(rig.house.isOn.value).isTrue()
-        assertThat(actions.refusal.value).isNull()
+        assertThat(actions.refusal.current()).isNull()
     }
 
     /** Review Focus 5. A tap while a change runs asks no PIN and opens nothing. */

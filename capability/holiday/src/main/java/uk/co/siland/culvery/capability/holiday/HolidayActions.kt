@@ -6,7 +6,6 @@ import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.Authorised
@@ -37,10 +36,8 @@ class HolidayActions internal constructor(
         clock: HouseholdClock,
     ) : this(access, house, events.orElse(null), switches, { clock.now.value?.toLocalDate() ?: LocalDate.now() })
 
-    private val refused = ModeRefusal(house.modeId, switches)
-
     /** "Turn Party mode off first." while a tap or confirm was refused and Party mode is still on. */
-    val refusal: StateFlow<String?> = refused
+    val refusal = ModeRefusal(house, switches)
 
     fun today(): LocalDate = todayNow()
 
@@ -65,19 +62,12 @@ class HolidayActions internal constructor(
     suspend fun toggle(open: (Authorised) -> Unit) {
         if (house.running.value != null) return
         val on = house.holiday.value ?: return
-        if (on) refused.clear() else if (refused.refuse()) return
+        if (refusal.refusesTap(turningOn = !on)) return
         val by = ask() ?: return
         // A turn-off cut short by the tile leaving Home would leave some parts changed and the record on.
         if (on) withContext(NonCancellable) { house.turnOff(by) } else open(by)
     }
 
     /** False, with the refusal showing, when Party mode went on after the sheet opened. */
-    suspend fun turnOn(back: LocalDate, by: Authorised): Boolean {
-        if (refused.refuse()) {
-            Log.w(TAG, "Holiday mode wasn't turned on because another mode is on")
-            return false
-        }
-        house.turnOn(back, by)
-        return true
-    }
+    suspend fun turnOn(back: LocalDate, by: Authorised): Boolean = refusal.turnOnUnlessRefused { house.turnOn(back, by) }
 }

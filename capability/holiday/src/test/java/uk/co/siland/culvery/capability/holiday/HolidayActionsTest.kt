@@ -186,20 +186,20 @@ class HolidayActionsTest {
         rig.loaded()
         val actions = actions(access, rig)
         party.value = true
-        assertThat(actions.refusal.value).isNull()
+        assertThat(actions.refusal.current()).isNull()
 
         actions.toggle { opened += it }
 
         assertThat(access.asked).isEmpty()
         assertThat(opened).isEmpty()
-        assertThat(actions.refusal.value).isEqualTo("Turn Party mode off first.")
+        assertThat(actions.refusal.current()).isEqualTo("Turn Party mode off first.")
 
         party.value = false
-        assertThat(actions.refusal.value).isNull()
+        assertThat(actions.refusal.current()).isNull()
         actions.toggle { opened += it }
         assertThat(access.asked).hasSize(1)
         party.value = true
-        assertThat(actions.refusal.value).isNull()
+        assertThat(actions.refusal.current()).isNull()
     }
 
     /** The line is a state, not an event: it is on while Party mode is and off once it isn't, without another tap. */
@@ -209,7 +209,7 @@ class HolidayActionsTest {
         rig.loaded()
         val actions = actions(TestAccess(Role.ADULT), rig)
         val seen = mutableListOf<String?>()
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { actions.refusal.toList(seen) }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { actions.refusal.line.toList(seen) }
         party.value = true
 
         actions.toggle { opened += it }
@@ -251,11 +251,11 @@ class HolidayActionsTest {
         assertThat(turned).isFalse()
         assertThat(rig.lights.calls).isEmpty()
         assertThat(rig.house.holiday.value).isFalse()
-        assertThat(actions.refusal.value).isEqualTo("Turn Party mode off first.")
+        assertThat(actions.refusal.current()).isEqualTo("Turn Party mode off first.")
 
         party.value = false
         assertThat(actions.turnOn(back, by!!)).isTrue()
         assertThat(rig.house.holiday.value).isTrue()
-        assertThat(actions.refusal.value).isNull()
+        assertThat(actions.refusal.current()).isNull()
     }
 }

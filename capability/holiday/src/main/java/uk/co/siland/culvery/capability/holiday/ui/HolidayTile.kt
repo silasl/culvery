@@ -118,7 +118,7 @@ private fun OnPill() {
 fun HolidayTileHost(actions: HolidayActions, house: HolidayHouse) {
     val record by house.record.collectAsState()
     val houseLine by house.line.collectAsState()
-    val refusal by actions.refusal.collectAsState()
+    val refusal by actions.refusal.line.collectAsState(initial = actions.refusal.current())
     val running by house.running.collectAsState()
     val overlay = LocalOverlayHost.current
     val action = rememberSingleAction(house) { e -> Log.w(TAG, "Holiday mode tile action failed: ${e::class.simpleName}") }
