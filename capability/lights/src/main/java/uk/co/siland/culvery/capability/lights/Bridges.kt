@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.firstConnectable
 
 private const val TAG = "Bridges"
 
@@ -28,8 +29,8 @@ class Bridges @Inject constructor(
 ) {
     val providers: List<LightsProvider> = providers.toList()
 
-    /** What Find Hue Bridge and a typed address ask: the first a household may connect to, so a debug sample never answers them. */
-    val connectable: LightsProvider? = this.providers.firstOrNull { it.descriptor.userConnectable }
+    /** What Find Hue Bridge and a typed address ask. */
+    val connectable: LightsProvider? = this.providers.firstConnectable { it.descriptor }
 
     private data class Opening(val providerId: String, val link: LightsLink) {
         fun sameBridge(other: Opening) =

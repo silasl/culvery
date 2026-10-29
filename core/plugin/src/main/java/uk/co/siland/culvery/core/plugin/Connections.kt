@@ -15,6 +15,9 @@ data class ProviderDescriptor(
     val connectHint: String? = null,
 )
 
+/** The first provider a household may connect to, by its [descriptor], so a debug sample never answers a Find or a typed address. */
+fun <T> List<T>.firstConnectable(descriptor: (T) -> ProviderDescriptor): T? = firstOrNull { descriptor(it).userConnectable }
+
 /**
  * One user-configured instance of a provider. [config] holds non-secret settings (Google: only the account email).
  * A SecretStore arrives with the first provider that has a secret; Google needs none (3a design D2).

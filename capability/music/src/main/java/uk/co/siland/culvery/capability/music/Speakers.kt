@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.firstConnectable
 
 private const val TAG = "Speakers"
 
@@ -28,8 +29,8 @@ class Speakers @Inject constructor(
 ) {
     val providers: List<MusicProvider> = providers.toList()
 
-    /** What Find Sonos and a typed address ask: the first a household may connect to, so a debug sample never answers them (6 §3.4). */
-    val connectable: MusicProvider? = this.providers.firstOrNull { it.descriptor.userConnectable }
+    /** What Find Sonos and a typed address ask (6 §3.4). */
+    val connectable: MusicProvider? = this.providers.firstConnectable { it.descriptor }
 
     private data class Opening(val providerId: String, val link: MusicLink) {
         fun sameHousehold(other: Opening) = providerId == other.providerId && link.householdId == other.link.householdId
