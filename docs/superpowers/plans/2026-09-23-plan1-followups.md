@@ -762,6 +762,7 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - **Seen:** the One-tap tray shows Holiday mode, then Party mode ("Off"), then the hoover.
 - **Not done yet:** Settings › Party mode against the household's real speakers, rooms and scenes (read-only, with the user); a real party run (only on the user's go), which also checks the speakers' regroup timing and a coordinator that already leads others.
 - **The log scan:** no crash or ANR; the Party, Holiday, music and lights tags wrote nothing (a release logs only warnings and errors).
+- **From main (2026-10-29):** merged with `--ff-only` at cbad52aa, the gate green on main; the release installed with `-r` (mapping `culvery-notes/mappings/mapping-cbad52a.txt`). Culvery is running and in front, but the tablet's screen went off after the install and sits on Android's lock screen; it wasn't unlocked. No crash or ANR; the Party tags wrote nothing.
 
 ## Plan 13 (Party mode): left for later (final review, 2026-10-29)
 - **For the end-of-v1 design review:** the tile's look copied from Holiday's, and its `celebration` icon; the sheet's full stops and the off sheet's wording; "Play {playlist} on {rooms}." when not every speaker is chosen; switch rows (not checkboxes) for the speakers, and the pickers as sheets; the speakers-not-regrouped line; the Settings "Speakers" sub-label.
