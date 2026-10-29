@@ -30,7 +30,7 @@ class LightsSettingsScreenshotTest {
         leftOut = setOf("Garden-id", "Gone-id"), goneLeftOut = 1, automations = listOf(MIMIC, AWAY), holidayAutomations = setOf("mimic-id"),
     )
 
-    private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) = compose.snap(name, dark, Modifier.size(960.dp, 800.dp), content)
+    private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) = compose.snap(name, dark, Modifier.size(960.dp, 800.dp), content = content)
 
     private fun page(ui: LightsSettingsUi): @Composable () -> Unit = { InSettingsPane { LightsSettingsPage(ui, {}, {}, {}, {}, {}) } }
 

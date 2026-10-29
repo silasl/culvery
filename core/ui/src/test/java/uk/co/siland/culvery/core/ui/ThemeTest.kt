@@ -5,6 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
@@ -28,6 +29,7 @@ private fun Probe() {
 @RunWith(AndroidJUnit4::class)
 class ThemeTest {
     @get:Rule val compose = createComposeRule()
+    private var nightOn by mutableStateOf(true)
 
     @Test
     fun darkThemeProvidesDarkTokens() {
@@ -92,5 +94,57 @@ class ThemeTest {
         tick++
         compose.waitForIdle()
         assertThat(probeCompositions).isEqualTo(before)
+    }
+
+    @Test
+    fun halloweenProvidesItsSets() {
+        var night: Triple<HhColors, SeasonalTheme?, SeasonalLook?>? = null
+        var day: HhColors? = null
+        compose.setContent {
+            if (nightOn) CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN) { night = Triple(Culvery.colors, Culvery.seasonal, Culvery.look) }
+            else CulveryTheme(dark = false, seasonal = SeasonalTheme.HALLOWEEN) { day = Culvery.colors }
+        }
+        compose.waitForIdle()
+        assertThat(night!!.first).isEqualTo(HalloweenNight)
+        assertThat(night!!.second).isEqualTo(SeasonalTheme.HALLOWEEN)
+        assertThat(night!!.third).isSameInstanceAs(HalloweenLook)
+        nightOn = false
+        compose.waitForIdle()
+        assertThat(day).isEqualTo(HalloweenDay)
+    }
+
+    /** **pin**: no theme is the look the family has today. */
+    @Test
+    fun noThemeIsTheNormalLook() {
+        var seen: Triple<HhColors, SeasonalTheme?, SeasonalLook?>? = null
+        compose.setContent { CulveryTheme(dark = true) { seen = Triple(Culvery.colors, Culvery.seasonal, Culvery.look) } }
+        compose.waitForIdle()
+        assertThat(seen!!.first).isEqualTo(DarkColors)
+        assertThat(seen!!.second).isNull()
+        assertThat(seen!!.third).isNull()
+        assertThat(colorsFor(null, false)).isEqualTo(LightColors)
+    }
+
+    @Test
+    fun halloweenKeepsTheLightOrDarkReading() {
+        assertThat(HalloweenDay.isLight).isTrue()
+        assertThat(HalloweenNight.isLight).isFalse()
+        assertThat(HalloweenNight.border).isEqualTo(Color.Transparent)
+    }
+
+    /** **pin**: person colours are the same in every theme (14 §3). */
+    @Test
+    fun personColoursDontChange() {
+        assertThat(PersonPalette.colors)
+            .containsExactly(0xFF4CB387, 0xFF5B9BE0, 0xFFE07BA8, 0xFF9CC44E, 0xFFE04A26, 0xFFCEC018).inOrder()
+        assertThat(PersonChipInk).isEqualTo(Color(0xFF0E1011))
+    }
+
+    @Test
+    fun halloweenKeepsWeatherAndRain() {
+        assertThat(HalloweenNight.weather).isEqualTo(DarkColors.weather)
+        assertThat(HalloweenNight.rain).isEqualTo(DarkColors.rain)
+        assertThat(HalloweenDay.weather).isEqualTo(LightColors.weather)
+        assertThat(HalloweenDay.rain).isEqualTo(LightColors.rain)
     }
 }

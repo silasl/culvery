@@ -9,11 +9,18 @@ import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 /** Draws [content] on the theme's background and compares it with [name]'s baseline in the module's screenshots. */
-fun ComposeContentTestRule.snap(name: String, dark: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun ComposeContentTestRule.snap(
+    name: String,
+    dark: Boolean,
+    modifier: Modifier = Modifier,
+    seasonal: SeasonalTheme? = null,
+    content: @Composable () -> Unit,
+) {
     setContent {
-        CulveryTheme(dark = dark) {
+        CulveryTheme(dark = dark, seasonal = seasonal) {
             Box(Modifier.background(Culvery.colors.bg).then(modifier)) { content() }
         }
     }

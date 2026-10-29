@@ -20,7 +20,11 @@ private const val NON_TEXT = 3.0
  * sits near its line is pinned at its value today, so a token change that lowers it fails here first.
  */
 class ContrastTest {
-    private val themes = listOf("dark" to DarkColors, "light" to LightColors)
+    private val themes = (listOf(null) + SeasonalTheme.entries).flatMap { seasonal ->
+        listOf(true, false).map { dark -> "${seasonal?.label ?: "normal"} ${if (dark) "night" else "day"}" to colorsFor(seasonal, dark) }
+    }
+
+    private val halloween = SeasonalTheme.entries.flatMap { listOf("${it.label} night" to colorsFor(it, true), "${it.label} day" to colorsFor(it, false)) }
 
     private fun surfaceOf(on: ButtonSurface, t: HhColors) = when (on) {
         ButtonSurface.Bg -> t.bg
@@ -176,5 +180,33 @@ class ContrastTest {
         themes.forEach { (name, t) -> check("$name clash tag", t.weather, t.weather.over(HhAlpha.clash(t), t.surf), TEXT) }
         val light = LightColors
         check("light clash tag (4.552)", light.weather, light.weather.over(HhAlpha.clash(light), light.surf), 4.55)
+    }
+
+    /** Warning red must not read as the theme's accent (14 §1). */
+    @Test
+    fun dangerAndAccentStayApart() {
+        themes.forEach { (name, t) ->
+            assertWithMessage("$name: the hue gap between danger and accent").that(hueGap(t.danger, t.accent)).isAtLeast(35f)
+        }
+    }
+
+    /** The clock and the date are drawn over the bats (14 §4.3). */
+    @Test
+    fun textReadsOverTheSky() {
+        halloween.forEach { (name, t) ->
+            val bat = HalloweenInks.bat(t)
+            check("$name accent over a bat", t.accent, bat, NON_TEXT)
+            check("$name ink over a bat", t.ink, bat, TEXT)
+            check("$name mute over a bat", t.mute, bat, TEXT)
+        }
+    }
+
+    @Test
+    fun theWebReadsUnderCardText() {
+        halloween.forEach { (name, t) ->
+            val web = HalloweenInks.web(t)
+            check("$name ink on the web", t.ink, web, TEXT)
+            check("$name mute on the web", t.mute, web, TEXT)
+        }
     }
 }

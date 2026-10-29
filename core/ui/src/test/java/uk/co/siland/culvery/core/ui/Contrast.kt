@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.ui.graphics.Color
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -25,4 +26,22 @@ private fun relativeLuminance(c: Color): Double = 0.2126 * linear(c.red) + 0.715
 private fun linear(channel: Float): Double {
     val s = (channel * 255).roundToInt() / 255.0
     return if (s <= 0.03928) s / 12.92 else ((s + 0.055) / 1.055).pow(2.4)
+}
+
+/** The angle between two colours' hues in degrees, 0 to 180; greys have no hue, so keep them out. */
+internal fun hueGap(a: Color, b: Color): Float {
+    val gap = abs(hue(a) - hue(b))
+    return if (gap > 180f) 360f - gap else gap
+}
+
+private fun hue(c: Color): Float {
+    val max = maxOf(c.red, c.green, c.blue)
+    val delta = max - minOf(c.red, c.green, c.blue)
+    if (delta == 0f) return 0f
+    val h = when (max) {
+        c.red -> ((c.green - c.blue) / delta) % 6
+        c.green -> (c.blue - c.red) / delta + 2
+        else -> (c.red - c.green) / delta + 4
+    }
+    return (h * 60f + 360f) % 360f
 }

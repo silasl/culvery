@@ -20,6 +20,7 @@ import uk.co.siland.culvery.capability.door.BitmapSnapshot
 import uk.co.siland.culvery.capability.door.picture
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 /** The card at its own width on `bg`, with room round it for its shadow. */
 @RunWith(AndroidJUnit4::class)
@@ -28,9 +29,9 @@ class DoorCardScreenshotTest {
     @get:Rule val compose = createComposeRule()
     @get:Rule val folder = TemporaryFolder()
 
-    private fun snap(name: String, dark: Boolean, card: DoorCardUi, lowered: Boolean = false) {
+    private fun snap(name: String, dark: Boolean, card: DoorCardUi, lowered: Boolean = false, seasonal: SeasonalTheme? = null) {
         compose.setContent {
-            CulveryTheme(dark = dark) { Box(Modifier.background(Culvery.colors.bg).padding(32.dp)) { DoorCard(card, onGotIt = {}, lowered = lowered) } }
+            CulveryTheme(dark = dark, seasonal = seasonal) { Box(Modifier.background(Culvery.colors.bg).padding(32.dp)) { DoorCard(card, onGotIt = {}, lowered = lowered) } }
         }
         if (card.snapshot != null) compose.waitUntil(5_000) { compose.onAllNodesWithTag("door_snapshot").fetchSemanticsNodes().isNotEmpty() }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
@@ -43,4 +44,6 @@ class DoorCardScreenshotTest {
     @Test fun cardSnapshotDark() = snap("door_card_snapshot_dark", true, ring.copy(snapshot = File(folder.root, "1.jpg").also { BitmapSnapshot(picture(640, 360)).saveTo(it) }))
     @Test fun cardUnrecognisedDark() = snap("door_card_unrecognised_dark", true, ring.copy(unrecognised = true))
     @Test fun cardLoweredDark() = snap("door_card_lowered_dark", true, ring, lowered = true)
+    @Test fun cardHalloweenDark() = snap("door_card_halloween_dark", true, ring, seasonal = SeasonalTheme.HALLOWEEN)
+    @Test fun cardHalloweenLight() = snap("door_card_halloween_light", false, ring, seasonal = SeasonalTheme.HALLOWEEN)
 }

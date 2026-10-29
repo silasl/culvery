@@ -24,6 +24,7 @@ import uk.co.siland.culvery.capability.party.PartyRecord
 import uk.co.siland.culvery.capability.party.PartyWords
 import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.ui.HhTrayColumn
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.test.snap
 
 /** The Party mode tile in the One-tap tray at 333 dp, and its sheet, on and off (13 §2.6), dark and light. */
@@ -38,8 +39,8 @@ class PartyScreenshotTest {
             HhTrayColumn("One-tap", listOf("party" to { PartyTile(on, line, null) {} }), Modifier.width(333.dp))
         }
 
-    private fun sheet(name: String, dark: Boolean, turningOn: Boolean, lines: List<String>) =
-        compose.snap(name, dark, Modifier.size(1_116.dp, 800.dp)) {
+    private fun sheet(name: String, dark: Boolean, turningOn: Boolean, lines: List<String>, seasonal: SeasonalTheme? = null) =
+        compose.snap(name, dark, Modifier.size(1_116.dp, 800.dp), seasonal) {
             Box(Modifier.size(1_116.dp, 800.dp), contentAlignment = Alignment.CenterEnd) {
                 PartySheet(turningOn, lines, onConfirm = {}, onCancel = {})
             }
@@ -56,6 +57,10 @@ class PartyScreenshotTest {
     @Test fun sheetOnDark() = sheet("party_sheet_on_dark", true, true, WILL)
 
     @Test fun sheetOnLight() = sheet("party_sheet_on_light", false, true, WILL)
+
+    @Test fun sheetOnHalloweenDark() = sheet("party_sheet_on_halloween_dark", true, true, WILL, SeasonalTheme.HALLOWEEN)
+
+    @Test fun sheetOnHalloweenLight() = sheet("party_sheet_on_halloween_light", false, true, WILL, SeasonalTheme.HALLOWEEN)
 
     @Test fun sheetNothingDark() = sheet("party_sheet_nothing_dark", true, true, NOTHING)
 

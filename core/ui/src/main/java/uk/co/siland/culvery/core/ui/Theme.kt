@@ -17,6 +17,13 @@ private val LocalHhColors = staticCompositionLocalOf { DarkColors }
 object Culvery {
     val colors: HhColors
         @Composable get() = LocalHhColors.current
+
+    /** The theme showing, or null for the normal look. */
+    val seasonal: SeasonalTheme?
+        @Composable get() = LocalSeasonalTheme.current
+
+    val look: SeasonalLook?
+        @Composable get() = LocalSeasonalTheme.current?.look
 }
 
 private val CulveryTypography: Typography = Typography().let { t ->
@@ -29,8 +36,8 @@ private val CulveryTypography: Typography = Typography().let { t ->
 }
 
 @Composable
-fun CulveryTheme(dark: Boolean, content: @Composable () -> Unit) {
-    val target = if (dark) DarkColors else LightColors
+fun CulveryTheme(dark: Boolean, seasonal: SeasonalTheme? = null, content: @Composable () -> Unit) {
+    val target = colorsFor(seasonal, dark)
     val colors = HhColors(
         bg = animated(target.bg),
         surf = animated(target.surf),
@@ -62,7 +69,7 @@ fun CulveryTheme(dark: Boolean, content: @Composable () -> Unit) {
             onSurfaceVariant = colors.mute,
         )
     }
-    CompositionLocalProvider(LocalHhColors provides colors) {
+    CompositionLocalProvider(LocalHhColors provides colors, LocalSeasonalTheme provides seasonal) {
         MaterialTheme(colorScheme = scheme, typography = CulveryTypography, content = content)
     }
 }
