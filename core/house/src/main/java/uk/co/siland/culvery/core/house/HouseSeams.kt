@@ -47,6 +47,18 @@ interface HouseLights {
     /** True once a Hue link is saved. */
     val ready: Flow<Boolean>
     suspend fun setHoliday(on: Boolean, by: Authorised): HouseStep
+
+    /** Every room and its scenes, read afresh; [LightOptions.line] says why they couldn't be. */
+    suspend fun partyOptions(): LightOptions
+
+    /** The chosen rooms read afresh; a room or scene the bridge no longer has is left out (13 §2.13). Throws when the bridge can't be read. */
+    suspend fun partyBefore(choices: List<SceneChoice>): List<RoomBefore>
+
+    /** Recalls each room's scene; the names of the rooms that didn't change. Never throws. */
+    suspend fun partyOn(rooms: List<RoomBefore>): List<String>
+
+    /** Puts back each room whose active scene, read afresh, is still Party's (13 §2.12); the names not put back. Never throws. */
+    suspend fun partyBack(rooms: List<RoomBefore>): List<String>
 }
 
 interface HouseHeating {

@@ -108,7 +108,14 @@ internal class TestLightsSystem(rooms: List<LightRoom> = emptyList()) : LightsSy
         failOnce.remove(call)?.let { throw it }
     }
 
-    override suspend fun readAll() = record("readAll")
+    /** Runs as a read completes, to change what the bridge shows. */
+    @Volatile
+    var onRead: (() -> Unit)? = null
+
+    override suspend fun readAll() {
+        record("readAll")
+        onRead?.invoke()
+    }
 
     override fun stream(): Flow<Unit> = flow {
         calls += "stream"

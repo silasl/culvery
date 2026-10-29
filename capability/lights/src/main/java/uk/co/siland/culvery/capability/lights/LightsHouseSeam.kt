@@ -8,11 +8,15 @@ import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.LightOptions
+import uk.co.siland.culvery.core.house.RoomBefore
+import uk.co.siland.culvery.core.house.SceneChoice
 
 /** Holiday mode's way to Holiday lights (11 §5.1). */
 class LightsHouseSeam @Inject constructor(
     private val house: LightsHouse,
     private val settings: LightsSettings,
+    private val party: LightsParty,
 ) : HouseLights {
     override val ready: Flow<Boolean> = settings.prefs.map { it.link != null }.distinctUntilChanged()
 
@@ -25,4 +29,12 @@ class LightsHouseSeam @Inject constructor(
             HolidayResult.Refused -> HouseStep.Failed(houseLine(result, house::nameOf) ?: HUE_REFUSED)
         }
     }
+
+    override suspend fun partyOptions(): LightOptions = party.options()
+
+    override suspend fun partyBefore(choices: List<SceneChoice>): List<RoomBefore> = party.before(choices)
+
+    override suspend fun partyOn(rooms: List<RoomBefore>): List<String> = party.on(rooms)
+
+    override suspend fun partyBack(rooms: List<RoomBefore>): List<String> = party.back(rooms)
 }

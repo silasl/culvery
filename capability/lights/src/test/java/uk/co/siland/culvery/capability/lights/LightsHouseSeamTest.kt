@@ -11,6 +11,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.SceneChoice
 import uk.co.siland.culvery.core.plugin.test.soon
 
 /** 11 §5.1: Holiday mode's way to Holiday lights. */
@@ -20,7 +21,7 @@ class LightsHouseSeamTest {
     private val settings get() = lights.settings
     private val system = TestLightsSystem(listOf(room("Lounge", on = true)))
     private val house by lazy { LightsHouse({ system }, settings) }
-    private val seam by lazy { LightsHouseSeam(house, settings) }
+    private val seam by lazy { LightsHouseSeam(house, settings, LightsParty({ system })) }
 
     /** Fails if turning on with the record already on runs the lights again. */
     @Test
@@ -80,5 +81,21 @@ class LightsHouseSeamTest {
         assertThat(seam.ready.first()).isFalse()
         soon { settings.connect("lights.hue", link()) }
         assertThat(seam.ready.first()).isTrue()
+    }
+
+    /** Fails if the seam's Party calls don't reach LightsParty over the same system. */
+    @Test
+    fun thePartyCallsReachLightsParty() = runTest {
+        system.rooms.value = listOf(room("Lounge", on = true, brightness = 40, scenes = listOf(RELAX), active = RELAX.id))
+        val choice = SceneChoice("Lounge-id", "Lounge", RELAX.id, "Relax")
+        val direct = LightsParty({ system })
+        assertThat(seam.partyOptions()).isEqualTo(direct.options())
+        val before = seam.partyBefore(listOf(choice))
+        assertThat(before).isEqualTo(direct.before(listOf(choice)))
+        assertThat(before).hasSize(1)
+        assertThat(seam.partyOn(before)).isEqualTo(direct.on(before))
+        assertThat(seam.partyBack(before)).isEqualTo(direct.back(before))
+        system.failures["recallScene Lounge-id relax-id"] = LightsRefusedException()
+        assertThat(seam.partyOn(before)).containsExactly("Lounge")
     }
 }
