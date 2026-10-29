@@ -159,7 +159,7 @@ class PlugsHouse internal constructor(
             val target = note.holders.filter { it.mode != modeId }.lastOrNull()?.on ?: note.before
             touched.on = target
             val now = state.isOn
-            val pending = prefs.runs.filterKeys { it != modeId }.values.any { id in it.pending }
+            val pending = prefs.runs.values.any { id in it.pending }
             when {
                 now == null -> (note.holders.last().mode != modeId).also { dropHolder(id, modeId) }
                 !pending && now != note.expected -> true.also { settings.update { it.copy(notes = it.notes - id) } }

@@ -185,9 +185,9 @@ class PlugsHouseTwoModesTest {
         assertThat(rig.system.switches).hasSize(2)
     }
 
-    /** 12 §2.7: fails if a mode's own unconfirmed switch lets leave override a hand change. */
+    /** 12 §5.4: fails if the leaving mode's own failed switch reads as a hand change and drops the older mode's note. */
     @Test
-    fun aHandChangeIsKeptWhenOnlyTheLeavingModeIsPending() = runTest {
+    fun theLeavingModesOwnFailedSwitchIsNotAHandChange() = runTest {
         val rig = rig(ON, ON)
         rig.configure {
             it.copy(
@@ -197,10 +197,9 @@ class PlugsHouseTwoModesTest {
             )
         }
 
-        assertThat(rig.house().leave(PARTY)).isEqualTo(HouseStep.Done)
+        rig.house().leave(PARTY)
 
-        assertThat(rig.system.switches).isEmpty()
-        assertThat(rig.note()).isNull()
+        assertThat(rig.note()).isEqualTo(PlugNote(false, listOf(Holder(HOLIDAY, true))))
     }
 
     /** 12 §2.7: fails if a hand change made while one mode holds the plug is kept as that mode's note for the next. */

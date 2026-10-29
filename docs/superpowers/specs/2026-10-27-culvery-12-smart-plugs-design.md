@@ -161,7 +161,7 @@ A mode's list is **snapshotted when the mode turns on** (`begin`, stored with th
 - **Someone switched it by hand** while modes held it (its state differs from *expected*): drop the whole note and leave the plug as they set it. *(My call, 2026-10-27, played back to the user: a hand change wins over every mode.)* A change made by the plug's own Tapo schedule counts the same (decision 17).
 - **Other modes still hold it:** remove this mode from the holders. If this mode was the newest, expected becomes the next newest holder's setting and the plug is switched to it; otherwise nothing is switched. *(My call: the mode still on keeps its say.)*
 - **This was the last holder:** switch the plug back to *before*, and drop the note.
-- **Unreachable now** (or gone, or its state unknown): it can't be switched; the step reports Failed. This mode is dropped from the holders, and the note goes when no holder is left, as if it had gone back. *(My call: the family are home and can switch it from the tab.)*
+- **Unreachable now** (or gone, or its state unknown): it can't be switched; the step reports Failed. This mode is dropped from the holders, and the note goes when no holder is left, as if it had gone back. When a newer mode still holds it, the step reports nothing: that mode decides the plug. *(My call: the family are home and can switch it from the tab. The newer-holder case is from the final review, 2026-10-29.)*
 - **Never reached** while the mode was on: there's no note to act on.
 
 **Turning a plug's Show off** in Settings drops its note; the plug is left as it is. *(My call.)*
