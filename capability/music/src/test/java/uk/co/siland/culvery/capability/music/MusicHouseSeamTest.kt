@@ -133,7 +133,7 @@ class MusicHouseSeamTest {
     }
 
     @Test
-    fun theSpeakersDownFailTheStartWithoutThrowing()= runTest {
+    fun theSpeakersDownFailTheStartWithoutThrowing() = runTest {
         val before = seam.before()
         system.failures["checkLayout"] = MusicUnreachableException(MusicProblem.UNREACHABLE)
         assertThat(seam.start("FV:2/3", null, before)).isEqualTo(MusicStart(null, startLine))

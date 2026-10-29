@@ -111,12 +111,11 @@ class PartyHouse internal constructor(
         exclusive(PartyRun.TURNING_ON) {
             if (load().on) return@exclusive
             orphansChecked = true
-            putGroupsBack()
             val prefs = settings.prefs.first()
             val plugs = readyPlugs()
             resetRun()
             offLine = null
-            set(PartyRecord(on = true, since = wall.nowMillis(), musicBefore = current.value?.let(::groupsWaiting)))
+            set(PartyRecord(on = true, since = wall.nowMillis(), musicBefore = groupsWaiting()))
             if (plugs != null) {
                 plugsPending = true
                 plugs.begin(by)
@@ -135,14 +134,13 @@ class PartyHouse internal constructor(
         exclusive(PartyRun.TURNING_OFF) {
             val record = load()
             if (!record.on) return@exclusive
-            val musicLine = record.made?.let { stopMusic(it, record.musicBefore.orEmpty()) } ?: putGroupsBack()
+            val musicLine = if (record.made != null) stopMusic(record.made, record.musicBefore.orEmpty()) else putGroupsBack()
             val lightsLine = record.lights?.takeIf { it.isNotEmpty() }?.let { putLightsBack(it) }
             val plugsLine = plugs?.leave()
             resetRun()
             offLine = Lines(musicLine, plugsLine, lightsLine).joined()
             offAt = wall.nowMillis()
-            // Groups still waiting for the music system stay saved, and the next tick puts them back.
-            set(PartyRecord(musicBefore = current.value?.let(::groupsWaiting)))
+            set(PartyRecord(musicBefore = groupsWaiting()))
         }
     }
 
@@ -184,7 +182,7 @@ class PartyHouse internal constructor(
     }
 
     /** Speaker groups saved for a party group that was never made: a restart or turn-off put them back (13 §4.3). */
-    private fun groupsWaiting(record: PartyRecord): List<GroupBefore>? = record.musicBefore.takeIf { record.made == null }
+    private fun groupsWaiting(): List<GroupBefore>? = current.value?.let { record -> record.musicBefore.takeIf { record.made == null } }
 
     /**
      * Puts the waiting groups back once, with nothing paused, and returns the line when they didn't go back. Waits for
@@ -192,7 +190,7 @@ class PartyHouse internal constructor(
      */
     private suspend fun putGroupsBack(): String? {
         val record = current.value ?: return null
-        val before = groupsWaiting(record) ?: return null
+        val before = groupsWaiting() ?: return null
         if (music == null || !music.ready.isReady()) return null
         val line = answer(PartyStep.MUSIC) { music.putBack(before) }.line(threw = HouseLines.SPEAKERS_NOT_BACK)
         set(record.copy(musicBefore = null))
@@ -210,6 +208,8 @@ class PartyHouse internal constructor(
     }
 
     private suspend fun startMusic(prefs: PartyPrefs) {
+        // Before the snapshot below, so it is taken of the groups as they went back.
+        lines.music = putGroupsBack()
         val choice = prefs.music ?: return
         if (music == null || !music.ready.isReady()) return
         val rooms = prefs.rooms

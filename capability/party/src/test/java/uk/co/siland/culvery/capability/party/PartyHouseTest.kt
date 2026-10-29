@@ -506,6 +506,21 @@ class PartyHouseTest {
         assertThat(rig.saved()).isEqualTo(PartyRecord())
     }
 
+    /** Fails if turning on puts the waiting groups back without saying when they didn't go back. */
+    @Test
+    fun aTurnOnWithGroupsWaitingPutsThemBackAndShowsARefusal() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = false
+        rig.settings.save(PartyRecord(musicBefore = GROUPS_BEFORE))
+        rig.music.putBackAnswer = HouseStep.Failed(SPEAKERS_NOT_BACK_LINE)
+        val house = rig.restarted()
+
+        house.turnOn(by())
+
+        assertThat(rig.music.putBacks).containsExactly(GROUPS_BEFORE)
+        assertThat(house.line.value).isEqualTo(SPEAKERS_NOT_BACK_LINE)
+    }
+
     /** Fails if a regroup that the speakers refuse isn't said on the tile. */
     @Test
     fun aRestartPutBackThatFailsShowsItsLine() = runTest {
