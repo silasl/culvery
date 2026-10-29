@@ -46,6 +46,7 @@ class LogHygieneTest {
         assertThat(sources.map { it.name }).contains("PartyActions.kt")
         assertThat(sources.map { it.name }).contains("PartyTile.kt")
         assertThat(sources.map { it.name }).contains("PartySheet.kt")
+        assertThat(sources.map { it.name }).contains("PartySettingsPage.kt")
         assertThat(sources.map { it.name }).contains("PlugSettings.kt")
         assertThat(sources.map { it.name }).contains("PlugsHouse.kt")
         assertThat(sources.map { it.name }).contains("PlugActions.kt")

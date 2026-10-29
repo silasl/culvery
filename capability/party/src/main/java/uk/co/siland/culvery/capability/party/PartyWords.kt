@@ -40,6 +40,22 @@ object PartyWords {
     const val PLUGS_BACK_NOW = "Put the plugs back as they were."
     const val BY_HAND = "Anything changed by hand during the party stays as it is."
 
+    const val SETTINGS_TITLE = "Party mode"
+    const val MUSIC_SECTION = "Music"
+    const val SPEAKERS = "Speakers"
+    const val NONE = "None"
+    const val MUSIC_SHEET_TITLE = "Music for Party mode"
+    const val CHOOSE_MUSIC = "Choose the music for Party mode"
+    const val LIGHTS_SECTION = "Lights"
+    const val LEAVE_ALONE = "Leave alone"
+    const val PLUGS_SECTION = "Plugs"
+    const val PLUGS_LINE = "Choose what each plug does in Party mode on the Plugs tab."
+    const val SET_UP_SONOS = "Set up Sonos in Settings › Music to choose the music."
+    const val SET_UP_HUE = "Set up Hue in Settings › Lights to choose scenes."
+
+    /** What a tap on a light room's row does. */
+    fun chooseScene(room: String) = "Choose a scene for $room"
+
     /** "Play {playlist} on every speaker." or on the [rooms] chosen. */
     fun musicLine(choice: MusicChoice, rooms: List<HouseRoom>? = null): String =
         "Play ${choice.pickName} on ${rooms?.let { HouseLines.roomList(it.map(HouseRoom::name)) } ?: "every speaker"}."

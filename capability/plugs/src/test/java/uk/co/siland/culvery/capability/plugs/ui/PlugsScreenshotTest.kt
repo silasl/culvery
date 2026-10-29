@@ -60,6 +60,10 @@ class PlugsScreenshotTest {
 
     @Test fun longNameEditLight() = tab("plugs_tab_long_name_edit_light", false, long, editing = true, modes = listOf(HOLIDAY_MODE, PARTY_MODE))
 
+    @Test fun partyDark() = tab("plugs_tab_party_dark", true, four, modes = listOf(HOLIDAY_MODE, PARTY_MODE))
+
+    @Test fun partyLight() = tab("plugs_tab_party_light", false, four, modes = listOf(HOLIDAY_MODE, PARTY_MODE))
+
     @Test fun editDark() = tab("plugs_tab_edit_dark", true, four, editing = true)
 
     @Test fun editLight() = tab("plugs_tab_edit_light", false, four, editing = true)

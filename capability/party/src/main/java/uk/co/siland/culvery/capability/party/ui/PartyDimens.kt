@@ -18,4 +18,7 @@ internal object PartyDimens {
     val sheetPaddingV = 28.dp
     val stepGap = 8.dp
     val buttonGap = 12.dp
+
+    val settingsGap = 16.dp
+    val rowGap = 12.dp
 }

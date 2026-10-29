@@ -13,6 +13,9 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -128,6 +131,23 @@ class PlugsTabTest {
         }
         assertThat(compose.onNodeWithTag("mode_heading_holiday").fetchSemanticsNode().boundsInRoot.left)
             .isLessThan(compose.onNodeWithTag("mode_heading_party").fetchSemanticsNode().boundsInRoot.left)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin (12 §5.1): a second registered mode is a second column and nothing else changes. Fails if Party mode has no heading after Holiday mode's, or a row lacks either cell. */
+    @Test
+    fun aSecondModeIsASecondColumn() {
+        show(plugs = listOf(LAMP_ON, FAN_OFF), modes = listOf(HOLIDAY_MODE, PARTY_MODE))
+        for ((mode, name) in listOf("holiday" to "Holiday mode", "party" to "Party mode")) {
+            compose.onNode(hasAnyAncestor(hasTestTag("mode_heading_$mode")) and hasContentDescription(name)).assertExists()
+        }
+        assertThat(compose.onNodeWithTag("mode_heading_holiday").fetchSemanticsNode().boundsInRoot.left)
+            .isLessThan(compose.onNodeWithTag("mode_heading_party").fetchSemanticsNode().boundsInRoot.left)
+        for (plug in listOf(LAMP, FAN)) {
+            for (mode in listOf("holiday", "party")) {
+                assertThat(compose.onAllNodesWithTag("mode_${mode}_$plug", useUnmergedTree = true).fetchSemanticsNodes()).hasSize(1)
+            }
+        }
         compose.assertClickablesHaveRoleAndLabel()
     }
 

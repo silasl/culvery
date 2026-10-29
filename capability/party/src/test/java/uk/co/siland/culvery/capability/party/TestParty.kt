@@ -186,7 +186,9 @@ internal class FakeMusic(private val trace: Trace = Trace()) : HouseMusic {
 
     override val ready: Flow<Boolean> = readyNow
 
-    override suspend fun options() = MusicOptions(emptyList(), emptyList(), null)
+    @Volatile var offered = MusicOptions(emptyList(), emptyList(), null)
+
+    override suspend fun options() = offered
 
     override suspend fun before(): List<GroupBefore> {
         trace.hit("music.before")
@@ -223,7 +225,9 @@ internal class FakeLights(private val trace: Trace = Trace()) : HouseLights {
 
     override suspend fun setHoliday(on: Boolean, by: Authorised): HouseStep = HouseStep.Done
 
-    override suspend fun partyOptions() = LightOptions(emptyList(), null)
+    @Volatile var offered = LightOptions(emptyList(), null)
+
+    override suspend fun partyOptions() = offered
 
     override suspend fun partyBefore(choices: List<SceneChoice>): List<RoomBefore> {
         trace.hit("lights.partyBefore")

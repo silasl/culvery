@@ -33,4 +33,12 @@ class PartyCapabilityTest {
         assertThat(capability.icon).isEqualTo(Icons.CELEBRATION)
         assertThat(capability.trayButtons().first().map { it.id to it.order }).containsExactly("party.mode" to 20)
     }
+
+    /** 13 §3: Settings › Party mode sits between Lights (470) and Other integrations (480). Fails if the page is missing, repeated or placed elsewhere. */
+    @Test
+    fun theSettingsPageSitsAfterLights() = runTest {
+        val pages = capability(backgroundScope).settingsPages()
+
+        assertThat(pages.map { Triple(it.id, it.title, it.order) }).containsExactly(Triple("party", "Party mode", 475))
+    }
 }
