@@ -25,11 +25,11 @@ object HolidayWords {
     const val NO_PICK = "Pick the day you’re back."
     const val STILL_ON_ECO = "The heating is still on Eco. Turn it off in the Nest app."
     const val LIGHTS_STILL_ON = "Holiday lights are still on. Turn them off in the Lights tab."
-    const val PLUGS_LEAVE_THREW = "Some plugs may not have gone back. Check them on the Plugs tab."
+    const val PLUGS_LEAVE_THREW = HouseLines.PLUGS_LEAVE_THREW
     private const val LIGHTS_MISSED = "Holiday lights didn’t switch on. Turn them on in the Lights tab."
-    private const val PLUGS_MISSED = "The plugs didn’t switch. Switch them on the Plugs tab."
-    private const val PLUGS_THREW = "The plugs didn’t switch. They’ll keep trying."
-    private const val PLUGS_BACK = "Plugs go back as they were when you turn it off."
+    private const val PLUGS_MISSED = HouseLines.PLUGS_MISSED
+    private const val PLUGS_THREW = HouseLines.PLUGS_THREW
+    private const val PLUGS_BACK = HouseLines.PLUGS_BACK
 
     private const val WEEKDAY_ALONE_DAYS = 6L
     private val SHORT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)

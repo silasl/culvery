@@ -141,6 +141,17 @@ class ModuleBoundariesTest {
         banned(":capability:holiday", ":capability:plugs")
     }
 
+    /** Pin: Party mode reaches the speakers, lights and plugs only through the house seams. */
+    @Test
+    fun thePartyModuleKeepsToItsFamily() {
+        allowed(":capability:party", ":core:house", "api")
+        banned(":capability:party", ":capability:music")
+        banned(":capability:party", ":capability:lights")
+        banned(":capability:party", ":capability:plugs")
+        banned(":capability:party", ":capability:holiday")
+        banned(":capability:holiday", ":capability:party")
+    }
+
     /** Pin: the Shopping pair follows the Lights rules, and the Google sign-in is core, so the Tasks provider may use it. */
     @Test
     fun theShoppingPairKeepsToItsFamily() {

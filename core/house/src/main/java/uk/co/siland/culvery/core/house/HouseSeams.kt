@@ -20,6 +20,23 @@ object HouseLines {
     const val ECO_ON_FAILED = "The heating didn’t go to Eco. Check the Nest app."
     const val ECO_OFF_FAILED = "The heating didn’t come off Eco. Turn it off in the Nest app."
     const val HOOVER_DIDNT_RUN = "The hoover didn’t run."
+    const val MUSIC_DIDNT_START = "The music didn’t start. Check the Sonos app."
+    const val MUSIC_DIDNT_STOP = "The music didn’t stop. Stop it in the Sonos app."
+    const val SPEAKERS_NOT_BACK = "The speakers didn’t go back to their groups. Regroup them in the Sonos app."
+    const val PLUGS_THREW = "The plugs didn’t switch. They’ll keep trying."
+    const val PLUGS_MISSED = "The plugs didn’t switch. Switch them on the Plugs tab."
+    const val PLUGS_LEAVE_THREW = "Some plugs may not have gone back. Check them on the Plugs tab."
+    const val PLUGS_BACK = "Plugs go back as they were when you turn it off."
+
+    /** "Kitchen", "Kitchen and Lounge", "Kitchen, Lounge and Dining". */
+    fun roomList(names: List<String>): String =
+        if (names.size < 2) names.joinToString() else "${names.dropLast(1).joinToString(", ")} and ${names.last()}"
+
+    fun lightsDidntChange(names: List<String>) = "Some lights didn’t change: ${roomList(names)}."
+
+    fun lightsDidntGoBack(names: List<String>) = "Some lights didn’t go back: ${roomList(names)}."
+
+    fun turnOffFirst(modeName: String) = "Turn $modeName off first."
 }
 
 /** Whether a seam's device is chosen: false with no system, else true while its state is known. */
@@ -54,7 +71,20 @@ data class HouseModeInfo(val id: String, val name: String, val order: Int, val p
 
 object HouseModes {
     const val HOLIDAY = "holiday"
+    const val PARTY = "party"
 }
+
+/** A mode's on state, for the rule that two modes are never on together (13 §2.6). */
+interface HouseModeSwitch {
+    val modeId: String
+    val modeName: String
+
+    /** Null until it has been read. */
+    val isOn: StateFlow<Boolean?>
+}
+
+/** The first mode other than [modeId] that is on. */
+fun Set<HouseModeSwitch>.blockedBy(modeId: String): HouseModeSwitch? = firstOrNull { it.modeId != modeId && it.isOn.value == true }
 
 /** A plug a mode will switch, or put back, to [on]. [toString] leaves out the name. */
 data class PlugChange(val name: String, val on: Boolean) {
@@ -86,4 +116,79 @@ data class MultiDayEvent(val title: String, val first: LocalDate, val last: Loca
 
 object HousePermissions {
     const val HOLIDAY_MODE = "holiday.mode"
+    const val PARTY_MODE = "party.mode"
+}
+
+/** A speaker room. [toString] leaves out the id and name. */
+data class HouseRoom(val id: String, val name: String) {
+    override fun toString() = "HouseRoom"
+}
+
+/** A favourite or playlist Party can play. [toString] leaves out the id and name. */
+data class MusicPick(val id: String, val name: String) {
+    override fun toString() = "MusicPick"
+}
+
+/** What Settings offers for the music: [line] says why [picks] or [rooms] couldn't be read. */
+data class MusicOptions(val picks: List<MusicPick>, val rooms: List<HouseRoom>, val line: String?)
+
+/** A speaker group as it was, [roomIds] in layout order. [toString] leaves out the ids. */
+data class GroupBefore(val coordinatorId: String, val roomIds: List<String>) {
+    override fun toString() = "GroupBefore"
+}
+
+/** The group Party made. [toString] leaves out the ids. */
+data class PartyGroup(val coordinatorId: String, val roomIds: Set<String>) {
+    override fun toString() = "PartyGroup"
+}
+
+/** [made] is the group Party made, or null when none was left standing. */
+data class MusicStart(val made: PartyGroup?, val step: HouseStep)
+
+/** What Party reaches in the speakers (13 §4.1, §4.2); absent with no music capability. */
+interface HouseMusic {
+    /** True while a music system is open. */
+    val ready: Flow<Boolean>
+
+    /** Favourites then playlists, and the rooms, read afresh; [MusicOptions.line] says why they couldn't be. */
+    suspend fun options(): MusicOptions
+
+    /** Every group as it is now, read afresh; throws when the speakers can't be read. */
+    suspend fun before(): List<GroupBefore>
+
+    /** Groups [roomIds] (null: every room) and plays [pickId]; a failed play puts [before] back. Never throws. */
+    suspend fun start(pickId: String, roomIds: Set<String>?, before: List<GroupBefore>): MusicStart
+
+    /** Pauses [made] and puts [before] back when [made] is still Party's (13 §2.11), else sends nothing. Never throws. */
+    suspend fun stop(made: PartyGroup, before: List<GroupBefore>): HouseStep
+}
+
+/** A Hue scene. [toString] leaves out the id and name. */
+data class HouseScene(val id: String, val name: String) {
+    override fun toString() = "HouseScene"
+}
+
+/** A Hue room and its scenes. [toString] leaves out the id, name and scenes. */
+data class LightRoomOption(val id: String, val name: String, val scenes: List<HouseScene>) {
+    override fun toString() = "LightRoomOption"
+}
+
+/** What Settings offers for the lights: [line] says why [rooms] couldn't be read. */
+data class LightOptions(val rooms: List<LightRoomOption>, val line: String?)
+
+/** The scene chosen for a room, with the names the sheet shows. [toString] leaves out the ids and names. */
+data class SceneChoice(val roomId: String, val roomName: String, val sceneId: String, val sceneName: String) {
+    override fun toString() = "SceneChoice"
+}
+
+/** A room as it was before Party; [sceneId] is Party's. [toString] leaves out the ids and name. */
+data class RoomBefore(
+    val roomId: String,
+    val name: String,
+    val sceneId: String,
+    val on: Boolean,
+    val brightness: Int,
+    val activeSceneId: String?,
+) {
+    override fun toString() = "RoomBefore"
 }

@@ -9,6 +9,8 @@ import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseModeInfo
+import uk.co.siland.culvery.core.house.HouseModeSwitch
+import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.MultiDayEvents
 
@@ -33,4 +35,11 @@ abstract class HouseModule {
 
     @BindsOptionalOf
     abstract fun multiDayEvents(): MultiDayEvents
+
+    @BindsOptionalOf
+    abstract fun music(): HouseMusic
+
+    // With no mode bound nothing blocks a mode (13 §2.6).
+    @Multibinds
+    abstract fun modeSwitches(): Set<HouseModeSwitch>
 }
