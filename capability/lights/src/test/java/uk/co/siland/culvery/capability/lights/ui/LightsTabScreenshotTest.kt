@@ -69,9 +69,28 @@ class LightsTabScreenshotTest {
 
     @Test fun grid9Light() = grid("lights_grid_9_light", false, 9)
 
-    @Test fun tabDark() = snap("lights_tab_dark", true)
+    private val plugs = listOf("Hall lamp" to true, "Kettle" to false, "Fish tank" to true, "Heater" to false)
 
-    @Test fun tabLight() = snap("lights_tab_light", false)
+    /** The tab at the shell's content size with the plugs drawn by [SampleLightsSection]; [hasBridge] false is a Plugs-only house. */
+    private fun withPlugs(name: String, dark: Boolean, count: Int, hasBridge: Boolean = true, plugs: List<Pair<String, Boolean>> = this.plugs) =
+        compose.snap(name, dark) {
+            val rooms = if (hasBridge) many.take(count) else emptyList()
+            val section = SampleLightsSection(plugs)
+            Box(Modifier.size(1116.dp, 690.dp)) {
+                LightsTab(
+                    rooms, false, rooms.any { it.on }, null, null, null, emptyMap(), null, {}, NO_HOUSE_ACTIONS, RoomActions.None,
+                    sections = listOf(section), plugsSummary = "${plugs.count { it.second }} of ${plugs.size} plugs on", hasBridge = hasBridge,
+                )
+            }
+        }
+
+    @Test fun twoRoomsFourPlugsDark() = withPlugs("lights_two_rooms_four_plugs_dark", true, 2)
+
+    @Test fun twoRoomsFourPlugsLight() = withPlugs("lights_two_rooms_four_plugs_light", false, 2)
+
+    @Test fun nineRoomsAndPlugsDark() = withPlugs("lights_nine_rooms_and_plugs_dark", true, 9, plugs = plugs + plugs.map { "${it.first} 2" to it.second })
+
+    @Test fun plugsOnlyDark() = withPlugs("lights_plugs_only_dark", true, 0, hasBridge = false)
 
     @Test fun statusDark() = snap("lights_tab_status_dark", true, status = problemLine(LightsProblem.UNREACHABLE))
 

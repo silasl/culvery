@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
@@ -42,7 +43,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.capability.lights.BRIGHT
 import uk.co.siland.culvery.capability.lights.LightRoom
+import uk.co.siland.culvery.capability.lights.RELAX
+import uk.co.siland.culvery.capability.lights.TestLightsSection
+import uk.co.siland.culvery.core.plugin.LightsTabSection
 import uk.co.siland.culvery.capability.lights.LightScene
 import uk.co.siland.culvery.capability.lights.LightsFixture
 import uk.co.siland.culvery.capability.lights.moreRooms
@@ -63,14 +68,17 @@ class LightsGridTest {
     private var focused = 0
 
     /** Room 1 … Room [n], in Hue's order; those named in [on] are on. */
-    private fun numbered(n: Int, on: Set<Int> = emptySet(), scenes: List<LightScene> = emptyList()) =
+    private fun numbered(n: Int, on: Set<Int> = emptySet(), scenes: List<LightScene> = listOf(RELAX, BRIGHT)) =
         (1..n).map { room("Room $it", on = it in on, scenes = scenes) }
 
-    private fun show(fontScale: Float = 1f) = compose.setContent {
+    private fun show(fontScale: Float = 1f, sections: List<LightsTabSection> = emptyList()) = compose.setContent {
         CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
             CulveryTheme(dark = true) {
                 Box(Modifier.size(1116.dp, 690.dp).testTag("tab")) {
-                    LightsTab(rooms, false, true, null, null, null, emptyMap(), focus, { focused++ }, NO_HOUSE_ACTIONS, RoomActions.None)
+                    LightsTab(
+                        rooms, false, true, null, null, null, emptyMap(), focus, { focused++ }, NO_HOUSE_ACTIONS, RoomActions.None,
+                        sections = sections,
+                    )
                 }
             }
         }
@@ -94,42 +102,84 @@ class LightsGridTest {
 
     private val dp get() = with(compose.density) { 1.dp.toPx() }
 
-    /** The cards of rooms 1…[n] lie in [columns] columns, the rows sharing the height and the last reaching the tab's foot. */
-    private fun assertRowsFillTheTab(n: Int, columns: Int) {
+    /** The cards of rooms 1…[n] lie in [columns] columns, in rows whose cards start level and keep to their column. */
+    private fun assertColumns(n: Int, columns: Int) {
         val cards = (1..n).map { bounds(card(it)) }
         val rows = cards.chunked(columns)
         rows.forEach { row -> row.forEach { assertThat(it.top).isWithin(dp).of(row[0].top) } }
         cards.forEachIndexed { i, b -> assertThat(b.left).isWithin(dp).of(cards[i % columns].left) }
         assertThat(rows[0][columns - 1].left).isGreaterThan(rows[0][0].right)
-        rows.forEach { assertThat(it[0].height).isWithin(dp).of(rows[0][0].height) }
-        assertThat(rows.last()[0].bottom).isWithin(dp).of(bounds("tab").bottom)
-        assertThat(exists("lights_more_rooms")).isFalse()
+        if (rows.size > 1) assertThat(rows[1][0].top).isGreaterThan(rows[0][0].bottom)
     }
 
-    /** 9 §7. Fails if four rooms aren't two rows of two sharing the tab's height. */
+    /** 15a §4.5. Fails if one to four rooms aren't two columns. */
     @Test
     fun fourRoomsAreTwoByTwo() {
         rooms = numbered(4)
         show()
-        assertRowsFillTheTab(4, columns = 2)
+        assertColumns(4, columns = 2)
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** 9 §7. Fails if six rooms aren't two rows of three sharing the tab's height. */
+    /** 15a §4.5. Fails if five or more rooms aren't three columns. */
     @Test
     fun sixRoomsAreThreeByTwo() {
         rooms = numbered(6)
         show()
-        assertRowsFillTheTab(6, columns = 3)
+        assertColumns(6, columns = 3)
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Fails if anything scrolls at six rooms. */
+    /** 15a §4.5. Fails if a card is stretched to its neighbour or the row rather than holding what it has. */
     @Test
-    fun sixRoomsDoNotScroll() {
-        rooms = numbered(6)
+    fun aRoomWithNoScenesIsShorterThanItsNeighbour() {
+        rooms = listOf(room("Room 1", on = true, scenes = listOf(RELAX, BRIGHT)), room("Room 2", on = true))
         show()
-        assertThat(compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes()).isEmpty()
+        assertThat(bounds(card(2)).top).isWithin(dp).of(bounds(card(1)).top)
+        assertThat(bounds(card(2)).height).isLessThan(bounds(card(1)).height - 10 * dp)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §4.5. Fails if the plugs section sits beside or above the rooms, or isn't below the last one's foot. */
+    @Test
+    fun theSectionFollowsTheRooms() {
+        rooms = numbered(4)
+        show(sections = listOf(TestLightsSection()))
+        assertThat(bounds("plugs_section").top).isAtLeast(bounds(card(4)).bottom)
+        assertThat(bounds("plugs_section").left).isWithin(dp).of(bounds(card(1)).left)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §4.5. Fails if the plugs have a scroll of their own, so the last tile can't be reached by scrolling the grid. */
+    @Test
+    fun pagesScrollAsOne() {
+        rooms = numbered(9)
+        show(sections = listOf(TestLightsSection(tiles = 8)))
+        compose.onNodeWithTag("lights_grid").performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 5_000 * dp) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("test_plug_7").assertIsDisplayed()
+        assertThat(compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes()).hasSize(1)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §4.5. Fails if the pill counts rooms once only plugs are below, or stays at the very end. */
+    @Test
+    fun thePillCountsRoomsThenSaysMoreBelow() {
+        rooms = numbered(9)
+        show(sections = listOf(TestLightsSection(tiles = 8)))
+        compose.onNodeWithTag("lights_more_rooms").assertTextContains("more room", substring = true)
+        val grid = compose.onNodeWithTag("lights_grid")
+        var guard = 0
+        while (guard++ < 40 && compose.onNodeWithTag("lights_more_rooms").fetchSemanticsNode().let { n ->
+                n.config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text }?.contains("room") == true
+            }) {
+            grid.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 100 * dp) }
+            compose.waitForIdle()
+        }
+        compose.onNodeWithTag("lights_more_rooms").assertTextEquals("More below")
+        grid.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 5_000 * dp) }
+        compose.waitForIdle()
+        assertThat(exists("lights_more_rooms")).isFalse()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -171,7 +221,8 @@ class LightsGridTest {
     fun tenRoomsCountWhatsBelow() {
         rooms = numbered(10)
         show()
-        compose.onNodeWithTag("lights_grid").performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 400 * dp) }
+        val half = bounds(card(1)).height / 2
+        compose.onNodeWithTag("lights_grid").performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, half) }
         compose.waitForIdle()
         val grid = bounds("lights_grid")
         val composed = (1..10).filter { exists(card(it)) }
@@ -305,12 +356,12 @@ class LightsGridTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** 9 §2.5. Fails if, in rows that share a fixed height at a large font, a scene chip is cut at the side or the last can't be reached. */
+    /** 9 §2.5, 15a §4.5. Fails if, at a large font, a scene chip is cut at the side or falls below the card that grows to hold it. */
     @Test
-    fun sceneChipsAreNotCutInTheSharedRows() {
+    fun sceneChipsAreNotCutInTheCards() {
         rooms = numbered(6, on = setOf(1, 2, 3), scenes = (1..8).map { LightScene("s$it-id", "Scene number $it") })
         show(fontScale = 1.3f)
-        (1..6).forEach { n ->
+        (1..3).forEach { n ->
             val card = bounds(card(n))
             val row = bounds("${card(n)}_scenes")
             assertThat(row.bottom).isAtMost(card.bottom)
@@ -319,10 +370,6 @@ class LightsGridTest {
                 assertThat(unclipped(chip).right).isAtMost(row.right)
             }
         }
-        val last = "${card(6)}_scene_s8-id"
-        compose.onNodeWithTag("${card(6)}_scenes").performScrollToNode(hasTestTag(last))
-        compose.onNodeWithTag(last).assertIsDisplayed()
-        assertThat(bounds(last).bottom).isAtMost(bounds(card(6)).bottom)
         compose.assertClickablesHaveRoleAndLabel()
     }
 }

@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.capability.lights.ui.LightsCardHost
@@ -13,6 +15,7 @@ import uk.co.siland.culvery.capability.lights.ui.LightsTabHost
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.LightsTabSection
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
@@ -35,22 +38,35 @@ class LightsCapability @Inject constructor(
     private val settings: LightsSettings,
     private val connect: LightsConnect,
     private val toaster: Toaster,
+    private val sections: Set<@JvmSuppressWildcards LightsTabSection>,
 ) : Capability {
     override val id = LIGHTS_ID
     override val label = LIGHTS
     override val icon = Icons.LIGHTBULB
     override val order = 40
 
-    /** Once a bridge is paired and its provider is in this build (7 §3.1). */
-    override val hasTab: Flow<Boolean> = bridges.system.map { it != null }.distinctUntilChanged()
+    private val bridgePaired: Flow<Boolean> = bridges.system.map { it != null }.distinctUntilChanged()
+
+    private val sectionShown: Flow<Boolean> =
+        if (sections.isEmpty()) flowOf(false) else combine(sections.map { it.shown }) { shown -> shown.any { it } }.distinctUntilChanged()
+
+    /** Once a bridge is paired and its provider is in this build (7 §3.1), or a plugs section has something to show (15a §4.5). */
+    override val hasTab: Flow<Boolean> = combine(bridgePaired, sectionShown) { bridge, plugs -> bridge || plugs }.distinctUntilChanged()
+
+    private val plugsOnly: Flow<Boolean> = combine(bridgePaired, sectionShown) { bridge, plugs -> !bridge && plugs }.distinctUntilChanged()
+
+    /** A house with plugs and no Hue Bridge has a Plugs tab (15a §4.5). */
+    override val railLabel: Flow<String> = plugsOnly.map { if (it) PLUGS else LIGHTS }
+
+    override val railIcon: Flow<String> = plugsOnly.map { if (it) Icons.POWER else Icons.LIGHTBULB }
 
     private val card = HomeCard(LIGHTS_CARD_ID, HomeCardSize.REGULAR, LIGHTS_CARD_PRIORITY) { LightsCardHost(view, actions, house, follow) }
 
     /** Home's card once a bridge is paired (7 §5.1). */
-    override fun cards(): Flow<List<HomeCard>> = hasTab.map { if (it) listOf(card) else emptyList() }
+    override fun cards(): Flow<List<HomeCard>> = bridgePaired.map { if (it) listOf(card) else emptyList() }
 
     @Composable
-    override fun TabContent() = LightsTabHost(view, actions, house, follow)
+    override fun TabContent() = LightsTabHost(view, actions, house, follow, sections.toList())
 
     private val pages: List<SettingsPage> =
         if (bridges.providers.isEmpty()) emptyList() else listOf(LightsPage { LightsSettingsHost(settings, bridges, view, connect, toaster) })

@@ -5,6 +5,9 @@ import uk.co.siland.culvery.core.plugin.TABLET_OFFLINE
 import uk.co.siland.culvery.core.ui.plural
 
 internal const val LIGHTS = "Lights"
+internal const val PLUGS = "Plugs"
+internal const val LIGHTS_AND_PLUGS = "Lights and plugs"
+internal const val MORE_BELOW = "More below"
 internal const val LIGHTS_BUSY = "The lights are busy. Culvery will try again in a few minutes."
 internal const val HUE_REFUSED = HouseLines.HUE_REFUSED
 internal const val ALL_LIGHTS_OFF = "All lights off"
@@ -35,9 +38,22 @@ internal fun roomState(room: LightRoom): String = when {
     else -> ON
 }
 
-/** The tab's subtitle: "2 of 3 rooms on · Hue Bridge", "1 of 1 room on · Hue Bridge" (9 §4.4). */
-fun roomsOn(rooms: List<LightRoom>): String =
-    "${rooms.count { it.on }} of ${plural(rooms.size.toLong(), "room")} on · $HUE_BRIDGE"
+/** "2 of 3 rooms on", "1 of 1 room on" (9 §4.4). */
+fun roomsOn(rooms: List<LightRoom>): String = "${rooms.count { it.on }} of ${plural(rooms.size.toLong(), "room")} on"
+
+/** The tab's title: Lights, Plugs, or both when the house has both (15a §4.5). */
+internal fun tabTitle(hasLights: Boolean, hasPlugs: Boolean): String = when {
+    hasLights && hasPlugs -> LIGHTS_AND_PLUGS
+    hasPlugs -> PLUGS
+    else -> LIGHTS
+}
+
+/** The tab's subtitle: "2 of 2 rooms on · 1 of 2 plugs on", or the part there is; null when there is neither (15a §4.5). */
+internal fun tabSummary(rooms: List<LightRoom>, plugs: String?): String? =
+    listOfNotNull(rooms.takeIf { it.isNotEmpty() }?.let(::roomsOn), plugs).joinToString(" · ").ifEmpty { null }
+
+/** The pill over the grid's foot: the rooms still below, or "More below" when only the plugs are (15a §4.5). */
+internal fun morePill(roomsBelow: Int): String = if (roomsBelow > 0) moreRooms(roomsBelow) else MORE_BELOW
 
 /** The pill over the grid's foot: the rooms after the last row wholly on screen: "1 more room", "3 more rooms" (9 §4.4). */
 fun moreRooms(count: Int): String = "$count more ${if (count == 1) "room" else "rooms"}"

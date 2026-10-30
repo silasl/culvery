@@ -26,6 +26,9 @@ fun allOffLit(rooms: List<LightRoom>, leftOut: Set<String>): Boolean = rooms.any
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class LightsView @Inject constructor(bridges: Bridges, settings: LightsSettings, @ApplicationScope scope: CoroutineScope) {
+    /** Whether a bridge is paired, known from the first frame so a Plugs-only tab never draws the tray. */
+    val paired: StateFlow<Boolean> = bridges.system.map { it != null }.distinctUntilChanged()
+        .stateIn(scope, SharingStarted.Eagerly, bridges.system.value != null)
     val rooms: Flow<List<LightRoom>> = bridges.system.flatMapLatest { it?.rooms ?: flowOf(emptyList()) }
     val problem: Flow<LightsProblem?> = bridges.system.flatMapLatest { it?.problem ?: flowOf(null) }
 

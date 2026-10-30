@@ -55,6 +55,7 @@ import uk.co.siland.culvery.capability.lights.LightsPermissions
 import uk.co.siland.culvery.capability.lights.LightsProblem
 import uk.co.siland.culvery.capability.lights.RELAX
 import uk.co.siland.culvery.capability.lights.TestAccess
+import uk.co.siland.culvery.capability.lights.TestLightsSection
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.room
 import uk.co.siland.culvery.core.ui.Culvery
@@ -195,7 +196,7 @@ class LightsTabTest {
     fun theHeaderCountsTheRoomsOn() {
         show()
         compose.onNodeWithText("Lights").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertIsDisplayed()
-        compose.onNodeWithText("2 of 3 rooms on · Hue Bridge").assertIsDisplayed()
+        compose.onNodeWithText("2 of 3 rooms on").assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -215,7 +216,7 @@ class LightsTabTest {
         assertThat(allOff.left).isAtLeast(title.right - 1f)
         assertThat(holiday.left).isGreaterThan(allOff.left)
         val tray = compose.onNodeWithTag("lights_tray").fetchSemanticsNode().boundsInRoot
-        val subtitle = compose.onNodeWithText("2 of 3 rooms on · Hue Bridge").fetchSemanticsNode().boundsInRoot
+        val subtitle = compose.onNodeWithText("2 of 3 rooms on").fetchSemanticsNode().boundsInRoot
         assertThat(tray.bottom).isWithin(1f).of(subtitle.bottom)
         compose.onNodeWithTag("lights_card_all_off").assertDoesNotExist()
         compose.onNodeWithTag("lights_card_holiday").assertDoesNotExist()
@@ -251,7 +252,7 @@ class LightsTabTest {
         show(rooms = emptyList(), status = problemLine(LightsProblem.UNPAIRED))
         compose.onNodeWithTag("lights_status").assertIsDisplayed()
         assertThat(top("lights_status")).isAtLeast(compose.onNodeWithText("Lights").fetchSemanticsNode().boundsInRoot.bottom - 1f)
-        compose.onNodeWithText("0 of 0 rooms on · Hue Bridge").assertDoesNotExist()
+        compose.onNodeWithText("0 of 0 rooms on").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -310,12 +311,9 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /**
-     * 9 §2.5. Fails if eight scenes at a large font on six cards stay on one line, or a chip is cut: every chip wraps onto
-     * the card's lines and, where they outgrow the card, is reached by scrolling the chip area.
-     */
+    /** 9 §2.5, 15a §4.5. Fails if eight scenes at a large font stay on one line, or a chip is cut: every chip wraps onto the card's lines and the card grows to hold them. */
     @Test
-    fun manyScenesWrapAndScrollInTheCardNotClipped() {
+    fun manyScenesWrapAndTheCardGrowsToHoldThem() {
         val scenes = (1..8).map { LightScene("s$it-id", "Scene number $it") }
         val rooms = listOf("Lounge", "Kitchen", "Hall", "Garden", "Front Door", "Back Garden").map { room(it, on = true, scenes = scenes) }
         compose.setContent {
@@ -327,21 +325,17 @@ class LightsTabTest {
                 }
             }
         }
-        listOf("Lounge-id", "Back Garden-id").forEach { id ->
-            val area = compose.onNodeWithTag("lights_room_${id}_scenes")
+        listOf("Lounge-id", "Hall-id").forEach { id ->
+            val area = compose.onNodeWithTag("lights_room_${id}_scenes").fetchSemanticsNode().boundsInRoot
             val card = compose.onNodeWithTag("lights_room_$id").fetchSemanticsNode().boundsInRoot
+            assertThat(area.bottom).isAtMost(card.bottom)
             val tops = scenes.map { scene ->
-                val tag = "lights_room_${id}_scene_${scene.id}"
-                area.performScrollToNode(hasTestTag(tag))
-                val chip = compose.onNodeWithTag(tag).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-                val shown = area.fetchSemanticsNode().boundsInRoot
-                assertThat(chip.top).isAtLeast(shown.top - 0.5f)
-                assertThat(chip.bottom).isAtMost(shown.bottom + 0.5f)
-                assertThat(chip.left).isAtLeast(shown.left - 0.5f)
-                assertThat(chip.right).isAtMost(shown.right + 0.5f)
-                assertThat(shown.bottom).isAtMost(card.bottom)
-                // In the area's own coordinates, so a chip scrolled into view is placed where it sits in the flow.
-                chip.top - shown.top + (area.fetchSemanticsNode().config.getOrNull(SemanticsProperties.VerticalScrollAxisRange)?.value?.invoke() ?: 0f)
+                val chip = compose.onNodeWithTag("lights_room_${id}_scene_${scene.id}").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                assertThat(chip.top).isAtLeast(area.top - 0.5f)
+                assertThat(chip.bottom).isAtMost(area.bottom + 0.5f)
+                assertThat(chip.left).isAtLeast(area.left - 0.5f)
+                assertThat(chip.right).isAtMost(area.right + 0.5f)
+                chip.top
             }
             assertThat(tops.distinct().size).isGreaterThan(1)
         }
@@ -407,6 +401,78 @@ class LightsTabTest {
     fun beforeTheFirstReadItIsLooking() {
         show(rooms = emptyList())
         compose.onNodeWithText("Looking for the lights…").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §4.5. Fails if the section isn't followed from the moment the tab shows, even with its plugs scrolled out of view, or still is once the tab goes. */
+    @Test
+    fun theSectionIsWatchedWhileTheTabShows() = runBlocking {
+        val h = lights.tabHost(lounge, kitchen, hall)
+        val section = TestLightsSection(tiles = 12, tileHeight = 200.dp)
+        var shown by mutableStateOf(true)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                if (shown) Box(Modifier.size(900.dp, 400.dp)) { LightsTabHost(h.view, h.actions, h.house, h.follow, listOf(section)) }
+            }
+        }
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_room_Lounge-id") == 1 }
+        compose.onNodeWithTag("test_plug_11").assertDoesNotExist()
+        assertThat(section.watching).isEqualTo(1)
+        shown = false
+        compose.waitUntil(5_000) { compose.waitForIdle(); section.watching == 0 }
+    }
+
+    /** 15a §4.5. Fails if the header leaves out the plugs, or shows them when the section isn't shown. */
+    @Test
+    fun theHeaderReadsTheSummary() = runBlocking {
+        val h = lights.tabHost(lounge, kitchen, hall)
+        val section = TestLightsSection(shown = true, summary = "1 of 2 plugs on")
+        compose.setContent {
+            CulveryTheme(dark = true) { Box(Modifier.size(900.dp, 800.dp)) { LightsTabHost(h.view, h.actions, h.house, h.follow, listOf(section)) } }
+        }
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_room_Lounge-id") == 1 }
+        compose.onNodeWithText("Lights and plugs").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertIsDisplayed()
+        compose.onNodeWithText("2 of 3 rooms on · 1 of 2 plugs on").assertIsDisplayed()
+        section.summaryFlow.value = null
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("plugs_section") == 1 }
+        compose.onNodeWithText("2 of 3 rooms on").assertIsDisplayed()
+        section.shownFlow.value = false
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("plugs_section") == 0 }
+        compose.onNodeWithText("Lights").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §4.5. Fails if Holiday lights leaves the tray when plugs join the tab. */
+    @Test
+    fun holidayLightsStaysInTheTray() = runBlocking {
+        val h = lights.tabHost(lounge)
+        compose.setContent {
+            CulveryTheme(dark = true) { Box(Modifier.size(900.dp, 800.dp)) { LightsTabHost(h.view, h.actions, h.house, h.follow, listOf(TestLightsSection())) } }
+        }
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_tray_holiday") == 1 }
+        compose.onNodeWithTag("lights_tray_holiday").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §4.5. Fails if a house with no bridge gets the tray, the looking line or a room grid, or loses its plugs. */
+    @Test
+    fun plugsOnlyHasNoTrayAndNoRooms() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Box(Modifier.size(900.dp, 800.dp)) {
+                    LightsTab(
+                        emptyList(), false, false, null, null, null, emptyMap(), null, {}, house, roomActions,
+                        sections = listOf(TestLightsSection()), plugsSummary = "1 of 2 plugs on", hasBridge = false,
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Plugs").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertIsDisplayed()
+        compose.onNodeWithText("1 of 2 plugs on").assertIsDisplayed()
+        compose.onNodeWithTag("plugs_section").assertIsDisplayed()
+        compose.onNodeWithTag("lights_tray").assertDoesNotExist()
+        compose.onNodeWithText("Looking for the lights…").assertDoesNotExist()
+        assertThat(tagCount("lights_room_Lounge-id")).isEqualTo(0)
         compose.assertClickablesHaveRoleAndLabel()
     }
 

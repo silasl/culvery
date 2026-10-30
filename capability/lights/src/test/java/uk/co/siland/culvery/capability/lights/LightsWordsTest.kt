@@ -72,12 +72,38 @@ class LightsWordsTest {
             .isEqualTo("2 rooms didn’t turn off. Try again. Culvery couldn’t start Mimic presence. Start it in the Hue app.")
     }
 
-    /** 9 §4.4. Fails if the tab's subtitle counts the rooms on wrongly or loses the bridge's name. */
+    /** 9 §4.4. Fails if the rooms-on count is wrong or still ends with the bridge's name. */
     @Test
     fun roomsOnCounts() {
-        assertThat(roomsOn(listOf(room("Lounge", on = true), room("Kitchen"), room("Hall", on = true)))).isEqualTo("2 of 3 rooms on · Hue Bridge")
-        assertThat(roomsOn(listOf(room("Kitchen")))).isEqualTo("0 of 1 room on · Hue Bridge")
-        assertThat(roomsOn(listOf(room("Lounge", on = true)))).isEqualTo("1 of 1 room on · Hue Bridge")
+        assertThat(roomsOn(listOf(room("Lounge", on = true), room("Kitchen"), room("Hall", on = true)))).isEqualTo("2 of 3 rooms on")
+        assertThat(roomsOn(listOf(room("Kitchen")))).isEqualTo("0 of 1 room on")
+        assertThat(roomsOn(listOf(room("Lounge", on = true)))).isEqualTo("1 of 1 room on")
+    }
+
+    /** 15a §4.5. Fails if a house with both, lights only or plugs only is titled anything else. */
+    @Test
+    fun titles() {
+        assertThat(tabTitle(hasLights = true, hasPlugs = true)).isEqualTo("Lights and plugs")
+        assertThat(tabTitle(hasLights = true, hasPlugs = false)).isEqualTo("Lights")
+        assertThat(tabTitle(hasLights = false, hasPlugs = true)).isEqualTo("Plugs")
+    }
+
+    /** 15a §4.5. Fails if the subtitle isn't both counts joined by a dot, or the part there is, or null with neither. */
+    @Test
+    fun summaryJoinsWhatThereIs() {
+        val rooms = listOf(room("Lounge", on = true), room("Kitchen", on = true))
+        assertThat(tabSummary(rooms, "1 of 2 plugs on")).isEqualTo("2 of 2 rooms on · 1 of 2 plugs on")
+        assertThat(tabSummary(rooms, null)).isEqualTo("2 of 2 rooms on")
+        assertThat(tabSummary(emptyList(), "1 of 2 plugs on")).isEqualTo("1 of 2 plugs on")
+        assertThat(tabSummary(emptyList(), null)).isNull()
+    }
+
+    /** 15a §4.5. Fails if the pill stops counting rooms while some are below, or has no words once only plugs are. */
+    @Test
+    fun morePill() {
+        assertThat(morePill(1)).isEqualTo("1 more room")
+        assertThat(morePill(2)).isEqualTo("2 more rooms")
+        assertThat(morePill(0)).isEqualTo("More below")
     }
 
     /** 9 §4.4. Fails if the pill says "1 more rooms", or loses the plural past one. */

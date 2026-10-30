@@ -2,20 +2,15 @@ package uk.co.siland.culvery.capability.lights.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridLayoutInfo
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,7 +19,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -35,7 +29,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.lights.LightRoom
-import uk.co.siland.culvery.capability.lights.moreRooms
+import uk.co.siland.culvery.capability.lights.morePill
+import uk.co.siland.culvery.core.plugin.LightsTabSection
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.Culvery
@@ -58,24 +53,24 @@ internal fun openedOrder(previous: List<String>?, rooms: List<LightRoom>): List<
     return previous.filter { it in listed } + ids.filter { it !in kept }
 }
 
-/** From seven rooms the rows keep a fixed height and scroll (9 §4.4). */
-internal fun scrolls(count: Int): Boolean = count >= 7
-
-/** The rooms after the last row wholly in the viewport; the header is item 0. */
+/** The rooms after the last row wholly in the viewport; the header is item 0, the rooms 1…[count], the sections after. */
 private fun roomsBelow(info: LazyGridLayoutInfo, count: Int): Int {
-    val rooms = info.visibleItemsInfo.filter { it.index > 0 }
+    if (count == 0) return 0
+    val visible = info.visibleItemsInfo
+    val rooms = visible.filter { it.index in 1..count }
+    if (rooms.isEmpty()) return if ((visible.minOfOrNull { it.index } ?: 0) > count) 0 else count
     val whole = rooms.filter { it.offset.y >= info.viewportStartOffset && it.offset.y + it.size.height <= info.viewportEndOffset }
-    val shownUpTo = whole.maxOfOrNull { it.index } ?: ((rooms.minOfOrNull { it.index } ?: 1) - 1)
+    val shownUpTo = whole.maxOfOrNull { it.index } ?: (rooms.minOf { it.index } - 1)
     return count - shownUpTo
 }
 
 private class Kept(var order: List<String>? = null)
 
 /**
- * The tab's rooms in the order they had when it opened (9 §4.4, §6.9). Up to six share the space under [header] in
- * [gridColumns] columns and nothing scrolls; from seven, [header] is the first item of a three-column grid of fixed rows
- * that scrolls under a fade, with a pill counting the rooms below. A [focus] naming a listed room is brought into view
- * once the order is set, then handed back through [onFocused].
+ * The tab's rooms in the order they had when it opened (9 §4.4, §6.9), then the [sections], in one grid that scrolls
+ * (15a §4.5): [header] is the first item, the rooms follow in [gridColumns] columns and wrap their content, each section
+ * takes a full row. While there is more below, a fade and a pill count the rooms still to come. A [focus] naming a
+ * listed room is brought into view once the order is set, then handed back through [onFocused].
  */
 @Composable
 internal fun LightsGrid(
@@ -86,6 +81,7 @@ internal fun LightsGrid(
     onFocused: () -> Unit,
     header: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    sections: List<LightsTabSection> = emptyList(),
 ) {
     val kept = remember { Kept() }
     val order = remember(rooms) { openedOrder(kept.order, rooms) }
@@ -95,28 +91,21 @@ internal fun LightsGrid(
         order.orEmpty().mapNotNull { byId[it] }
     }
     // Laid out by the kept order, so a bridge that drops and comes back keeps the grid and its place.
-    val scrolling = scrolls(order.orEmpty().size)
+    val columns = gridColumns(order.orEmpty().size)
     val grid = rememberLazyGridState()
     val handBack by rememberUpdatedState(onFocused)
     LaunchedEffect(focus, order, shown.isEmpty()) {
         if (focus == null || shown.isEmpty()) return@LaunchedEffect
         val at = shown.indexOfFirst { it.id == focus }
-        if (at >= 0 && scrolling) grid.scrollToItem(at + 1)
+        if (at >= 0) grid.scrollToItem(at + 1)
         handBack()
-    }
-    if (!scrolling) {
-        Column(modifier.fillMaxSize()) {
-            header()
-            Box(Modifier.weight(1f)) { SharedRows(shown, lines, actions) }
-        }
-        return
     }
     val c = Culvery.colors
     val scope = rememberCoroutineScope()
     val below by remember(grid, shown.size) { derivedStateOf { roomsBelow(grid.layoutInfo, shown.size) } }
     Box(modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(GRID_COLUMNS),
+            columns = GridCells.Fixed(columns),
             state = grid,
             horizontalArrangement = Arrangement.spacedBy(LightsDimens.gridGap),
             contentPadding = PaddingValues(bottom = ButtonTokens.regularHeight + LightsDimens.pillFoot),
@@ -125,14 +114,18 @@ internal fun LightsGrid(
             item(key = HEADER_KEY, span = { GridItemSpan(maxLineSpan) }) { header() }
             // The header ends with its own gap, so only the rows after the first take one above.
             itemsIndexed(shown, key = { _, it -> it.id }) { i, it ->
-                val above = if (i >= GRID_COLUMNS) LightsDimens.gridGap else 0.dp
-                LightsRoomCard(it, lines[it.id], actions, Modifier.padding(top = above).height(LightsDimens.fixedRow))
+                val above = if (i >= columns) LightsDimens.gridGap else 0.dp
+                LightsRoomCard(it, lines[it.id], actions, Modifier.padding(top = above))
+            }
+            items(sections, key = { it.javaClass.name }, span = { GridItemSpan(maxLineSpan) }) {
+                val above = if (shown.isEmpty()) 0.dp else LightsDimens.gridGap
+                it.Content(Modifier.padding(top = above).testTag("plugs_section"))
             }
         }
-        if (below > 0) {
+        if (grid.canScrollForward) {
             HhBottomFade(c.bg, LightsDimens.gridFade, Modifier.align(Alignment.BottomCenter))
             HhButton(
-                moreRooms(below),
+                morePill(below),
                 { scope.launch { grid.animateScrollBy(grid.layoutInfo.viewportSize.height.toFloat()) } },
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -147,18 +140,3 @@ internal fun LightsGrid(
 }
 
 private const val HEADER_KEY = "header"
-private const val GRID_COLUMNS = 3
-
-/** Up to six rooms in rows that share the height, the last row's empty places left blank so the columns hold. */
-@Composable
-private fun SharedRows(rooms: List<LightRoom>, lines: Map<String, String>, actions: RoomActions) {
-    val columns = gridColumns(rooms.size)
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(LightsDimens.gridGap)) {
-        rooms.chunked(columns).forEach { row ->
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LightsDimens.gridGap)) {
-                row.forEach { key(it.id) { LightsRoomCard(it, lines[it.id], actions, Modifier.weight(1f).fillMaxHeight()) } }
-                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}

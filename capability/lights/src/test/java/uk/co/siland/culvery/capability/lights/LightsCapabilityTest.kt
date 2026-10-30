@@ -11,6 +11,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.LightsTabSection
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.Icons
@@ -21,14 +22,17 @@ class LightsCapabilityTest {
     private val scope = lights.scope
     private val settings get() = lights.settings
 
-    private fun capability(providers: Set<LightsProvider> = setOf(TestLightsProvider())): LightsCapability {
+    private fun capability(
+        providers: Set<LightsProvider> = setOf(TestLightsProvider()),
+        sections: Set<LightsTabSection> = emptySet(),
+    ): LightsCapability {
         val bridges = Bridges(providers, settings, scope)
         val house = LightsHouse(bridges, settings)
         return LightsCapability(
             bridges, LightsView(bridges, settings, scope),
             LightsActions({ bridges.system.value }, scope, System::currentTimeMillis, house, TestAccess(null)),
             house, LightsFollow(bridges.system, MutableStateFlow(true), scope),
-            settings, LightsConnect(bridges.connectable, settings::connect), RecordingToaster(),
+            settings, LightsConnect(bridges.connectable, settings::connect), RecordingToaster(), sections,
         )
     }
 
@@ -91,5 +95,34 @@ class LightsCapabilityTest {
         val layout = HomeCardPlacer.place(others + card)
         assertThat(layout.left?.id).isEqualTo("calendar.today")
         assertThat(layout.right.map { it.id }).containsExactly("lights.home", "music.now").inOrder()
+    }
+
+    /** 15a §4.5, Ruling 6: with no bridge and a section shown the tab is Plugs, with the power icon and no Home card. Fails if the rail still says Lights, the tab hides, or a card shows. */
+    @Test
+    fun plugsOnlyShowsTheTabAsPlugs() = runTest {
+        val section = TestLightsSection()
+        val lights = capability(sections = setOf(section))
+        soon { lights.hasTab.first { it } }
+        assertThat(lights.railLabel.first()).isEqualTo("Plugs")
+        assertThat(lights.railIcon.first()).isEqualTo(Icons.POWER)
+        assertThat(lights.cards().first()).isEmpty()
+    }
+
+    /** 15a §4.5. Fails if a house with a bridge and plugs relabels its rail tab. */
+    @Test
+    fun lightsAndPlugsKeepTheRailLabelLights() = runTest {
+        val lights = capability(sections = setOf(TestLightsSection()))
+        settings.connect("lights.hue", link())
+        soon { lights.cards().first { it.isNotEmpty() } }
+        assertThat(lights.hasTab.first()).isTrue()
+        assertThat(lights.railLabel.first()).isEqualTo("Lights")
+        assertThat(lights.railIcon.first()).isEqualTo(Icons.LIGHTBULB)
+    }
+
+    /** 15a §4.5. Fails if the tab shows with no bridge and no section shown, or a hidden section brings it back. */
+    @Test
+    fun neitherHidesTheTab() = runTest {
+        assertThat(capability().hasTab.first()).isFalse()
+        assertThat(capability(sections = setOf(TestLightsSection(shown = false))).hasTab.first()).isFalse()
     }
 }

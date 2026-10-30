@@ -14,6 +14,7 @@ import uk.co.siland.culvery.capability.lights.LightsProvider
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.LightsTabSection
 import uk.co.siland.culvery.core.plugin.Startable
 
 @Module
@@ -22,6 +23,10 @@ abstract class LightsModule {
     // With no provider bound there is no Lights tab (7 §3.1).
     @Multibinds
     abstract fun providers(): Set<LightsProvider>
+
+    // Plugs binds its section here (15a §4.5); with none, the tab is Lights alone.
+    @Multibinds
+    abstract fun sections(): Set<LightsTabSection>
 
     @Binds
     @IntoSet

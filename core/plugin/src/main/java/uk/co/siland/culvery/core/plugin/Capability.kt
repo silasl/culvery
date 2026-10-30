@@ -9,6 +9,12 @@ interface Capability : HomeCardContributor {
     val label: String
     /** Material Symbols ligature name for the nav rail. */
     val icon: String
+    /** The rail tab's label, which may change while the app runs (15a §4.5); [label] by default. */
+    val railLabel: Flow<String> get() = flowOf(label)
+
+    /** The rail tab's icon, which may change while the app runs (15a §4.5); [icon] by default. */
+    val railIcon: Flow<String> get() = flowOf(icon)
+
     /** Rail position: Calendar 10, Music 30, Lights 40, Door 50, Plugs 55, Weather 60, Hoover 70 (no tab). */
     val order: Int
     /** True when at least one connection provides this capability and it has a tab. */

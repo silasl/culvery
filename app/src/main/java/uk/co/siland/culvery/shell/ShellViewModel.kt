@@ -103,7 +103,11 @@ class ShellViewModel @Inject constructor(
                             .onStart { emit(false) },
                         cap.badge.retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its badge (${it::class.simpleName}); retrying") }
                             .onStart { emit(null) },
-                    ) { shown, badge -> if (shown) TabItem(cap.id, cap.label, cap.icon, badge) else null }
+                        cap.railLabel.retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its rail label (${it::class.simpleName}); retrying") }
+                            .onStart { emit(cap.label) },
+                        cap.railIcon.retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its rail icon (${it::class.simpleName}); retrying") }
+                            .onStart { emit(cap.icon) },
+                    ) { shown, badge, label, icon -> if (shown) TabItem(cap.id, label, icon, badge) else null }
                 },
             ) {
                 it.filterNotNull()

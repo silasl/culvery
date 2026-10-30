@@ -31,6 +31,8 @@ class FakeCapability(
     override val icon = "star"
     val shownFlow = MutableStateFlow(shown)
     override val hasTab: Flow<Boolean> = shownFlow
+    val railLabelFlow = MutableStateFlow(label)
+    override val railLabel: Flow<String> = railLabelFlow
     val badgeFlow = MutableStateFlow<RailBadge?>(null)
     override val badge: Flow<RailBadge?> = badgeFlow
     override fun cards(): Flow<List<HomeCard>> = flowOf(cardList)
@@ -45,6 +47,17 @@ class NeverEmittingCapability(override val id: String, override val order: Int) 
     override val icon = "star"
     override val hasTab: Flow<Boolean> = flow { awaitCancellation() }
     override fun cards(): Flow<List<HomeCard>> = flow { awaitCancellation() }
+    @Composable override fun TabContent() {}
+}
+
+/** A capability with a tab whose rail label and icon never emit, to prove they can't hide or block its tab. */
+class NeverEmittingRailCapability(override val id: String, override val order: Int) : Capability {
+    override val label = id.replaceFirstChar { it.uppercase() }
+    override val icon = "star"
+    override val hasTab: Flow<Boolean> = flowOf(true)
+    override val railLabel: Flow<String> = flow { awaitCancellation() }
+    override val railIcon: Flow<String> = flow { awaitCancellation() }
+    override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
     @Composable override fun TabContent() {}
 }
 

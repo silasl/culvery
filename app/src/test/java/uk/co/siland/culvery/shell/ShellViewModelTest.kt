@@ -594,6 +594,28 @@ class ShellViewModelTest {
         }
     }
 
+    /** 15a §4.5: the rail follows a capability's label as it changes, as Lights becomes Plugs. */
+    @Test
+    fun aRailLabelChangeReachesTheRail() = runTest {
+        val lights = FakeCapability("lights", order = 40, shown = true)
+        vm(setOf(lights)).uiState.test {
+            assertThat(expectMostRecentItem().tabs.single().label).isEqualTo("Lights")
+            lights.railLabelFlow.value = "Plugs"
+            assertThat(awaitItem().tabs.single().label).isEqualTo("Plugs")
+        }
+    }
+
+    /** 15a §4.5: a rail label that never answers shows the tab under its own label, not no tab. */
+    @Test
+    fun aRailLabelThatNeverEmitsDoesntBlockTheRail() = runTest {
+        vm(setOf(NeverEmittingRailCapability("lights", order = 40), FakeCapability("calendar", order = 10, shown = true))).uiState.test {
+            val tabs = expectMostRecentItem().tabs
+            assertThat(tabs.map { it.id }).containsExactly("calendar", "lights").inOrder()
+            assertThat(tabs.last().label).isEqualTo("Lights")
+            assertThat(tabs.last().icon).isEqualTo("star")
+        }
+    }
+
     /** 5 §3.3: any capability can mark its tab; the shell passes the mark to the rail as it changes. */
     @Test
     fun aTabCarriesItsCapabilitysBadge() = runTest {
