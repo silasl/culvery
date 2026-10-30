@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -100,12 +103,13 @@ class DisplaySettingsPageTest {
         previewing: SeasonalTheme? = null,
         dates: Map<SeasonalTheme, SeasonDates> = defaultSeasonDates(),
         next: Pair<SeasonalTheme, LocalDate>? = null,
+        today: LocalDate = TODAY,
     ) {
         compose.setContent {
             CompositionLocalProvider(LocalOverlayHost provides overlay) {
                 CulveryTheme(dark = true) {
                     Box {
-                        InSettingsPane { DisplaySettingsScreen(DisplaySettingsUi(prefs, camera, sunKnown, TODAY, previewing, dates, next), actions) }
+                        InSettingsPane { DisplaySettingsScreen(DisplaySettingsUi(prefs, camera, sunKnown, today, previewing, dates, next), actions) }
                         overlay.content?.invoke()
                     }
                 }
@@ -380,8 +384,8 @@ class DisplaySettingsPageTest {
 
     private fun day(month: Int, day: Int) = compose.onNodeWithTag("day_${LocalDate.of(2026, month, day)}")
 
-    private fun openHalloweenDates(dates: SeasonDates = SeasonalTheme.HALLOWEEN.defaultDates) {
-        show(dates = mapOf(SeasonalTheme.HALLOWEEN to dates))
+    private fun openHalloweenDates(dates: SeasonDates = SeasonalTheme.HALLOWEEN.defaultDates, today: LocalDate = TODAY) {
+        show(dates = mapOf(SeasonalTheme.HALLOWEEN to dates), today = today)
         compose.onNodeWithTag("display_dates_halloween").performScrollTo().performClick()
         compose.waitForIdle()
     }
@@ -395,6 +399,58 @@ class DisplaySettingsPageTest {
         assertThat(checkRange(LocalDate.of(2026, 12, 20), LocalDate.of(2027, 1, 2))).isNull()
         assertThat(checkRange(LocalDate.of(2026, 10, 24), LocalDate.of(2027, 10, 24)))
             .isEqualTo("A theme can show for a year at most. Tap a last day before 24 Oct 2027.")
+    }
+
+    /** Fails if the sheet opens on the wrong run: the one holding today, else the next to start; a wrapped end lands in the new year. */
+    @Test
+    fun shownRangeIsTheRunHoldingTodayElseTheNext() {
+        val halloween = SeasonalTheme.HALLOWEEN.defaultDates
+        assertThat(shownRange(LocalDate.of(2026, 10, 30), halloween)).isEqualTo(LocalDate.of(2026, 10, 24) to LocalDate.of(2026, 10, 31))
+        assertThat(shownRange(LocalDate.of(2026, 11, 1), halloween)).isEqualTo(LocalDate.of(2027, 10, 24) to LocalDate.of(2027, 10, 31))
+        assertThat(shownRange(LocalDate.of(2026, 9, 15), halloween)).isEqualTo(LocalDate.of(2026, 10, 24) to LocalDate.of(2026, 10, 31))
+        val christmas = SeasonDates(MonthDay.of(12, 20), MonthDay.of(1, 2))
+        assertThat(shownRange(LocalDate.of(2027, 1, 1), christmas)).isEqualTo(LocalDate.of(2026, 12, 20) to LocalDate.of(2027, 1, 2))
+        assertThat(shownRange(LocalDate.of(2026, 12, 25), christmas)).isEqualTo(LocalDate.of(2026, 12, 20) to LocalDate.of(2027, 1, 2))
+        assertThat(shownRange(LocalDate.of(2026, 6, 1), christmas)).isEqualTo(LocalDate.of(2026, 12, 20) to LocalDate.of(2027, 1, 2))
+    }
+
+    /** Fails if a 29 Feb end in a year without one isn't the 28th. */
+    @Test
+    fun shownRangeKeepsALeapDayEndInANonLeapYear() {
+        val february = SeasonDates(MonthDay.of(2, 1), MonthDay.of(2, 29))
+        assertThat(shownRange(LocalDate.of(2027, 2, 10), february)).isEqualTo(LocalDate.of(2027, 2, 1) to LocalDate.of(2027, 2, 28))
+        assertThat(shownRange(LocalDate.of(2028, 2, 10), february)).isEqualTo(LocalDate.of(2028, 2, 1) to LocalDate.of(2028, 2, 29))
+    }
+
+    /** Fails if, during the dates, the sheet doesn't open on that month with the saved first day, last day and the days between shown as picked. */
+    @Test
+    fun theSheetOpensOnTheSavedDatesPicked() {
+        openHalloweenDates(today = LocalDate.of(2026, 10, 30))
+        compose.onNodeWithTag("month_title").assertTextEquals("October 2026")
+        day(10, 24).assertIsSelected()
+        day(10, 31).assertIsSelected()
+        day(10, 27).assertIsNotSelected()
+        day(10, 24).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "first day"))
+        day(10, 27).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "in the range"))
+        day(10, 31).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "last day"))
+        compose.onNodeWithTag("display_dates_save").assertIsEnabled()
+    }
+
+    /** Fails if, outside the dates, the sheet doesn't open on the next run's month. */
+    @Test
+    fun outsideTheDatesTheSheetOpensOnTheNextRun() {
+        openHalloweenDates(today = LocalDate.of(2026, 11, 1))
+        compose.onNodeWithTag("month_title").assertTextEquals("October 2027")
+    }
+
+    /** Fails if a tap on an opened sheet doesn't start a fresh pick. */
+    @Test
+    fun aTapAfterTheSavedRangeStartsAFreshPick() {
+        openHalloweenDates(today = LocalDate.of(2026, 10, 30))
+        day(10, 26).performClick()
+        day(10, 24).assertIsNotSelected()
+        day(10, 26).assertIsSelected()
+        compose.onNodeWithTag("display_dates_save").assertIsNotEnabled()
     }
 
     /** Fails if a theme's row doesn't name it and its dates, or its click doesn't say what it does. */
@@ -450,7 +506,6 @@ class DisplaySettingsPageTest {
     @Test
     fun saveWaitsForTwoDays() {
         openHalloweenDates()
-        compose.onNodeWithTag("display_dates_save").assertIsNotEnabled()
         day(10, 20).performClick()
         compose.onNodeWithTag("display_dates_save").assertIsNotEnabled()
     }

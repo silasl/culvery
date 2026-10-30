@@ -78,9 +78,6 @@ class DisplaySettingsScreenshotTest {
 
     private fun datesSheet(name: String, dark: Boolean) = snap(name, dark, CameraState.ALLOWED) {
         compose.onNodeWithTag("display_dates_halloween").performScrollTo().performClick()
-        compose.onNodeWithTag("day_2026-10-20").performClick()
-        compose.onNodeWithTag("month_next").performClick()
-        compose.onNodeWithTag("day_2026-11-02").performClick()
         compose.waitForIdle()
     }
 

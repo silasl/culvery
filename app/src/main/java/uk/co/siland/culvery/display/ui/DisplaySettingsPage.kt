@@ -155,6 +155,17 @@ internal fun checkRange(first: LocalDate, last: LocalDate): String? = when {
     else -> null
 }
 
+/** The days the dates sheet opens on: the run holding [today], else the next one to start; an end before the start lands in the next year. */
+internal fun shownRange(today: LocalDate, dates: SeasonDates): Pair<LocalDate, LocalDate> {
+    val startYear = when {
+        today !in dates -> if (dates.start.atYear(today.year).isBefore(today)) today.year + 1 else today.year
+        dates.end < dates.start && MonthDay.from(today) <= dates.end -> today.year - 1
+        else -> today.year
+    }
+    val endYear = if (dates.end < dates.start) startYear + 1 else startYear
+    return dates.start.atYear(startYear) to dates.end.atYear(endYear)
+}
+
 @Composable
 fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions) {
     val c = Culvery.colors
@@ -211,7 +222,7 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
     }
 }
 
-/** A theme's dates sheet: the first tap is the first day, the second the last; Save waits for a last day that passes [checkRange] (14 §4.5). */
+/** A theme's dates sheet, opened with the saved run picked: a tap after a complete range starts a new pick; Save waits for a last day that passes [checkRange] (14 §4.5). */
 @Composable
 private fun DatesSheet(
     theme: SeasonalTheme,
@@ -223,12 +234,10 @@ private fun DatesSheet(
     onClose: () -> Unit,
 ) {
     val c = Culvery.colors
-    var month by remember {
-        val start = saved.start.atYear(today.year)
-        mutableStateOf(YearMonth.from(if (start.isBefore(today)) start.plusYears(1) else start))
-    }
-    var first by remember { mutableStateOf<LocalDate?>(null) }
-    var last by remember { mutableStateOf<LocalDate?>(null) }
+    val shown = remember { shownRange(today, saved) }
+    var month by remember { mutableStateOf(YearMonth.from(shown.first)) }
+    var first by remember { mutableStateOf<LocalDate?>(shown.first) }
+    var last by remember { mutableStateOf<LocalDate?>(shown.second) }
     val firstDay = first
     val lastDay = last
     val refusal = if (firstDay != null && lastDay != null) checkRange(firstDay, lastDay) else null
