@@ -185,7 +185,7 @@ class ContrastTest {
         check("light clash tag (4.552)", light.weather, light.weather.over(HhAlpha.clash(light), light.surf), 4.55)
     }
 
-    /** Warning red must not read as the theme's accent (14 §1). */
+    /** Warning red must not read as the theme's accent (14 §1). **pin** for the Halloween entries: they passed against the stubs. */
     @Test
     fun dangerAndAccentStayApart() {
         themes.forEach { (name, t) ->
@@ -193,7 +193,7 @@ class ContrastTest {
         }
     }
 
-    /** No text is drawn over the sky (it sits in the header's open band), so the moon and bats only need to stand off the background (14 §4.3). */
+    /** No text is drawn over the sky (it sits in the header's open band), so the moon and bats only need to stand off the background (14 §4.3). **pin**: it passed against the stubs. */
     @Test
     fun theMoonAndBatsStandOffTheBackground() {
         halloween.forEach { (name, t) ->
@@ -202,6 +202,7 @@ class ContrastTest {
         }
     }
 
+    /** **pin**: the web sits under card text, and the text reads over it (14 §4.3). It passed against the stubs. */
     @Test
     fun theWebReadsUnderCardText() {
         halloween.forEach { (name, t) ->

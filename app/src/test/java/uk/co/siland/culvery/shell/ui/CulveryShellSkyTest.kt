@@ -40,6 +40,7 @@ import uk.co.siland.culvery.core.ui.HalloweenNight
 import uk.co.siland.culvery.core.ui.HalloweenDimens
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.moonIn
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.shell.ShellUiState
 import uk.co.siland.culvery.shell.TabItem
 
@@ -96,6 +97,7 @@ class CulveryShellSkyTest {
             compose.onNodeWithTag(it).fetchSemanticsNode().config.getOrNull(SemanticsProperties.TraversalIndex)
         }
         assertThat(reading).containsExactly(0f, 1f, 2f).inOrder()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /**
@@ -141,6 +143,7 @@ class CulveryShellSkyTest {
         val moon = moonIn(local, density)
         assertThat(moon.centre.x + moon.radius).isAtMost(local.right)
         assertThat(moon.centre.y + moon.radius).isAtMost(local.bottom)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -153,6 +156,7 @@ class CulveryShellSkyTest {
     fun noSkyOffHome() {
         show(fullHome(dark = true, tab = "door"), SeasonalTheme.HALLOWEEN)
         compose.onAllNodesWithTag("halloween_sky").assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Pin: no theme, no sky. */
@@ -160,6 +164,7 @@ class CulveryShellSkyTest {
     fun noSkyWithoutATheme() {
         show(fullHome(dark = true), null)
         compose.onAllNodesWithTag("halloween_sky").assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     private fun snapshot(): Bitmap {

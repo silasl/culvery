@@ -128,6 +128,7 @@ class ThemeTest {
         assertThat(colorsFor(null, false)).isEqualTo(LightColors)
     }
 
+    /** **pin**: Halloween stays light by day and dark by night, with no border at night (14 §1). */
     @Test
     fun halloweenKeepsTheLightOrDarkReading() {
         assertThat(HalloweenDay.isLight).isTrue()
@@ -143,6 +144,7 @@ class ThemeTest {
         assertThat(PersonChipInk).isEqualTo(Color(0xFF0E1011))
     }
 
+    /** **pin**: Halloween keeps the weather and rain colours of the theme it replaces (14 §1). */
     @Test
     fun halloweenKeepsWeatherAndRain() {
         assertThat(HalloweenNight.weather).isEqualTo(DarkColors.weather)
