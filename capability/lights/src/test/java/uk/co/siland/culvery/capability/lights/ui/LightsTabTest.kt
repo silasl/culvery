@@ -42,6 +42,12 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.runBlocking
+import uk.co.siland.culvery.capability.lights.Bridges
+import uk.co.siland.culvery.capability.lights.LightsActions
+import uk.co.siland.culvery.capability.lights.LightsFollow
+import uk.co.siland.culvery.capability.lights.LightsHouse
+import uk.co.siland.culvery.capability.lights.LightsView
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -434,10 +440,10 @@ class LightsTabTest {
         compose.onNodeWithText("Lights and plugs").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertIsDisplayed()
         compose.onNodeWithText("2 of 3 rooms on · 1 of 2 plugs on").assertIsDisplayed()
         section.summaryFlow.value = null
-        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("plugs_section") == 1 }
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_section") == 1 }
         compose.onNodeWithText("2 of 3 rooms on").assertIsDisplayed()
         section.shownFlow.value = false
-        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("plugs_section") == 0 }
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_section") == 0 }
         compose.onNodeWithText("Lights").assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -469,11 +475,27 @@ class LightsTabTest {
         }
         compose.onNodeWithText("Plugs").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertIsDisplayed()
         compose.onNodeWithText("1 of 2 plugs on").assertIsDisplayed()
-        compose.onNodeWithTag("plugs_section").assertIsDisplayed()
+        compose.onNodeWithTag("lights_section").assertIsDisplayed()
         compose.onNodeWithTag("lights_tray").assertDoesNotExist()
         compose.onNodeWithText("Looking for the lights…").assertDoesNotExist()
         assertThat(tagCount("lights_room_Lounge-id")).isEqualTo(0)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §4.5. Fails if a house with no bridge reads "Lights" for the frame before its plugs section says it is shown. */
+    @Test
+    fun plugsOnlyReadsPlugsOnTheFirstFrame() {
+        val bridges = Bridges(emptySet(), lights.settings, lights.scope)
+        val view = LightsView(bridges, lights.settings, lights.scope)
+        val lightsHouse = LightsHouse(bridges, lights.settings)
+        val actions = LightsActions({ null }, lights.scope, System::currentTimeMillis, lightsHouse, TestAccess(null))
+        val follow = LightsFollow(bridges.system, MutableStateFlow(true), lights.scope)
+        compose.setContent {
+            CulveryTheme(dark = true) { Box(Modifier.size(900.dp, 800.dp)) { LightsTabHost(view, actions, lightsHouse, follow, listOf(TestLightsSection())) } }
+        }
+        compose.onNodeWithText("Plugs").assertIsDisplayed()
+        compose.onNodeWithText("Lights").assertDoesNotExist()
+        compose.onNodeWithTag("lights_tray").assertDoesNotExist()
     }
 
     /** 7 §4.2: Fails if the rooms aren't followed while the tab is on screen, or still are after it goes. */

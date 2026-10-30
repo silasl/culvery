@@ -115,7 +115,9 @@ class DoorAlerts internal constructor(
     }
 
     /** Clear history: the ring card goes whichever ring it shows, as the pictures it may show are deleted. Done when it returns. */
-    suspend fun dismissCard() = lock.withLock { _showing.value?.let { closeShowing(it.eventId) } }
+    suspend fun dismissCard() {
+        lock.withLock { _showing.value?.let { closeShowing(it.eventId) } }
+    }
 
     private fun closeShowing(eventId: Long) {
         if (_showing.value?.eventId == eventId) {

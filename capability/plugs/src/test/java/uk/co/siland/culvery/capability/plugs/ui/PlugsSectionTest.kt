@@ -21,6 +21,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
@@ -48,7 +49,8 @@ class PlugsSectionTest {
     private inner class Host(vararg states: PlugState, role: Role? = Role.ADULT) {
         val rig = PlugsRig(*states)
         val access = TestAccess(role)
-        val actions = PlugActions(access, rig.settings, rig.system, RecordingToaster(), CoroutineScope(Job()))
+        val scope = CoroutineScope(Job())
+        val actions = PlugActions(access, rig.settings, rig.system, RecordingToaster(), scope)
         val section = PlugsSection(setOf(rig.system), actions, rig.settings)
 
         fun show() = compose.setContent {
@@ -163,6 +165,8 @@ class PlugsSectionTest {
         compose.waitFor { count("plug_${FAN}_lock") > 0 }
         compose.onNodeWithTag("plug_${FAN}_switch").performClick()
         compose.waitFor { host.access.asked.size == 1 }
+        // Let the tap's action run to its end, so no switch can't pass by being early.
+        runBlocking { host.scope.coroutineContext.job.children.toList().forEach { it.join() } }
         compose.waitForIdle()
         assertThat(host.rig.system.switches).isEmpty()
         compose.onNodeWithTag("plug_${FAN}_switch").assertContentDescriptionEquals("Switch on, needs a PIN")

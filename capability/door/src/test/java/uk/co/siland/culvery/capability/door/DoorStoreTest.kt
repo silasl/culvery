@@ -180,6 +180,22 @@ class DoorStoreTest {
         }
     }
 
+    /** A corrupt settings file reads as thirty days, so the prune that follows keeps a ten-day-old event. */
+    @Test
+    fun aCorruptSettingsFileDoesNotCutHistory() = runTest {
+        File(folder.root, "door_settings.preferences_pb").writeBytes(byteArrayOf(1, 2, 3, 4, 5))
+        val reader = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val cold = DoorStore(db, ApplicationProvider.getApplicationContext(), doorSettings(folder.root, reader), householdZone())
+            val tenDays = NOW - 10 * 24 * 60 * 60_000L
+            val old = cold.record(ring(key = "old", at = tenDays, whenMillis = tenDays)).event
+            cold.prune(NOW)
+            assertThat(cold.events.first().map { it.id }).containsExactly(old.id)
+        } finally {
+            reader.cancel()
+        }
+    }
+
     /** An unreadable setting is not a choice of two days: no event goes, though the files with no event still do. */
     @Test
     fun anUnreadableSettingDeletesNoRows() = runTest {

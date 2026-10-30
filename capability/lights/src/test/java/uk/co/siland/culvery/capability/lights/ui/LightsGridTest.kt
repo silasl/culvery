@@ -145,8 +145,8 @@ class LightsGridTest {
     fun theSectionFollowsTheRooms() {
         rooms = numbered(4)
         show(sections = listOf(TestLightsSection()))
-        assertThat(bounds("plugs_section").top).isAtLeast(bounds(card(4)).bottom)
-        assertThat(bounds("plugs_section").left).isWithin(dp).of(bounds(card(1)).left)
+        assertThat(bounds("lights_section").top).isAtLeast(bounds(card(4)).bottom)
+        assertThat(bounds("lights_section").left).isWithin(dp).of(bounds(card(1)).left)
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -370,6 +370,13 @@ class LightsGridTest {
                 assertThat(unclipped(chip).right).isAtMost(row.right)
             }
         }
+        compose.onNodeWithTag("lights_grid").performScrollToNode(hasTestTag(card(6)))
+        compose.waitForIdle()
+        val last = bounds(card(6))
+        val lastRow = bounds("${card(6)}_scenes")
+        assertThat(lastRow.bottom).isAtMost(last.bottom)
+        assertThat(unclipped("${card(6)}_scene_s8-id").right).isAtMost(lastRow.right)
+        assertThat(unclipped("${card(6)}_scene_s8-id").bottom).isAtMost(last.bottom)
         compose.assertClickablesHaveRoleAndLabel()
     }
 }

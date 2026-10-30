@@ -11,14 +11,18 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import java.io.IOException
 import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +38,11 @@ import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.look
 
 private const val FILE = "door_settings"
+private const val KEEP_NAME = "keep_days"
+
+/** The door's store: a corrupt file keeps the longest history rather than cutting it (15a §3.1). */
+internal fun doorDataStore(scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO), produceFile: () -> File): DataStore<Preferences> =
+    settingsDataStore(scope, { preferencesOf(stringPreferencesKey(KEEP_NAME) to KeepDays.THIRTY.name) }, produceFile)
 private const val TAG = "DoorSettings"
 private const val SECONDS_PER_MINUTE = 60
 
@@ -83,7 +92,7 @@ data class DoorPrefs(
 class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineScope) {
     @Inject
     constructor(@ApplicationContext context: Context, @ApplicationScope scope: CoroutineScope) :
-        this(settingsDataStore { context.preferencesDataStoreFile(FILE) }, scope)
+        this(doorDataStore { context.preferencesDataStoreFile(FILE) }, scope)
 
     val prefs: Flow<DoorPrefs> = store.data
         .catch { e ->
@@ -164,6 +173,6 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
         val CAPTURE_UNTIL = longPreferencesKey("capture_until")
         val LAST_HEARD = longPreferencesKey("last_heard")
         val UNRECOGNISED_RUN = intPreferencesKey("unrecognised_run")
-        val KEEP = stringPreferencesKey("keep_days")
+        val KEEP = stringPreferencesKey(KEEP_NAME)
     }
 }

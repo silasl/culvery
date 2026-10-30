@@ -15,7 +15,7 @@ interface Capability : HomeCardContributor {
     /** The rail tab's icon, which may change while the app runs (15a §4.5); [icon] by default. */
     val railIcon: Flow<String> get() = flowOf(icon)
 
-    /** Rail position: Calendar 10, Music 30, Lights 40, Door 50, Plugs 55, Weather 60, Hoover 70 (no tab). */
+    /** Rail position: Calendar 10, Music 30, Lights 40 (its tab also holds the plugs; Plugs has no tab of its own), Door 50, Weather 60, Hoover 70 (no tab). */
     val order: Int
     /** True when at least one connection provides this capability and it has a tab. */
     val hasTab: Flow<Boolean>

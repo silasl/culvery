@@ -19,9 +19,9 @@ import uk.co.siland.culvery.core.household.Role
 private val person = Person(PersonId("p"), "P", 0)
 
 /**
- * A PIN pad answered by someone with [role] (null: cancelled), over the real permission rules of [sources].
- * [asked] holds each call's permissions in order, and [padGate] holds the answer back. [session] is settable to
- * stand for a signed-in Settings session; like the real one, a fresh-PIN permission still asks the pad.
+ * A PIN pad answered by someone with [role] (null: cancelled), over the real permission rules of [sources]. It asks the
+ * pad for every permission, a fresh-PIN one or not, and [session] is settable but never consulted by [authorise].
+ * [asked] holds each call's permissions in order, and [padGate] holds the answer back.
  */
 class FakeAccess(var role: Role?, vararg sources: PermissionSource) : AccessControl {
     @Volatile var padGate: CompletableDeferred<Unit>? = null

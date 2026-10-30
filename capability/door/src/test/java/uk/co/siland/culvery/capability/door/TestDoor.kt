@@ -21,7 +21,6 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.AlertHost
-import uk.co.siland.culvery.core.plugin.settingsDataStore
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.ShowingTheme
 
@@ -38,7 +37,7 @@ internal fun householdZone(): HouseholdZone = HouseholdZone(
 )
 
 internal fun doorSettings(dir: File, scope: CoroutineScope) =
-    DoorSettings(settingsDataStore(scope) { File(dir, "door_settings.preferences_pb") }, scope)
+    DoorSettings(doorDataStore(scope) { File(dir, "door_settings.preferences_pb") }, scope)
 
 /** Wednesday 14 October 2026, 14:02 in London (13:02 UTC). */
 internal const val NOW = 1_791_982_920_000L
@@ -66,8 +65,8 @@ internal fun File.names(): List<String> = listFiles()?.map { it.name }?.sorted()
 internal class FakeAlertHost(inFront: Boolean = true) : AlertHost {
     override val inFront = MutableStateFlow(inFront)
     override val lowered = MutableStateFlow(false)
-    var shown = 0
-    var dismissed = 0
+    @Volatile var shown = 0
+    @Volatile var dismissed = 0
     var content: (@Composable () -> Unit)? = null
 
     /** Whether the last show was loud. */

@@ -141,6 +141,13 @@ class DoorSettingsTest {
         assertThat(read.storedKeep()).isEqualTo(KeepDays.TWO)
     }
 
+    /** A file of garbage bytes reads as thirty days, the longest history, not the two-day default that would cut it. */
+    @Test
+    fun aCorruptFileKeepsThirtyDays() = runTest {
+        File(folder.root, "door_settings.preferences_pb").writeBytes(byteArrayOf(1, 2, 3, 4, 5))
+        assertThat(settings.storedKeep()).isEqualTo(KeepDays.THIRTY)
+    }
+
     /** An unreadable file gives no keep, not the default, so a prune can tell it from a choice of two days. */
     @Test
     fun anUnreadableFileHasNoStoredKeep() = runTest {

@@ -119,7 +119,7 @@ internal fun LightsGrid(
             }
             items(sections, key = { it.javaClass.name }, span = { GridItemSpan(maxLineSpan) }) {
                 val above = if (shown.isEmpty()) 0.dp else LightsDimens.gridGap
-                it.Content(Modifier.padding(top = above).testTag("plugs_section"))
+                it.Content(Modifier.padding(top = above).testTag("lights_section"))
             }
         }
         if (grid.canScrollForward) {

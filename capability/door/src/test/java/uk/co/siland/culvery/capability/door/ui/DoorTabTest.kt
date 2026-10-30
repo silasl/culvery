@@ -34,6 +34,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -97,8 +98,9 @@ class DoorTabTest {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val toaster = RecordingToaster()
     private var access = TestAccess(Role.ADULT)
+    private val alertHost = FakeAlertHost()
     private val alerts by lazy {
-        DoorAlerts(FakeAlertHost(), {}, { DoorPrefs() }, FakeChime(), { london }, WallClock { NOW }, appScope, NightHours { false }, { null }, { null })
+        DoorAlerts(alertHost, {}, { DoorPrefs() }, FakeChime(), { london }, WallClock { NOW }, appScope, NightHours { false }, { null }, { null })
     }
     private val opened = mutableListOf<DoorEvent>()
 
@@ -511,7 +513,8 @@ class DoorTabTest {
     /** A ring that was being recorded when Clear was confirmed shows its card after the first dismissal; the clear dismisses again. */
     @Test
     fun aRingRecordedWhileClearingLeavesNoCard() {
-        runBlocking { store.record(ring(key = "old")) }
+        // A card is already up, so the first dismissal is one that can be waited for.
+        runBlocking { alerts.onRecorded(store.record(ring(key = "old"))) }
         val started = CountDownLatch(1)
         val release = CountDownLatch(1)
         val slow = Snapshot { it.writeBytes(byteArrayOf(1)); started.countDown(); release.await() }
@@ -525,9 +528,9 @@ class DoorTabTest {
         waitFor { exists("door_clear_confirm") }
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
         waitFor { access.asked.isNotEmpty() }
-        Thread.sleep(200)
+        waitFor { alertHost.dismissed == 1 }
         release.countDown()
-        gated.held.await()
+        assertThat(gated.held.await(5, TimeUnit.SECONDS)).isTrue()
         waitFor { alerts.showing.value != null }
         gated.release()
         waitFor { toaster.messages.isNotEmpty() }

@@ -75,7 +75,7 @@ fun LightsTab(
     val below = if (hasBridge && (status != null || houseLine != null) || looking) LightsDimens.gridGap else 0.dp
     LightsGrid(rooms, lines, room, focus, onFocused, modifier = modifier.testTag("lights_tab"), sections = sections, header = {
         Column(Modifier.padding(bottom = below), verticalArrangement = Arrangement.spacedBy(LightsDimens.tabGap)) {
-            HhPageHeader(tabTitle(hasBridge, sections.isNotEmpty()), tabSummary(rooms, plugsSummary)) {
+            HhPageHeader(tabTitle(hasBridge, sections.isNotEmpty() || !hasBridge), tabSummary(rooms, plugsSummary)) {
                 if (hasBridge) {
                     HhTray(Modifier.testTag("lights_tray"), label = ONE_TAP) {
                         AllOffButton(allOffLit, house.onAllOff, tag = "lights_tray_all_off", surface = ButtonSurface.Bg)
