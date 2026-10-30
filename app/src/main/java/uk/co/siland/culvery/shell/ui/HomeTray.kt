@@ -25,15 +25,10 @@ internal fun trayRows(buttons: List<TrayButton>): List<List<TrayCell>> {
     val rows = mutableListOf<List<TrayCell>>()
     var i = 0
     while (i < buttons.size) {
-        val b = buttons[i]
-        val next = buttons.getOrNull(i + 1)
-        if (b.width == TrayWidth.HALF && next?.width == TrayWidth.HALF) {
-            rows += listOf(b.id to b.content, next.id to next.content)
-            i += 2
-        } else {
-            rows += listOf(b.id to b.content)
-            i++
-        }
+        val pair = buttons.drop(i).take(2).takeIf { p -> p.size == 2 && p.all { it.width == TrayWidth.HALF } }
+        val row = pair ?: listOf(buttons[i])
+        rows += row.map { it.id to it.content }
+        i += row.size
     }
     return rows
 }

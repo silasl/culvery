@@ -32,8 +32,9 @@ import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /**
- * One room (9 §4.4): its bulb, name, [cardStatus] and switch; its brightness with the level; and its scenes wrapping onto
- * more lines, the card growing to hold them (15a §4.5). An off room has a disabled slider, and a scene chip turns it on with that scene. [line] is the room's last refused command.
+ * One room (9 §4.4): its bulb, name, [cardStatus] and switch; its brightness with the level; and its scenes wrapping
+ * onto more lines, the card growing to hold them (15a §4.5). An off room has a disabled slider, and a scene chip turns
+ * it on with that scene. [line] is the room's last refused command.
  */
 @Composable
 internal fun LightsRoomCard(room: LightRoom, line: String?, actions: RoomActions, modifier: Modifier = Modifier) {

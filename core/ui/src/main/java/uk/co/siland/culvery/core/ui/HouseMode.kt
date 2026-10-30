@@ -74,7 +74,8 @@ fun HouseModeOnPill(tag: String) {
 
 /**
  * A mode's tray tile, narrow enough for half the tray: [icon] with [trailing] on its right, then [label] and [second]
- * under them, all spoken as [spoken], then what didn't happen as [line] under the tile. A tap does nothing unless [enabled]. Its tags start with [tag]; [second]'s is [secondTag].
+ * under them, all spoken as [spoken], then what didn't happen as [line] under the tile. A tap does nothing unless
+ * [enabled]. Its tags start with [tag]; [second]'s is [secondTag].
  */
 @Composable
 fun HouseModeTile(

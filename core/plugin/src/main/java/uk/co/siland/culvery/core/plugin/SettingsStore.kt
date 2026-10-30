@@ -10,10 +10,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
-/** A settings file's store; one that can't be read is replaced by [replacement], which a setting can set so a corrupt file keeps the longest history rather than cutting it. */
+/**
+ * A settings file's store; one that can't be read is replaced by [replacement], which a setting can set so a corrupt
+ * file keeps the longest history rather than cutting it.
+ */
 fun settingsDataStore(
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     replacement: () -> Preferences = ::emptyPreferences,
     produceFile: () -> File,
 ): DataStore<Preferences> =
-    PreferenceDataStoreFactory.create(corruptionHandler = ReplaceFileCorruptionHandler { replacement() }, scope = scope, produceFile = produceFile)
+    PreferenceDataStoreFactory.create(
+        corruptionHandler = ReplaceFileCorruptionHandler { replacement() },
+        scope = scope,
+        produceFile = produceFile,
+    )
