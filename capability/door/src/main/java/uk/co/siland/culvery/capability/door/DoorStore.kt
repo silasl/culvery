@@ -96,13 +96,17 @@ class DoorStore internal constructor(
 
     /**
      * Deletes every event and every file in the picture folder (15a §3.3), pictures first: a row whose picture is gone draws
-     * nothing, where a picture without a row is never seen again. Not cancellable once it holds the lock, so it never stops half-way.
+     * nothing, where a picture without a row is never seen again. A picture that won't delete stops it with its rows kept, so
+     * nothing is left that the tab can no longer show. Not cancellable once it holds the lock, so it never stops half-way.
      */
     suspend fun clear() = lock.withLock {
         withContext(NonCancellable + io) {
-            dir.listFiles()?.forEach { it.delete() }
+            val stuck = dir.listFiles().orEmpty().filter { !it.delete() && it.exists() }
+            check(stuck.isEmpty()) { "A picture couldn't be deleted" }
             dao.deleteAll()
-            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use {
+                if (it.moveToFirst() && it.getInt(0) != 0) Log.w(TAG, "WAL checkpoint busy")
+            }
         }
     }
 

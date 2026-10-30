@@ -6,8 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
 import uk.co.siland.culvery.core.access.test.FakeAccess
@@ -108,3 +113,32 @@ internal class FakeShowing(theme: SeasonalTheme? = null) : ShowingTheme {
 
 /** A PIN pad answered by someone with [role] (null: cancelled) over the Door permissions. */
 internal fun TestAccess(role: Role?) = FakeAccess(role, DoorPermissionSource())
+
+/**
+ * An IO dispatcher that holds the [n]th dispatch after [holdDispatch] until [release], so a test can stop a store call at a known
+ * point: [held] opens once it is waiting.
+ */
+internal class GatedIo : CoroutineDispatcher() {
+    private val seen = AtomicInteger()
+    private val gate = CountDownLatch(1)
+    @Volatile private var holdAt = 0
+    val held = CountDownLatch(1)
+
+    fun holdDispatch(n: Int) {
+        seen.set(0)
+        holdAt = n
+    }
+
+    fun release() = gate.countDown()
+
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+        val hold = holdAt != 0 && seen.incrementAndGet() == holdAt
+        Dispatchers.IO.dispatch(context) {
+            if (hold) {
+                held.countDown()
+                gate.await()
+            }
+            block.run()
+        }
+    }
+}

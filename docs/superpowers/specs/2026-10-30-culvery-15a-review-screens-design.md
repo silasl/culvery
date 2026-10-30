@@ -84,7 +84,7 @@ Finish the screens the review passed with small changes, so that 15b can rebuild
 ### 4.4 Door history
 - **Keep setting:** stored in `DoorSettings` as 2, 7 or 30 days. Default 2. `DoorStore.prune` deletes events before the start of the oldest kept day (today minus N−1 days, at local midnight in the household's zone) in place of `KEEP_MS`, keeping today's rule that files with no event go too. A change prunes at once. The prune must read the stored setting, never a default that is standing in before the file has been read, or a start-up prune would cut 30 days down to 2.
 - **Days shown:** `doorDays` returns every kept day, grouped by the household's dates, newest first. The badge's `since` stays `startOfYesterday`.
-- **Clear:** `DoorStore.clear()` under the store's lock (so a record in progress can't leave a picture behind) deletes every row, then every file in the snapshot folder, and drops any decoded snapshot or thumbnail Culvery holds in memory. A new permission, Door's "Clear door history" for Admin and Adult with a fresh PIN, guards it.
+- **Clear:** `DoorStore.clear()` under the store's lock (so a record in progress can't leave a picture behind) deletes every file in the snapshot folder, then every row (files first, because a row whose picture is gone draws nothing), and drops any decoded snapshot or thumbnail Culvery holds in memory. A new permission, Door's "Clear door history" for Admin and Adult with a fresh PIN, guards it.
 - **Flow:** tap Clear history, then the `HhConfirmCard` with the copy in §2.5 and "Clear history" or "Keep". Then the PIN, then the delete, then the toast. Cancelling either step changes nothing.
 
 ### 4.5 Lights and plugs

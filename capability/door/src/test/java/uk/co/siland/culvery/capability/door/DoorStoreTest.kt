@@ -19,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -313,6 +314,8 @@ class DoorStoreTest {
         val recording = async(Dispatchers.IO) { store.record(ring(snapshot = slow)) }
         started.await()
         val clearing = async(Dispatchers.IO) { store.clear() }
+        delay(200)
+        assertThat(clearing.isCompleted).isFalse()
         release.countDown()
         val recorded = recording.await()
         clearing.await()
@@ -321,17 +324,31 @@ class DoorStoreTest {
         assertThat(dir.listFiles()).isEmpty()
     }
 
-    /** Cancelling the caller while the files go does not leave the pictures and take the rows: the file loop finishes. */
+    /** Cancelling the caller while the clear is under way doesn't stop it: no row and no picture is left. */
     @Test
     fun aCancelledClearLeavesNoPicture() = runBlocking {
-        repeat(3) { store.record(ring(key = "k$it", snapshot = aPicture)) }
-        val clearing = async(Dispatchers.IO) { store.clear() }
+        val gated = GatedIo()
+        val gatedStore = DoorStore(db, dir, io = gated)
+        repeat(3) { gatedStore.record(ring(key = "k$it", snapshot = aPicture)) }
+        gated.holdDispatch(1)
+        val clearing = async(Dispatchers.IO) { gatedStore.clear() }
+        gated.held.await()
         clearing.cancel()
-        clearing.join()
-        // Cancelled before it took the lock, or finished regardless: never rows gone with pictures left.
-        if (store.events.first().isEmpty()) assertThat(dir.listFiles()).isEmpty()
-        store.clear()
+        gated.release()
+        val ended = runCatching { clearing.await() }.exceptionOrNull()
+        assertThat(ended).isInstanceOf(CancellationException::class.java)
+        assertThat(gatedStore.events.first()).isEmpty()
         assertThat(dir.listFiles()).isEmpty()
+    }
+
+    /** A picture that won't delete stops the clear with every row kept, so no row is left without its picture's say. */
+    @Test
+    fun aPictureThatWontDeleteStopsTheClear() = runBlocking {
+        store.record(ring(snapshot = aPicture))
+        File(dir, "stuck.jpg").apply { mkdirs() }.also { File(it, "inside").writeBytes(byteArrayOf(1)) }
+        val failure = runCatching { store.clear() }.exceptionOrNull()
+        assertThat(failure).isInstanceOf(IllegalStateException::class.java)
+        assertThat(store.events.first()).hasSize(1)
     }
 
     /** A save stopped half-way leaves no half picture behind. */

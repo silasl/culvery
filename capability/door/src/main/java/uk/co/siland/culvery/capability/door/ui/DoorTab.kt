@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.door.ui
 
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import android.util.Log
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,12 +43,12 @@ import uk.co.siland.culvery.capability.door.CLEAR_FAILED
 import uk.co.siland.culvery.capability.door.CLEAR_HISTORY
 import uk.co.siland.culvery.capability.door.DOOR
 import uk.co.siland.culvery.capability.door.DoorAlerts
-import uk.co.siland.culvery.capability.door.DoorPermissions
-import uk.co.siland.culvery.capability.door.HISTORY_CLEARED
 import uk.co.siland.culvery.capability.door.DoorDay
 import uk.co.siland.culvery.capability.door.DoorEvent
 import uk.co.siland.culvery.capability.door.DoorKind
+import uk.co.siland.culvery.capability.door.DoorPermissions
 import uk.co.siland.culvery.capability.door.DoorStore
+import uk.co.siland.culvery.capability.door.HISTORY_CLEARED
 import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.NO_RINGS_TODAY
 import uk.co.siland.culvery.capability.door.SNAPSHOT
@@ -94,6 +94,8 @@ fun DoorTab(
     newIds: Set<Long> = emptySet(),
     /** Clear history, shown in the header when not null: the host passes it only while the store holds an event. */
     onClear: (() -> Unit)? = null,
+    /** Clear history's question, shown under the header while it waits for an answer. */
+    clearAsk: ClearAsk? = null,
 ) {
     val c = Culvery.colors
     fun isNew(event: DoorEvent) = event.kind == DoorKind.RING && (event.id in newIds || !event.seen)
@@ -111,6 +113,7 @@ fun DoorTab(
                 }
             }
         }
+        if (clearAsk != null) item(key = "clear_ask") { Box(gap) { ClearCard(clearAsk) } }
         if (status != null) item { Box(gap) { DoorStatusLine(status) } }
         item { HhSectionLabel(TODAY, gap.testTag("door_today")) }
         val todays = days.firstOrNull { it.date == today }?.events.orEmpty()
@@ -144,36 +147,35 @@ fun SnapshotSheet(event: DoorEvent, zone: ZoneId, onClose: () -> Unit) {
     }
 }
 
-/** Clear history's question (15a §3.3): Keep on the left, where the tap that opened it was. */
+/** Clear history's question, with [count] the stored events; [busy] from the confirm until the clear has finished or been refused. */
+class ClearAsk(val count: Int, val busy: Boolean, val onKeep: () -> Unit, val onConfirm: () -> Unit)
+
 @Composable
-internal fun ClearSheet(count: Int, onKeep: () -> Unit, onConfirm: () -> Unit) {
-    HhSheet(padding = PaddingValues(horizontal = DoorDimens.sheetPaddingH, vertical = DoorDimens.sheetPaddingV)) {
-        HhConfirmCard(
-            tag = "door_clear_confirm", title = CLEAR_HISTORY,
-            keep = KEEP, keepTag = "door_clear_confirm_keep",
-            confirm = CLEAR_HISTORY, confirmTag = "door_clear_confirm_yes",
-            busy = false, onKeep = onKeep, onConfirm = onConfirm, confirmIcon = Icons.DELETE,
-        ) { Text(clearQuestion(count), style = HhType.body, color = Culvery.colors.ink) }
-    }
+private fun ClearCard(ask: ClearAsk) {
+    HhConfirmCard(
+        tag = "door_clear_confirm", title = CLEAR_HISTORY,
+        keep = KEEP, keepTag = "door_clear_confirm_keep",
+        confirm = CLEAR_HISTORY, confirmTag = "door_clear_confirm_yes",
+        busy = ask.busy, onKeep = ask.onKeep, onConfirm = ask.onConfirm, confirmIcon = Icons.DELETE,
+    ) { Text(clearQuestion(ask.count), style = HhType.body, color = Culvery.colors.ink) }
 }
 
 /**
- * Runs on [scope], so the toast shows if the tab is left meanwhile. The PIN comes first; then the ring card goes (it may show a
- * picture about to be deleted), then the history.
+ * The PIN comes first; then the ring card goes, as it may show a picture about to be deleted, and again once the clear is done,
+ * for a ring recorded while it waited on the store.
  */
-private fun clearHistory(scope: CoroutineScope, access: AccessControl, alerts: DoorAlerts, store: DoorStore, toaster: Toaster) {
-    scope.launch {
-        try {
-            access.authorise(DoorPermissions.CLEAR, label = CLEAR_HISTORY) ?: return@launch
-            alerts.dismissCard()
-            store.clear()
-            toaster.show(HISTORY_CLEARED)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.w(TAG, "Couldn't clear the door history (${e::class.simpleName})")
-            toaster.show(CLEAR_FAILED, urgent = true)
-        }
+private suspend fun clearHistory(access: AccessControl, alerts: DoorAlerts, store: DoorStore, toaster: Toaster) {
+    try {
+        access.authorise(DoorPermissions.CLEAR, label = CLEAR_HISTORY) ?: return
+        alerts.dismissCard()
+        store.clear()
+        alerts.dismissCard()
+        toaster.show(HISTORY_CLEARED)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w(TAG, "Couldn't clear the door history (${e::class.simpleName})")
+        toaster.show(CLEAR_FAILED, urgent = true)
     }
 }
 
@@ -214,21 +216,27 @@ internal fun DoorTabHost(
     val z = householdZone ?: return
     val k = kept ?: return
     val days = remember(events, d, z, k) { doorDays(events, d, z, k) }
+    var asking by remember { mutableStateOf(false) }
+    var clearing by remember { mutableStateOf(false) }
     val stored = events.size
+    // On the application scope, so the toast shows if the tab is left meanwhile.
+    fun confirmClear() {
+        if (clearing) return
+        clearing = true
+        appScope.launch {
+            try {
+                clearHistory(access, alerts, store, toaster)
+            } finally {
+                clearing = false
+                asking = false
+            }
+        }
+    }
     DoorTab(
         days, d, z, problem,
         onOpenSnapshot = { event -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } },
         newIds = newIds,
-        onClear = if (stored == 0) null else ({
-            overlay.show {
-                ClearSheet(
-                    stored, onKeep = overlay::dismiss,
-                    onConfirm = {
-                        overlay.dismiss()
-                        clearHistory(appScope, access, alerts, store, toaster)
-                    },
-                )
-            }
-        }),
+        onClear = if (stored == 0) null else ({ asking = true }),
+        clearAsk = if (asking && stored > 0) ClearAsk(stored, clearing, onKeep = { asking = false }, onConfirm = ::confirmClear) else null,
     )
 }

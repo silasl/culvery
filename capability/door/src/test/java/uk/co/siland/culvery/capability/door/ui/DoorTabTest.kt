@@ -33,6 +33,8 @@ import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.concurrent.CountDownLatch
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,6 +44,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
@@ -50,26 +54,28 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.door.DoorAlerts
 import uk.co.siland.culvery.capability.door.DoorDay
-import uk.co.siland.culvery.capability.door.DoorPrefs
-import uk.co.siland.culvery.capability.door.FakeAlertHost
-import uk.co.siland.culvery.capability.door.FakeChime
-import uk.co.siland.culvery.capability.door.RecordingToaster
-import uk.co.siland.culvery.capability.door.TestAccess
-import uk.co.siland.culvery.capability.door.clearQuestion
-import uk.co.siland.culvery.capability.door.motion
 import uk.co.siland.culvery.capability.door.DoorEvent
 import uk.co.siland.culvery.capability.door.DoorKind
+import uk.co.siland.culvery.capability.door.DoorPrefs
 import uk.co.siland.culvery.capability.door.DoorStore
+import uk.co.siland.culvery.capability.door.FakeAlertHost
+import uk.co.siland.culvery.capability.door.FakeChime
+import uk.co.siland.culvery.capability.door.GatedIo
 import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.NOW
+import uk.co.siland.culvery.capability.door.RecordingToaster
+import uk.co.siland.culvery.capability.door.Snapshot
+import uk.co.siland.culvery.capability.door.TestAccess
 import uk.co.siland.culvery.capability.door.aPicture
+import uk.co.siland.culvery.capability.door.clearQuestion
 import uk.co.siland.culvery.capability.door.doorDb
+import uk.co.siland.culvery.capability.door.motion
 import uk.co.siland.culvery.capability.door.ring
 import uk.co.siland.culvery.capability.door.startOfYesterday
+import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
-import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalTabReselected
 import uk.co.siland.culvery.core.plugin.NightHours
@@ -86,7 +92,8 @@ class DoorTabTest {
     private val october14 = LocalDate.of(2026, 10, 14)
     private val db = doorDb()
     private val dir by lazy { File(folder.root, "door") }
-    private val store by lazy { DoorStore(db, dir) }
+    private val gated = GatedIo()
+    private val store by lazy { DoorStore(db, dir, io = gated) }
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val toaster = RecordingToaster()
     private var access = TestAccess(Role.ADULT)
@@ -407,6 +414,9 @@ class DoorTabTest {
         compose.setContent { CulveryTheme(dark = true) { host(flowOf(october14)) } }
     }
 
+    /** Lets the clear a click started run to its end, so a check that nothing happened can't pass by being early. */
+    private fun settled() = runBlocking { appScope.coroutineContext.job.children.toList().forEach { it.join() } }
+
     private fun openConfirm() {
         openHost()
         waitFor { exists("door_clear") }
@@ -469,6 +479,7 @@ class DoorTabTest {
         openConfirm()
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
         waitFor { access.asked.isNotEmpty() }
+        settled()
         compose.waitForIdle()
         assertThat(runBlocking { store.events.first() }).hasSize(3)
         assertThat(dir.listFiles()).hasLength(2)
@@ -483,6 +494,7 @@ class DoorTabTest {
         openConfirm()
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
         waitFor { access.asked.isNotEmpty() }
+        settled()
         compose.waitForIdle()
         assertThat(runBlocking { store.events.first() }).hasSize(3)
         assertThat(toaster.messages).isEmpty()
@@ -494,6 +506,61 @@ class DoorTabTest {
         runBlocking { store.record(ring()) }
         openConfirm()
         compose.onNodeWithText("Clear the 1 door event? Pictures saved on this tablet are deleted too. Ring keeps its own copies.").assertIsDisplayed()
+    }
+
+    /** A ring that was being recorded when Clear was confirmed shows its card after the first dismissal; the clear dismisses again. */
+    @Test
+    fun aRingRecordedWhileClearingLeavesNoCard() {
+        runBlocking { store.record(ring(key = "old")) }
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val slow = Snapshot { it.writeBytes(byteArrayOf(1)); started.countDown(); release.await() }
+        openHost()
+        waitFor { exists("door_clear") }
+        appScope.launch(Dispatchers.IO) { alerts.onRecorded(store.record(ring(key = "new", snapshot = slow))) }
+        started.await()
+        // The record's prune is the next dispatch; the clear's is the one held.
+        gated.holdDispatch(2)
+        compose.onNodeWithTag("door_clear").performClick()
+        waitFor { exists("door_clear_confirm") }
+        compose.onNodeWithTag("door_clear_confirm_yes").performClick()
+        waitFor { access.asked.isNotEmpty() }
+        Thread.sleep(200)
+        release.countDown()
+        gated.held.await()
+        waitFor { alerts.showing.value != null }
+        gated.release()
+        waitFor { toaster.messages.isNotEmpty() }
+        assertThat(toaster.messages).containsExactly("Door history cleared")
+        assertThat(alerts.showing.value).isNull()
+        assertThat(dir.listFiles()).isEmpty()
+    }
+
+    /** A second tap on the confirm, while the first still waits for the PIN, asks for nothing more. */
+    @Test
+    fun aDoubleTapAsksForOnePin() {
+        threeEventsTwoWithPictures()
+        access.padGate = CompletableDeferred()
+        openConfirm()
+        compose.onNodeWithTag("door_clear_confirm_yes").performClick()
+        waitFor { access.asked.isNotEmpty() }
+        compose.onNodeWithTag("door_clear_confirm_yes").performClick()
+        compose.waitForIdle()
+        access.padGate?.complete(Unit)
+        waitFor { toaster.messages.isNotEmpty() }
+        assertThat(access.asked).hasSize(1)
+    }
+
+    /** A picture that won't delete says so and leaves the history. */
+    @Test
+    fun aFailedClearSaysSo() {
+        threeEventsTwoWithPictures()
+        File(dir, "stuck.jpg").apply { mkdirs() }.also { File(it, "inside").writeBytes(byteArrayOf(1)) }
+        openConfirm()
+        compose.onNodeWithTag("door_clear_confirm_yes").performClick()
+        waitFor { toaster.messages.isNotEmpty() }
+        assertThat(toaster.messages).containsExactly("Couldn’t clear the door history. Try again.")
+        assertThat(runBlocking { store.events.first() }).hasSize(3)
     }
 
     /** Fails if the tab keeps the day it opened on after the household's date moves on. */

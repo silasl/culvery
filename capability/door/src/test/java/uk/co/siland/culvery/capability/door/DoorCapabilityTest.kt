@@ -21,8 +21,8 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.HouseholdClock
-import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.NightHours
+import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.WallClock
 
