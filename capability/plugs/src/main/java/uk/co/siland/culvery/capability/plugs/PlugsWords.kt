@@ -23,11 +23,9 @@ object PlugsWords {
     const val ON = "On"
     const val OFF = "Off"
 
-    /** "1 of 2 plugs on", counting the plugs known to be On or Off; null with none known. */
-    fun plugsOnSummary(plugs: List<PlugState>): String? {
-        val known = plugs.filter { it.isOn != null }
-        return if (known.isEmpty()) null else "${known.count { it.power == PlugPower.ON }} of ${known.size} plugs on"
-    }
+    /** "1 of 2 plugs on", out of every plug shown (an unreachable plug is shown and not on); null when no plug's state is known. */
+    fun plugsOnSummary(plugs: List<PlugState>): String? =
+        if (plugs.none { it.isOn != null }) null else "${plugs.count { it.power == PlugPower.ON }} of ${plugs.size} plugs on"
 
     fun showSpoken(name: String) = "$name, ${SHOW_ON_TAB.replaceFirstChar(Char::lowercase)}"
 

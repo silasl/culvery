@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 interface LightsTabSection {
     val shown: Flow<Boolean>
 
-    /** "1 of 2 plugs on"; null when there are none. */
+    /** "1 of 2 plugs on"; null when no plug's state is known. */
     val summary: Flow<String?>
 
     /** Starts watching; call the result when the tab goes. */

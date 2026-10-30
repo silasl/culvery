@@ -12,6 +12,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.plugs.DESK
 import uk.co.siland.culvery.capability.plugs.FAN
+import uk.co.siland.culvery.capability.plugs.LAMP
 import uk.co.siland.culvery.capability.plugs.PlugPower
 import uk.co.siland.culvery.capability.plugs.PlugState
 import uk.co.siland.culvery.core.ui.test.snap
@@ -30,6 +31,21 @@ class PlugsScreenshotTest {
             PlugsSectionBody(plugs, needsPin = setOf(FAN), switching = emptySet(), problem = null, onSwitch = {})
         }
     }
+
+    private val long = listOf(
+        PlugState(LAMP, "Fairy lights above the bookcase and the window in the long living room at the back of the house", PlugPower.ON, 12),
+        FAN_OFF,
+    )
+
+    private fun longName(name: String, dark: Boolean) = compose.snap(name, dark, Modifier.size(1116.dp, 240.dp)) {
+        Box(Modifier.size(1116.dp, 240.dp)) {
+            PlugsSectionBody(long, needsPin = setOf(FAN), switching = emptySet(), problem = null, onSwitch = {})
+        }
+    }
+
+    @Test fun longNameDark() = longName("plugs_tiles_long_name_dark", true)
+
+    @Test fun longNameLight() = longName("plugs_tiles_long_name_light", false)
 
     @Test fun tilesDark() = tiles("plugs_tiles_dark", true)
 

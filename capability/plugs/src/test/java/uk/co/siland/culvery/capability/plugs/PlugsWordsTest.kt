@@ -35,12 +35,13 @@ class PlugsWordsTest {
         assertThat(PlugsWords.switchSpoken(plug(PlugPower.OFF), needsPin = true)).isEqualTo("Switch on, needs a PIN")
     }
 
-    /** 15a §4.5: fails if the summary counts plugs of unknown state, says "Home Assistant", or isn't null with none known. */
+    /** 15a §4.5: fails if the summary leaves a plug shown out of n, says "Home Assistant", or isn't null with none known. */
     @Test
     fun theSummaryCountsThePlugsThatAreOn() {
         val plugs = listOf(plug(PlugPower.ON), plug(PlugPower.ON), plug(PlugPower.OFF), plug(PlugPower.UNREACHABLE))
-        assertThat(PlugsWords.plugsOnSummary(plugs)).isEqualTo("2 of 3 plugs on")
-        assertThat(PlugsWords.plugsOnSummary(listOf(plug(PlugPower.ON), plug(PlugPower.OFF), plug(PlugPower.UNKNOWN)))).isEqualTo("1 of 2 plugs on")
+        assertThat(PlugsWords.plugsOnSummary(plugs)).isEqualTo("2 of 4 plugs on")
+        assertThat(PlugsWords.plugsOnSummary(listOf(plug(PlugPower.UNREACHABLE), plug(PlugPower.OFF)))).isEqualTo("0 of 2 plugs on")
+        assertThat(PlugsWords.plugsOnSummary(listOf(plug(PlugPower.ON), plug(PlugPower.OFF), plug(PlugPower.UNKNOWN)))).isEqualTo("1 of 3 plugs on")
         assertThat(PlugsWords.plugsOnSummary(listOf(plug(PlugPower.UNKNOWN), plug(PlugPower.UNKNOWN)))).isNull()
         assertThat(PlugsWords.plugsOnSummary(emptyList())).isNull()
     }

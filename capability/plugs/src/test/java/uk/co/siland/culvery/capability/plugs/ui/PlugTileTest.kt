@@ -16,8 +16,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -126,12 +130,69 @@ class PlugTileTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Fails if "Switching…" doesn't show while the switch is out, or a tap during it reaches the switch. */
+    /** Fails if "Switching…" isn't both shown and spoken while the switch is out, or a tap during it reaches the switch. */
     @Test
     fun switchingShowsUntilTheStateComes() {
         show(LAMP_ON, switching = true)
+        compose.onNodeWithText("Switching…", useUnmergedTree = true).assertIsDisplayed()
+        compose.onAllNodesWithText("Switch off", useUnmergedTree = true).assertCountEquals(0)
         button().assertContentDescriptionEquals("Switching…").performClick()
         assertThat(calls).isEmpty()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the pill is missing its visible "Switch on" or "Switch off", or isn't at the bottom right of a tile with no padlock. */
+    @Test
+    fun theLabelledPillSitsAtTheBottomRight() {
+        show(LAMP_ON)
+        compose.onNodeWithText("Switch off", useUnmergedTree = true).assertIsDisplayed()
+        val tile = tile().fetchSemanticsNode().boundsInRoot
+        val pill = button().fetchSemanticsNode().boundsInRoot
+        val d = compose.density.density
+        assertThat(pill.bottom).isWithin(2f).of(tile.bottom - 15 * d)
+        assertThat(pill.right).isWithin(2f).of(tile.right - 17 * d)
+        assertThat(pill.height).isAtLeast(48 * d - 1)
+    }
+
+    private fun nameLayout(): TextLayoutResult {
+        val results = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithTag("plug_${LAMP}_name", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
+        return results.single()
+    }
+
+    /** Fails if a name that needs two lines is cut to one, ellipsised or shortened. */
+    @Test
+    fun aLongNameWrapsToTwoLines() {
+        val name = "Reading lamp by the bed"
+        show(PlugState(LAMP, name, PlugPower.OFF, null))
+        compose.onNodeWithTag("plug_${LAMP}_name", useUnmergedTree = true).assertTextEquals(name)
+        val layout = nameLayout()
+        assertThat(layout.lineCount).isEqualTo(2)
+        assertThat(layout.isLineEllipsized(1)).isFalse()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if a name that needs more than two lines is ellipsised, or the pill ends up outside the tile. */
+    @Test
+    fun aVeryLongNameIsNeverCutShort() {
+        val name = "Living room standard lamp by the window next to the long bookcase and the old piano"
+        show(PlugState(LAMP, name, PlugPower.OFF, null))
+        compose.onNodeWithTag("plug_${LAMP}_name", useUnmergedTree = true).assertTextEquals(name)
+        val layout = nameLayout()
+        assertThat(layout.lineCount).isGreaterThan(2)
+        assertThat((0 until layout.lineCount).any { layout.isLineEllipsized(it) }).isFalse()
+        val tile = tile().fetchSemanticsNode().boundsInRoot
+        assertThat(button().fetchSemanticsNode().boundsInRoot.bottom).isAtMost(tile.bottom)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if a short name is ellipsised or takes two lines. */
+    @Test
+    fun aShortNameStaysOnOneLine() {
+        show(LAMP_ON)
+        val layout = nameLayout()
+        assertThat(layout.lineCount).isEqualTo(1)
+        assertThat(layout.isLineEllipsized(0)).isFalse()
         compose.assertClickablesHaveRoleAndLabel()
     }
 }
