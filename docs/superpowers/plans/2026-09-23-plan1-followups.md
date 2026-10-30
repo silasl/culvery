@@ -807,6 +807,12 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
   - Settings' Close took a tap near its left edge but not its middle; see "Lost taps" below;
   - Android's screen dump hangs while the bats drift (it waits for a still screen), so the walk-through used screenshots only.
 
+## Plan 14 (seasonal themes): left for later (final review, 2026-10-30)
+- **For the end-of-v1 design review:** from 24 to 30 October the Preview row's words don't fit. Turned on, it says "It ends at midnight" though Halloween carries on by its dates; turned off, it offers to show what's already on the wall.
+- **For the Christmas plan:** a range starting 29 February starts on 1 March in common years, but "Next:" and the dates sheet say 28 February, and saving unchanged rewrites the start to 28 Feb. Only reachable by picking 29 Feb.
+- **Known, small:** on a cold start the default dates apply for a few milliseconds before the settings are read. A household that moved Halloween could see a flash, and a ring in that moment would play the organ. Leave it unless it shows on the tablet.
+- **The plan against the code:** the bats cross in 45 s in 2 lanes (the plan said 90 s and 4 lanes), from the Task 9 ruling that moved the sky into the header band.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
