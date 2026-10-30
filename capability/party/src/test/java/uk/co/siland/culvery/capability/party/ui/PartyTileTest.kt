@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
@@ -21,6 +22,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -84,6 +87,15 @@ class PartyTileTest {
         assertThat(clickLabel()).isEqualTo("Turn off")
         compose.assertNothingReadTwice()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §2.1. Fails if the tile's own fill stops short of its row's height. */
+    @Test
+    fun theTileFillsItsRow() {
+        show()
+        val row = compose.onNodeWithTag("tray_row_party").getUnclippedBoundsInRoot()
+        val tile = compose.onNodeWithTag("party_tile").getUnclippedBoundsInRoot()
+        assertThat(tile.height.value).isWithin(1f).of(row.height.value)
     }
 
     /** Fails if a tap while a change runs reaches [onTap], or the words don't say what is happening. */

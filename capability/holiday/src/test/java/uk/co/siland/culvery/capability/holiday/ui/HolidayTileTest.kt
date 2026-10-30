@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -24,6 +25,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
@@ -70,7 +73,14 @@ class HolidayTileTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 Box(Modifier.background(Culvery.colors.bg)) {
-                    HhTrayGrid("One-tap", listOf(listOf("holiday" to { HolidayTile(on, back, line, running) { taps++ } }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
+                    HhTrayGrid(
+                        "One-tap",
+                        listOf(
+                            listOf("holiday" to { HolidayTile(on, back, line, running) { taps++ } }, "neighbour" to { Spacer(Modifier.fillMaxSize()) }),
+                            listOf("hoover.start" to { Box(Modifier.fillMaxSize().background(Culvery.colors.surf2).testTag("hoover_standin")) }),
+                        ),
+                        Modifier.width(333.dp).height(359.dp),
+                    )
                 }
             }
         }
@@ -122,6 +132,37 @@ class HolidayTileTest {
         compose.waitForIdle()
         compose.onNodeWithTag("holiday_tile_line").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §2.1. Fails if the tile's own fill stops short of its row's height. */
+    @Test
+    fun theTileFillsItsRow() {
+        show()
+        val row = compose.onNodeWithTag("tray_row_holiday").getUnclippedBoundsInRoot()
+        val tile = compose.onNodeWithTag("holiday_tile").getUnclippedBoundsInRoot()
+        assertThat(tile.height.value).isWithin(1f).of(row.height.value)
+        assertThat(tile.width.value).isWithin(1f).of(row.width.value)
+    }
+
+    /** 15a §2.1. Fails if a long line runs outside the tray or onto the Hoover row below, instead of growing its row. */
+    @Test
+    fun aLongLineGrowsItsRowAndStaysClearOfTheHoover() {
+        on = true
+        back = LocalDate.of(2026, 10, 31)
+        line = "The heating is still on Eco. Turn it off in the Nest app. Lamp didn’t switch back on. Switch it on the Plugs tab. " +
+            "Holiday lights are still on. Turn them off in the Lights tab."
+        show()
+        val tray = compose.onNodeWithTag("tray_column").getUnclippedBoundsInRoot()
+        val tile = compose.onNodeWithTag("holiday_tile").getUnclippedBoundsInRoot()
+        val under = compose.onNodeWithTag("holiday_tile_line").getUnclippedBoundsInRoot()
+        val row = compose.onNodeWithTag("tray_row_holiday").getUnclippedBoundsInRoot()
+        val hoover = compose.onNodeWithTag("tray_row_hoover.start").getUnclippedBoundsInRoot()
+        assertThat(under.bottom.value).isAtMost(row.bottom.value + 0.5f)
+        assertThat(row.bottom.value).isAtMost(hoover.top.value)
+        assertThat(under.bottom.value).isAtMost(hoover.top.value)
+        assertThat(tile.top.value).isAtLeast(tray.top.value)
+        assertThat(hoover.bottom.value).isAtMost(tray.bottom.value)
+        assertThat(row.height.value).isGreaterThan(hoover.height.value)
     }
 
     /** Review Focus 4. Fails if a tap while a change runs reaches [onTap], or the words don't say what is happening. */

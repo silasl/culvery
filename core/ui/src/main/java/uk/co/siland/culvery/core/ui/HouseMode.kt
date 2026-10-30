@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -91,11 +92,12 @@ fun HouseModeTile(
 ) {
     val colors = Culvery.colors
     val ink = if (on) colors.accentInk else colors.ink
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxSize()) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(HouseModeDimens.gap),
+            verticalArrangement = Arrangement.spacedBy(HouseModeDimens.gap, Alignment.CenterVertically),
             modifier = Modifier
                 .fillMaxWidth()
+                .weight(1f)
                 .testTag(tag)
                 .clip(RoundedCornerShape(HouseModeDimens.radius))
                 .background(if (on) colors.accent else colors.surf2)

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -23,6 +24,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
@@ -84,6 +87,16 @@ class HooverRowTest {
         val results = mutableListOf<TextLayoutResult>()
         status().fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!(results)
         return results.single().lineCount
+    }
+
+    /** 15a §2.1. Fails if the row's own fill stops short of the tray row's height. */
+    @Test
+    fun theRowFillsItsTrayRow() {
+        show()
+        val cell = compose.onNodeWithTag("tray_row_hoover").getUnclippedBoundsInRoot()
+        val row = compose.onNodeWithTag("hoover_row").getUnclippedBoundsInRoot()
+        assertThat(row.height.value).isWithin(1f).of(cell.height.value)
+        assertThat(row.width.value).isWithin(1f).of(cell.width.value)
     }
 
     /** Fails if the words, the button or what TalkBack hears differ from the spec. */

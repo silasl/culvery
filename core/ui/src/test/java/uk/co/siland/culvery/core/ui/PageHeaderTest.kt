@@ -2,6 +2,7 @@ package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -229,5 +230,29 @@ class PageHeaderTest {
         assertThat(a.width.value).isWithin(0.5f).of((333f - 22f - 8f) / 2)
         assertThat(b.left.value - a.right.value).isWithin(0.5f).of(8f)
         assertThat(a.top.value).isEqualTo(b.top.value)
+    }
+
+    /** 15a §2.1. Fails if a cell taller than its third runs over the next row or out of the tray, instead of growing its row. */
+    @Test
+    fun aTallCellGrowsItsRowFromTheEmptyOne() {
+        show {
+            HhTrayGrid(
+                "One-tap",
+                listOf(
+                    listOf("a" to { Box(Modifier.fillMaxWidth().height(150.dp)) }, "b" to { Box(Modifier.fillMaxSize()) }),
+                    listOf("c" to { Box(Modifier.fillMaxSize()) }),
+                ),
+                Modifier.width(333.dp).height(359.dp),
+            )
+        }
+        val tray = compose.onNodeWithTag("tray_column").getUnclippedBoundsInRoot()
+        val a = compose.onNodeWithTag("tray_row_a").getUnclippedBoundsInRoot()
+        val b = compose.onNodeWithTag("tray_row_b").getUnclippedBoundsInRoot()
+        val c = compose.onNodeWithTag("tray_row_c").getUnclippedBoundsInRoot()
+        assertThat(a.height.value).isWithin(0.5f).of(150f)
+        assertThat(b.height.value).isWithin(0.5f).of(150f)
+        assertThat(c.top.value - a.bottom.value).isWithin(0.5f).of(8f)
+        assertThat(c.bottom.value).isAtMost(tray.bottom.value - 11f + 0.5f)
+        assertThat(c.height.value).isGreaterThan(0f)
     }
 }

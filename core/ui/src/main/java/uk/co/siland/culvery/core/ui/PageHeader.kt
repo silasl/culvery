@@ -11,18 +11,19 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -158,18 +159,72 @@ fun HhTrayGrid(label: String, rows: List<List<TrayCell>>, modifier: Modifier = M
             .padding(TrayTokens.padding),
     ) {
         TrayLabel(label)
-        rows.forEach { cells ->
-            Row(horizontalArrangement = Arrangement.spacedBy(TrayTokens.gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
-                cells.forEach { (id, content) ->
-                    key(id) {
-                        // A tile's "didn't happen" line can run past its row, so the content measures at its own height from the row's top.
-                        Box(Modifier.weight(1f).fillMaxHeight().testTag("tray_row_$id").wrapContentHeight(Alignment.Top, unbounded = true)) { content() }
+        TrayRows(rows, Modifier.fillMaxWidth().weight(1f))
+    }
+}
+
+/**
+ * [TRAY_ROWS] rows, each at least a third of the height. A row whose content needs more (a tile with a "didn't happen"
+ * line) grows, taking the height from the empty rows first and then from rows with room to spare, so no row is drawn over another.
+ */
+@Composable
+private fun TrayRows(rows: List<List<TrayCell>>, modifier: Modifier) {
+    val slots = maxOf(TRAY_ROWS, rows.size)
+    Layout(
+        content = {
+            repeat(slots) { i ->
+                val cells = rows.getOrNull(i)
+                if (cells == null) {
+                    Spacer(Modifier)
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(TrayTokens.gap)) {
+                        cells.forEach { (id, content) ->
+                            key(id) { Box(Modifier.weight(1f).fillMaxHeight().testTag("tray_row_$id")) { content() } }
+                        }
                     }
                 }
             }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val width = constraints.maxWidth
+        val gap = TrayTokens.gap.roundToPx()
+        val natural = measurables.mapIndexed { i, m -> if (i < rows.size) m.minIntrinsicHeight(width) else 0 }
+        val heights = if (constraints.hasBoundedHeight) {
+            trayRowHeights(natural, rows.size, constraints.maxHeight, gap)
+        } else {
+            natural
         }
-        repeat(TRAY_ROWS - rows.size) { Spacer(Modifier.fillMaxWidth().weight(1f)) }
+        val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints.fixed(width, heights[i])) }
+        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else heights.sum() + gap * (slots - 1)
+        layout(width, height) {
+            var y = 0
+            placeables.forEach { it.placeRelative(0, y); y += it.height + gap }
+        }
     }
+}
+
+/** Each row's height: a third of [total] less the gaps, grown to its [natural] height where that is more and the others can give. */
+private fun trayRowHeights(natural: List<Int>, filled: Int, total: Int, gap: Int): List<Int> {
+    val third = (total - gap * (natural.size - 1)) / natural.size
+    val heights = MutableList(natural.size) { third }
+    val demand = natural.mapIndexed { i, n -> if (i < filled) maxOf(0, n - third) else 0 }
+    var need = demand.sum()
+    var donated = 0
+    fun give(i: Int, room: Int) {
+        val g = minOf(room, need)
+        heights[i] -= g
+        need -= g
+        donated += g
+    }
+    for (i in natural.indices) if (i >= filled) give(i, third)
+    for (i in 0 until filled) give(i, maxOf(0, third - natural[i]))
+    for (i in 0 until filled) {
+        val g = minOf(demand[i], donated)
+        heights[i] += g
+        donated -= g
+    }
+    return heights
 }
 
 @Composable
