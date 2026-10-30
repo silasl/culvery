@@ -47,14 +47,12 @@ internal fun CulveryShell(
                     val band = remember { HomeSkyBand() }
                     CompositionLocalProvider(LocalHomeSkyBand provides band) {
                         val sky = Culvery.look?.sky
-                        if (sky == null) {
+                        sky?.invoke(skyDrifts, Modifier.matchParentSize())
+                        // Home's pixels are cached in a layer, so a sky step doesn't replay Home's drawing.
+                        // The Box stays when the sky comes or goes, so Home keeps its state.
+                        val cached = if (sky != null) Modifier.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen) else Modifier
+                        Box(Modifier.fillMaxSize().then(cached)) {
                             HomeScreen(now, state.homeCards, state.headerItems)
-                        } else {
-                            sky(skyDrifts, Modifier.matchParentSize())
-                            // Home's pixels are cached in a layer, so a sky step doesn't replay Home's drawing.
-                            Box(Modifier.fillMaxSize().graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)) {
-                                HomeScreen(now, state.homeCards, state.headerItems)
-                            }
                         }
                     }
                 } else {
