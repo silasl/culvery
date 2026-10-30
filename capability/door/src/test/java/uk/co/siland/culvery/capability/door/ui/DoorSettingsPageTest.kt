@@ -53,6 +53,9 @@ import uk.co.siland.culvery.capability.door.NOW
 import uk.co.siland.culvery.capability.door.RecordingToaster
 import uk.co.siland.culvery.capability.door.TestAccess
 import uk.co.siland.culvery.capability.door.doorSettings
+import uk.co.siland.culvery.core.access.Identified
+import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
@@ -285,6 +288,7 @@ class DoorSettingsPageTest {
     @Test
     fun aShorterKeepConfirmsThenAsksAFreshPin() {
         runBlocking { settings.setKeep(KeepDays.THIRTY) }
+        access.session.value = Identified(Person(PersonId("alex"), "Alex", 0), Role.ADMIN)
         showHost()
         waitFor { runCatching { compose.onNodeWithTag("door_keep_30").assertIsSelected() }.isSuccess }
         chooseKeep(2)

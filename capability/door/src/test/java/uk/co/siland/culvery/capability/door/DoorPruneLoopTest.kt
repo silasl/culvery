@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.door
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
+import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,6 +65,26 @@ class DoorPruneLoopTest {
         advanceTimeBy(10 * minute)
         runCurrent()
         assertThat(prunedAt).containsExactly(lateEvening, lateEvening + 10 * minute, lateEvening + 10 * minute + DAY_MS).inOrder()
+    }
+
+    /** The clocks go back on Sunday 25 October 2026: from Saturday 23:50 the next prune is at Sunday 00:00, the one after 25 hours on, not 24. */
+    @Test
+    fun theLongDayIsTwentyFiveHours() = runTest {
+        val saturdayLate = Instant.parse("2026-10-24T22:50:00Z").toEpochMilli()
+        val sundayMidnight = saturdayLate + 10 * minute
+        val hour = 60 * minute
+        val prunedAt = mutableListOf<Long>()
+        loop({ prunedAt += it }, start = saturdayLate)
+        runCurrent()
+        advanceTimeBy(10 * minute)
+        runCurrent()
+        assertThat(prunedAt).containsExactly(saturdayLate, sundayMidnight).inOrder()
+        advanceTimeBy(24 * hour)
+        runCurrent()
+        assertThat(prunedAt).hasSize(2)
+        advanceTimeBy(hour)
+        runCurrent()
+        assertThat(prunedAt).containsExactly(saturdayLate, sundayMidnight, sundayMidnight + 25 * hour).inOrder()
     }
 
     /** A new keep prunes at once; the value already read at start doesn't, nor does the same value again. */

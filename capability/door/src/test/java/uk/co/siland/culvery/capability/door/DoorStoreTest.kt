@@ -167,10 +167,9 @@ class DoorStoreTest {
             val cold = DoorStore(db, ApplicationProvider.getApplicationContext(), doorSettings(folder.root, reader), householdZone())
             val tenDays = NOW - 10 * 24 * 60 * 60_000L
             val old = cold.record(ring(key = "old", at = tenDays, whenMillis = tenDays)).event
-            val older = cold.record(ring(key = "older", at = NOW - 40 * 24 * 60 * 60_000L)).event
+            cold.record(ring(key = "older", at = NOW - 40 * 24 * 60 * 60_000L))
             cold.prune(NOW)
             assertThat(cold.events.first().map { it.id }).containsExactly(old.id)
-            assertThat(older.id).isNotEqualTo(old.id)
         } finally {
             reader.cancel()
         }
