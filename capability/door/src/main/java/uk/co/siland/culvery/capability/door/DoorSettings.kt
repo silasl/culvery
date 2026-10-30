@@ -40,7 +40,7 @@ import uk.co.siland.culvery.core.ui.look
 private const val FILE = "door_settings"
 private const val KEEP_NAME = "keep_days"
 
-/** The door's store: a corrupt file keeps the longest history rather than cutting it (15a ง3.1). */
+/** The door's store: a corrupt file keeps the longest history rather than cutting it (15a ยง3.1). */
 internal fun doorDataStore(scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO), produceFile: () -> File): DataStore<Preferences> =
     settingsDataStore(scope, { preferencesOf(stringPreferencesKey(KEEP_NAME) to KeepDays.THIRTY.name) }, produceFile)
 private const val TAG = "DoorSettings"
