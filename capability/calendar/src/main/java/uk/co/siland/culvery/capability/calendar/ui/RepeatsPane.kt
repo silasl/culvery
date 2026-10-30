@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,11 +33,11 @@ import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhRadioGroup
 import uk.co.siland.culvery.core.ui.HhRadioRow
 import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhSegmented
 import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.RadioRowTokens
 
 internal const val KEEPS_GOING = "Keeps going"
 internal const val STOPS_AFTER = "Stops after"
@@ -65,7 +64,7 @@ internal fun RepeatsPane(form: EditorForm, service: String, onPicked: () -> Unit
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
-        Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
+        HhRadioGroup {
             EDITOR_REPEATS.forEach { choice ->
                 val locked = !choice.fitsLength(form.eventWhen.repeatLength)
                 HhRadioRow(

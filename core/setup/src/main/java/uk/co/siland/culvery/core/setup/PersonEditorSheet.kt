@@ -16,7 +16,6 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +56,7 @@ import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhFooterButton
 import uk.co.siland.culvery.core.ui.HhMessageLine
+import uk.co.siland.culvery.core.ui.HhRadioGroup
 import uk.co.siland.culvery.core.ui.HhRadioRow
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
@@ -66,7 +66,6 @@ import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.KeepsToastsAbove
 import uk.co.siland.culvery.core.ui.PersonPalette
-import uk.co.siland.culvery.core.ui.RadioRowTokens
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
@@ -301,7 +300,7 @@ internal fun PersonEditorSheet(
                     }
                 }
                 Section(ROLE, PersonField.ROLE, form, views, focus) {
-                    Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
+                    HhRadioGroup {
                         Role.entries.forEach { role ->
                             HhRadioRow(role.label, roleWhat(role), selected = form.role == role, tag = "role_${role.name}") { form.role = role }
                         }

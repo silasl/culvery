@@ -62,13 +62,13 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhPageTitle
+import uk.co.siland.culvery.core.ui.HhRadioGroup
 import uk.co.siland.culvery.core.ui.HhRadioRow
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.PersonChipInk
-import uk.co.siland.culvery.core.ui.RadioRowTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.hhToggleable
 import uk.co.siland.culvery.core.ui.listRowCard
@@ -262,7 +262,7 @@ internal fun ReviewCalendars(
 @Composable
 private fun WeeksAheadRows(chosen: WeeksShown, onWeeks: (WeeksShown) -> Unit) {
     HhSectionLabel(WEEKS_AHEAD)
-    Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
+    HhRadioGroup {
         WeeksShown.entries.forEach { option ->
             HhRadioRow(weeksLabel(option), null, option == chosen, "calendars_weeks_${option.weeks}") { onWeeks(option) }
         }
