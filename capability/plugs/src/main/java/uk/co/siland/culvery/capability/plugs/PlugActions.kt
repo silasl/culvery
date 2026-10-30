@@ -18,8 +18,8 @@ import uk.co.siland.culvery.core.plugin.Toaster
 private const val TAG = "PlugActions"
 
 /**
- * What the Plugs tab does (12 §4.2): a switch by hand runs on the application scope, so its toast shows if the tab
- * closes, and asks a fresh Adult or Admin PIN only for a plug set to need one. Set-up sits behind `plugs.manage`.
+ * What the Lights tab's plugs do (12 §4.2): a switch by hand runs on the application scope, so its toast shows if the tab
+ * goes, and asks a fresh Adult or Admin PIN only for a plug set to need one. Set-up sits behind `plugs.manage`.
  */
 @Singleton
 class PlugActions internal constructor(
@@ -75,8 +75,6 @@ class PlugActions internal constructor(
             }
         }
     }
-
-    suspend fun mayManage(): Boolean = access.authorise(PlugsPermissions.MANAGE) != null
 
     suspend fun show(entityId: String, on: Boolean) = write { if (on) it.showing(entityId) else it.hiding(entityId) }
 

@@ -32,8 +32,8 @@ object HouseLines {
     const val MUSIC_DIDNT_STOP = "The music didn’t stop. Stop it in the Sonos app."
     const val SPEAKERS_NOT_BACK = "The speakers didn’t go back to their groups. Regroup them in the Sonos app."
     const val PLUGS_THREW = "The plugs didn’t switch. They’ll keep trying."
-    const val PLUGS_MISSED = "The plugs didn’t switch. Switch them on the Plugs tab."
-    const val PLUGS_LEAVE_THREW = "Some plugs may not have gone back. Check them on the Plugs tab."
+    const val PLUGS_MISSED = "The plugs didn’t switch. Switch them on the Lights tab."
+    const val PLUGS_LEAVE_THREW = "Some plugs may not have gone back. Check them on the Lights tab."
     const val PLUGS_BACK = "Plugs go back as they were when you turn it off."
     const val CANT_REACH_SONOS = "Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi."
     const val SONOS_REFUSED = "Sonos didn’t do that. Try again."
@@ -98,7 +98,7 @@ interface HouseMode {
     val holiday: StateFlow<Boolean?>
 }
 
-/** A mode that can list plugs (12 §5.1): [order] sorts its section on the Plugs tab, [permission] is what turning it on takes. */
+/** A mode that can list plugs (12 §5.1): [order] sorts it among the modes, [permission] is what turning it on takes. */
 data class HouseModeInfo(val id: String, val name: String, val order: Int, val permission: String)
 
 object HouseModes {

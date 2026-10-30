@@ -128,7 +128,7 @@ class HolidayScreenshotTest {
         const val LINE = "The heating didn’t come off Eco. Turn it off in the Nest app."
         val THREE_LINES = listOf(
             "The heating is still on Eco. Turn it off in the Nest app.",
-            "Lamp didn’t switch back on. Switch it on the Plugs tab.",
+            "Lamp didn’t switch back on. Switch it on the Lights tab.",
             "Holiday lights are still on. Turn them off in the Lights tab.",
         ).joinToString("\n")
     }

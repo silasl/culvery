@@ -149,7 +149,7 @@ class HolidayTileTest {
     fun aLongLineGrowsItsRowAndStaysClearOfTheHoover() {
         on = true
         back = LocalDate.of(2026, 10, 31)
-        line = "The heating is still on Eco. Turn it off in the Nest app. Lamp didn’t switch back on. Switch it on the Plugs tab. " +
+        line = "The heating is still on Eco. Turn it off in the Nest app. Lamp didn’t switch back on. Switch it on the Lights tab. " +
             "Holiday lights are still on. Turn them off in the Lights tab."
         show()
         val tray = compose.onNodeWithTag("tray_column").getUnclippedBoundsInRoot()

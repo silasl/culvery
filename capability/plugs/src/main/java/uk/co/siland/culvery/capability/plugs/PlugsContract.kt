@@ -42,7 +42,7 @@ interface PlugSystem {
     /** The link's §6 line, null when nothing is wrong. */
     val problem: Flow<String?>
 
-    /** The Plugs tab is showing; call the result when it goes. */
+    /** The Lights tab is showing; call the result when it goes. */
     fun watch(): () -> Unit
 
     /** The plugs Home Assistant has, by name; reads its registry afresh. */

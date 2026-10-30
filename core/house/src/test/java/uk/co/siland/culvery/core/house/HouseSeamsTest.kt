@@ -13,6 +13,13 @@ class HouseSeamsTest {
         override suspend fun tick() = Unit
     }
 
+    /** 15a §4.5: fails if a line still sends the user to a Plugs tab, which no longer exists. */
+    @Test
+    fun theLinesSendTheUserToTheLightsTab() {
+        assertThat(HouseLines.PLUGS_MISSED).isEqualTo("The plugs didn’t switch. Switch them on the Lights tab.")
+        assertThat(HouseLines.PLUGS_LEAVE_THREW).isEqualTo("Some plugs may not have gone back. Check them on the Lights tab.")
+    }
+
     /** 12 §6: fails if a plug's name can be read out of a log line. */
     @Test
     fun aPlugChangeHidesItsName() {

@@ -49,7 +49,7 @@ data class ModeRun(val place: Long, val pending: Map<String, Boolean>) {
     override fun toString() = "ModeRun"
 }
 
-/** Everything the Plugs tab and the modes remember (12 §5.2). [toString] leaves out every id. */
+/** Everything the Lights tab's plugs and the modes remember (12 §5.2). [toString] leaves out every id. */
 data class PlugPrefs(
     val plugs: List<String> = emptyList(),
     val needsPin: Set<String> = emptySet(),

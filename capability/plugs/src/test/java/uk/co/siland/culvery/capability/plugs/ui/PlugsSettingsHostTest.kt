@@ -87,7 +87,7 @@ class PlugsSettingsHostTest {
         compose.onNodeWithTag("plugs_name_1").assertTextEquals("LAMP")
         compose.onAllNodesWithTag("plugs_show_2").assertCountEquals(0)
         compose.onNodeWithTag("plugs_help")
-            .assertTextEquals("Plugs from Home Assistant’s TP-Link integration. Turn one on to show it on the Plugs tab.")
+            .assertTextEquals("Plugs from Home Assistant’s TP-Link integration. Turn one on to show it on the Lights tab.")
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -152,7 +152,7 @@ class PlugsSettingsHostTest {
         show(found(LAMP_CANDIDATE))
         compose.waitFor { count("plugs_show_0") == 1 }
         compose.onNodeWithTag("plugs_show_0")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lamp, show on the Plugs tab")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lamp, show on the Lights tab")))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Text))
         compose.onNodeWithTag("plugs_pin_0")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lamp, needs a PIN to switch")))

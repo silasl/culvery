@@ -263,7 +263,7 @@ class PlugsHouseTest {
         house.start(HOLIDAY)
         rig.power(LAMP, UNREACHABLE)
 
-        assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Failed("Lamp didn’t switch back on. Switch it on the Plugs tab."))
+        assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Failed("Lamp didn’t switch back on. Switch it on the Lights tab."))
 
         assertThat(rig.prefs().notes).isEmpty()
         assertThat(rig.system.switches).containsExactly(LAMP to false)
@@ -496,7 +496,7 @@ class PlugsHouseTest {
         house.start(HOLIDAY)
         rig.power(LAMP, GONE)
 
-        assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Failed("Lamp didn’t switch back on. Switch it on the Plugs tab."))
+        assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Failed("Lamp didn’t switch back on. Switch it on the Lights tab."))
 
         assertThat(rig.prefs().notes).isEmpty()
         assertThat(rig.system.switches).containsExactly(LAMP to false)
@@ -512,7 +512,7 @@ class PlugsHouseTest {
         rig.power(LAMP, UNREACHABLE)
         rig.power(FAN, UNREACHABLE)
 
-        assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Failed("2 plugs didn’t switch back. Switch them on the Plugs tab."))
+        assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Failed("2 plugs didn’t switch back. Switch them on the Lights tab."))
 
         assertThat(rig.prefs().notes).isEmpty()
         assertThat(rig.prefs().runs).isEmpty()

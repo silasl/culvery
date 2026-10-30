@@ -33,7 +33,7 @@ abstract class HouseModule {
     @BindsOptionalOf
     abstract fun plugs(): HousePlugs
 
-    // With no mode bound the Plugs tab has no mode column (12 §5.1).
+    // With no mode bound plugs have no mode choices (12 §5.1).
     @Multibinds
     abstract fun modes(): Set<HouseModeInfo>
 

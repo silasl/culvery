@@ -273,12 +273,12 @@ class PartyHouseTest {
         val turnedOn = rig.wall
 
         assertThat(rig.saved().on).isTrue()
-        assertThat(house.line.value).isEqualTo("The plugs didn’t switch. Switch them on the Plugs tab.")
+        assertThat(house.line.value).isEqualTo("The plugs didn’t switch. Switch them on the Lights tab.")
         rig.wall = turnedOn + 2 * HouseTimings.RETRY_MS
         house.tick()
 
         assertThat(rig.enters()).isEqualTo(1)
-        assertThat(house.line.value).isEqualTo("The plugs didn’t switch. Switch them on the Plugs tab.")
+        assertThat(house.line.value).isEqualTo("The plugs didn’t switch. Switch them on the Lights tab.")
     }
 
     /** Fails if turning off puts anything back in another order, or with other than what was saved, or leaves the record. */
@@ -345,7 +345,7 @@ class PartyHouseTest {
         assertThat(house.isOn.value).isFalse()
         assertThat(rig.saved()).isEqualTo(PartyRecord())
         assertThat(house.line.value).isEqualTo(
-            "$MUSIC_STOP_LINE\nSome plugs may not have gone back. Check them on the Plugs tab.\nSome lights didn’t go back: Kitchen and Lounge.",
+            "$MUSIC_STOP_LINE\nSome plugs may not have gone back. Check them on the Lights tab.\nSome lights didn’t go back: Kitchen and Lounge.",
         )
     }
 
@@ -719,6 +719,6 @@ class PartyHouseTest {
         const val MUSIC_STOP_LINE = "The music didn’t stop. Stop it in the Sonos app."
         const val SPEAKERS_NOT_BACK_LINE = "The speakers didn’t go back to their groups. Regroup them in the Sonos app."
         const val LAMP_LINE = "Lamp didn’t switch off. It’ll keep trying."
-        const val LAMP_BACK_LINE = "Lamp didn’t switch back on. Switch it on the Plugs tab."
+        const val LAMP_BACK_LINE = "Lamp didn’t switch back on. Switch it on the Lights tab."
     }
 }

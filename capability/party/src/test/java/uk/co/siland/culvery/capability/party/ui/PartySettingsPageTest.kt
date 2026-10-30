@@ -341,7 +341,7 @@ class PartySettingsPageTest {
     @Test
     fun thePlugsLinePointsToThePlugsTab() {
         screen(ui)
-        compose.onNodeWithTag("party_plugs_line").assertTextEquals("Choose what each plug does in Party mode on the Plugs tab.")
+        compose.onNodeWithTag("party_plugs_line").assertTextEquals("Party mode keeps the plug choices it has. A later update lets you change them here.")
     }
 
     @Test

@@ -3,10 +3,10 @@ package uk.co.siland.culvery.capability.plugs
 import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.plugin.CHECKING
 
-/** The Plugs tab's words (12 §2.5, §2.14). */
+/** The plugs' words (12 §2.5, §2.14; 15a §4.5). */
 object PlugsWords {
     const val PLUGS = "Plugs"
-    private const val HOME_ASSISTANT = "Home Assistant"
+    const val SECTION = "Plugs · Home Assistant"
     const val A_PLUG = "A plug"
     const val SWITCHING = "Switching…"
     const val SWITCH_ON = "Switch on"
@@ -15,21 +15,18 @@ object PlugsWords {
     const val CANT_REACH_THIS_PLUG = "Can’t reach this plug."
     const val GONE_PLUG = "Home Assistant has no plug called that any more. Turn it off in Settings."
     const val NEEDS_A_PIN = "Needs a PIN to switch"
-    const val SHOW_ON_TAB = "Show on the Plugs tab"
-    const val PLUGS_HELP = "Plugs from Home Assistant’s TP-Link integration. Turn one on to show it on the Plugs tab."
+    const val SHOW_ON_TAB = "Show on the Lights tab"
+    const val PLUGS_HELP = "Plugs from Home Assistant’s TP-Link integration. Turn one on to show it on the Lights tab."
     const val NO_TP_LINK_PLUGS = "Home Assistant has no TP-Link plugs. Add them in Home Assistant first."
     const val CANT_LIST_PLUGS = "Can’t list the plugs. Check Home Assistant is up to date."
     const val GONE_SHOWN = "Home Assistant has no plug called that any more."
-    const val IGNORE = "Ignore"
     const val ON = "On"
     const val OFF = "Off"
-    const val EDIT = "Edit"
-    const val DONE = "Done"
 
-    /** Counts the plugs known to be On or Off; with none known, just "Home Assistant". */
-    fun plugsOn(plugs: List<PlugState>): String {
+    /** "1 of 2 plugs on", counting the plugs known to be On or Off; null with none known. */
+    fun plugsOnSummary(plugs: List<PlugState>): String? {
         val known = plugs.filter { it.isOn != null }
-        return if (known.isEmpty()) HOME_ASSISTANT else "${known.count { it.power == PlugPower.ON }} of ${known.size} on · $HOME_ASSISTANT"
+        return if (known.isEmpty()) null else "${known.count { it.power == PlugPower.ON }} of ${known.size} plugs on"
     }
 
     fun showSpoken(name: String) = "$name, ${SHOW_ON_TAB.replaceFirstChar(Char::lowercase)}"
@@ -64,16 +61,6 @@ object PlugsWords {
         return if (needsPin) "$action, needs a PIN" else action
     }
 
-    fun word(choice: ModeChoice) = when (choice) {
-        ModeChoice.IGNORE -> IGNORE
-        ModeChoice.ON -> ON
-        ModeChoice.OFF -> OFF
-    }
-
-    fun modeRowSpoken(mode: String, name: String, choice: ModeChoice) = "$mode, $name, ${word(choice).lowercase()}"
-
-    fun modeCellSpoken(mode: String, choice: ModeChoice) = "$mode, ${word(choice).lowercase()}"
-
     fun cantReach(name: String) = "Can’t reach $name. Check it’s plugged in and the Tapo app can see it."
 
     fun didntSwitch(name: String) = "$name didn’t switch. Try again, or use the Tapo app."
@@ -85,6 +72,6 @@ object PlugsWords {
 
     /** The tile line for plugs a mode didn't put back; nothing retries them. */
     fun leaveLine(missed: List<PlugChange>): String =
-        missed.singleOrNull()?.let { "${it.name} didn’t switch back ${if (it.on) "on. Switch it on" else "off. Switch it off on"} the Plugs tab." }
-            ?: "${missed.size} plugs didn’t switch back. Switch them on the Plugs tab."
+        missed.singleOrNull()?.let { "${it.name} didn’t switch back ${if (it.on) "on. Switch it on" else "off. Switch it off on"} the Lights tab." }
+            ?: "${missed.size} plugs didn’t switch back. Switch them on the Lights tab."
 }

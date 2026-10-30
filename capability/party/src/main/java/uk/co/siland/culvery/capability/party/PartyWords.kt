@@ -42,7 +42,7 @@ object PartyWords {
     const val LIGHTS_SECTION = "Lights"
     const val LEAVE_ALONE = "Leave alone"
     const val PLUGS_SECTION = "Plugs"
-    const val PLUGS_LINE = "Choose what each plug does in Party mode on the Plugs tab."
+    const val PLUGS_LINE = "Party mode keeps the plug choices it has. A later update lets you change them here."
     const val SET_UP_SONOS = "Set up Sonos in Settings › Music to choose the music."
     const val SET_UP_HUE = "Set up Hue in Settings › Lights to choose scenes."
 

@@ -535,7 +535,7 @@ class HolidayHouseTest {
         assertThat(rig.settings.prefs.first().on).isTrue()
         assertThat(rig.plugs.calls).containsExactly("leave:holiday", "begin:holiday", "enter:holiday").inOrder()
         assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(MISSED)
-        assertThat(house.line.value).isEqualTo("The plugs didn’t switch. Switch them on the Plugs tab.")
+        assertThat(house.line.value).isEqualTo("The plugs didn’t switch. Switch them on the Lights tab.")
     }
 
     /** Fails if a failed plugs step shows no line, is tried before five minutes or not at five, or keeps its line once it works. */
@@ -761,7 +761,7 @@ class HolidayHouseTest {
 
         assertThat(house.holiday.value).isFalse()
         assertThat(rig.settings.prefs.first()).isEqualTo(HolidayRecord())
-        assertThat(house.line.value).isEqualTo("Some plugs may not have gone back. Check them on the Plugs tab.")
+        assertThat(house.line.value).isEqualTo("Some plugs may not have gone back. Check them on the Lights tab.")
     }
 
     /** Review Focus 4: fails if a run left by a turn-on that never saved isn't put back once, with no line, when the record loads as off. */
@@ -823,7 +823,7 @@ class HolidayHouseTest {
         const val ECO_ON_LINE = "The heating didn’t go to Eco. Check the Nest app."
         const val STILL_ON_ECO = "The heating is still on Eco. Turn it off in the Nest app."
         const val LAMP_LINE = "Lamp didn’t switch off. It’ll keep trying."
-        const val LAMP_BACK_LINE = "Lamp didn’t switch back on. Switch it on the Plugs tab."
+        const val LAMP_BACK_LINE = "Lamp didn’t switch back on. Switch it on the Lights tab."
 
         fun FakePlugs.enterCount() = calls.count { it == "enter:holiday" }
 

@@ -284,16 +284,6 @@ class PlugActionsTest {
         }
     }
 
-    /** 12 §4.4: fails if set-up skips the pad or a Child gets in. */
-    @Test
-    fun manageAsksForAFreshPinAndRefusesAChild() = runTest {
-        val adult = rig()
-        assertThat(adult.actions.mayManage()).isTrue()
-        assertThat(adult.access.asked).containsExactly(listOf("plugs.manage"))
-
-        assertThat(rig(Role.CHILD).actions.mayManage()).isFalse()
-    }
-
     /** 12r §4.2: fails if show doubles, an Ignore keeps its entry, or hide loses the plug's choices or PIN setting. */
     @Test
     fun showHidePinAndChoiceReachTheStore() = runTest {

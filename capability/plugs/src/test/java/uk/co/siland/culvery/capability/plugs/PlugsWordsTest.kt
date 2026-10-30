@@ -35,49 +35,31 @@ class PlugsWordsTest {
         assertThat(PlugsWords.switchSpoken(plug(PlugPower.OFF), needsPin = true)).isEqualTo("Switch on, needs a PIN")
     }
 
+    /** 15a §4.5: fails if the summary counts plugs of unknown state, says "Home Assistant", or isn't null with none known. */
     @Test
-    fun modeRowsAreSpokenWithTheirChoice() {
-        assertThat(PlugsWords.modeRowSpoken("Holiday mode", "Lamp", ModeChoice.IGNORE)).isEqualTo("Holiday mode, Lamp, ignore")
-        assertThat(PlugsWords.modeRowSpoken("Holiday mode", "Lamp", ModeChoice.ON)).isEqualTo("Holiday mode, Lamp, on")
-        assertThat(PlugsWords.modeRowSpoken("Holiday mode", "Lamp", ModeChoice.OFF)).isEqualTo("Holiday mode, Lamp, off")
-    }
-
-    @Test
-    fun theColumnCellIsSpokenWithItsMode() {
-        assertThat(PlugsWords.modeCellSpoken("Holiday mode", ModeChoice.IGNORE)).isEqualTo("Holiday mode, ignore")
-        assertThat(PlugsWords.modeCellSpoken("Holiday mode", ModeChoice.ON)).isEqualTo("Holiday mode, on")
-        assertThat(PlugsWords.modeCellSpoken("Holiday mode", ModeChoice.OFF)).isEqualTo("Holiday mode, off")
-    }
-
-    @Test
-    fun theModeChoicesAreIgnoreOnOff() {
-        assertThat(listOf(PlugsWords.IGNORE, PlugsWords.ON, PlugsWords.OFF)).containsExactly("Ignore", "On", "Off").inOrder()
-    }
-
-    @Test
-    fun theHeaderCountsThePlugsThatAreOn() {
+    fun theSummaryCountsThePlugsThatAreOn() {
         val plugs = listOf(plug(PlugPower.ON), plug(PlugPower.ON), plug(PlugPower.OFF), plug(PlugPower.UNREACHABLE))
-        assertThat(PlugsWords.plugsOn(plugs)).isEqualTo("2 of 3 on · Home Assistant")
+        assertThat(PlugsWords.plugsOnSummary(plugs)).isEqualTo("2 of 3 plugs on")
+        assertThat(PlugsWords.plugsOnSummary(listOf(plug(PlugPower.ON), plug(PlugPower.OFF), plug(PlugPower.UNKNOWN)))).isEqualTo("1 of 2 plugs on")
+        assertThat(PlugsWords.plugsOnSummary(listOf(plug(PlugPower.UNKNOWN), plug(PlugPower.UNKNOWN)))).isNull()
+        assertThat(PlugsWords.plugsOnSummary(emptyList())).isNull()
     }
 
     @Test
-    fun theHeaderCountsOnlyPlugsWhoseStateIsKnown() {
-        assertThat(PlugsWords.plugsOn(listOf(plug(PlugPower.ON), plug(PlugPower.OFF), plug(PlugPower.UNKNOWN))))
-            .isEqualTo("1 of 2 on · Home Assistant")
-        assertThat(PlugsWords.plugsOn(listOf(plug(PlugPower.UNKNOWN), plug(PlugPower.UNKNOWN)))).isEqualTo("Home Assistant")
-        assertThat(PlugsWords.plugsOn(emptyList())).isEqualTo("Home Assistant")
+    fun theSectionLabelNamesHomeAssistant() {
+        assertThat(PlugsWords.SECTION).isEqualTo("Plugs · Home Assistant")
     }
 
     @Test
     fun theSettingsSectionWords() {
         assertThat(PlugsWords.PLUGS_HELP)
-            .isEqualTo("Plugs from Home Assistant’s TP-Link integration. Turn one on to show it on the Plugs tab.")
+            .isEqualTo("Plugs from Home Assistant’s TP-Link integration. Turn one on to show it on the Lights tab.")
         assertThat(PlugsWords.NO_TP_LINK_PLUGS).isEqualTo("Home Assistant has no TP-Link plugs. Add them in Home Assistant first.")
         assertThat(PlugsWords.CANT_LIST_PLUGS).isEqualTo("Can’t list the plugs. Check Home Assistant is up to date.")
-        assertThat(PlugsWords.SHOW_ON_TAB).isEqualTo("Show on the Plugs tab")
+        assertThat(PlugsWords.SHOW_ON_TAB).isEqualTo("Show on the Lights tab")
         assertThat(PlugsWords.NEEDS_A_PIN).isEqualTo("Needs a PIN to switch")
         assertThat(PlugsWords.GONE_SHOWN).isEqualTo("Home Assistant has no plug called that any more.")
-        assertThat(PlugsWords.showSpoken("Lamp")).isEqualTo("Lamp, show on the Plugs tab")
+        assertThat(PlugsWords.showSpoken("Lamp")).isEqualTo("Lamp, show on the Lights tab")
         assertThat(PlugsWords.needsPinSpoken("Lamp")).isEqualTo("Lamp, needs a PIN to switch")
     }
 
@@ -93,15 +75,15 @@ class PlugsWordsTest {
         assertThat(PlugsWords.enterLine(listOf(PlugChange("Lamp", false), PlugChange("Fan", true))))
             .isEqualTo("2 plugs didn’t switch. They’ll keep trying.")
         assertThat(PlugsWords.leaveLine(listOf(PlugChange("Lamp", true))))
-            .isEqualTo("Lamp didn’t switch back on. Switch it on the Plugs tab.")
+            .isEqualTo("Lamp didn’t switch back on. Switch it on the Lights tab.")
         assertThat(PlugsWords.leaveLine(listOf(PlugChange("Lamp", true), PlugChange("Fan", false))))
-            .isEqualTo("2 plugs didn’t switch back. Switch them on the Plugs tab.")
+            .isEqualTo("2 plugs didn’t switch back. Switch them on the Lights tab.")
     }
 
     @Test
     fun aPlugThatShouldHaveGoneBackOffSaysSo() {
         assertThat(PlugsWords.leaveLine(listOf(PlugChange("Fan", false))))
-            .isEqualTo("Fan didn’t switch back off. Switch it off on the Plugs tab.")
+            .isEqualTo("Fan didn’t switch back off. Switch it off on the Lights tab.")
     }
 
     @Test
