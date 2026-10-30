@@ -3,13 +3,14 @@ package uk.co.siland.culvery.capability.hoover
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.household.Role
 
 /** 11 §4.4: Start asks for a fresh Adult or Admin PIN every time, and a Child's PIN starts nothing. */
 class HooverActionsTest {
     private val system = FakeHooverSystem()
 
-    private fun actions(access: TestAccess) = HooverActions(access, setOf(system))
+    private fun actions(access: FakeAccess) = HooverActions(access, setOf(system))
 
     /** Fails if an Adult's PIN doesn't start the hoover or the system's answer is lost. */
     @Test

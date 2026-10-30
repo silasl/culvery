@@ -13,12 +13,13 @@ import uk.co.siland.culvery.capability.lights.TestAccess
 import uk.co.siland.culvery.capability.lights.TestLightsProvider
 import uk.co.siland.culvery.capability.lights.TestLightsSystem
 import uk.co.siland.culvery.capability.lights.link
+import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.plugin.test.soon
 
 /** What [LightsTabHost] takes, over a paired fake [system] whose rooms a test changes. */
 internal class TabHost(val view: LightsView, val actions: LightsActions, val house: LightsHouse, val follow: LightsFollow, val system: TestLightsSystem)
 
-internal suspend fun LightsFixture.tabHost(vararg rooms: LightRoom, access: TestAccess = TestAccess(null)): TabHost {
+internal suspend fun LightsFixture.tabHost(vararg rooms: LightRoom, access: FakeAccess = TestAccess(null)): TabHost {
     settings.connect("lights.hue", link())
     val provider = TestLightsProvider()
     val bridges = Bridges(setOf(provider), settings, scope)

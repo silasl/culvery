@@ -30,6 +30,8 @@ import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhTrayGrid
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.test.TRAY_HEIGHT_DP
+import uk.co.siland.culvery.core.ui.test.TRAY_WIDTH_DP
 import uk.co.siland.culvery.core.ui.test.snap
 
 /** The Holiday mode tile in the One-tap tray at 333 dp, and the "When are you back?" sheet (11 §5.2), dark and light. */
@@ -50,7 +52,7 @@ class HolidayScreenshotTest {
                     listOf("holiday" to { HolidayTile(on, back.takeIf { on }, line, null) {} }, "party" to { Spacer(Modifier.fillMaxSize()) }),
                     listOf("hoover" to { HooverSizedRow() }),
                 ),
-                Modifier.width(333.dp).height(359.dp),
+                Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
             )
         }
 

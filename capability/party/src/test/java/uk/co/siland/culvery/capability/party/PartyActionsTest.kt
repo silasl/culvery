@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.household.Role
@@ -27,7 +28,7 @@ class PartyActionsTest {
 
     private fun TestScope.rig() = HouseRig(backgroundScope)
 
-    private fun actions(access: TestAccess, rig: HouseRig) =
+    private fun actions(access: FakeAccess, rig: HouseRig) =
         PartyActions(access, rig.house, setOf(TestSwitch(HouseModes.HOLIDAY, "Holiday mode", holiday)))
 
     private suspend fun turnOn(rig: HouseRig) = rig.house.turnOn(TestAccess(Role.ADULT).authorise(HousePermissions.PARTY_MODE)!!)

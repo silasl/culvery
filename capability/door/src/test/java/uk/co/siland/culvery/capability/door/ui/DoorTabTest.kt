@@ -45,7 +45,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -73,9 +72,8 @@ import uk.co.siland.culvery.capability.door.doorDb
 import uk.co.siland.culvery.capability.door.motion
 import uk.co.siland.culvery.capability.door.ring
 import uk.co.siland.culvery.capability.door.startOfYesterday
-import uk.co.siland.culvery.core.access.Identified
-import uk.co.siland.culvery.core.household.Person
-import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.access.test.settled
+import uk.co.siland.culvery.core.access.test.signedIn
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalTabReselected
@@ -416,9 +414,6 @@ class DoorTabTest {
         compose.setContent { CulveryTheme(dark = true) { host(flowOf(october14)) } }
     }
 
-    /** Lets the clear a click started run to its end, so a check that nothing happened can't pass by being early. */
-    private fun settled() = runBlocking { appScope.coroutineContext.job.children.toList().forEach { it.join() } }
-
     private fun openConfirm() {
         openHost()
         waitFor { exists("door_clear") }
@@ -448,7 +443,7 @@ class DoorTabTest {
     @Test
     fun clearAsksThenAsksForAPinThenClears() {
         threeEventsTwoWithPictures()
-        access.session.value = Identified(Person(PersonId("alex"), "Alex", 0), Role.ADMIN)
+        access.session.value = signedIn(Role.ADMIN)
         openConfirm()
         compose.onNodeWithText(clearQuestion(3)).assertIsDisplayed()
         assertThat(access.asked).isEmpty()
@@ -481,7 +476,7 @@ class DoorTabTest {
         openConfirm()
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
         waitFor { access.asked.isNotEmpty() }
-        settled()
+        appScope.settled()
         compose.waitForIdle()
         assertThat(runBlocking { store.events.first() }).hasSize(3)
         assertThat(dir.listFiles()).hasLength(2)
@@ -496,7 +491,7 @@ class DoorTabTest {
         openConfirm()
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
         waitFor { access.asked.isNotEmpty() }
-        settled()
+        appScope.settled()
         compose.waitForIdle()
         assertThat(runBlocking { store.events.first() }).hasSize(3)
         assertThat(toaster.messages).isEmpty()

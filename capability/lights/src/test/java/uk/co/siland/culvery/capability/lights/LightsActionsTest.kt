@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.test.waitFor
@@ -33,7 +34,7 @@ class LightsActionsTest {
 
     private val house by lazy { LightsHouse({ system }, fixture.settings) }
 
-    private fun TestScope.actions(access: TestAccess) =
+    private fun TestScope.actions(access: FakeAccess) =
         LightsActions({ system }, backgroundScope, { testScheduler.currentTime }, house, access)
 
     private suspend fun waitFor(call: String) = soon { while (call !in system.calls) delay(5) }

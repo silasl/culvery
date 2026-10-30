@@ -21,7 +21,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
@@ -34,6 +33,7 @@ import uk.co.siland.culvery.capability.plugs.PlugPower
 import uk.co.siland.culvery.capability.plugs.PlugState
 import uk.co.siland.culvery.capability.plugs.PlugsRig
 import uk.co.siland.culvery.capability.plugs.TestAccess
+import uk.co.siland.culvery.core.access.test.settled
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -166,7 +166,7 @@ class PlugsSectionTest {
         compose.onNodeWithTag("plug_${FAN}_switch").performClick()
         compose.waitFor { host.access.asked.size == 1 }
         // Let the tap's action run to its end, so no switch can't pass by being early.
-        runBlocking { host.scope.coroutineContext.job.children.toList().forEach { it.join() } }
+        host.scope.settled()
         compose.waitForIdle()
         assertThat(host.rig.system.switches).isEmpty()
         compose.onNodeWithTag("plug_${FAN}_switch").assertContentDescriptionEquals("Switch on, needs a PIN")

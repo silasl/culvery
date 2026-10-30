@@ -28,6 +28,7 @@ dependencies {
     testFixturesImplementation(libs.androidx.test.core)
     testImplementation(testFixtures(project(":core:ui")))
     testImplementation(testFixtures(project(":core:plugin")))
+    testImplementation(testFixtures(project(":core:access")))
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)

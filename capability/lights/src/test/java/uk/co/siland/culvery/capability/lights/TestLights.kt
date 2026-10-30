@@ -10,20 +10,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import org.junit.rules.TemporaryFolder
 import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
-import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.house.HousePermissions
-import uk.co.siland.culvery.core.access.CorePermissionSource
-import uk.co.siland.culvery.core.access.Identified
-import uk.co.siland.culvery.core.access.PermissionRegistry
-import uk.co.siland.culvery.core.access.PinReason
-import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
@@ -213,37 +207,8 @@ internal fun houseAdult() = Authorised(person, Role.ADULT, setOf(HousePermission
 /** Someone identified who holds nothing. */
 internal fun nobody() = Authorised(person, Role.ADULT, emptySet())
 
-/** A PIN pad answered by someone with [role] (null: cancelled); [asked] holds each call's permissions in order. */
-internal class TestAccess(var role: Role?) : AccessControl {
-    private val registry = PermissionRegistry(setOf(CorePermissionSource(), LightsPermissionSource()))
-    val asked: MutableList<List<String>> = CopyOnWriteArrayList()
-
-    override val session: StateFlow<Identified?> = MutableStateFlow(null)
-    override val expiresAt: StateFlow<Long?> = MutableStateFlow(null)
-
-    override suspend fun authorise(
-        vararg anyOf: String,
-        reason: PinReason,
-        allow: (Identified, Set<String>) -> Boolean,
-        refusal: Refusal,
-        label: String?,
-    ): Authorised? {
-        asked += anyOf.toList()
-        val role = role ?: return null
-        val granted = anyOf.filter { registry.isGranted(role, it) }.toSet()
-        return if (granted.isEmpty()) null else Authorised(person, role, granted)
-    }
-
-    override fun beginSetupSession(person: Identified) = Unit
-
-    override fun endSetupSession() = Unit
-
-    override fun touch(holdForEdits: Boolean) = Unit
-
-    override fun checkExpiry() = Unit
-
-    override fun lock() = Unit
-}
+/** A PIN pad answered by someone with [role] (null: cancelled) over the Lights permissions. */
+internal fun TestAccess(role: Role?) = FakeAccess(role, LightsPermissionSource())
 
 
 

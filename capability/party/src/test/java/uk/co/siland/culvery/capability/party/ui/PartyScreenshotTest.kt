@@ -1,12 +1,8 @@
 package uk.co.siland.culvery.capability.party.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -26,8 +22,8 @@ import uk.co.siland.culvery.capability.party.PartyPlan
 import uk.co.siland.culvery.capability.party.PartyRecord
 import uk.co.siland.culvery.capability.party.PartyWords
 import uk.co.siland.culvery.core.house.PlugChange
-import uk.co.siland.culvery.core.ui.HhTrayGrid
 import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.test.OneTapTray
 import uk.co.siland.culvery.core.ui.test.snap
 
 /** The Party mode tile in the One-tap tray at 333 dp, and its sheet, on and off (13 §2.6), dark and light. */
@@ -39,7 +35,7 @@ class PartyScreenshotTest {
 
     private fun tile(name: String, dark: Boolean, on: Boolean, line: String? = null) =
         compose.snap(name, dark, Modifier.padding(16.dp)) {
-            HhTrayGrid("One-tap", listOf(listOf("party" to { PartyTile(on, line, null) {} }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
+            OneTapTray("party") { PartyTile(on, line, null) {} }
         }
 
     private fun sheet(name: String, dark: Boolean, turningOn: Boolean, lines: List<String>, seasonal: SeasonalTheme? = null) =

@@ -1,8 +1,6 @@
 package uk.co.siland.culvery.capability.hoover.ui
 
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -14,7 +12,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.hoover.HooverActivity
 import uk.co.siland.culvery.capability.hoover.HooverState
-import uk.co.siland.culvery.core.ui.HhTrayGrid
+import uk.co.siland.culvery.core.ui.test.OneTapTray
 import uk.co.siland.culvery.core.ui.test.snap
 
 /** The Hoover row in the One-tap tray at 333 dp (11 §4.4), dark and light. */
@@ -26,7 +24,7 @@ class HooverRowScreenshotTest {
 
     private fun snap(name: String, dark: Boolean, state: HooverState, line: String? = null, starting: Boolean = false) =
         compose.snap(name, dark, Modifier.padding(16.dp)) {
-            HhTrayGrid("One-tap", listOf(listOf("hoover" to { HooverRow(state, line, starting) {} })), Modifier.width(333.dp).height(359.dp))
+            OneTapTray("hoover", neighbour = false) { HooverRow(state, line, starting) {} }
         }
 
     private val docked = HooverState(HooverActivity.DOCKED, 86, null)

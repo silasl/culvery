@@ -58,6 +58,7 @@ import uk.co.siland.culvery.capability.lights.TestLightsSystem
 import uk.co.siland.culvery.capability.lights.link
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.room
+import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.soon
@@ -241,7 +242,7 @@ class LightsCardTest {
         }
     }
 
-    private class Host(val view: LightsView, val actions: LightsActions, val house: LightsHouse, val follow: LightsFollow, val access: TestAccess, val system: TestLightsSystem)
+    private class Host(val view: LightsView, val actions: LightsActions, val house: LightsHouse, val follow: LightsFollow, val access: FakeAccess, val system: TestLightsSystem)
 
     private suspend fun host(vararg rooms: LightRoom): Host {
         val access = TestAccess(null)

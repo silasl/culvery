@@ -44,7 +44,7 @@ class DoorSettingsScreenshotTest {
             val scroll = rememberScrollState()
             if (toEnd) LaunchedEffect(Unit) { scroll.scrollTo(scroll.maxValue) }
             CulveryTheme(dark = dark, seasonal = seasonal) {
-                Box(Modifier.size(960.dp, 1200.dp).background(Culvery.colors.bg)) { InSettingsPane(scroll) { DoorSettingsScreen(ui, actions) } }
+                Box(Modifier.size(960.dp, 1200.dp).background(Culvery.colors.bg)) { InSettingsPane(scroll = scroll) { DoorSettingsScreen(ui, actions) } }
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")

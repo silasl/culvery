@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.household.Role
@@ -27,7 +28,7 @@ class HolidayActionsTest {
 
     private fun kotlinx.coroutines.test.TestScope.rig() = HouseRig(backgroundScope)
 
-    private fun actions(access: TestAccess, rig: HouseRig, events: FakeEvents? = null) =
+    private fun actions(access: FakeAccess, rig: HouseRig, events: FakeEvents? = null) =
         HolidayActions(access, rig.house, events, setOf(TestSwitch(HouseModes.PARTY, "Party mode", party)), { HouseRig.TODAY })
 
     /** Fails if the pad asks for anything but `holiday.mode`, or the sheet doesn't open once. */

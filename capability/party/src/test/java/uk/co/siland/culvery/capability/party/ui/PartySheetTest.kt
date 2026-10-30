@@ -2,10 +2,6 @@ package uk.co.siland.culvery.capability.party.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -51,7 +47,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.HhTrayGrid
+import uk.co.siland.culvery.core.ui.test.OneTapTray
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 import uk.co.siland.culvery.core.ui.test.waitFor
@@ -161,7 +157,7 @@ class PartySheetTest {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Row(Modifier.background(Culvery.colors.bg)) {
-                        HhTrayGrid("One-tap", listOf(listOf("party" to { PartyTileHost(actions, rig.house) }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
+                        OneTapTray("party") { PartyTileHost(actions, rig.house) }
                         overlay.content?.invoke()
                     }
                 }
@@ -215,7 +211,7 @@ class PartySheetTest {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Row(Modifier.background(Culvery.colors.bg)) {
-                        HhTrayGrid("One-tap", listOf(listOf("party" to { PartyTileHost(actions, rig.house) }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
+                        OneTapTray("party") { PartyTileHost(actions, rig.house) }
                         overlay.content?.invoke()
                     }
                 }

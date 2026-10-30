@@ -25,6 +25,7 @@ import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.TrayTokens
 import uk.co.siland.culvery.shell.ShellUiState
 
 /** The shell at 1280 × 800 dp with a tagged box for each card (9 §6.1). */
@@ -189,8 +190,8 @@ class HomeGridTest {
         val tray = bounds("home_tray")
         val label = compose.onNodeWithTag("tray_label", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val row = bounds("tray_row_holiday.mode")
-        val padding = 11f
-        val gap = 8f
+        val padding = TrayTokens.padding.value
+        val gap = TrayTokens.gap.value
         val third = (tray.height.value - 2 * padding - label.height.value - 3 * gap) / 3
         assertThat(row.height.value).isWithin(1f).of(third)
         assertThat(row.width.value).isWithin(1f).of(tray.width.value - 2 * padding)

@@ -8,6 +8,7 @@ plugins {
 dependencies {
     testImplementation(testFixtures(project(":core:ui")))
     testImplementation(testFixtures(project(":core:plugin")))
+    testImplementation(testFixtures(project(":core:access")))
     // Startable and PermissionSource appear in this module's public API.
     api(project(":core:plugin"))
     // HouseMode, which HolidayHouse is, and the seams in its constructor.

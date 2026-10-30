@@ -29,6 +29,8 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.ui.test.TRAY_HEIGHT_DP
+import uk.co.siland.culvery.core.ui.test.TRAY_WIDTH_DP
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 @RunWith(AndroidJUnit4::class)
@@ -192,6 +194,9 @@ class PageHeaderTest {
         compose.onNodeWithTag("tray_label", useUnmergedTree = true).assertDoesNotExist()
     }
 
+    private val gap = TrayTokens.gap.value
+    private val padding = TrayTokens.padding.value
+
     /** 15a §2.1. Fails if the label isn't on top and unspoken, the rows aren't 8 apart and equal, or an empty row is missing. */
     @Test
     fun theGridKeepsThreeEqualRowsUnderItsLabel() {
@@ -206,11 +211,11 @@ class PageHeaderTest {
         val a = compose.onNodeWithTag("tray_row_a").getUnclippedBoundsInRoot()
         val b = compose.onNodeWithTag("tray_row_b").getUnclippedBoundsInRoot()
         val tray = compose.onNodeWithTag("tray_column").getUnclippedBoundsInRoot()
-        assertThat(a.top.value - label.bottom.value).isWithin(0.5f).of(8f)
+        assertThat(a.top.value - label.bottom.value).isWithin(0.5f).of(gap)
         assertThat(a.height.value).isWithin(0.5f).of(b.height.value)
-        assertThat(b.top.value - a.bottom.value).isWithin(0.5f).of(8f)
-        // The third row is empty but still takes its share: the tray ends 8 + a row + 11 under b.
-        assertThat(tray.bottom.value - b.bottom.value).isWithin(0.5f).of(8f + a.height.value + 11f)
+        assertThat(b.top.value - a.bottom.value).isWithin(0.5f).of(gap)
+        // The third row is empty but still takes its share: the tray ends a gap, a row and the padding under b.
+        assertThat(tray.bottom.value - b.bottom.value).isWithin(0.5f).of(gap + a.height.value + padding)
         compose.onNodeWithTag("tray_label", useUnmergedTree = true).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
     }
 
@@ -221,14 +226,14 @@ class PageHeaderTest {
             HhTrayGrid(
                 "One-tap",
                 listOf(listOf("a" to { Box(Modifier.fillMaxWidth().height(40.dp)) }, "b" to { Box(Modifier.fillMaxWidth().height(40.dp)) })),
-                Modifier.width(333.dp).height(300.dp),
+                Modifier.width(TRAY_WIDTH_DP.dp).height(300.dp),
             )
         }
         val a = compose.onNodeWithTag("tray_row_a").getUnclippedBoundsInRoot()
         val b = compose.onNodeWithTag("tray_row_b").getUnclippedBoundsInRoot()
         assertThat(a.width.value).isWithin(0.5f).of(b.width.value)
-        assertThat(a.width.value).isWithin(0.5f).of((333f - 22f - 8f) / 2)
-        assertThat(b.left.value - a.right.value).isWithin(0.5f).of(8f)
+        assertThat(a.width.value).isWithin(0.5f).of((TRAY_WIDTH_DP - 2 * padding - gap) / 2)
+        assertThat(b.left.value - a.right.value).isWithin(0.5f).of(gap)
         assertThat(a.top.value).isEqualTo(b.top.value)
     }
 
@@ -242,7 +247,7 @@ class PageHeaderTest {
                     listOf("a" to { Box(Modifier.fillMaxWidth().height(150.dp)) }, "b" to { Box(Modifier.fillMaxSize()) }),
                     listOf("c" to { Box(Modifier.fillMaxSize()) }),
                 ),
-                Modifier.width(333.dp).height(359.dp),
+                Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
             )
         }
         val tray = compose.onNodeWithTag("tray_column").getUnclippedBoundsInRoot()
@@ -251,8 +256,8 @@ class PageHeaderTest {
         val c = compose.onNodeWithTag("tray_row_c").getUnclippedBoundsInRoot()
         assertThat(a.height.value).isWithin(0.5f).of(150f)
         assertThat(b.height.value).isWithin(0.5f).of(150f)
-        assertThat(c.top.value - a.bottom.value).isWithin(0.5f).of(8f)
-        assertThat(c.bottom.value).isAtMost(tray.bottom.value - 11f + 0.5f)
+        assertThat(c.top.value - a.bottom.value).isWithin(0.5f).of(gap)
+        assertThat(c.bottom.value).isAtMost(tray.bottom.value - padding + 0.5f)
         assertThat(c.height.value).isGreaterThan(0f)
     }
 }

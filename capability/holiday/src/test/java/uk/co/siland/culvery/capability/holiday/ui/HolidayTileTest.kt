@@ -53,6 +53,9 @@ import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhTrayGrid
+import uk.co.siland.culvery.core.ui.test.OneTapTray
+import uk.co.siland.culvery.core.ui.test.TRAY_HEIGHT_DP
+import uk.co.siland.culvery.core.ui.test.TRAY_WIDTH_DP
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 import uk.co.siland.culvery.core.ui.test.waitFor
@@ -79,7 +82,7 @@ class HolidayTileTest {
                             listOf("holiday" to { HolidayTile(on, back, line, running) { taps++ } }, "neighbour" to { Spacer(Modifier.fillMaxSize()) }),
                             listOf("hoover.start" to { Box(Modifier.fillMaxSize().background(Culvery.colors.surf2).testTag("hoover_standin")) }),
                         ),
-                        Modifier.width(333.dp).height(359.dp),
+                        Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
                     )
                 }
             }
@@ -202,7 +205,7 @@ class HolidayTileTest {
                 CulveryTheme(dark = true) {
                     CompositionLocalProvider(LocalOverlayHost provides overlay) {
                         Box(Modifier.background(Culvery.colors.bg)) {
-                            HhTrayGrid("One-tap", listOf(listOf("holiday" to { HolidayTileHost(actions, rig.house) }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
+                            OneTapTray("holiday") { HolidayTileHost(actions, rig.house) }
                         }
                     }
                 }

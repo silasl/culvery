@@ -2,10 +2,7 @@ package uk.co.siland.culvery.capability.party.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -34,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.party.PartyRun
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.HhTrayGrid
+import uk.co.siland.culvery.core.ui.test.OneTapTray
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 
@@ -53,7 +50,7 @@ class PartyTileTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 Box(Modifier.background(Culvery.colors.bg)) {
-                    HhTrayGrid("One-tap", listOf(listOf("party" to { PartyTile(on, line, running) { taps++ } }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
+                    OneTapTray("party") { PartyTile(on, line, running) { taps++ } }
                 }
             }
         }

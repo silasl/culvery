@@ -43,7 +43,7 @@ import uk.co.siland.culvery.capability.hoover.TestAccess
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.HhTrayGrid
+import uk.co.siland.culvery.core.ui.test.OneTapTray
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 
@@ -65,7 +65,7 @@ class HooverRowTest {
             CulveryTheme(dark = true) {
                 Box(Modifier.background(Culvery.colors.bg)) {
                     if (shown) {
-                        HhTrayGrid("One-tap", listOf(listOf("hoover" to { HooverRowHost(system, HooverActions(access, setOf(system))) })), Modifier.width(333.dp).height(359.dp))
+                        OneTapTray("hoover", neighbour = false) { HooverRowHost(system, HooverActions(access, setOf(system))) }
                     }
                 }
             }
