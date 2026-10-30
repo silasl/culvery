@@ -3,7 +3,6 @@ package uk.co.siland.culvery.capability.door.ui
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +63,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
+import uk.co.siland.culvery.core.plugin.save
 import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
@@ -73,6 +73,7 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhPageTitle
+import uk.co.siland.culvery.core.ui.HhRadioGroup
 import uk.co.siland.culvery.core.ui.HhRadioRow
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSliderRow
@@ -81,9 +82,9 @@ import uk.co.siland.culvery.core.ui.HhTimeStepperRow
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
-import uk.co.siland.culvery.core.ui.RadioRowTokens
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.UNTIL
+import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "DoorSettings"
 
@@ -139,7 +140,7 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
     ) {
         HhPageTitle(DOOR)
         HhSectionLabel(DOORBELL_SOUND)
-        Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
+        HhRadioGroup {
             HhRadioRow(FOLLOW_THE_THEME, FOLLOW_THE_THEME_LINE, ui.doorbell == DoorbellChoice.FOLLOW_THEME, "door_doorbell_follow") { actions.onDoorbell(DoorbellChoice.FOLLOW_THEME) }
             HhRadioRow(CLASSIC_CHIME, null, ui.doorbell == DoorbellChoice.CLASSIC, "door_doorbell_classic") { actions.onDoorbell(DoorbellChoice.CLASSIC) }
             HhRadioRow(HAUNTED_ORGAN, null, ui.doorbell == DoorbellChoice.ORGAN, "door_doorbell_organ") { actions.onDoorbell(DoorbellChoice.ORGAN) }
@@ -155,7 +156,7 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
         HhTimeStepperRow(FROM, "quiet hours start", ui.quietFrom, "door_from") { actions.onQuietHours(ui.quietOn, it, ui.quietUntil) }
         HhTimeStepperRow(UNTIL, "quiet hours end", ui.quietUntil, "door_until") { actions.onQuietHours(ui.quietOn, ui.quietFrom, it) }
         HhSectionLabel(KEEP_HISTORY_FOR)
-        Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
+        HhRadioGroup {
             KeepDays.entries.forEach { option ->
                 HhRadioRow(keepLabel(option), null, option == ui.keep, "door_keep_${option.days}") { actions.onKeep(option) }
             }
@@ -222,8 +223,9 @@ internal fun DoorSettingsHost(
     val p = prefs ?: return
     val z = householdZone ?: return
     var shortenTo by remember { mutableStateOf<KeepDays?>(null) }
-    var asking by remember { mutableStateOf(false) }
-    val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a door setting (${it::class.simpleName})") }
+    val logSave: (Exception) -> Unit = { Log.w(TAG, "Couldn't save a door setting (${it::class.simpleName})") }
+    val change = scope.saving(toaster, logSave)
+    val shorten = rememberSingleAction(Unit, logSave)
     val service = provider.descriptor.displayName
     DoorSettingsScreen(
         DoorSettingsUi(
@@ -241,7 +243,7 @@ internal fun DoorSettingsHost(
             capturing = p.capturingAt(now),
             keep = p.keep,
             shortenTo = shortenTo,
-            busy = asking,
+            busy = shorten.busy,
         ),
         DoorSettingsActions(
             onVolume = { v -> change { settings.setVolume(v) } },
@@ -261,17 +263,14 @@ internal fun DoorSettingsHost(
             onKeepAsIs = { shortenTo = null },
             onConfirmShorter = {
                 val choice = shortenTo
-                if (choice != null && !asking) {
-                    asking = true
-                    change {
-                        try {
+                if (choice != null) {
+                    shorten.run {
+                        toaster.save({
                             // Deleting is a fresh PIN's decision even with Settings open, so the pad asks whoever is signed in.
-                            access.authorise(DoorPermissions.CLEAR, label = DELETE_OLDER_EVENTS) ?: return@change
+                            access.authorise(DoorPermissions.CLEAR, label = DELETE_OLDER_EVENTS) ?: return@save
                             settings.setKeep(choice)
                             shortenTo = null
-                        } finally {
-                            asking = false
-                        }
+                        }, logSave)
                     }
                 }
             },

@@ -75,6 +75,7 @@ import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.SingleAction
 
 private const val TAG = "DoorTab"
 
@@ -217,26 +218,28 @@ internal fun DoorTabHost(
     val k = kept ?: return
     val days = remember(events, d, z, k) { doorDays(events, d, z, k) }
     var asking by remember { mutableStateOf(false) }
-    var clearing by remember { mutableStateOf(false) }
-    val stored = events.size
     // On the application scope, so the toast shows if the tab is left meanwhile.
-    fun confirmClear() {
-        if (clearing) return
-        clearing = true
-        appScope.launch {
-            try {
-                clearHistory(access, alerts, store, toaster)
-            } finally {
-                clearing = false
-                asking = false
-            }
-        }
-    }
+    val clear = remember { SingleAction(appScope) { Log.w(TAG, "Couldn't clear the door history (${it::class.simpleName})") } }
+    val stored = events.size
+    val openSnapshot = remember(overlay, z) { { event: DoorEvent -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } } }
+    val ask = remember { { asking = true } }
     DoorTab(
         days, d, z, problem,
-        onOpenSnapshot = { event -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } },
+        onOpenSnapshot = openSnapshot,
         newIds = newIds,
-        onClear = if (stored == 0) null else ({ asking = true }),
-        clearAsk = if (asking && stored > 0) ClearAsk(stored, clearing, onKeep = { asking = false }, onConfirm = ::confirmClear) else null,
+        onClear = if (stored == 0) null else ask,
+        clearAsk = if (asking && stored > 0) {
+            ClearAsk(stored, clear.busy, onKeep = { asking = false }, onConfirm = {
+                clear.run {
+                    try {
+                        clearHistory(access, alerts, store, toaster)
+                    } finally {
+                        asking = false
+                    }
+                }
+            })
+        } else {
+            null
+        },
     )
 }

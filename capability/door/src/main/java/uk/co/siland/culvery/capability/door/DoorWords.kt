@@ -107,6 +107,7 @@ internal fun keepLabel(keep: KeepDays) = "${keep.days} days"
 
 /** The question under a shorter keep: its events go at once, so it asks (15a §3.2). */
 fun shortenQuestion(keep: KeepDays) = "Delete door events older than ${keep.days} days?"
+
 internal const val ACCESS_STEP = "Allow notification access"
 internal const val ACCESS_STEP_LINE = "Opens Android’s notification access, where you allow Culvery."
 internal const val OPEN_NOTIFICATION_ACCESS = "open notification access"

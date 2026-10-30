@@ -15,7 +15,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.WallClock
+
+private const val DAY_MS = 24 * 60 * 60 * 1_000L
 
 /** 5 §4.5, 15a §3.1: at start, at each household midnight, when the keep changes, and each time Culvery comes back to the front. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -32,7 +35,8 @@ class DoorPruneLoopTest {
         start: Long = NOW,
         inFront: MutableStateFlow<Boolean> = MutableStateFlow(false),
         keep: MutableStateFlow<KeepDays> = MutableStateFlow(KeepDays.TWO),
-    ) = DoorPruneLoop(prune, WallClock { start + testScheduler.currentTime }, inFront, keep, flowOf(london), backgroundScope).also { it.start() }
+    ) = DoorPruneLoop(prune, HouseholdClock(flowOf(london), WallClock { start + testScheduler.currentTime }, backgroundScope), inFront, keep, backgroundScope)
+        .also { it.start() }
 
     @Test
     fun itPrunesAtStartAndOnEachReturnToTheFront() = runTest {
