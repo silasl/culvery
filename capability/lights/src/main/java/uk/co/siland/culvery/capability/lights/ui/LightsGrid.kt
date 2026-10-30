@@ -112,7 +112,7 @@ internal fun LightsGrid(
             modifier = Modifier.fillMaxSize().testTag("lights_grid"),
         ) {
             item(key = HEADER_KEY, span = { GridItemSpan(maxLineSpan) }) { header() }
-            // The header ends with its own gap, so only the rows after the first take one above.
+            // The header ends with its own gap, so the first row of cards takes none above.
             itemsIndexed(shown, key = { _, it -> it.id }) { i, it ->
                 val above = if (i >= columns) LightsDimens.gridGap else 0.dp
                 LightsRoomCard(it, lines[it.id], actions, Modifier.padding(top = above))

@@ -45,28 +45,31 @@ class LightsCapability @Inject constructor(
     override val icon = Icons.LIGHTBULB
     override val order = 40
 
-    private val bridgePaired: Flow<Boolean> = bridges.system.map { it != null }.distinctUntilChanged()
+    private val sectionList = sections.toList()
 
+    // A combine of no flows never emits, so a build with no section says false itself.
     private val sectionShown: Flow<Boolean> =
-        if (sections.isEmpty()) flowOf(false) else combine(sections.map { it.shown }) { shown -> shown.any { it } }.distinctUntilChanged()
+        if (sectionList.isEmpty()) flowOf(false) else combine(sectionList.map { it.shown }) { shown -> shown.any { it } }.distinctUntilChanged()
+
+    private val bridgeAndPlugs: Flow<Pair<Boolean, Boolean>> = combine(view.paired, sectionShown, ::Pair)
 
     /** Once a bridge is paired and its provider is in this build (7 §3.1), or a plugs section has something to show (15a §4.5). */
-    override val hasTab: Flow<Boolean> = combine(bridgePaired, sectionShown) { bridge, plugs -> bridge || plugs }.distinctUntilChanged()
+    override val hasTab: Flow<Boolean> = bridgeAndPlugs.map { (bridge, plugs) -> bridge || plugs }.distinctUntilChanged()
 
-    private val plugsOnly: Flow<Boolean> = combine(bridgePaired, sectionShown) { bridge, plugs -> !bridge && plugs }.distinctUntilChanged()
+    private val plugsOnly: Flow<Boolean> = bridgeAndPlugs.map { (bridge, plugs) -> !bridge && plugs }.distinctUntilChanged()
 
     /** A house with plugs and no Hue Bridge has a Plugs tab (15a §4.5). */
     override val railLabel: Flow<String> = plugsOnly.map { if (it) PLUGS else LIGHTS }
 
     override val railIcon: Flow<String> = plugsOnly.map { if (it) Icons.POWER else Icons.LIGHTBULB }
 
-    private val card = HomeCard(LIGHTS_CARD_ID, HomeCardSize.REGULAR, LIGHTS_CARD_PRIORITY) { LightsCardHost(view, actions, house, follow) }
+    private val card = HomeCard(LIGHTS_CARD_ID, HomeCardSize.REGULAR, LIGHTS_CARD_PRIORITY) { LightsCardHost(view, actions, follow) }
 
     /** Home's card once a bridge is paired (7 §5.1). */
-    override fun cards(): Flow<List<HomeCard>> = bridgePaired.map { if (it) listOf(card) else emptyList() }
+    override fun cards(): Flow<List<HomeCard>> = view.paired.map { if (it) listOf(card) else emptyList() }
 
     @Composable
-    override fun TabContent() = LightsTabHost(view, actions, house, follow, sections.toList())
+    override fun TabContent() = LightsTabHost(view, actions, house, follow, sectionList)
 
     private val pages: List<SettingsPage> =
         if (bridges.providers.isEmpty()) emptyList() else listOf(LightsPage { LightsSettingsHost(settings, bridges, view, connect, toaster) })

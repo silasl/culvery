@@ -1,7 +1,9 @@
 package uk.co.siland.culvery.capability.lights.ui
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import uk.co.siland.culvery.core.ui.ButtonTokens
 
 /** Lights' layout values (7 §5); provisional until the end-of-v1 design walk-through. */
 internal object LightsDimens {
@@ -23,15 +25,16 @@ internal object LightsDimens {
     val chevron = 48.dp
 
     // All lights off and the Scene pill side by side: the pill keeps its width, All lights off takes the rest.
-    val scenePillHeight = 48.dp
-    val sceneChipHeight = 31.dp
-    val sceneChipPaddingH = 12.dp
-    val scenePillPaddingStart = 14.dp
-    val scenePillPaddingEnd = 8.dp
-    val scenePillGap = 8.dp
-    val sceneChipMaxWidth = 120.dp
     val buttonGap = 8.dp
     val lineGap = 10.dp
+
+    // The Scene pill (15a §3): a touch target tall, holding a chip with the room's current scene.
+    val scenePillHeight = ButtonTokens.regularHeight
+    val scenePillPadding = PaddingValues(start = 14.dp, end = 8.dp)
+    val scenePillGap = 8.dp
+    val sceneChipHeight = 31.dp
+    val sceneChipPaddingH = 12.dp
+    val sceneChipMaxWidth = 120.dp
 
     // The tab: cards 10 apart as lists are; inside a card, 12 between its lines and 8 between scene chips.
     val tabGap = 10.dp

@@ -31,7 +31,7 @@ internal const val NO_BRIDGE_THERE = "No Hue Bridge answered at that address. Ch
 internal const val PRESS_THE_BUTTON = "Press the round button on top of the Hue Bridge"
 internal const val NOT_PRESSED_IN_TIME = "The button wasn’t pressed in time. Try again."
 
-/** What a room's button shows under its name: "On · 70%", "Off", or "On" for a room that can't dim (7 §5.1). */
+/** "On · 70%", "Off", or "On" for a room that can't dim (7 §5.1). */
 internal fun roomState(room: LightRoom): String = when {
     !room.on -> OFF
     room.dimmable -> "$ON · ${room.brightness}%"
@@ -41,10 +41,10 @@ internal fun roomState(room: LightRoom): String = when {
 /** "2 of 3 rooms on", "1 of 1 room on" (9 §4.4). */
 fun roomsOn(rooms: List<LightRoom>): String = "${rooms.count { it.on }} of ${plural(rooms.size.toLong(), "room")} on"
 
-/** The tab's title: Lights, Plugs, or both when the house has both (15a §4.5). */
+/** The tab's title: Plugs for a house with no lights, even before its plugs say they are shown; Lights and plugs for both (15a §4.5). */
 internal fun tabTitle(hasLights: Boolean, hasPlugs: Boolean): String = when {
-    hasLights && hasPlugs -> LIGHTS_AND_PLUGS
-    hasPlugs -> PLUGS
+    !hasLights -> PLUGS
+    hasPlugs -> LIGHTS_AND_PLUGS
     else -> LIGHTS
 }
 
@@ -55,7 +55,7 @@ internal fun tabSummary(rooms: List<LightRoom>, plugs: String?): String? =
 /** The pill over the grid's foot: the rooms still below, or "More below" when only the plugs are (15a §4.5). */
 internal fun morePill(roomsBelow: Int): String = if (roomsBelow > 0) moreRooms(roomsBelow) else MORE_BELOW
 
-/** The pill over the grid's foot: the rooms after the last row wholly on screen: "1 more room", "3 more rooms" (9 §4.4). */
+/** "1 more room", "3 more rooms" (9 §4.4). */
 fun moreRooms(count: Int): String = "$count more ${if (count == 1) "room" else "rooms"}"
 
 /** The Home card's status: [roomState] and, while the room is on, its active scene: "On · 70% · Relax" (9 §4.2). */
@@ -64,17 +64,17 @@ internal fun cardStatus(room: LightRoom): String {
     return if (room.on && scene != null) "${roomState(room)} · $scene" else roomState(room)
 }
 
-/** The scene after the room's active one, wrapping round; the first when none is active (15a §3). Null for a room with no scenes. */
+/** The scene after the active one, wrapping; the first when none is active; null with no scenes (15a §3). */
 internal fun nextScene(room: LightRoom): LightScene? {
     if (room.scenes.isEmpty()) return null
     val at = room.scenes.indexOfFirst { it.id == room.activeSceneId }
     return room.scenes[(at + 1) % room.scenes.size]
 }
 
-/** The active scene's name, or "None" (15a §3). */
+/** "None" when no scene is active (15a §3). */
 internal fun currentSceneName(room: LightRoom): String = room.scenes.firstOrNull { it.id == room.activeSceneId }?.name ?: NO_SCENE
 
-/** "Scene, Relax": the Scene pill's name (15a §3). */
+/** "Scene, Relax" (15a §3). */
 internal fun scenePillSpoken(room: LightRoom): String = "Scene, ${currentSceneName(room)}"
 
 /** "Lounge, on, 70 percent", "Lounge, off" (7 §5.4). */
@@ -84,10 +84,10 @@ internal fun roomSpoken(room: LightRoom): String = when {
     else -> "${room.name}, on"
 }
 
-/** What tapping the room's button does: "Turn the Lounge on" when [on] is the state it turns to. */
+/** "Turn the Lounge on"; [on] is the state it turns to. */
 internal fun turnSpoken(room: LightRoom, on: Boolean): String = "Turn the ${room.name} ${if (on) "on" else "off"}"
 
-/** What tapping Holiday lights does: "Turn Holiday lights on" when [on] is the state it turns to. */
+/** "Turn Holiday lights on"; [on] is the state it turns to. */
 internal fun holidaySpoken(on: Boolean): String = "Turn $HOLIDAY_LIGHTS ${if (on) "on" else "off"}"
 
 /** "Lounge brightness": the slider's name; its state is the percent (7 §5.4). */

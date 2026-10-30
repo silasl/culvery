@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,13 +29,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.co.siland.culvery.capability.lights.LIGHTS
 import uk.co.siland.culvery.capability.lights.LIGHTS_ID
 import uk.co.siland.culvery.capability.lights.LOOKING_FOR_LIGHTS
-import uk.co.siland.culvery.capability.lights.NEXT_SCENE
-import uk.co.siland.culvery.capability.lights.SCENE
 import uk.co.siland.culvery.capability.lights.LightRoom
 import uk.co.siland.culvery.capability.lights.LightsActions
 import uk.co.siland.culvery.capability.lights.LightsFollow
-import uk.co.siland.culvery.capability.lights.LightsHouse
 import uk.co.siland.culvery.capability.lights.LightsView
+import uk.co.siland.culvery.capability.lights.NEXT_SCENE
+import uk.co.siland.culvery.capability.lights.SCENE
 import uk.co.siland.culvery.capability.lights.currentSceneName
 import uk.co.siland.culvery.capability.lights.nextScene
 import uk.co.siland.culvery.capability.lights.problemLine
@@ -51,9 +50,10 @@ import uk.co.siland.culvery.core.ui.quietFill
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /**
- * The REGULAR Home card (9 §4.2): the main room as a toggle with a › to its tab, its brightness, All lights off and a Scene pill that steps to its next scene (15a §3). With a
- * problem, the §6 line and no controls; before the first read, that it is looking. In the side-by-side row (10 §4.9) a line
- * under the buttons takes the two gaps and shows on one line, ending in … if longer.
+ * The REGULAR Home card (9 §4.2): the main room as a toggle with a › to its tab, its brightness, All lights off and a
+ * Scene pill that steps to its next scene (15a §3). With a problem, the §6 line and no controls; before the first read,
+ * that it is looking. In the side-by-side row (10 §4.9) a line under the buttons takes the two gaps and shows on one
+ * line, ending in … if longer.
  */
 @Composable
 fun LightsCard(
@@ -62,12 +62,12 @@ fun LightsCard(
     status: String?,
     line: String?,
     mainRoom: MainRoomActions,
-    house: HouseActions,
+    onAllOff: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val squeezed = line != null && maxHeight <= LightsDimens.rowCardMaxHeight
-        LightsCardContent(main, allOffLit, status, line, squeezed, mainRoom, house)
+        LightsCardContent(main, allOffLit, status, line, squeezed, mainRoom, onAllOff)
     }
 }
 
@@ -79,7 +79,7 @@ private fun LightsCardContent(
     line: String?,
     squeezed: Boolean,
     mainRoom: MainRoomActions,
-    house: HouseActions,
+    onAllOff: () -> Unit,
 ) {
     val c = Culvery.colors
     HhCard(
@@ -103,7 +103,7 @@ private fun LightsCardContent(
             if (!squeezed) Spacer(Modifier.height(LightsDimens.bottomGap))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
-            AllOffButton(allOffLit, house.onAllOff, Modifier.weight(1f))
+            AllOffButton(allOffLit, onAllOff, Modifier.weight(1f))
             if (main.scenes.isNotEmpty()) ScenePill(main) { nextScene(main)?.let(mainRoom.onScene) }
         }
         if (line != null) {
@@ -126,18 +126,17 @@ private fun ScenePill(room: LightRoom, onNext: () -> Unit) {
         modifier = Modifier
             .testTag("lights_card_scene")
             .heightIn(min = LightsDimens.scenePillHeight)
-            .clip(RoundedCornerShape(percent = 50))
+            .clip(CircleShape)
             .background(quietFill(ButtonSurface.Surf, c))
             .hhClickable(onNext, label = NEXT_SCENE, spoken = scenePillSpoken(room))
-            .padding(start = LightsDimens.scenePillPaddingStart, end = LightsDimens.scenePillPaddingEnd),
+            .padding(LightsDimens.scenePillPadding),
     ) {
         Text(SCENE, style = HhType.buttonLabel, color = c.ink, maxLines = 1, modifier = Modifier.shownNotSpoken())
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .height(LightsDimens.sceneChipHeight)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(c.surf3)
+                .background(c.surf3, CircleShape)
                 .padding(horizontal = LightsDimens.sceneChipPaddingH)
                 .shownNotSpoken(),
         ) {
@@ -148,7 +147,7 @@ private fun ScenePill(room: LightRoom, onNext: () -> Unit) {
 
 /** The card over the view; while it shows, the rooms are followed (7 §4.2). */
 @Composable
-internal fun LightsCardHost(view: LightsView, actions: LightsActions, house: LightsHouse, follow: LightsFollow) {
+internal fun LightsCardHost(view: LightsView, actions: LightsActions, follow: LightsFollow) {
     FollowWhileShown(follow)
     val navigator = LocalShellNavigator.current
     val main by view.main.collectAsStateWithLifecycle()
@@ -169,6 +168,5 @@ internal fun LightsCardHost(view: LightsView, actions: LightsActions, house: Lig
             onLetGo = { percent -> room?.let { actions.letGoBrightness(it, percent) } },
         )
     }
-    val houseActions = remember(actions) { HouseActions(onAllOff = actions::allOff, onHoliday = actions::toggleHoliday) }
-    LightsCard(room, allOffLit, problem?.let(::problemLine), room?.let { roomLines[it.id] } ?: houseLine, mainRoom, houseActions)
+    LightsCard(room, allOffLit, problem?.let(::problemLine), room?.let { roomLines[it.id] } ?: houseLine, mainRoom, actions::allOff)
 }

@@ -47,9 +47,10 @@ class RoomActions(
 /**
  * The Lights tab (7 §5.2, 9 §4.4, 15a §4.5): the title with the rooms and plugs on and a tray of All lights off and
  * Holiday lights, then the rooms' cards in [LightsGrid] and the shown [sections] under them. With no bridge
- * ([hasBridge] false) there is the title and the sections alone. The status line shows only when something is wrong; [houseLine] is how the last All
- * lights off or Holiday lights went and [lines] each room's last refused command. A [focus] naming a listed room is
- * brought into view, then handed back through [onFocused].
+ * ([hasBridge] false) there is the title and the sections alone, and the caller passes no [status] or [houseLine]. The
+ * status line shows only when something is wrong; [houseLine] is how the last All lights off or Holiday lights went and
+ * [lines] each room's last refused command. A [focus] naming a listed room is brought into view, then handed back
+ * through [onFocused].
  */
 @Composable
 fun LightsTab(
@@ -72,10 +73,10 @@ fun LightsTab(
     val c = Culvery.colors
     val looking = hasBridge && rooms.isEmpty() && status == null
     // HhPageHeader ends with its gap; a line under it needs one of its own before the rooms.
-    val below = if (hasBridge && (status != null || houseLine != null) || looking) LightsDimens.gridGap else 0.dp
+    val below = if (status != null || houseLine != null || looking) LightsDimens.gridGap else 0.dp
     LightsGrid(rooms, lines, room, focus, onFocused, modifier = modifier.testTag("lights_tab"), sections = sections, header = {
         Column(Modifier.padding(bottom = below), verticalArrangement = Arrangement.spacedBy(LightsDimens.tabGap)) {
-            HhPageHeader(tabTitle(hasBridge, sections.isNotEmpty() || !hasBridge), tabSummary(rooms, plugsSummary)) {
+            HhPageHeader(tabTitle(hasBridge, sections.isNotEmpty()), tabSummary(rooms, plugsSummary)) {
                 if (hasBridge) {
                     HhTray(Modifier.testTag("lights_tray"), label = ONE_TAP) {
                         AllOffButton(allOffLit, house.onAllOff, tag = "lights_tray_all_off", surface = ButtonSurface.Bg)
@@ -83,8 +84,8 @@ fun LightsTab(
                     }
                 }
             }
-            if (hasBridge && status != null) LightsStatusLine(status)
-            if (hasBridge && houseLine != null) Text(houseLine, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("lights_tab_line"))
+            if (status != null) LightsStatusLine(status)
+            if (houseLine != null) Text(houseLine, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("lights_tab_line"))
             if (looking) Text(LOOKING_FOR_LIGHTS, style = HhType.body, color = c.mute)
         }
     })
@@ -121,10 +122,12 @@ internal fun LightsTabHost(
     val houseActions = remember(actions) { HouseActions(onAllOff = actions::allOff, onHoliday = actions::toggleHoliday) }
     val roomActions = remember(actions) { RoomActions(actions::setOn, actions::dragBrightness, actions::letGoBrightness, actions::recallScene) }
     val shown = sections.filter { it.shown.collectAsStateWithLifecycle(false).value }
-    val plugsSummary = sections.mapNotNull { it.summary.collectAsStateWithLifecycle(null).value }.joinToString(" · ").ifEmpty { null }
+    // Every section's summary is collected, shown or not, so one that appears has its summary on its first frame.
+    val summaries = sections.map { it.summary.collectAsStateWithLifecycle(null).value }
+    val plugsSummary = sections.zip(summaries).mapNotNull { (section, text) -> text.takeIf { section in shown } }.joinToString(" · ").ifEmpty { null }
     LightsTab(
-        rooms, holidayOn, allOffLit, run, problem?.let(::problemLine), houseLine, lines, focus,
+        rooms, holidayOn, allOffLit, run, problem?.let(::problemLine).takeIf { hasBridge }, houseLine.takeIf { hasBridge }, lines, focus,
         onFocused = { view.focus.value = null }, houseActions, roomActions,
-        sections = shown, plugsSummary = if (shown.isEmpty()) null else plugsSummary, hasBridge = hasBridge,
+        sections = shown, plugsSummary = plugsSummary, hasBridge = hasBridge,
     )
 }

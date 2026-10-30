@@ -80,7 +80,7 @@ class LightsCardTest {
     @get:Rule val lights = LightsFixture()
     private val calls = mutableListOf<String>()
     private val mainRoom = MainRoomActions(onToggle = { calls += "toggle" }, onOpen = { calls += "open" }, onScene = { calls += "scene ${it.name}" })
-    private val house = HouseActions(onAllOff = { calls += "all off" }, onHoliday = {})
+    private val allOff: () -> Unit = { calls += "all off" }
     private val lounge = room("Lounge", on = true, brightness = 70, scenes = listOf(RELAX, READ), active = RELAX.id)
 
     private fun show(
@@ -89,7 +89,7 @@ class LightsCardTest {
         status: String? = null,
         line: String? = null,
     ) = compose.setContent {
-        CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main, allOffLit, status, line, mainRoom, house) } }
+        CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main, allOffLit, status, line, mainRoom, allOff) } }
     }
 
     private fun clickLabelIs(label: String) = SemanticsMatcher("click label is $label") {
@@ -219,7 +219,7 @@ class LightsCardTest {
         var line by mutableStateOf<String?>(null)
         compose.setContent {
             CulveryTheme(dark = dark) {
-                Box(Modifier.size(rowCardSize).testTag("fit_card")) { LightsCard(main, true, null, line, mainRoom, house) }
+                Box(Modifier.size(rowCardSize).testTag("fit_card")) { LightsCard(main, true, null, line, mainRoom, allOff) }
             }
         }
         for (theme in listOf(true, false)) {
@@ -275,7 +275,7 @@ class LightsCardTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
-                    if (shown) LightsCardHost(h.view, h.actions, h.house, h.follow)
+                    if (shown) LightsCardHost(h.view, h.actions, h.follow)
                 }
             }
         }
@@ -292,7 +292,7 @@ class LightsCardTest {
         val navigator = RecordingNavigator()
         compose.setContent {
             CulveryTheme(dark = true) {
-                CompositionLocalProvider(LocalShellNavigator provides navigator) { LightsCardHost(h.view, h.actions, h.house, h.follow) }
+                CompositionLocalProvider(LocalShellNavigator provides navigator) { LightsCardHost(h.view, h.actions, h.follow) }
             }
         }
         compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_card_open") == 1 }
@@ -304,7 +304,7 @@ class LightsCardTest {
     private fun showHost(h: Host) = compose.setContent {
         CulveryTheme(dark = true) {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
-                Box(Modifier.size(rightHalfSize)) { LightsCardHost(h.view, h.actions, h.house, h.follow) }
+                Box(Modifier.size(rightHalfSize)) { LightsCardHost(h.view, h.actions, h.follow) }
             }
         }
     }
@@ -370,7 +370,7 @@ class LightsCardTest {
     private fun showOnVirtualTime(main: () -> LightRoom) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main(), true, null, null, mainRoom, house) } }
+            CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main(), true, null, null, mainRoom, allOff) } }
         }
     }
 
