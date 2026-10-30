@@ -789,6 +789,24 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - **For the end-of-v1 design review:** night bats faint across a room and the night moon muddy; the day cobweb faint; "Chime volume" and "Play chime" now cover the organ too; the dates row has no tap cue; the dates sheet's look.
 - **By design (spec):** themes change the tablet only, never lights, plugs or speakers; the night clock stays as it is; no "never show" switch; a preview is the only manual way in, and it ends at midnight.
 
+## Plan 14 (seasonal themes): emulator walk-through (2026-10-30)
+- **Set-up:** the debug build of 269bb2bb on `culvery-5` with `install -r`, airplane mode on and the debug sample house; the debug sample Admin PIN for Settings. Airplane mode doesn't survive a restart (the emulator boots from its saved snapshot), so turn it on again each time.
+- **Worked:**
+  - Halloween by day and by night (status bar preview): Home, every tab, New event, the PIN pad and Settings in Halloween's colours; the emulator matched the screenshot baselines;
+  - the pumpkin, the cobweb, the moon and drifting bats; the Creepster clock; the header still from 10:39 to 10:40;
+  - the night clock (15:00–15:30 on this emulator) unchanged, no frames drawn;
+  - the bats still under the PIN pad and Settings (0 frames) and with animations off (0 frames), drifting again when animations came back (about 11 fps);
+  - outside the dates (the clock moved to 23:58 on 31 Oct): at 00:00 on 1 November Home was Culvery's own look again, with no restart;
+  - Preview Halloween outside the dates: "Showing now. It ends at midnight.", Halloween at once, Play chime played the organ (88,200 frames, the organ's length); off: the classic chime (70,560 frames); on again and the clock past midnight: it ended and the switch read off;
+  - Settings › Display's dates: 20 Oct – 2 Nov saved; 31 Oct then 24 Oct refused with its line and Save off; "Put back 24 Oct – 31 Oct"; "Next: Halloween from 24 October" outside the dates;
+  - Settings › Door: Classic chime, Haunted organ and Follow the theme each played the right sound.
+- **Fault, fixed in ca286883 and re-checked on the emulator:** the dates sheet opened on next year's month (October 2027 during Halloween 2026) with nothing picked. It now opens on the saved dates' month, this year's while they're running or still to come, with them picked.
+- **Not checked:** a sample ring. The debug build has no way to fake a Ring press (the listener takes Ring's own notifications); the ring path is unit-tested, and the first real ring during Halloween is the live check.
+- **Notes:**
+  - the tablet's own blue light filter is on (scheduled), and Samsung screenshots include it, so the tablet's colours read warmer than the app draws them;
+  - Settings' Close took a tap near its left edge but not its middle; see "Lost taps" below;
+  - Android's screen dump hangs while the bats drift (it waits for a still screen), so the walk-through used screenshots only.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
@@ -803,6 +821,7 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **Doorbell missed (21 Oct; again 23 Oct at 16:02), cause found:** Android holds at most 25 notifications per app. Nothing on the wall clears Ring's, and Culvery's listener doesn't cancel them, so Ring's motion and ring notifications pile up. Once 25 are held, Android drops every new one ("Package has already posted or enqueued 25 notifications. Not showing more. package=com.ringapp"), and Culvery never sees the ring. On 23 Oct the tablet held 25 Ring notifications, most of them motion; posts were dropped at 15:12, 15:23 and 16:02. **Fixed 2026-10-23 (34b60d4a):** `RingNotificationListener` clears each Ring notification once read, and clears leftovers when it connects. The release from 34b60d4a is on the tablet (mapping `culvery-notes/mappings/mapping-34b60d4.txt`); the tablet held 0 Ring notifications after the install, down from 25. A real ring on the new build is still to check.
 - **Not tried yet:** "Use for new events" with real calendars, and a new Sonos playlist appearing on the next open.
 - **TalkBack checks from 9c-2:** dropped; the user will raise them if they show in use.
+- **Accented letters broken on the Music card (seen 2026-10-30):** on the tablet, Home's Lounge card showed a Polish track title with Ż and ą as stray marks (the Ż's dot above the line, ą as an apostrophe). Either Sonos sends the text mangled, or the card's font or line height clips marks above and below the letters. Compare the raw title from Sonos with what's drawn before fixing.
 
 ## Feature ideas (2026-10-02, after v1)
 
