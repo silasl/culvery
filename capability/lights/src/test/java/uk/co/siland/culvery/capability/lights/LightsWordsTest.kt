@@ -131,4 +131,19 @@ class LightsWordsTest {
         assertThat(holidayNamed(false, null)).isEqualTo("Holiday lights, off")
         assertThat(holidayNamed(false, HouseRun.TURNING_ON)).isEqualTo("Holiday lights, turning on")
     }
+
+    @Test fun nextSceneFollowsTheActiveOne() = assertThat(nextScene(room("Lounge", scenes = listOf(RELAX, READ, BRIGHT), active = READ.id))).isEqualTo(BRIGHT)
+
+    @Test fun nextSceneWrapsRound() = assertThat(nextScene(room("Lounge", scenes = listOf(RELAX, READ), active = READ.id))).isEqualTo(RELAX)
+
+    @Test fun withNoActiveSceneTheFirstIsNext() = assertThat(nextScene(room("Lounge", scenes = listOf(RELAX, READ), active = null))).isEqualTo(RELAX)
+
+    @Test fun anUnknownActiveSceneCountsAsNone() = assertThat(nextScene(room("Lounge", scenes = listOf(RELAX), active = "gone"))).isEqualTo(RELAX)
+
+    @Test fun noScenesNoNext() = assertThat(nextScene(room("Lounge"))).isNull()
+
+    @Test fun theNameIsNoneWithoutAnActiveScene() = assertThat(currentSceneName(room("Lounge", scenes = listOf(RELAX), active = null))).isEqualTo("None")
+
+    @Test fun thePillIsSpokenWithTheScene() =
+        assertThat(scenePillSpoken(room("Lounge", scenes = listOf(RELAX), active = RELAX.id))).isEqualTo("Scene, Relax")
 }

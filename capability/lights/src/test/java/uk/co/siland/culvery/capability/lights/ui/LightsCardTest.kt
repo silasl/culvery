@@ -15,6 +15,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
@@ -49,6 +50,8 @@ import uk.co.siland.culvery.capability.lights.LightsHouse
 import uk.co.siland.culvery.capability.lights.LightsPermissions
 import uk.co.siland.culvery.capability.lights.LightsProblem
 import uk.co.siland.culvery.capability.lights.LightsView
+import uk.co.siland.culvery.capability.lights.READ
+import uk.co.siland.culvery.capability.lights.RELAX
 import uk.co.siland.culvery.capability.lights.TestAccess
 import uk.co.siland.culvery.capability.lights.TestLightsProvider
 import uk.co.siland.culvery.capability.lights.TestLightsSystem
@@ -75,19 +78,17 @@ class LightsCardTest {
     @get:Rule val compose = createComposeRule()
     @get:Rule val lights = LightsFixture()
     private val calls = mutableListOf<String>()
-    private val mainRoom = MainRoomActions(onToggle = { calls += "toggle" }, onOpen = { calls += "open" })
-    private val house = HouseActions(onAllOff = { calls += "all off" }, onHoliday = { calls += "holiday" })
-    private val lounge = room("Lounge", on = true, brightness = 70)
+    private val mainRoom = MainRoomActions(onToggle = { calls += "toggle" }, onOpen = { calls += "open" }, onScene = { calls += "scene ${it.name}" })
+    private val house = HouseActions(onAllOff = { calls += "all off" }, onHoliday = {})
+    private val lounge = room("Lounge", on = true, brightness = 70, scenes = listOf(RELAX, READ), active = RELAX.id)
 
     private fun show(
         main: LightRoom? = lounge,
-        holidayOn: Boolean = false,
         allOffLit: Boolean = true,
-        run: HouseRun? = null,
         status: String? = null,
         line: String? = null,
     ) = compose.setContent {
-        CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main, holidayOn, allOffLit, run, status, line, mainRoom, house) } }
+        CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main, allOffLit, status, line, mainRoom, house) } }
     }
 
     private fun clickLabelIs(label: String) = SemanticsMatcher("click label is $label") {
@@ -97,7 +98,7 @@ class LightsCardTest {
     /** Fails if the room, its brightness, the words TalkBack hears or the action it offers differ from the spec's. */
     @Test
     fun theMainRoomOnShowsItsBrightness() {
-        show()
+        show(room("Lounge", on = true, brightness = 70))
         compose.onNodeWithText("Lounge", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("On · 70%", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("lights_card_main").assertContentDescriptionEquals("Lounge, on, 70 percent").assert(clickLabelIs("Turn the Lounge off"))
@@ -123,39 +124,61 @@ class LightsCardTest {
         compose.assertAccessible()
     }
 
-    /** Fails if either button's name, label or action differs, or Holiday lights' two lines are wrong. */
+    /** Fails if All lights off's name, label or action differs. */
     @Test
-    fun allLightsOffAndHolidayMode() {
+    fun allLightsOff() {
         show()
         compose.onNodeWithText("All lights off", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("lights_card_all_off").assert(clickLabelIs("Turn all lights off")).performClick()
-        compose.onNodeWithText("Holiday lights", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithText("Off", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("lights_card_holiday").assert(clickLabelIs("Turn Holiday lights on")).performClick()
-        assertThat(calls).containsExactly("all off", "holiday").inOrder()
+        assertThat(calls).containsExactly("all off")
         compose.assertAccessible()
     }
 
-    /** Fails if Holiday lights while on doesn't show "On" and offer to turn off. */
+    /** 15a §3. Fails if the pill doesn't show the room's current scene, speak "Scene, Relax" or offer the next-scene action. */
     @Test
-    fun holidayModeOn() {
-        show(holidayOn = true)
-        compose.onNodeWithText("On", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday lights, on").assert(clickLabelIs("Turn Holiday lights off"))
+    fun thePillShowsTheCurrentScene() {
+        show()
+        compose.onNodeWithTag("lights_card_scene").assertIsDisplayed().assertContentDescriptionEquals("Scene, Relax").assert(clickLabelIs("go to the next scene"))
+        compose.onNode(hasText("Relax") and hasAnyAncestor(hasTestTag("lights_card_scene")), useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasText("Scene") and hasAnyAncestor(hasTestTag("lights_card_scene")), useUnmergedTree = true).assertIsDisplayed()
         compose.assertAccessible()
     }
 
-    /** Fails if a run doesn't replace the state with "Turning on…" or "Turning off…". */
+    /** Fails if the chip doesn't say "None" when no scene is active, or a tap on the pill doesn't pass the first scene on. */
     @Test
-    fun whileItRunsTheButtonSaysTurningOn() {
-        var run by mutableStateOf<HouseRun?>(HouseRun.TURNING_ON)
-        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(lounge, false, true, run, null, null, mainRoom, house) } } }
-        compose.onNodeWithText("Turning on…", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday lights, turning on")
+    fun withNoActiveSceneTheChipSaysNoneAndATapStepsToTheFirst() {
+        show(room("Lounge", on = true, scenes = listOf(RELAX, READ)))
+        compose.onNode(hasText("None") and hasAnyAncestor(hasTestTag("lights_card_scene")), useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("lights_card_scene").performClick()
+        assertThat(calls).containsExactly("scene Relax")
+    }
+
+    /** Fails if a tap doesn't hand the next scene on, or the pill is shorter than a touch target. */
+    @Test
+    fun aTapPassesTheNextSceneOn() {
+        show()
+        compose.onNodeWithTag("lights_card_scene").assertHeightIsAtLeast(48.dp).performClick()
+        assertThat(calls).containsExactly("scene Read")
+    }
+
+    /** Fails if a room with no scenes gets a pill, or All lights off doesn't take the whole row. */
+    @Test
+    fun noScenesNoPillAndAllOffTakesTheRow() {
+        show(room("Lounge", on = true))
+        compose.onNodeWithTag("lights_card_scene").assertDoesNotExist()
+        val allOff = compose.onNodeWithTag("lights_card_all_off").fetchSemanticsNode().boundsInRoot
+        val card = compose.onNodeWithTag("lights_card").fetchSemanticsNode().boundsInRoot
+        val padding = with(compose.density) { LightsDimens.cardPaddingH.toPx() }
+        assertThat(allOff.width).isWithin(1f).of(card.width - 2 * padding)
         compose.assertAccessible()
-        run = HouseRun.TURNING_OFF
-        compose.onNodeWithText("Turning off…", useUnmergedTree = true).assertIsDisplayed()
-        compose.assertAccessible()
+    }
+
+    /** Fails if Holiday lights is still on the Home card. */
+    @Test
+    fun noHolidayButton() {
+        show()
+        compose.onNodeWithTag("lights_card_holiday").assertDoesNotExist()
+        compose.onNodeWithText("Holiday lights").assertDoesNotExist()
     }
 
     /** Fails if a problem leaves the controls on the card, or the line isn't the problem's. */
@@ -165,7 +188,7 @@ class LightsCardTest {
         compose.onNodeWithText("The tablet is offline. Check the Wi-Fi.").assertIsDisplayed()
         compose.onNodeWithTag("lights_card_main").assertDoesNotExist()
         compose.onNodeWithTag("lights_card_all_off").assertDoesNotExist()
-        compose.onNodeWithTag("lights_card_holiday").assertDoesNotExist()
+        compose.onNodeWithTag("lights_card_scene").assertDoesNotExist()
         compose.assertAccessible()
     }
 
@@ -192,18 +215,14 @@ class LightsCardTest {
     fun theCardFitsTheSideBySideRow() {
         var dark by mutableStateOf(true)
         var main by mutableStateOf(room("Upstairs landing and hallway", on = true, brightness = 70))
-        var holidayOn by mutableStateOf(false)
         var line by mutableStateOf<String?>(null)
         compose.setContent {
             CulveryTheme(dark = dark) {
-                Box(Modifier.size(rowCardSize).testTag("fit_card")) { LightsCard(main, holidayOn, true, null, null, line, mainRoom, house) }
+                Box(Modifier.size(rowCardSize).testTag("fit_card")) { LightsCard(main, true, null, line, mainRoom, house) }
             }
         }
         for (theme in listOf(true, false)) {
             dark = theme
-            compose.waitForIdle()
-            compose.assertFitsTheCard(textStaysOffControls = false)
-            holidayOn = true
             compose.waitForIdle()
             compose.assertFitsTheCard(textStaysOffControls = false)
             for (message in listOf(
@@ -215,7 +234,6 @@ class LightsCardTest {
                 compose.assertFitsTheCard(textStaysOffControls = false)
             }
             line = null
-            holidayOn = false
             main = room("Lounge", on = false)
             compose.waitForIdle()
             compose.assertFitsTheCard(textStaysOffControls = false)
@@ -351,7 +369,7 @@ class LightsCardTest {
     private fun showOnVirtualTime(main: () -> LightRoom) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main(), false, true, null, null, null, mainRoom, house) } }
+            CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main(), true, null, null, mainRoom, house) } }
         }
     }
 
@@ -419,15 +437,15 @@ class LightsCardTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Pin (9 §2.3, §6.2). Fails if the card's Holiday lights doesn't reach toggleHoliday and ask for the Holiday permission. */
+    /** 15a §3. Fails if tapping the pill through the host doesn't recall the room's next scene on the bridge. */
     @Test
-    fun holidayModeAsksForTheFreshPin() = runBlocking {
-        val h = host(lounge)
+    fun theHostRecallsTheNextScene() = runBlocking {
+        val h = host(room("Lounge", on = true, scenes = listOf(RELAX, READ), active = RELAX.id))
         showHost(h)
-        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_card_holiday") == 1 }
-        compose.onNodeWithTag("lights_card_holiday").performClick()
-        compose.waitUntil(5_000) { h.access.asked.isNotEmpty() }
-        assertThat(h.access.asked.single()).containsExactly(LightsPermissions.HOLIDAY)
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_card_scene") == 1 }
+        compose.onNodeWithTag("lights_card_scene").performClick()
+        compose.waitUntil(5_000) { h.system.calls.any { it.startsWith("recallScene") } }
+        assertThat(h.system.calls.filter { it.startsWith("recallScene") }).containsExactly("recallScene Lounge-id read-id")
         compose.assertClickablesHaveRoleAndLabel()
     }
 }

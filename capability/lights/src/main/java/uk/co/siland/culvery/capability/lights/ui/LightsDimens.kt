@@ -22,7 +22,14 @@ internal object LightsDimens {
     // A room's row is at least a touch target tall, as the card's › (HhRoundButton's 48 dp).
     val chevron = 48.dp
 
-    // All lights off and Holiday lights side by side: Holiday lights keep their width, All lights off takes the rest.
+    // All lights off and the Scene pill side by side: the pill keeps its width, All lights off takes the rest.
+    val scenePillHeight = 48.dp
+    val sceneChipHeight = 31.dp
+    val sceneChipPaddingH = 12.dp
+    val scenePillPaddingStart = 14.dp
+    val scenePillPaddingEnd = 8.dp
+    val scenePillGap = 8.dp
+    val sceneChipMaxWidth = 120.dp
     val buttonGap = 8.dp
     val lineGap = 10.dp
 

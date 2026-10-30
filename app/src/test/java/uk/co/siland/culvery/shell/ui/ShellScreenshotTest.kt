@@ -245,7 +245,7 @@ class ShellScreenshotTest {
         HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
         HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
         HomeCard("lights.card", HomeCardSize.REGULAR, 35) {
-            LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
+            LightsCard(rooms[0], allOffLit = true, status = null, line = null, MainRoomActions({}, {}, {}), noHouse)
         }.takeIf { lights },
         HomeCard("music.card", HomeCardSize.REGULAR, 30) {
             MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None)

@@ -19,6 +19,7 @@ import uk.co.siland.culvery.capability.lights.ALL_LIGHTS_OFF
 import uk.co.siland.culvery.capability.lights.HOLIDAY_LIGHTS
 import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LightRoom
+import uk.co.siland.culvery.capability.lights.LightScene
 import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.OFF
 import uk.co.siland.culvery.capability.lights.TURN_ALL_OFF
@@ -46,8 +47,14 @@ import uk.co.siland.culvery.core.ui.shownNotSpoken
 /** What All lights off and Holiday lights do, on the card and the tab. */
 class HouseActions(val onAllOff: () -> Unit, val onHoliday: () -> Unit)
 
-/** What the Home card's main room does: its toggle, its › to the tab, and its slider while moving and let go. */
-class MainRoomActions(val onToggle: () -> Unit, val onOpen: () -> Unit, val onDrag: (Int) -> Unit = {}, val onLetGo: (Int) -> Unit = {})
+/** What the Home card's main room does: its toggle, its › to the tab, its Scene pill's recall, and its slider while moving and let go. */
+class MainRoomActions(
+    val onToggle: () -> Unit,
+    val onOpen: () -> Unit,
+    val onScene: (LightScene) -> Unit,
+    val onDrag: (Int) -> Unit = {},
+    val onLetGo: (Int) -> Unit = {},
+)
 
 /** While this shows, the rooms are followed (7 §4.2). */
 @Composable

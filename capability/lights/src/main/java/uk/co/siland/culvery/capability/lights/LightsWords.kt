@@ -18,6 +18,9 @@ internal const val CANT_REACH_HUE = "Culvery can’t reach the Hue Bridge. Check
 internal const val HUE_FORGOT = "The Hue Bridge no longer knows Culvery. Pair it again in Settings › Lights."
 internal const val OTHER_BRIDGE = "Culvery found a different Hue Bridge. Find Hue Bridge again in Settings › Lights."
 internal const val TURN_ALL_OFF = "Turn all lights off"
+internal const val SCENE = "Scene"
+internal const val NO_SCENE = "None"
+internal const val NEXT_SCENE = "go to the next scene"
 internal const val LOOKING_FOR_LIGHTS = "Looking for the lights…"
 private const val AN_AUTOMATION = "an automation"
 internal const val NO_BRIDGE_ANSWERED = "No Hue Bridge answered. Check it’s plugged in, or enter the bridge’s address."
@@ -44,6 +47,19 @@ internal fun cardStatus(room: LightRoom): String {
     val scene = room.scenes.firstOrNull { it.id == room.activeSceneId }?.name
     return if (room.on && scene != null) "${roomState(room)} · $scene" else roomState(room)
 }
+
+/** The scene after the room's active one, wrapping round; the first when none is active (15a §3). Null for a room with no scenes. */
+internal fun nextScene(room: LightRoom): LightScene? {
+    if (room.scenes.isEmpty()) return null
+    val at = room.scenes.indexOfFirst { it.id == room.activeSceneId }
+    return room.scenes[(at + 1) % room.scenes.size]
+}
+
+/** The active scene's name, or "None" (15a §3). */
+internal fun currentSceneName(room: LightRoom): String = room.scenes.firstOrNull { it.id == room.activeSceneId }?.name ?: NO_SCENE
+
+/** "Scene, Relax": the Scene pill's name (15a §3). */
+internal fun scenePillSpoken(room: LightRoom): String = "Scene, ${currentSceneName(room)}"
 
 /** "Lounge, on, 70 percent", "Lounge, off" (7 §5.4). */
 internal fun roomSpoken(room: LightRoom): String = when {

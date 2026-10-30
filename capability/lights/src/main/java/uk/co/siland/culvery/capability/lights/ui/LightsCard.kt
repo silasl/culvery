@@ -1,6 +1,8 @@
 package uk.co.siland.culvery.capability.lights.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -8,44 +10,55 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LIGHTS
 import uk.co.siland.culvery.capability.lights.LIGHTS_ID
 import uk.co.siland.culvery.capability.lights.LOOKING_FOR_LIGHTS
+import uk.co.siland.culvery.capability.lights.NEXT_SCENE
+import uk.co.siland.culvery.capability.lights.SCENE
 import uk.co.siland.culvery.capability.lights.LightRoom
 import uk.co.siland.culvery.capability.lights.LightsActions
 import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.LightsHouse
 import uk.co.siland.culvery.capability.lights.LightsView
+import uk.co.siland.culvery.capability.lights.currentSceneName
+import uk.co.siland.culvery.capability.lights.nextScene
 import uk.co.siland.culvery.capability.lights.problemLine
+import uk.co.siland.culvery.capability.lights.scenePillSpoken
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.hhClickable
+import uk.co.siland.culvery.core.ui.quietFill
+import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /**
- * The REGULAR Home card (9 §4.2): the main room as a toggle with a › to its tab, its brightness, All lights off and Holiday lights. With a
+ * The REGULAR Home card (9 §4.2): the main room as a toggle with a › to its tab, its brightness, All lights off and a Scene pill that steps to its next scene (15a §3). With a
  * problem, the §6 line and no controls; before the first read, that it is looking. In the side-by-side row (10 §4.9) a line
  * under the buttons takes the two gaps and shows on one line, ending in … if longer.
  */
 @Composable
 fun LightsCard(
     main: LightRoom?,
-    holidayOn: Boolean,
     allOffLit: Boolean,
-    run: HouseRun?,
     status: String?,
     line: String?,
     mainRoom: MainRoomActions,
@@ -54,16 +67,14 @@ fun LightsCard(
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val squeezed = line != null && maxHeight <= LightsDimens.rowCardMaxHeight
-        LightsCardContent(main, holidayOn, allOffLit, run, status, line, squeezed, mainRoom, house)
+        LightsCardContent(main, allOffLit, status, line, squeezed, mainRoom, house)
     }
 }
 
 @Composable
 private fun LightsCardContent(
     main: LightRoom?,
-    holidayOn: Boolean,
     allOffLit: Boolean,
-    run: HouseRun?,
     status: String?,
     line: String?,
     squeezed: Boolean,
@@ -93,7 +104,7 @@ private fun LightsCardContent(
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
             AllOffButton(allOffLit, house.onAllOff, Modifier.weight(1f))
-            HolidayButton(holidayOn, run, house.onHoliday)
+            if (main.scenes.isNotEmpty()) ScenePill(main) { nextScene(main)?.let(mainRoom.onScene) }
         }
         if (line != null) {
             if (!squeezed) Spacer(Modifier.height(LightsDimens.lineGap))
@@ -105,16 +116,44 @@ private fun LightsCardContent(
     }
 }
 
+/** "Scene" with a chip holding the room's current scene; a tap recalls the next one (15a §3). Spoken "Scene, Relax". */
+@Composable
+private fun ScenePill(room: LightRoom, onNext: () -> Unit) {
+    val c = Culvery.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LightsDimens.scenePillGap),
+        modifier = Modifier
+            .testTag("lights_card_scene")
+            .heightIn(min = LightsDimens.scenePillHeight)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(quietFill(ButtonSurface.Surf, c))
+            .hhClickable(onNext, label = NEXT_SCENE, spoken = scenePillSpoken(room))
+            .padding(start = LightsDimens.scenePillPaddingStart, end = LightsDimens.scenePillPaddingEnd),
+    ) {
+        Text(SCENE, style = HhType.buttonLabel, color = c.ink, maxLines = 1, modifier = Modifier.shownNotSpoken())
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .height(LightsDimens.sceneChipHeight)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(c.surf3)
+                .padding(horizontal = LightsDimens.sceneChipPaddingH)
+                .shownNotSpoken(),
+        ) {
+            Text(currentSceneName(room), style = HhType.buttonLabel, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = LightsDimens.sceneChipMaxWidth))
+        }
+    }
+}
+
 /** The card over the view; while it shows, the rooms are followed (7 §4.2). */
 @Composable
 internal fun LightsCardHost(view: LightsView, actions: LightsActions, house: LightsHouse, follow: LightsFollow) {
     FollowWhileShown(follow)
     val navigator = LocalShellNavigator.current
     val main by view.main.collectAsStateWithLifecycle()
-    val holidayOn by view.holidayOn.collectAsStateWithLifecycle(false)
     val allOffLit by view.allOffLit.collectAsStateWithLifecycle(false)
     val problem by view.problem.collectAsStateWithLifecycle(null)
-    val run by house.running.collectAsStateWithLifecycle()
     val roomLines by actions.lines.collectAsStateWithLifecycle()
     val houseLine by actions.houseLine.collectAsStateWithLifecycle()
     val room = main
@@ -125,10 +164,11 @@ internal fun LightsCardHost(view: LightsView, actions: LightsActions, house: Lig
                 room?.let { view.focus.value = it.id }
                 navigator.openTab(LIGHTS_ID)
             },
+            onScene = { scene -> room?.let { actions.recallScene(it, scene) } },
             onDrag = { percent -> room?.let { actions.dragBrightness(it, percent) } },
             onLetGo = { percent -> room?.let { actions.letGoBrightness(it, percent) } },
         )
     }
     val houseActions = remember(actions) { HouseActions(onAllOff = actions::allOff, onHoliday = actions::toggleHoliday) }
-    LightsCard(room, holidayOn, allOffLit, run, problem?.let(::problemLine), room?.let { roomLines[it.id] } ?: houseLine, mainRoom, houseActions)
+    LightsCard(room, allOffLit, problem?.let(::problemLine), room?.let { roomLines[it.id] } ?: houseLine, mainRoom, houseActions)
 }

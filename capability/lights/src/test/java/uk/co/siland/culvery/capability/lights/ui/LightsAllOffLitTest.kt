@@ -47,7 +47,7 @@ class LightsAllOffLitTest {
                         }
                     } else {
                         Box(Modifier.size(345.dp, 279.dp)) {
-                            LightsCard(room("Lounge", on = lit), false, lit, null, null, null, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS)
+                            LightsCard(room("Lounge", on = lit), lit, null, null, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS)
                         }
                     }
                 }
@@ -95,7 +95,7 @@ class LightsAllOffLitTest {
                 if (onTab) {
                     LightsTab(listOf(room("Lounge", on = lit)), false, lit, null, null, null, emptyMap(), null, {}, house, RoomActions.None)
                 } else {
-                    LightsCard(room("Lounge", on = lit), false, lit, null, null, null, NO_MAIN_ROOM_ACTIONS, house)
+                    LightsCard(room("Lounge", on = lit), lit, null, null, NO_MAIN_ROOM_ACTIONS, house)
                 }
             }
         }

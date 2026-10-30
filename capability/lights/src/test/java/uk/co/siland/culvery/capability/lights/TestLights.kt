@@ -33,6 +33,7 @@ import uk.co.siland.culvery.core.plugin.settingsDataStore
 import uk.co.siland.culvery.core.ui.Icons
 
 internal val RELAX = LightScene("relax-id", "Relax")
+internal val READ = LightScene("read-id", "Read")
 internal val BRIGHT = LightScene("bright-id", "Bright")
 internal val MIMIC = Automation("mimic-id", "Mimic presence", on = false)
 internal val AWAY = Automation("away-id", "Away from home", on = false)

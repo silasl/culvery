@@ -12,9 +12,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LightRoom
 import uk.co.siland.culvery.capability.lights.LightsProblem
+import uk.co.siland.culvery.capability.lights.READ
 import uk.co.siland.culvery.capability.lights.RELAX
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.room
@@ -32,17 +32,15 @@ class LightsCardScreenshotTest {
         name: String,
         dark: Boolean,
         main: LightRoom? = lounge,
-        holidayOn: Boolean = false,
-        run: HouseRun? = null,
         status: String? = null,
         line: String? = null,
     ) = compose.snap(name, dark, Modifier.padding(16.dp)) {
-        Box(Modifier.size(701.dp, 285.5.dp)) { LightsCard(main, holidayOn, main?.on == true, run, status, line, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS) }
+        Box(Modifier.size(701.dp, 285.5.dp)) { LightsCard(main, main?.on == true, status, line, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS) }
     }
 
     /** The card in the 343 × 212 half of the row beneath a utility card (10 §4.9); app's HomeGridTest pins the size. */
     private fun snapRow(name: String, dark: Boolean, line: String? = null) = compose.snap(name, dark, Modifier.padding(16.dp)) {
-        Box(Modifier.size(343.dp, 212.dp)) { LightsCard(lounge, false, true, null, null, line, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS) }
+        Box(Modifier.size(343.dp, 212.dp)) { LightsCard(lounge, true, null, line, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS) }
     }
 
     @Test fun onDark() = snap("lights_card_on_dark", true)
@@ -53,9 +51,9 @@ class LightsCardScreenshotTest {
 
     @Test fun sceneDark() = snap("lights_card_scene_dark", true, main = room("Lounge", on = true, brightness = 70, scenes = listOf(RELAX), active = RELAX.id))
 
-    @Test fun holidayDark() = snap("lights_card_holiday_dark", true, holidayOn = true)
+    @Test fun sceneNoneDark() = snap("lights_card_scene_none_dark", true, main = room("Lounge", on = true, brightness = 70, scenes = listOf(RELAX, READ)))
 
-    @Test fun turningOnDark() = snap("lights_card_turning_on_dark", true, run = HouseRun.TURNING_ON)
+    @Test fun noScenesDark() = snap("lights_card_no_scenes_dark", true)
 
     @Test fun problemDark() = snap("lights_card_problem_dark", true, status = problemLine(LightsProblem.UNREACHABLE))
 
