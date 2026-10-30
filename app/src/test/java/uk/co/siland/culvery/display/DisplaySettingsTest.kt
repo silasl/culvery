@@ -1,9 +1,14 @@
 package uk.co.siland.culvery.display
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.time.LocalTime
+import java.time.MonthDay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,12 +23,15 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.settingsDataStore
+import uk.co.siland.culvery.core.ui.SeasonDates
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 @RunWith(AndroidJUnit4::class)
 class DisplaySettingsTest {
     @get:Rule val folder = TemporaryFolder()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val settings by lazy { displaySettings(folder.root, scope) }
+    private val rawStore by lazy { settingsDataStore(scope) { File(folder.root, FILE_NAME) } }
+    private val settings by lazy { DisplaySettings(rawStore, scope) }
 
     @After
     fun tearDown() = scope.cancel()
@@ -96,5 +104,87 @@ class DisplaySettingsTest {
         }
         assertThat(thrown).isInstanceOf(IllegalArgumentException::class.java)
         assertThat(settings.prefs.first().sleepAfterMinutes).isEqualTo(5)
+    }
+
+    private fun day(month: Int, day: Int) = MonthDay.of(month, day)
+    private val halloweenDefaults = SeasonDates(day(10, 24), day(10, 31))
+
+    /** Fails if a fresh file doesn't give each theme its own default dates. */
+    @Test
+    fun seasonDatesDefaultToEachThemes() = runTest {
+        assertThat(settings.prefs.first().seasonDates.getValue(SeasonalTheme.HALLOWEEN)).isEqualTo(halloweenDefaults)
+    }
+
+    /** Fails if edited dates are lost or aren't read back. */
+    @Test
+    fun editedDatesAreKept() = runTest {
+        val edited = SeasonDates(day(10, 20), day(11, 2))
+        settings.setSeasonDates(SeasonalTheme.HALLOWEEN, edited)
+        assertThat(settings.prefs.first().seasonDates.getValue(SeasonalTheme.HALLOWEEN)).isEqualTo(edited)
+    }
+
+    /** Fails if putting back the defaults leaves either key in the file. */
+    @Test
+    fun puttingBackTheDefaultsRemovesTheKeys() = runTest {
+        settings.setSeasonDates(SeasonalTheme.HALLOWEEN, SeasonDates(day(10, 20), day(11, 2)))
+        settings.resetSeasonDates(SeasonalTheme.HALLOWEEN)
+        assertThat(settings.prefs.first().seasonDates.getValue(SeasonalTheme.HALLOWEEN)).isEqualTo(halloweenDefaults)
+        assertThat(storedKeys()).containsNoneOf("season_halloween_start", "season_halloween_end")
+    }
+
+    private suspend fun storedKeys(): Set<String> = rawStore.data.first().asMap().keys.map { it.name }.toSet()
+
+    private suspend fun seasonDatesAfterStoring(edit: (MutablePreferences) -> Unit): SeasonDates {
+        rawStore.edit(edit)
+        return settings.prefs.first().seasonDates.getValue(SeasonalTheme.HALLOWEEN)
+    }
+
+    /** Fails if an unreadable start (not a month and day) is used instead of falling back to the defaults. */
+    @Test
+    fun unreadableStartsFallBackToTheDefaults() = runTest {
+        listOf(1332, 231, 0, -1, 1301, 100).forEach { bad ->
+            val read = seasonDatesAfterStoring {
+                it[intPreferencesKey("season_halloween_start")] = bad
+                it[intPreferencesKey("season_halloween_end")] = 1105
+            }
+            assertThat(read).isEqualTo(halloweenDefaults)
+        }
+    }
+
+    /** Fails if a key stored as text throws or is used. */
+    @Test
+    fun aStartStoredAsTextFallsBackToTheDefaults() = runTest {
+        val read = seasonDatesAfterStoring {
+            it[stringPreferencesKey("season_halloween_start")] = "1020"
+            it[intPreferencesKey("season_halloween_end")] = 1105
+        }
+        assertThat(read).isEqualTo(halloweenDefaults)
+    }
+
+    /** Fails if a good start is kept beside an unreadable end. */
+    @Test
+    fun aGoodStartWithABadEndFallsBackToBothDefaults() = runTest {
+        val read = seasonDatesAfterStoring {
+            it[intPreferencesKey("season_halloween_start")] = 1020
+            it[intPreferencesKey("season_halloween_end")] = 1332
+        }
+        assertThat(read).isEqualTo(halloweenDefaults)
+    }
+
+    /** Fails if one stored end is used without its start. */
+    @Test
+    fun onlyAnEndStoredFallsBackToTheDefaults() = runTest {
+        val read = seasonDatesAfterStoring { it[intPreferencesKey("season_halloween_end")] = 1105 }
+        assertThat(read).isEqualTo(halloweenDefaults)
+    }
+
+    /** Fails if 29 February is refused as a date. */
+    @Test
+    fun theLeapDayIsAValidDate() = runTest {
+        val read = seasonDatesAfterStoring {
+            it[intPreferencesKey("season_halloween_start")] = 229
+            it[intPreferencesKey("season_halloween_end")] = 301
+        }
+        assertThat(read).isEqualTo(SeasonDates(day(2, 29), day(3, 1)))
     }
 }

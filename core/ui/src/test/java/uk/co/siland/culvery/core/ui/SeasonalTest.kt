@@ -48,4 +48,12 @@ class SeasonalTest {
             assertThat(it.look.day.isLight).isTrue()
         }
     }
+
+    /** Pin: a 29 February end still holds the last day of February in a year without one. */
+    @Test
+    fun aLeapDayEndInAShortYearEndsOnThe28th() {
+        val dates = SeasonDates(MonthDay.of(2, 20), MonthDay.of(2, 29))
+        assertThat(LocalDate.of(2027, 2, 28) in dates).isTrue()
+        assertThat(LocalDate.of(2027, 3, 1) in dates).isFalse()
+    }
 }

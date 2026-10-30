@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.LocalTime
+import java.time.Month
+import java.time.MonthDay
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +24,9 @@ import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 import uk.co.siland.culvery.core.plugin.settingsDataStore
+import uk.co.siland.culvery.core.ui.SeasonDates
+import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.defaultSeasonDates
 
 private const val FILE = "display_settings"
 private const val TAG = "DisplaySettings"
@@ -46,6 +51,7 @@ data class DisplayPrefs(
     val wakeByCamera: Boolean? = null,
     /** Culvery has asked for the camera at least once, so a missing permission with no rationale is a refusal. */
     val cameraAsked: Boolean = false,
+    val seasonDates: Map<SeasonalTheme, SeasonDates> = defaultSeasonDates(),
 )
 
 /** A small DataStore file under `files/datastore/`, which backup and transfer leave alone. Writes throw `IOException`. */
@@ -94,6 +100,20 @@ class DisplaySettings(private val store: DataStore<Preferences>, scope: Coroutin
         store.edit { it[CAMERA_ASKED] = true }
     }
 
+    suspend fun setSeasonDates(theme: SeasonalTheme, dates: SeasonDates) {
+        store.edit {
+            it[intPreferencesKey(theme.startKey)] = dates.start.packed()
+            it[intPreferencesKey(theme.endKey)] = dates.end.packed()
+        }
+    }
+
+    suspend fun resetSeasonDates(theme: SeasonalTheme) {
+        store.edit {
+            it.remove(intPreferencesKey(theme.startKey))
+            it.remove(intPreferencesKey(theme.endKey))
+        }
+    }
+
     private fun Preferences.toPrefs(): DisplayPrefs {
         val defaults = DisplayPrefs()
         return DisplayPrefs(
@@ -104,8 +124,27 @@ class DisplaySettings(private val store: DataStore<Preferences>, scope: Coroutin
             sleepAfterMinutes = this[SLEEP_AFTER]?.takeIf { it in SLEEP_CHOICES } ?: defaults.sleepAfterMinutes,
             wakeByCamera = this[WAKE_BY_CAMERA],
             cameraAsked = this[CAMERA_ASKED] ?: defaults.cameraAsked,
+            seasonDates = SeasonalTheme.entries.associateWith { seasonDates(it) ?: it.defaultDates },
         )
     }
+
+    /** Both ends, or null when either is missing, stored as another type, or not a real month and day. */
+    private fun Preferences.seasonDates(theme: SeasonalTheme): SeasonDates? {
+        val start = (asMap().entries.firstOrNull { it.key.name == theme.startKey }?.value as? Int)?.toMonthDay() ?: return null
+        val end = (asMap().entries.firstOrNull { it.key.name == theme.endKey }?.value as? Int)?.toMonthDay() ?: return null
+        return SeasonDates(start, end)
+    }
+
+    private fun MonthDay.packed(): Int = monthValue * 100 + dayOfMonth
+
+    private fun Int.toMonthDay(): MonthDay? {
+        val month = this / 100
+        val day = this % 100
+        return if (month in 1..12 && day in 1..Month.of(month).maxLength()) MonthDay.of(month, day) else null
+    }
+
+    private val SeasonalTheme.startKey get() = "season_${name.lowercase()}_start"
+    private val SeasonalTheme.endKey get() = "season_${name.lowercase()}_end"
 
     private fun minuteOfDay(minutes: Int): LocalTime = LocalTime.ofSecondOfDay(minutes.coerceIn(0, MINUTES_PER_DAY - 1) * SECONDS_PER_MINUTE.toLong())
 

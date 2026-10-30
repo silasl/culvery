@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -29,6 +30,16 @@ internal fun showingOn(date: LocalDate, dates: Map<SeasonalTheme, SeasonDates>, 
     preview?.takeIf { it.day == date }?.theme
         ?: SeasonalTheme.entries.firstOrNull { (dates[it] ?: it.defaultDates).contains(date) }
 
+/** The theme whose next start is soonest, with that day (today counts); ties go to list order (14 §4.5). */
+internal fun nextTheme(today: LocalDate, dates: Map<SeasonalTheme, SeasonDates>): Pair<SeasonalTheme, LocalDate>? =
+    SeasonalTheme.entries
+        .map { theme ->
+            val start = (dates[theme] ?: theme.defaultDates).start
+            val thisYear = start.atYear(today.year)
+            theme to if (thisYear.isBefore(today)) start.atYear(today.year + 1) else thisYear
+        }
+        .minByOrNull { it.second }
+
 /** Which seasonal theme the wall shows, by the household's date; the clock is read from [now], never the device's own. */
 @Singleton
 class SeasonalThemes internal constructor(
@@ -37,11 +48,19 @@ class SeasonalThemes internal constructor(
     scope: CoroutineScope,
 ) : ShowingTheme {
     @Inject
-    constructor(clock: HouseholdClock, @ApplicationScope scope: CoroutineScope) : this(clock.now, flowOf(defaultSeasonDates()), scope)
+    constructor(clock: HouseholdClock, settings: DisplaySettings, @ApplicationScope scope: CoroutineScope) :
+        this(clock.now, settings.read.filterNotNull().map { it.seasonDates }, scope)
 
     private val preview = MutableStateFlow<ThemePreview?>(null)
 
     val dates: StateFlow<Map<SeasonalTheme, SeasonDates>> = dates.stateIn(scope, SharingStarted.Eagerly, defaultSeasonDates())
+
+    /** The theme to look for next and its first day; null while a theme is in its dates or the clock is unread. */
+    val next: StateFlow<Pair<SeasonalTheme, LocalDate>?> =
+        combine(now, this.dates) { now, dates ->
+            val today = now?.toLocalDate()
+            if (today == null || showingOn(today, dates, null) != null) null else nextTheme(today, dates)
+        }.stateIn(scope, SharingStarted.Eagerly, null)
 
     override val showing: StateFlow<SeasonalTheme?> =
         combine(now, this.dates, preview) { now, dates, preview -> now?.let { showingOn(it.toLocalDate(), dates, preview) } }
