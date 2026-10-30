@@ -3,7 +3,13 @@ package uk.co.siland.culvery.display
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.MonthDay
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import uk.co.siland.culvery.core.ui.SeasonDates
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.clockText
 
 internal const val DISPLAY = "Display"
@@ -48,3 +54,32 @@ internal fun previewLine(label: String, on: Boolean): String =
 /** Android's details screen for this app, where its permissions are; the first intent the tablet has opens. */
 fun appDetailsIntents(packageName: String): List<Intent> =
     listOf(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+
+private val DAY_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+private val DAY_MONTH_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+private val DAY_LONG_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.ENGLISH)
+
+/** "24 Oct". */
+fun dayMonth(d: MonthDay): String = d.atYear(2000).format(DAY_MONTH)
+
+internal fun dayMonth(d: LocalDate): String = d.format(DAY_MONTH)
+
+/** "24 Oct 2027", for a day in a year other than the one being picked in. */
+internal fun dayMonthYear(d: LocalDate): String = d.format(DAY_MONTH_YEAR)
+
+internal fun datesLine(dates: SeasonDates): String = "${dayMonth(dates.start)} – ${dayMonth(dates.end)}"
+
+internal const val CHANGE_THE_DATES = "Change the dates"
+internal const val TAP_FIRST_THEN_LAST = "Tap the first day, then the last."
+internal const val SAVE_DATES = "Save dates"
+internal const val CANCEL = "Cancel"
+
+internal fun datesTitle(label: String): String = "$label dates"
+
+internal fun putBack(dates: SeasonDates): String = "Put back ${datesLine(dates)}"
+
+internal fun lastDayBeforeFirst(first: LocalDate): String = "The last day is before the first. Tap a last day on or after ${dayMonth(first)}."
+
+internal fun longerThanAYear(limit: LocalDate): String = "A theme can show for a year at most. Tap a last day before ${dayMonthYear(limit)}."
+
+internal fun nextLine(theme: SeasonalTheme, date: LocalDate): String = "Next: ${theme.label} from ${date.format(DAY_LONG_MONTH)}"

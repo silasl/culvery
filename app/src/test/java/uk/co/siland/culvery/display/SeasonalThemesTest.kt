@@ -165,4 +165,14 @@ class SeasonalThemesTest {
         moveTo(now, at(11, 5, 12, 0))
         assertThat(themes.next.value).isEqualTo(SeasonalTheme.HALLOWEEN to date(2027, 10, 24))
     }
+
+    /** Fails if `next` keeps the default dates after the household edits them. */
+    @Test
+    fun nextFollowsEditedDates() = runTest {
+        val now = MutableStateFlow<LocalDateTime?>(at(10, 29, 12, 0))
+        val edited = halloweenOn(MonthDay.of(11, 1), MonthDay.of(11, 5))
+        val themes = SeasonalThemes(now, flowOf(edited), backgroundScope)
+        runCurrent()
+        assertThat(themes.next.value).isEqualTo(SeasonalTheme.HALLOWEEN to date(2026, 11, 1))
+    }
 }

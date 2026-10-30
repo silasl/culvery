@@ -55,6 +55,9 @@ class SeasonalThemes internal constructor(
 
     val dates: StateFlow<Map<SeasonalTheme, SeasonDates>> = dates.stateIn(scope, SharingStarted.Eagerly, defaultSeasonDates())
 
+    /** The household's date; null while the clock is unread. */
+    val today: StateFlow<LocalDate?> = now.map { it?.toLocalDate() }.stateIn(scope, SharingStarted.Eagerly, null)
+
     /** The theme to look for next and its first day; null while a theme is in its dates or the clock is unread. */
     val next: StateFlow<Pair<SeasonalTheme, LocalDate>?> =
         combine(now, this.dates) { now, dates ->

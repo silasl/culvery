@@ -20,4 +20,6 @@ object DisplayDimens {
     val glyphFallbackEnd = 28.dp
     val glyphFallbackTop = 14.dp
     val settingsGap = 16.dp
+    val sheetPaddingH = 30.dp
+    val sheetPaddingV = 28.dp
 }

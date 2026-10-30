@@ -1,8 +1,11 @@
 package uk.co.siland.culvery.display.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
@@ -19,8 +22,10 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.MonthDay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,10 +39,13 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SeasonDates
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.defaultSeasonDates
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
@@ -64,6 +72,8 @@ class DisplaySettingsPageTest {
     private var allows = 0
     private var opens = 0
     private val previews = mutableListOf<Pair<SeasonalTheme, Boolean>>()
+    private val dated = mutableListOf<Pair<SeasonalTheme, SeasonDates?>>()
+    private val overlay = TestOverlay()
     private val actions = DisplaySettingsActions(
         onNight = { from, until -> nights += from to until },
         onDay = { days += it },
@@ -73,7 +83,12 @@ class DisplaySettingsPageTest {
         onAllowCamera = { allows++ },
         onOpenAndroidSettings = { opens++ },
         onPreview = { theme, on -> previews += theme to on },
+        onDates = { theme, dates -> dated += theme to dates },
     )
+
+    private companion object {
+        val TODAY: LocalDate = LocalDate.of(2026, 9, 15)
+    }
 
     @After
     fun tearDown() = io.cancel()
@@ -83,9 +98,18 @@ class DisplaySettingsPageTest {
         prefs: DisplayPrefs = DisplayPrefs(),
         sunKnown: Boolean = true,
         previewing: SeasonalTheme? = null,
+        dates: Map<SeasonalTheme, SeasonDates> = defaultSeasonDates(),
+        next: Pair<SeasonalTheme, LocalDate>? = null,
     ) {
         compose.setContent {
-            CulveryTheme(dark = true) { InSettingsPane { DisplaySettingsScreen(DisplaySettingsUi(prefs, camera, sunKnown, previewing), actions) } }
+            CompositionLocalProvider(LocalOverlayHost provides overlay) {
+                CulveryTheme(dark = true) {
+                    Box {
+                        InSettingsPane { DisplaySettingsScreen(DisplaySettingsUi(prefs, camera, sunKnown, TODAY, previewing, dates, next), actions) }
+                        overlay.content?.invoke()
+                    }
+                }
+            }
         }
     }
 
@@ -245,7 +269,7 @@ class DisplaySettingsPageTest {
         val access = CameraAccess({ true }, { false }, settings, io)
         val navigator = RecordingNavigator()
         compose.setContent {
-            CompositionLocalProvider(LocalShellNavigator provides navigator) {
+            CompositionLocalProvider(LocalShellNavigator provides navigator, LocalOverlayHost provides overlay) {
                 CulveryTheme(dark = true) { InSettingsPane { DisplayPage(settings, access, SunToday(null, io), RecordingToaster(), themes(MutableStateFlow(null))).Content() } }
             }
         }
@@ -310,7 +334,7 @@ class DisplaySettingsPageTest {
         val settings = displaySettings(folder.root, io)
         val themes = themes(now)
         compose.setContent {
-            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides overlay) {
                 CulveryTheme(dark = true) {
                     InSettingsPane { DisplayPage(settings, CameraAccess({ true }, { false }, settings, io), SunToday(null, io), RecordingToaster(), themes).Content() }
                 }
@@ -352,5 +376,119 @@ class DisplaySettingsPageTest {
         now.value = LocalDateTime.of(2026, 11, 6, 0, 0)
         waitUntilShowing(null, themes)
         compose.onNodeWithTag("display_preview_halloween").assertIsOff()
+    }
+
+    private fun day(month: Int, day: Int) = compose.onNodeWithTag("day_${LocalDate.of(2026, month, day)}")
+
+    private fun openHalloweenDates(dates: SeasonDates = SeasonalTheme.HALLOWEEN.defaultDates) {
+        show(dates = mapOf(SeasonalTheme.HALLOWEEN to dates))
+        compose.onNodeWithTag("display_dates_halloween").performScrollTo().performClick()
+        compose.waitForIdle()
+    }
+
+    /** Fails if the refusal for a last day before the first, or a year or more after it, differs or shows a needless year. */
+    @Test
+    fun checkRangeNamesWhatToDo() {
+        assertThat(checkRange(LocalDate.of(2026, 10, 24), LocalDate.of(2026, 10, 31))).isNull()
+        assertThat(checkRange(LocalDate.of(2026, 10, 31), LocalDate.of(2026, 10, 24)))
+            .isEqualTo("The last day is before the first. Tap a last day on or after 31 Oct.")
+        assertThat(checkRange(LocalDate.of(2026, 12, 20), LocalDate.of(2027, 1, 2))).isNull()
+        assertThat(checkRange(LocalDate.of(2026, 10, 24), LocalDate.of(2027, 10, 24)))
+            .isEqualTo("A theme can show for a year at most. Tap a last day before 24 Oct 2027.")
+    }
+
+    /** Fails if a theme's row doesn't name it and its dates, or its click doesn't say what it does. */
+    @Test
+    fun eachThemeShowsItsDates() {
+        show()
+        compose.onNodeWithTag("display_dates_halloween").performScrollTo().assertTextEquals("Halloween", "24 Oct – 31 Oct")
+        val click = compose.onNodeWithTag("display_dates_halloween").fetchSemanticsNode().config[SemanticsActions.OnClick]
+        assertThat(click.label).isEqualTo("Change the dates")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if two taps don't hand on the two days, or the sheet stays open. */
+    @Test
+    fun pickingTwoDaysSavesThem() {
+        openHalloweenDates()
+        compose.onNodeWithText("Halloween dates").assertExists()
+        compose.onNodeWithText("Tap the first day, then the last.").assertExists()
+        day(10, 20).performClick()
+        compose.onNodeWithTag("month_next").performClick()
+        day(11, 2).performClick()
+        compose.onNodeWithTag("display_dates_save").assertIsEnabled().performClick()
+        assertThat(dated).containsExactly(SeasonalTheme.HALLOWEEN to SeasonDates(MonthDay.of(10, 20), MonthDay.of(11, 2)))
+        compose.waitForIdle()
+        assertThat(shows("display_dates_sheet")).isFalse()
+    }
+
+    /** Fails if a last day before the first is accepted, goes unexplained, or can be saved. */
+    @Test
+    fun aLastDayBeforeTheFirstIsRefused() {
+        openHalloweenDates()
+        day(10, 31).performClick()
+        day(10, 24).performClick()
+        compose.onNodeWithTag("display_dates_refused").assertTextEquals("The last day is before the first. Tap a last day on or after 31 Oct.")
+        compose.onNodeWithTag("display_dates_save").assertIsNotEnabled()
+        assertThat(dated).isEmpty()
+    }
+
+    /** Fails if, after a refusal, the next tap doesn't try another last day for the same first day. */
+    @Test
+    fun afterARefusalTheNextTapIsAnotherLastDay() {
+        openHalloweenDates()
+        day(10, 31).performClick()
+        day(10, 24).performClick()
+        compose.onNodeWithTag("month_next").performClick()
+        day(11, 3).performClick()
+        compose.onNodeWithTag("display_dates_refused").assertTextEquals("")
+        compose.onNodeWithTag("display_dates_save").performClick()
+        assertThat(dated).containsExactly(SeasonalTheme.HALLOWEEN to SeasonDates(MonthDay.of(10, 31), MonthDay.of(11, 3)))
+    }
+
+    /** Fails if Save works before both days are picked. */
+    @Test
+    fun saveWaitsForTwoDays() {
+        openHalloweenDates()
+        compose.onNodeWithTag("display_dates_save").assertIsNotEnabled()
+        day(10, 20).performClick()
+        compose.onNodeWithTag("display_dates_save").assertIsNotEnabled()
+    }
+
+    /** Fails if the default dates can't be put back, or the button doesn't name them. */
+    @Test
+    fun puttingBackTheDefaults() {
+        openHalloweenDates(SeasonDates(MonthDay.of(10, 20), MonthDay.of(11, 2)))
+        compose.onNodeWithTag("display_dates_reset").assertTextEquals("Put back 24 Oct – 31 Oct").performClick()
+        assertThat(dated).containsExactly(SeasonalTheme.HALLOWEEN to null)
+        compose.waitForIdle()
+        assertThat(shows("display_dates_sheet")).isFalse()
+    }
+
+    /** Fails if Cancel saves anything or leaves the sheet open. */
+    @Test
+    fun cancelSavesNothing() {
+        openHalloweenDates()
+        day(10, 20).performClick()
+        day(10, 22).performClick()
+        compose.onNodeWithText("Cancel").performClick()
+        assertThat(dated).isEmpty()
+        compose.waitForIdle()
+        assertThat(shows("display_dates_sheet")).isFalse()
+    }
+
+    /** Fails if the Next line reads differently, or shows when nothing is next. */
+    @Test
+    fun theNextLineShowsOutsideTheDates() {
+        show(next = SeasonalTheme.HALLOWEEN to LocalDate.of(2027, 10, 24))
+        compose.onNodeWithTag("display_next").performScrollTo().assertTextEquals("Next: Halloween from 24 October")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: no Next line while a theme is in its dates. */
+    @Test
+    fun withoutANextThereIsNoNextLine() {
+        show(next = null)
+        assertThat(shows("display_next")).isFalse()
     }
 }

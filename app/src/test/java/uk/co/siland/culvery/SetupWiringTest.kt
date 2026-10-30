@@ -19,6 +19,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,10 +39,12 @@ import uk.co.siland.culvery.capability.music.ui.MusicSettingsUi
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.HomeCard
+import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
+import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhPageTitle
@@ -183,7 +186,7 @@ class SetupWiringTest {
         val pages: List<Pair<String, @Composable () -> Unit>> = listOf(
             "display" to {
                 DisplaySettingsScreen(
-                    DisplaySettingsUi(DisplayPrefs(), CameraState.ALLOWED, sunKnown = true),
+                    DisplaySettingsUi(DisplayPrefs(), CameraState.ALLOWED, sunKnown = true, today = LocalDate.of(2026, 10, 29)),
                     DisplaySettingsActions({ _, _ -> }, {}, {}, {}, {}, {}, {}),
                 )
             },
@@ -209,7 +212,7 @@ class SetupWiringTest {
         )
         compose.setContent {
             CulveryTheme(dark = true) {
-                CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+                CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides TestOverlay()) {
                     Column {
                         Box(Modifier.testTag("reference")) { HhPageTitle("Reference") }
                         pages.forEach { (id, page) -> Box(Modifier.testTag("page_$id")) { page() } }
