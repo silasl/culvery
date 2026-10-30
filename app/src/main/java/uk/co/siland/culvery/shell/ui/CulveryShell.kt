@@ -10,6 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import java.time.LocalDateTime
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HomeSkyBand
@@ -44,8 +46,16 @@ internal fun CulveryShell(
                 if (state.selectedTabId == HOME_TAB_ID) {
                     val band = remember { HomeSkyBand() }
                     CompositionLocalProvider(LocalHomeSkyBand provides band) {
-                        Culvery.look?.sky?.invoke(skyDrifts, Modifier.matchParentSize())
-                        HomeScreen(now, state.homeCards, state.headerItems)
+                        val sky = Culvery.look?.sky
+                        if (sky == null) {
+                            HomeScreen(now, state.homeCards, state.headerItems)
+                        } else {
+                            sky(skyDrifts, Modifier.matchParentSize())
+                            // Home's pixels are cached in a layer, so a sky step doesn't replay Home's drawing.
+                            Box(Modifier.fillMaxSize().graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)) {
+                                HomeScreen(now, state.homeCards, state.headerItems)
+                            }
+                        }
                     }
                 } else {
                     tabContent(state.selectedTabId)

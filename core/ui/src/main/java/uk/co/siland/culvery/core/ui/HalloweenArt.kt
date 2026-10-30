@@ -1,7 +1,9 @@
 package uk.co.siland.culvery.core.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableLongState
@@ -17,22 +19,27 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.toPath
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.round
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.delay
 
@@ -153,24 +160,43 @@ fun moonIn(band: Rect, density: Density): Moon = with(density) {
     Moon(Offset(x, y), radius)
 }
 
+/** Where the bats sit in [band]: a bat's width, the lap length across the band, and each lane's top. */
+private class BatTrack(band: Rect, density: Density) {
+    val span = with(density) { HalloweenDimens.batSpan.toPx() }
+    val left = band.left - span
+    val cycle = band.width + span
+    val tops = FloatArray(BATS) { i ->
+        val lanes = HalloweenDimens.batLanes
+        band.top + minOf(with(density) { lanes[i % lanes.size].toPx() }, band.height - span / 2)
+    }
+
+    fun left(lap: Double, i: Int): Float = left + ((lap + (i + 0.5) / BATS) % 1.0 * cycle).toFloat()
+}
+
+private fun lapAt(elapsedMillis: Long): Double = (elapsedMillis % BAT_LAP_MS).toDouble() / BAT_LAP_MS
+
 /**
  * Where each bat's box starts (left edge, top), [elapsedMillis] into the drift. The bats share two lanes, start a quarter of
  * a lap apart and cross from a bat's width left of [band] to its right edge once every [BAT_LAP_MS] (14 §4.3).
  */
-fun batPositions(elapsedMillis: Long, band: Rect, density: Density): List<Offset> = with(density) {
-    val span = HalloweenDimens.batSpan.toPx()
-    val cycle = band.width + span
-    val lap = (elapsedMillis % BAT_LAP_MS).toDouble() / BAT_LAP_MS
-    val lanes = HalloweenDimens.batLanes
-    List(BATS) { i ->
-        val top = band.top + minOf(lanes[i % lanes.size].toPx(), band.height - span / 2)
-        Offset(band.left - span + ((lap + (i + 0.5) / BATS) % 1.0 * cycle).toFloat(), top)
-    }
+fun batPositions(elapsedMillis: Long, band: Rect, density: Density): List<Offset> {
+    val track = BatTrack(band, density)
+    val lap = lapAt(elapsedMillis)
+    return List(BATS) { i -> Offset(track.left(lap, i), track.tops[i]) }
+}
+
+/** What the sky draws for one size, worked out once rather than at every step. */
+private class SkyFrame(size: Size, density: Density) {
+    val band = Rect(Offset.Zero, size)
+    val moon = moonIn(band, density)
+    val track = BatTrack(band, density)
+    val fit = track.span / BAT_W
 }
 
 /**
  * The moon and the bats in Home's open header band. Nothing in it is read by TalkBack. While [drifting] it advances [elapsed]
- * about every [SKY_FRAME_MS]; the time is read only when drawing, so a step redraws this layer and nothing else (14 §4.3).
+ * about every [SKY_FRAME_MS]; the time is read only when drawing, so a step redraws this small layer and nothing else (14 §4.3).
+ * It is as big as the band, so [modifier] gives the room the band sits in.
  */
 @Composable
 fun HalloweenSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: MutableLongState = remember { mutableLongStateOf(0L) }) {
@@ -190,16 +216,33 @@ fun HalloweenSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Muta
             delay(SKY_FRAME_MS)
         }
     }
-    Canvas(modifier.testTag("halloween_sky").clearAndSetSemantics {}.graphicsLayer()) {
-        val band = skyBand(measured, size, this)
-        if (band.width <= 0f || band.height <= 0f) return@Canvas
-        clipRect(band.left, band.top, band.right, band.bottom) {
-            val disc = moonIn(band, this)
-            drawCircle(moon, disc.radius, disc.centre)
-            val fit = HalloweenDimens.batSpan.toPx() / BAT_W
-            batPositions(elapsed.longValue, band, this).forEach { at ->
-                translate(at.x, at.y) { scale(fit, fit, pivot = Offset.Zero) { drawPath(batShape, bat) } }
-            }
-        }
+    // The box gives the band its room; the band's own node is placed inside it, so the box's size can't stretch it.
+    Box(modifier) {
+        Spacer(
+            Modifier
+                .offset { measured?.let { skyBand(it, Size.Zero, this).topLeft.round() } ?: IntOffset.Zero }
+                .layout { measurable, constraints ->
+                    val band = skyBand(measured, Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()), this)
+                    val width = band.width.roundToInt().coerceAtLeast(0)
+                    val height = band.height.roundToInt().coerceAtLeast(0)
+                    val placeable = measurable.measure(Constraints.fixed(width, height))
+                    layout(width, height) { placeable.place(0, 0) }
+                }
+                .testTag("halloween_sky")
+                .clearAndSetSemantics {}
+                .graphicsLayer { clip = true }
+                .drawWithCache {
+                    val frame = SkyFrame(size, this)
+                    val bats = frame.track
+                    onDrawBehind {
+                        if (size.width <= 0f || size.height <= 0f) return@onDrawBehind
+                        drawCircle(moon, frame.moon.radius, frame.moon.centre)
+                        val lap = lapAt(elapsed.longValue)
+                        for (i in 0 until BATS) {
+                            translate(bats.left(lap, i), bats.tops[i]) { scale(frame.fit, frame.fit, pivot = Offset.Zero) { drawPath(batShape, bat) } }
+                        }
+                    }
+                },
+        )
     }
 }

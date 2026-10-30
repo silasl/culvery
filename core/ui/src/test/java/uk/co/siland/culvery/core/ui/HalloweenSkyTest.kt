@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.AccessibilityAction
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.hasAnyAncestor
@@ -138,7 +139,7 @@ class HalloweenSkyTest {
     private fun showStill(measured: HomeSkyBand?) = compose.setContent {
         CompositionLocalProvider(LocalHomeSkyBand provides measured) {
             CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN) {
-                Box(Modifier.size(300.dp, 300.dp).background(HalloweenNight.bg)) {
+                Box(Modifier.size(300.dp, 300.dp).testTag("still_frame").background(HalloweenNight.bg)) {
                     HalloweenSky(drifting = false, modifier = Modifier.fillMaxSize())
                 }
             }
@@ -177,18 +178,25 @@ class HalloweenSkyTest {
         val node = compose.onNodeWithTag("halloween_sky")
         val origin = node.fetchSemanticsNode().boundsInWindow
         val image = windowBitmap(node)
-        val drawn = skyBand(measured, Size(origin.width, origin.height), Density(d))
+        val frame = compose.onNodeWithTag("still_frame").fetchSemanticsNode().boundsInWindow
+        val drawn = skyBand(measured, Size(300 * d, 300 * d), Density(d)).translate(frame.topLeft)
+        // The sky is only as big as the band.
+        assertThat(origin.left).isWithin(1f).of(drawn.left)
+        assertThat(origin.top).isWithin(1f).of(drawn.top)
+        assertThat(origin.width).isWithin(1f).of(drawn.width)
+        assertThat(origin.height).isWithin(1f).of(drawn.height)
         val ink = HalloweenInks.moon(HalloweenNight).toArgb()
         val moon = (0 until image.height).flatMap { y -> (0 until image.width).filter { x -> image.getPixel(x, y) == ink }.map { x -> x to y } }
         assertThat(moon).isNotEmpty()
-        assertThat(moon.minOf { it.first } - origin.left).isAtLeast(drawn.left - 1f)
-        assertThat(moon.maxOf { it.first } - origin.left).isAtMost(drawn.right + 1f)
-        assertThat(moon.minOf { it.second } - origin.top).isAtLeast(drawn.top - 1f)
-        assertThat(moon.maxOf { it.second } - origin.top).isAtMost(drawn.bottom + 1f)
+        assertThat(moon.minOf { it.first }.toFloat()).isAtLeast(drawn.left - 1f)
+        assertThat(moon.maxOf { it.first }.toFloat()).isAtMost(drawn.right + 1f)
+        assertThat(moon.minOf { it.second }.toFloat()).isAtLeast(drawn.top - 1f)
+        assertThat(moon.maxOf { it.second }.toFloat()).isAtMost(drawn.bottom + 1f)
         // Left edge: the date's 60 plus the 24 gap; right: 300 - 80 - 24.
-        assertThat(drawn.left).isEqualTo((60 + 24) * d)
-        assertThat(drawn.right).isEqualTo((300 - 80 - 24) * d)
-        val radius = moonIn(drawn, Density(d)).radius
+        assertThat(drawn.left - frame.left).isEqualTo((60 + 24) * d)
+        assertThat(drawn.right - frame.left).isEqualTo((300 - 80 - 24) * d)
+        val bandLocal = Rect(Offset.Zero, Size(drawn.width, drawn.height))
+        val radius = moonIn(bandLocal, Density(d)).radius
         assertThat(radius).isEqualTo(30 * d)
     }
 

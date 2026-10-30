@@ -85,10 +85,8 @@ class CulveryShellSkyTest {
         show(fullHome(dark = true), SeasonalTheme.HALLOWEEN)
         val sky = bounds("halloween_sky")
         val clock = bounds("home_clock")
-        assertThat(sky.left).isAtMost(clock.left)
-        assertThat(sky.top).isAtMost(clock.top)
-        assertThat(sky.right).isAtLeast(clock.right)
-        assertThat(sky.bottom).isAtLeast(clock.bottom)
+        assertThat(sky.top).isWithin(1f).of(clock.top)
+        assertThat(sky.left).isAtLeast(clock.right)
         val skyNode = compose.onNodeWithTag("halloween_sky").fetchSemanticsNode()
         val siblings = skyNode.parent!!.children.map { it.id }
         var above = compose.onNodeWithTag("home_clock", useUnmergedTree = true).fetchSemanticsNode()
@@ -113,7 +111,12 @@ class CulveryShellSkyTest {
         val date = bounds("home_date")
         val items = bounds("home_header_items")
         val cards = listOf("card_a", "card_b").map { bounds(it) }
-        val band = Rect(maxOf(clock.right, date.right) + gap, sky.top, items.left - gap, maxOf(date.bottom, items.bottom))
+        val band = Rect(maxOf(clock.right, date.right) + gap, clock.top, items.left - gap, maxOf(date.bottom, items.bottom))
+
+        // The sky is only as big as the band, so Home's frame is never redrawn for it.
+        listOf(sky.left to band.left, sky.top to band.top, sky.right to band.right, sky.bottom to band.bottom).forEach { (actual, want) ->
+            assertThat(actual).isWithin(1f).of(want)
+        }
 
         listOf(clock, date, items).plus(cards).forEach { assertThat(band.overlaps(it)).isFalse() }
         assertThat(band.width).isGreaterThan(0f)
@@ -123,8 +126,8 @@ class CulveryShellSkyTest {
         // The weather draws its own divider in the same grey as the night bats.
         val texts = listOf(clock, date, items)
         var drawn = 0
-        for (y in sky.top.toInt() until band.bottom.toInt()) {
-            for (x in sky.left.toInt() until sky.right.toInt()) {
+        for (y in clock.top.toInt() until band.bottom.toInt()) {
+            for (x in clock.left.toInt() until items.right.toInt()) {
                 val here = Offset(x.toFloat(), y.toFloat())
                 if (image.getPixel(x, y) in colours && !texts.any { it.contains(here) }) {
                     drawn++
@@ -134,7 +137,7 @@ class CulveryShellSkyTest {
         }
         assertThat(drawn).isGreaterThan(0)
 
-        val local = Rect(band.left - sky.left, 0f, band.right - sky.left, band.height)
+        val local = Rect(0f, 0f, sky.width, sky.height)
         val moon = moonIn(local, density)
         assertThat(moon.centre.x + moon.radius).isAtMost(local.right)
         assertThat(moon.centre.y + moon.radius).isAtMost(local.bottom)
