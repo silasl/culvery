@@ -3,6 +3,8 @@ package uk.co.siland.culvery.capability.door.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -16,6 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.door.DoorbellChoice
+import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
@@ -27,18 +30,21 @@ import uk.co.siland.culvery.core.ui.SeasonalTheme
 class DoorSettingsScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private val actions = DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {})
+    private val actions = DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {})
 
     private val connected = DoorSettingsUi(
         service = "Ring", hint = "Sign in as a Ring Shared User, and turn off the Ring app’s notification sound.", volume = 1.0f, doorbell = DoorbellChoice.FOLLOW_THEME,
         quietOn = true, quietFrom = LocalTime.of(21, 0), quietUntil = LocalTime.of(7, 0), status = null,
-        lastHeard = "Last heard from Ring: Wednesday 14:02", appInstalled = true, accessAllowed = true, capturing = false,
+        lastHeard = "Last heard from Ring: Wednesday 14:02", appInstalled = true, accessAllowed = true, capturing = false, keep = KeepDays.TWO,
     )
 
-    private fun snap(name: String, dark: Boolean, ui: DoorSettingsUi, seasonal: SeasonalTheme? = null) {
+    /** The window holds 1280 dp of the page, which is now less than all of it: [toEnd] scrolls to what is below. */
+    private fun snap(name: String, dark: Boolean, ui: DoorSettingsUi, seasonal: SeasonalTheme? = null, toEnd: Boolean = false) {
         compose.setContent {
+            val scroll = rememberScrollState()
+            if (toEnd) LaunchedEffect(Unit) { scroll.scrollTo(scroll.maxValue) }
             CulveryTheme(dark = dark, seasonal = seasonal) {
-                Box(Modifier.size(960.dp, 1200.dp).background(Culvery.colors.bg)) { InSettingsPane { DoorSettingsScreen(ui, actions) } }
+                Box(Modifier.size(960.dp, 1200.dp).background(Culvery.colors.bg)) { InSettingsPane(scroll) { DoorSettingsScreen(ui, actions) } }
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
@@ -52,6 +58,10 @@ class DoorSettingsScreenshotTest {
 
     @Test fun doorHalloweenLight() = snap("settings_door_halloween_light", false, connected.copy(doorbell = DoorbellChoice.ORGAN), SeasonalTheme.HALLOWEEN)
 
+    @Test fun doorKeepConfirmDark() = snap("settings_door_keep_confirm_dark", true, connected.copy(keep = KeepDays.THIRTY, shortenTo = KeepDays.TWO), toEnd = true)
+
+    @Test fun doorKeepConfirmLight() = snap("settings_door_keep_confirm_light", false, connected.copy(keep = KeepDays.THIRTY, shortenTo = KeepDays.TWO), toEnd = true)
+
     @Test
-    fun doorStepsDark() = snap("settings_door_steps_dark", true, connected.copy(accessAllowed = false, lastHeard = "Culvery hasn’t heard from Ring yet."))
+    fun doorStepsDark() = snap("settings_door_steps_dark", true, connected.copy(accessAllowed = false, lastHeard = "Culvery hasn’t heard from Ring yet."), toEnd = true)
 }

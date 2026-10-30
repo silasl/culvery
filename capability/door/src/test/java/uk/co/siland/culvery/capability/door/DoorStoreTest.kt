@@ -1,14 +1,21 @@
 package uk.co.siland.culvery.capability.door
 
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -22,7 +29,7 @@ import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
 import uk.co.siland.culvery.core.plugin.RailBadge
 
-/** 5 §4.3–4.5, §4.7–4.8: merge on key and time, snapshots, the 48-hour prune and orphans, what is unseen. */
+/** 5 §4.3–4.5, §4.7–4.8, 15a §3.1: merge on key and time, snapshots, the keep-days prune and orphans, what is unseen. */
 @RunWith(AndroidJUnit4::class)
 class DoorStoreTest {
     @get:Rule val folder = TemporaryFolder()
@@ -103,22 +110,87 @@ class DoorStoreTest {
         assertThat(store.events.first()).hasSize(1)
     }
 
-    /** 5 §4.5: older than 48 hours goes with its picture; files with no event go too. */
-    @Test
-    fun pruneDeletesOldEventsTheirSnapshotsAndOrphans() = runTest {
-        val old = store.record(ring(key = "old", at = NOW - KEEP_MS - 1, snapshot = aPicture)).event
-        val edge = store.record(ring(key = "edge", at = NOW - KEEP_MS, snapshot = aPicture)).event
-        File(dir, "999.jpg").writeBytes(byteArrayOf(1))
-        File(dir, "${edge.id}.jpg.part").writeBytes(byteArrayOf(1))
+    private fun londonMillis(local: String) = LocalDateTime.parse(local).atZone(london).toInstant().toEpochMilli()
+
+    private fun keeping(keep: KeepDays) = DoorStore(db, dir, keepFrom = { keepFrom(dateIn(it, london), london, keep) })
+
+    /** Records an event at each London local time in [at], then prunes at [NOW]. */
+    private suspend fun prunedAt(store: DoorStore, vararg at: String) {
+        at.forEach { store.record(ring(key = it, at = londonMillis(it), whenMillis = londonMillis(it))) }
         store.prune(NOW)
-        assertThat(store.events.first().map { it.id }).containsExactly(edge.id)
-        assertThat(dir.names()).containsExactly("${edge.id}.jpg")
-        assertThat(old.snapshot!!.exists()).isFalse()
+    }
+
+    /** 15a §3.1: two days are today and yesterday, from yesterday's midnight. Fails if the cut is 48 hours back or at today's midnight. */
+    @Test
+    fun twoDaysKeepsTodayAndYesterday() = runTest {
+        val before = store.record(ring(key = "b", at = londonMillis("2026-10-12T23:59:00"), snapshot = aPicture)).event
+        val after = store.record(ring(key = "a", at = londonMillis("2026-10-13T00:00:00"), snapshot = aPicture)).event
+        File(dir, "999.jpg").writeBytes(byteArrayOf(1))
+        File(dir, "${after.id}.jpg.part").writeBytes(byteArrayOf(1))
+        store.prune(NOW)
+        assertThat(store.events.first().map { it.id }).containsExactly(after.id)
+        assertThat(dir.names()).containsExactly("${after.id}.jpg")
+        assertThat(before.snapshot!!.exists()).isFalse()
+    }
+
+    /** The cut is the household's midnight [keep] days back, today included. */
+    @Test
+    fun sevenAndThirtyDaysCutAtMidnight() = runTest {
+        val seven = keeping(KeepDays.SEVEN)
+        prunedAt(seven, "2026-10-07T23:59:00", "2026-10-08T00:00:00")
+        assertThat(seven.events.first().single().atMillis).isEqualTo(londonMillis("2026-10-08T00:00:00"))
+        db.clearAllTables()
+        val thirty = keeping(KeepDays.THIRTY)
+        prunedAt(thirty, "2026-09-14T23:59:00", "2026-09-15T00:00:00")
+        assertThat(thirty.events.first().single().atMillis).isEqualTo(londonMillis("2026-09-15T00:00:00"))
+    }
+
+    /** Europe/London, Monday 26 October 2026 after the clocks went back: the cut is Sunday's midnight BST, 23:00Z, not UTC midnight. */
+    @Test
+    fun theCutHoldsAcrossTheClockChange() = runTest {
+        val goes = Instant.parse("2026-10-24T22:30:00Z").toEpochMilli()
+        val stays = Instant.parse("2026-10-24T23:30:00Z").toEpochMilli()
+        store.record(ring(key = "goes", at = goes, whenMillis = goes))
+        val kept = store.record(ring(key = "stays", at = stays, whenMillis = stays)).event
+        store.prune(Instant.parse("2026-10-26T12:00:00Z").toEpochMilli())
+        assertThat(store.events.first().map { it.id }).containsExactly(kept.id)
+    }
+
+    /** Review Focus 5: a restart reads the family's 30 days from the file, not the two-day stand-in a fresh DoorSettings holds until it has read it. */
+    @Test
+    fun aColdStartKeepsThirtyDays() = runTest {
+        val writer = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        doorSettings(folder.root, writer).setKeep(KeepDays.THIRTY)
+        writer.coroutineContext[Job]!!.cancelAndJoin()
+        val reader = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val cold = DoorStore(db, ApplicationProvider.getApplicationContext(), doorSettings(folder.root, reader), householdZone())
+            val tenDays = NOW - 10 * 24 * 60 * 60_000L
+            val old = cold.record(ring(key = "old", at = tenDays, whenMillis = tenDays)).event
+            val older = cold.record(ring(key = "older", at = NOW - 40 * 24 * 60 * 60_000L)).event
+            cold.prune(NOW)
+            assertThat(cold.events.first().map { it.id }).containsExactly(old.id)
+            assertThat(older.id).isNotEqualTo(old.id)
+        } finally {
+            reader.cancel()
+        }
+    }
+
+    /** An unreadable setting is not a choice of two days: no event goes, though the files with no event still do. */
+    @Test
+    fun anUnreadableSettingDeletesNoRows() = runTest {
+        val unreadable = DoorStore(db, dir, keepFrom = { null })
+        val old = unreadable.record(ring(key = "old", at = NOW - 40 * 24 * 60 * 60_000L, snapshot = aPicture)).event
+        val recent = unreadable.record(ring(key = "new", snapshot = aPicture)).event
+        File(dir, "999.jpg").writeBytes(byteArrayOf(1))
+        unreadable.prune(NOW)
+        assertThat(unreadable.events.first().map { it.id }).containsExactly(recent.id, old.id)
+        assertThat(dir.names()).containsExactly("${old.id}.jpg", "${recent.id}.jpg")
     }
 
     @Test
     fun recordingPrunes() = runTest {
-        store.record(ring(key = "old", at = NOW - KEEP_MS - 1))
+        store.record(ring(key = "old", at = NOW - 3 * 24 * 60 * 60_000L))
         store.record(ring(key = "new"))
         assertThat(store.events.first().map { it.atMillis }).containsExactly(NOW)
     }

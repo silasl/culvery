@@ -28,6 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.door.DoorbellChoice
+import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.ui.DoorSettingsActions
 import uk.co.siland.culvery.capability.door.ui.DoorSettingsScreen
 import uk.co.siland.culvery.capability.door.ui.DoorSettingsUi
@@ -192,8 +193,8 @@ class SetupWiringTest {
             },
             "door" to {
                 DoorSettingsScreen(
-                    DoorSettingsUi("Ring", null, 0.5f, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(22, 0), LocalTime.of(7, 0), null, "never", true, true, false),
-                    DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}),
+                    DoorSettingsUi("Ring", null, 0.5f, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(22, 0), LocalTime.of(7, 0), null, "never", true, true, false, KeepDays.TWO),
+                    DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {}),
                 )
             },
             "lights" to {

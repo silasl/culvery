@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.plugin.ApplicationScope
@@ -51,6 +52,9 @@ fun DoorbellChoice.soundFor(showing: SeasonalTheme?): DoorSound = when (this) {
     DoorbellChoice.ORGAN -> DoorSound.ORGAN
 }
 
+/** How many days of door history are kept, today included (15a §3.1). */
+enum class KeepDays(val days: Int) { TWO(2), SEVEN(7), THIRTY(30) }
+
 /** The door's settings. Defaults: 5 §2.6, §4.1, §5.4. */
 data class DoorPrefs(
     /** Both connect steps were done: the Door tab shows (5 §5.5). */
@@ -65,6 +69,7 @@ data class DoorPrefs(
     val lastHeardMillis: Long? = null,
     /** New unrecognised alerts since the last recognised one: three in a row mean Ring's words changed (5 §6). */
     val unrecognisedRun: Int = 0,
+    val keep: KeepDays = KeepDays.TWO,
 ) {
     /** Check Ring's notifications is on at [nowMillis]; a clock set back past its 30 minutes turns it off rather than stretching it (5 §5.4). */
     fun capturingAt(nowMillis: Long): Boolean = (captureUntilMillis - nowMillis) in 1..CAPTURE_MS
@@ -89,6 +94,8 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
         .map { it.toPrefs() }
         .distinctUntilChanged()
 
+    val keep: Flow<KeepDays> = prefs.map { it.keep }.distinctUntilChanged()
+
     /** For the listener and the alert decision, which can't wait: the defaults until the file is first read. */
     val current: StateFlow<DoorPrefs> = prefs.stateIn(scope, SharingStarted.Eagerly, DoorPrefs())
 
@@ -106,6 +113,19 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
 
     /** Check Ring's notifications runs until [untilMillis]; 0 turns it off (5 §5.4). */
     suspend fun setCapture(untilMillis: Long) = edit { it[CAPTURE_UNTIL] = untilMillis }
+
+    suspend fun setKeep(keep: KeepDays) = edit { it[KEEP] = keep.name }
+
+    /**
+     * The stored keep, read from the file itself: [prefs] gives the two-day default when the file can't be read, and a
+     * prune that took that for the family's choice would delete days they chose to keep. Null when unreadable.
+     */
+    suspend fun storedKeep(): KeepDays? = try {
+        store.data.first().keep()
+    } catch (e: IOException) {
+        Log.w(TAG, "Couldn't read how long to keep door history (${e::class.simpleName})")
+        null
+    }
 
     suspend fun heard(atMillis: Long) = edit { it[LAST_HEARD] = atMillis }
 
@@ -128,8 +148,11 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
             captureUntilMillis = this[CAPTURE_UNTIL] ?: defaults.captureUntilMillis,
             lastHeardMillis = this[LAST_HEARD],
             unrecognisedRun = this[UNRECOGNISED_RUN] ?: defaults.unrecognisedRun,
+            keep = keep(),
         )
     }
+
+    private fun Preferences.keep(): KeepDays = KeepDays.entries.firstOrNull { it.name == this[KEEP] } ?: DoorPrefs().keep
 
     private companion object {
         val CONNECTED = booleanPreferencesKey("connected")
@@ -141,5 +164,6 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
         val CAPTURE_UNTIL = longPreferencesKey("capture_until")
         val LAST_HEARD = longPreferencesKey("last_heard")
         val UNRECOGNISED_RUN = intPreferencesKey("unrecognised_run")
+        val KEEP = stringPreferencesKey("keep_days")
     }
 }

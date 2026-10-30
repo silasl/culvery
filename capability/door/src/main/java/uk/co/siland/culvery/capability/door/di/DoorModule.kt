@@ -14,11 +14,13 @@ import javax.inject.Singleton
 import uk.co.siland.culvery.capability.door.Chime
 import uk.co.siland.culvery.capability.door.DoorCapability
 import uk.co.siland.culvery.capability.door.DoorEventSink
+import uk.co.siland.culvery.capability.door.DoorPermissionSource
 import uk.co.siland.culvery.capability.door.DoorProvider
 import uk.co.siland.culvery.capability.door.DoorPruneLoop
 import uk.co.siland.culvery.capability.door.DoorRecorder
 import uk.co.siland.culvery.capability.door.MediaPlayerChime
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
+import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -32,6 +34,10 @@ abstract class DoorModule {
     @Binds
     @IntoSet
     abstract fun capability(impl: DoorCapability): Capability
+
+    @Binds
+    @IntoSet
+    abstract fun permissions(impl: DoorPermissionSource): PermissionSource
 
     @Binds
     abstract fun sink(impl: DoorRecorder): DoorEventSink

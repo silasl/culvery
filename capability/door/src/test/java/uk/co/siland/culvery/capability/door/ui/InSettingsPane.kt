@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.door.ui
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -14,8 +15,12 @@ import androidx.compose.ui.unit.dp
 
 /** Hosts a page as SettingsScreen does: inside a vertical scroll, in a column 720 dp wide. Add no scroll of the page's own. */
 @Composable
-internal fun InSettingsPane(modifier: Modifier = Modifier.fillMaxWidth().fillMaxHeight(), page: @Composable () -> Unit) {
-    Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = 48.dp, vertical = 40.dp)) {
+internal fun InSettingsPane(
+    scroll: ScrollState = rememberScrollState(),
+    modifier: Modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+    page: @Composable () -> Unit,
+) {
+    Column(modifier.verticalScroll(scroll).padding(horizontal = 48.dp, vertical = 40.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.widthIn(max = 720.dp)) { page() }
     }
 }

@@ -1,10 +1,13 @@
 package uk.co.siland.culvery.capability.door
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
+import java.io.IOException
 import java.time.LocalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,7 +15,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Rule
@@ -108,6 +113,42 @@ class DoorSettingsTest {
         assertThat(DoorbellChoice.FOLLOW_THEME.soundFor(null)).isEqualTo(DoorSound.CLASSIC)
         assertThat(DoorbellChoice.CLASSIC.soundFor(SeasonalTheme.HALLOWEEN)).isEqualTo(DoorSound.CLASSIC)
         assertThat(DoorbellChoice.ORGAN.soundFor(null)).isEqualTo(DoorSound.ORGAN)
+    }
+
+    /** 15a §3.1: two days until the family picks more. */
+    @Test
+    fun keepDefaultsToTwoDays() = runTest {
+        assertThat(settings.prefs.first().keep).isEqualTo(KeepDays.TWO)
+        assertThat(settings.storedKeep()).isEqualTo(KeepDays.TWO)
+    }
+
+    @Test
+    fun keepIsKept() = runTest {
+        val writer = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        doorSettings(folder.root, writer).setKeep(KeepDays.THIRTY)
+        writer.coroutineContext[Job]!!.cancelAndJoin()
+        assertThat(settings.prefs.first().keep).isEqualTo(KeepDays.THIRTY)
+        assertThat(settings.storedKeep()).isEqualTo(KeepDays.THIRTY)
+    }
+
+    /** An unknown stored value reads as two days, as the other enums fall back. */
+    @Test
+    fun anUnknownKeepFallsBack() = runTest {
+        val store = settingsDataStore(scope) { File(folder.root, "door_settings.preferences_pb") }
+        store.edit { it[stringPreferencesKey("keep_days")] = "FOREVER" }
+        val read = DoorSettings(store, scope)
+        assertThat(read.prefs.first().keep).isEqualTo(KeepDays.TWO)
+        assertThat(read.storedKeep()).isEqualTo(KeepDays.TWO)
+    }
+
+    /** An unreadable file gives no keep, not the default, so a prune can tell it from a choice of two days. */
+    @Test
+    fun anUnreadableFileHasNoStoredKeep() = runTest {
+        val broken = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flow { throw IOException("unreadable") }
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences = throw IOException("unreadable")
+        }
+        assertThat(DoorSettings(broken, scope).storedKeep()).isNull()
     }
 
     @Test

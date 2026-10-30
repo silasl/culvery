@@ -19,15 +19,14 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
 import uk.co.siland.culvery.capability.door.db.DoorEventEntity
+import uk.co.siland.culvery.core.household.HouseholdZone
 
 /** A notification posted again within this long of its event updates it (5 §4.3). */
 const val MERGE_MS = 120_000L
 
-/** Events and their pictures are kept this long (5 §2.8). */
-const val KEEP_MS = 48 * 60 * 60 * 1_000L
-
 private const val SNAPSHOT_DIR = "door"
 private const val TAG = "DoorStore"
+private val LONDON: ZoneId = ZoneId.of("Europe/London")
 
 data class Recorded(val event: DoorEvent, val isNew: Boolean)
 
@@ -36,17 +35,26 @@ data class Unseen(val rings: Int, val motion: Int)
 /** Where the Door tab's days begin: the household's yesterday, at midnight (5 §5.2). */
 fun startOfYesterday(today: LocalDate, zone: ZoneId): Long = today.minusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 
-/** `door.db` and `files/door/` (5 §3.1): rings and motion for 48 hours, with their pictures. */
+/**
+ * `door.db` and `files/door/` (5 §3.1): rings and motion for the days Settings keeps, with their pictures. [keepFrom] gives
+ * the oldest moment kept at a time, or null when the setting can't be read, which deletes no events (15a §3.1).
+ */
 @Singleton
 class DoorStore internal constructor(
     db: DoorDatabase,
     private val dir: File,
     private val io: CoroutineContext = Dispatchers.IO,
+    keepFrom: suspend (nowMillis: Long) -> Long? = { keepFrom(dateIn(it, LONDON), LONDON, KeepDays.TWO) },
 ) {
     @Inject
-    constructor(db: DoorDatabase, @ApplicationContext context: Context) : this(db, File(context.filesDir, SNAPSHOT_DIR))
+    constructor(db: DoorDatabase, @ApplicationContext context: Context, settings: DoorSettings, zone: HouseholdZone) :
+        this(
+            db, File(context.filesDir, SNAPSHOT_DIR),
+            keepFrom = { now -> settings.storedKeep()?.let { keep -> zone.current().let { keepFrom(dateIn(now, it), it, keep) } } },
+        )
 
     private val dao = db.doorDao()
+    private val cutOff = keepFrom
 
     // A record and a prune never meet: a prune would take a picture still being written for an event not yet stored.
     private val lock = Mutex()
@@ -82,7 +90,7 @@ class DoorStore internal constructor(
         recorded
     }
 
-    /** Deletes events older than [KEEP_MS] before [nowMillis], their pictures, and pictures with no event (5 §4.5). */
+    /** Deletes events before the keep cut-off at [nowMillis], their pictures, and pictures with no event (5 §4.5). */
     suspend fun prune(nowMillis: Long) = lock.withLock { pruneLocked(nowMillis) }
 
     /** Marks every unseen event seen and returns their ids: the rings that are new on this visit to the tab (9 §6.8). */
@@ -91,7 +99,7 @@ class DoorStore internal constructor(
     suspend fun markSeen(id: Long) = dao.markSeen(id)
 
     private suspend fun pruneLocked(nowMillis: Long) {
-        dao.deleteBefore(nowMillis - KEEP_MS)
+        cutOff(nowMillis)?.let { dao.deleteBefore(it) }
         val kept = dao.withSnapshots().map { fileOf(it).name }.toSet()
         withContext(io) { dir.listFiles()?.filter { it.name !in kept }?.forEach { it.delete() } }
     }

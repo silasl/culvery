@@ -37,14 +37,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.capability.door.DOOR
-import uk.co.siland.culvery.capability.door.DoorDays
+import uk.co.siland.culvery.capability.door.DoorDay
 import uk.co.siland.culvery.capability.door.DoorEvent
 import uk.co.siland.culvery.capability.door.DoorKind
 import uk.co.siland.culvery.capability.door.DoorStore
+import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.NO_RINGS_TODAY
 import uk.co.siland.culvery.capability.door.SNAPSHOT
 import uk.co.siland.culvery.capability.door.TODAY
-import uk.co.siland.culvery.capability.door.YESTERDAY
+import uk.co.siland.culvery.capability.door.dayLabel
 import uk.co.siland.culvery.capability.door.doorDays
 import uk.co.siland.culvery.capability.door.doorSubtitle
 import uk.co.siland.culvery.capability.door.eventLine
@@ -60,12 +61,13 @@ import uk.co.siland.culvery.core.ui.HhType
 
 /**
  * The Door tab (5 §5.2, 9 §4.6): the title with the devices and the new rings, a status line when something is wrong,
- * then Today and Yesterday, newest first. A ring is NEW when it was unseen as the tab opened ([newIds]) or still is,
+ * then Today and every older kept day under its date, newest first. A ring is NEW when it was unseen as the tab opened ([newIds]) or still is,
  * as one arriving while the tab is open. Open to everyone.
  */
 @Composable
 fun DoorTab(
-    days: DoorDays,
+    days: List<DoorDay>,
+    today: LocalDate,
     zone: ZoneId,
     status: String?,
     onOpenSnapshot: (DoorEvent) -> Unit,
@@ -75,7 +77,7 @@ fun DoorTab(
     val c = Culvery.colors
     fun isNew(event: DoorEvent) = event.kind == DoorKind.RING && (event.id in newIds || !event.seen)
     val subtitle = remember(days, newIds) {
-        val shown = days.today + days.yesterday
+        val shown = days.flatMap { it.events }
         doorSubtitle(shown, shown.count(::isNew))
     }
     // The header ends with its own gap, so each item after it carries the one below it.
@@ -84,11 +86,13 @@ fun DoorTab(
         item { HhPageHeader(DOOR, subtitle) }
         if (status != null) item { Box(gap) { DoorStatusLine(status) } }
         item { HhSectionLabel(TODAY, gap.testTag("door_today")) }
-        if (days.today.isEmpty()) item { Text(NO_RINGS_TODAY, style = HhType.body, color = c.mute, modifier = gap.testTag("door_empty")) }
-        items(days.today, key = { it.id }) { DoorRow(it, zone, isNew(it), onOpenSnapshot, gap) }
-        if (days.yesterday.isNotEmpty()) {
-            item { HhSectionLabel(YESTERDAY, gap.padding(top = DoorDimens.sectionTop).testTag("door_yesterday")) }
-            items(days.yesterday, key = { it.id }) { DoorRow(it, zone, isNew(it), onOpenSnapshot, gap) }
+        val todays = days.firstOrNull { it.date == today }?.events.orEmpty()
+        if (todays.isEmpty()) item { Text(NO_RINGS_TODAY, style = HhType.body, color = c.mute, modifier = gap.testTag("door_empty")) }
+        items(todays, key = { it.id }) { DoorRow(it, zone, isNew(it), onOpenSnapshot, gap) }
+        days.filter { it.date != today }.forEach { day ->
+            val tag = if (day.date == today.minusDays(1)) "door_yesterday" else "door_day_${day.date}"
+            item(key = day.date.toString()) { HhSectionLabel(dayLabel(day.date, today), gap.padding(top = DoorDimens.sectionTop).testTag(tag)) }
+            items(day.events, key = { it.id }) { DoorRow(it, zone, isNew(it), onOpenSnapshot, gap) }
         }
     }
 }
@@ -113,13 +117,14 @@ fun SnapshotSheet(event: DoorEvent, zone: ZoneId, onClose: () -> Unit) {
     }
 }
 
-/** The tab as the rail opens it: the store's events on the household's [today], and its [status]. */
+/** The tab as the rail opens it: the store's events over the [keep] days to the household's [today], and its [status]. */
 @Composable
-internal fun DoorTabHost(store: DoorStore, today: Flow<LocalDate>, zone: Flow<ZoneId>, status: Flow<String?>) {
+internal fun DoorTabHost(store: DoorStore, today: Flow<LocalDate>, zone: Flow<ZoneId>, status: Flow<String?>, keep: Flow<KeepDays>) {
     val events by store.events.collectAsStateWithLifecycle(emptyList())
     val day by today.collectAsStateWithLifecycle(null)
     val householdZone by zone.collectAsStateWithLifecycle(null)
     val problem by status.collectAsStateWithLifecycle(null)
+    val kept by keep.collectAsStateWithLifecycle(null)
     val overlay = LocalOverlayHost.current
     // Seen on opening, coming back to the tab, or tapping it again (5 §4.7); a ring that arrives while it stays open keeps its badge.
     // Each resume is a new visit and replaces the NEW rings; a tap again adds to them (9 §6.8). One take at a time, in order.
@@ -137,6 +142,7 @@ internal fun DoorTabHost(store: DoorStore, today: Flow<LocalDate>, zone: Flow<Zo
     }
     val d = day ?: return
     val z = householdZone ?: return
-    val days = remember(events, d, z) { doorDays(events, d, z) }
-    DoorTab(days, z, problem, onOpenSnapshot = { event -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } }, newIds = newIds)
+    val k = kept ?: return
+    val days = remember(events, d, z, k) { doorDays(events, d, z, k) }
+    DoorTab(days, d, z, problem, onOpenSnapshot = { event -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } }, newIds = newIds)
 }

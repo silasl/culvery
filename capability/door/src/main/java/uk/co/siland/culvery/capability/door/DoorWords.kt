@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.door
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -36,6 +37,13 @@ fun cardLine(device: String, time: String): String = listOf(device, time, JUST_N
 
 internal const val TODAY = "Today"
 internal const val YESTERDAY = "Yesterday"
+/** "Today", "Yesterday", or "Tue 27 Oct". */
+fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
+    today -> TODAY
+    today.minusDays(1) -> YESTERDAY
+    else -> date.format(DAY_LABEL)
+}
+
 internal const val NO_RINGS_TODAY = "No rings or motion today."
 internal const val SNAPSHOT = "Snapshot"
 internal const val SHOW_FULL_SIZE = "show it full size"
@@ -83,6 +91,14 @@ internal const val CHIME = "Chime"
 internal const val CHIME_VOLUME = "Chime volume"
 internal const val PLAY_CHIME = "Play chime"
 internal const val QUIET_HOURS = "Quiet hours"
+internal const val KEEP_HISTORY_FOR = "Keep door history for"
+internal const val DELETE = "Delete"
+internal const val DELETE_OLDER_EVENTS = "Delete older door events"
+
+internal fun keepLabel(keep: KeepDays) = "${keep.days} days"
+
+/** The question under a shorter keep: its events go at once, so it asks (15a §3.2). */
+fun shortenQuestion(keep: KeepDays) = "Delete door events older than ${keep.days} days?"
 internal const val ACCESS_STEP = "Allow notification access"
 internal const val ACCESS_STEP_LINE = "Opens Android’s notification access, where you allow Culvery."
 internal const val OPEN_NOTIFICATION_ACCESS = "open notification access"
@@ -91,6 +107,8 @@ internal const val NOT_DONE_YET = "not done yet"
 internal const val CAPTURE_LINE = "Writes each notification’s details to the tablet’s log for 30 minutes, so Culvery can learn to read them."
 internal const val NOTIFICATION_ACCESS_MISSING =
     "Culvery can’t open notification access. Choose Settings › Tablet lock › Use other apps, then allow Culvery in the tablet’s Settings › Notifications."
+
+private val DAY_LABEL: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.UK)
 
 private val DAY_AND_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE HH:mm", Locale.ENGLISH)
 

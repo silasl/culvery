@@ -44,10 +44,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
-import uk.co.siland.culvery.capability.door.DoorDays
+import uk.co.siland.culvery.capability.door.DoorDay
 import uk.co.siland.culvery.capability.door.DoorEvent
 import uk.co.siland.culvery.capability.door.DoorKind
 import uk.co.siland.culvery.capability.door.DoorStore
+import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.NOW
 import uk.co.siland.culvery.capability.door.aPicture
 import uk.co.siland.culvery.capability.door.doorDb
@@ -90,8 +91,12 @@ class DoorTabTest {
         seen: Boolean = false,
     ) = DoorEvent(id, at, kind, device, unrecognised, snapshot, seen)
 
-    private fun show(days: DoorDays, status: String? = null, newIds: Set<Long> = emptySet()) =
-        compose.setContent { CulveryTheme(dark = true) { DoorTab(days, london, status, onOpenSnapshot = { opened += it }, newIds = newIds) } }
+    private fun show(days: List<DoorDay>, status: String? = null, newIds: Set<Long> = emptySet()) =
+        compose.setContent { CulveryTheme(dark = true) { DoorTab(days, october14, london, status, onOpenSnapshot = { opened += it }, newIds = newIds) } }
+
+    private fun today(vararg events: DoorEvent) = listOf(DoorDay(october14, events.toList()))
+
+    private fun day(date: LocalDate, vararg events: DoorEvent) = DoorDay(date, events.toList())
 
     private fun exists(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
 
@@ -115,7 +120,7 @@ class DoorTabTest {
     private fun host(today: Flow<LocalDate>, overlay: DrawingOverlay = DrawingOverlay()) {
         CompositionLocalProvider(LocalOverlayHost provides overlay) {
             Box {
-                DoorTabHost(store, today, flowOf(london), flowOf(null))
+                DoorTabHost(store, today, flowOf(london), flowOf(null), flowOf(KeepDays.TWO))
                 overlay.content?.invoke()
             }
         }
@@ -124,7 +129,7 @@ class DoorTabTest {
     /** 9 §4.6: fails if the title block is missing, a device repeats, or motion counts as a new ring. */
     @Test
     fun theHeaderCountsNewRings() {
-        show(DoorDays(listOf(event(1), event(2), event(3, DoorKind.MOTION, device = "Back Garden")), emptyList()))
+        show(today(event(1), event(2), event(3, DoorKind.MOTION, device = "Back Garden")))
         compose.onNodeWithText("Door").assertIsDisplayed()
         compose.onNodeWithText("Front Door · Back Garden · 2 new rings").assertIsDisplayed()
         compose.onNodeWithTag("door_row_3_new").assertDoesNotExist()
@@ -134,7 +139,7 @@ class DoorTabTest {
     /** Fails if the status line moves above the title, or the block's one gap doubles under it. */
     @Test
     fun theStoreStatusShowsUnderTheNewTitle() {
-        show(DoorDays(emptyList(), emptyList()), status = "The tablet is offline. Check the Wi-Fi.")
+        show(emptyList(), status = "The tablet is offline. Check the Wi-Fi.")
         val title = compose.onNodeWithText("Door").getUnclippedBoundsInRoot()
         val status = compose.onNodeWithTag("door_status").getUnclippedBoundsInRoot()
         assertThat(status.top.value - title.bottom.value).isWithin(1f).of(15f)
@@ -144,7 +149,7 @@ class DoorTabTest {
     /** One 15 dp gap under the title block, as on Lights and Music. */
     @Test
     fun theDayLabelSitsOneGapBelowTheHeader() {
-        show(DoorDays(listOf(event(1)), emptyList()))
+        show(today(event(1)))
         val subtitle = compose.onNodeWithText("Front Door · 1 new ring").getUnclippedBoundsInRoot()
         val today = compose.onNodeWithTag("door_today").getUnclippedBoundsInRoot()
         assertThat(today.top.value - subtitle.bottom.value).isWithin(1f).of(15f)
@@ -153,7 +158,7 @@ class DoorTabTest {
     /** 9 §4.6: fails if a row drops its time or its kind, uses the old words, or an unplaced notice doesn't say so. */
     @Test
     fun eachRowSaysTheTimeAndWhatHappened() {
-        show(DoorDays(listOf(event(1), event(2, DoorKind.MOTION), event(3, unrecognised = true)), emptyList()))
+        show(today(event(1), event(2, DoorKind.MOTION), event(3, unrecognised = true)))
         fun row(id: Long, vararg texts: String) = texts.forEach { compose.onNode(hasTestTag("door_row_$id") and hasAnyDescendant(hasText(it))).assertExists() }
         row(1, "14:01 · Someone rang", "Front Door")
         row(2, "14:00 · Movement", "Front Door")
@@ -165,7 +170,7 @@ class DoorTabTest {
     /** Pin: a ring already seen before the tab opened carries no NEW. */
     @Test
     fun aRingSeenBeforeOpeningHasNoTag() {
-        show(DoorDays(listOf(event(1, seen = true)), emptyList()))
+        show(today(event(1, seen = true)))
         compose.onNodeWithTag("door_row_1").assertExists()
         compose.onNodeWithTag("door_row_1_new").assertDoesNotExist()
         compose.assertAccessible()
@@ -174,22 +179,43 @@ class DoorTabTest {
     /** Fails if an empty Today shows no sentence, the sentence changes, or an empty Today hides Yesterday. */
     @Test
     fun anEmptyTodaySaysSo() {
-        show(DoorDays(emptyList(), listOf(event(1))))
+        show(listOf(day(october14.minusDays(1), event(1))))
         compose.onNodeWithTag("door_empty").assertTextEquals("No rings or motion today.")
         compose.onNodeWithTag("door_yesterday").assertExists()
+    }
+
+    /** 15a §3.1: a kept day before yesterday sits under its date with its rows, and the header counts every shown event. */
+    @Test
+    fun olderDaysShowUnderTheirDate() {
+        val sunday = LocalDate.of(2026, 10, 11)
+        show(
+            listOf(
+                DoorDay(october14, listOf(event(1))),
+                day(october14.minusDays(1), event(2, at = NOW - 20 * 60 * 60_000L)),
+                day(sunday, event(3, device = "Back Garden", at = NOW - 3 * 24 * 60 * 60_000L)),
+            ),
+        )
+        compose.onNodeWithText("SUN 11 OCT").assertExists()
+        compose.onNodeWithText("YESTERDAY").assertExists()
+        compose.onNodeWithText("Front Door · Back Garden · 3 new rings").assertIsDisplayed()
+        compose.onNodeWithTag("door_row_3").assertExists()
+        val yesterday = compose.onNodeWithTag("door_yesterday").getUnclippedBoundsInRoot()
+        val older = compose.onNodeWithTag("door_day_2026-10-11").getUnclippedBoundsInRoot()
+        assertThat(older.top.value).isGreaterThan(yesterday.top.value)
+        compose.assertAccessible()
     }
 
     /** Fails if a status passed to the tab is not drawn. */
     @Test
     fun theStatusLineShowsOnlyWhenSomethingIsWrong() {
-        show(DoorDays(emptyList(), emptyList()), status = "Culvery can’t see Ring’s notifications. Allow notification access in Settings › Door.")
+        show(emptyList(), status = "Culvery can’t see Ring’s notifications. Allow notification access in Settings › Door.")
         compose.onNodeWithTag("door_status").assertExists()
     }
 
     /** Fails if the status line is drawn when there is no status. */
     @Test
     fun noStatusNoLine() {
-        show(DoorDays(emptyList(), emptyList()))
+        show(emptyList())
         compose.onNodeWithTag("door_status").assertDoesNotExist()
     }
 
@@ -197,7 +223,7 @@ class DoorTabTest {
     @Test
     fun aThumbnailOpensTheSnapshot() {
         val withPicture = event(1, snapshot = File(folder.root, "1.jpg"))
-        show(DoorDays(listOf(withPicture), emptyList()))
+        show(today(withPicture))
         compose.onNodeWithTag("door_thumb_1").assertHeightIsAtLeast(48.dp).performClick()
         assertThat(opened).containsExactly(withPicture)
     }
@@ -206,7 +232,7 @@ class DoorTabTest {
     @Test
     fun theThumbnailStillOpensTheSnapshot() {
         val withPicture = event(1, snapshot = File(folder.root, "1.jpg"))
-        show(DoorDays(listOf(withPicture), emptyList()))
+        show(today(withPicture))
         compose.onNodeWithTag("door_thumb_1")
             .assertWidthIsEqualTo(107.dp)
             .assertHeightIsEqualTo(60.dp)
@@ -219,7 +245,7 @@ class DoorTabTest {
     /** Fails if a row with a snapshot thumbnail has an unlabelled or unnamed control, or the thumbnail's tap area is under 48 dp high. */
     @Test
     fun aRowWithAThumbnailIsAccessible() {
-        show(DoorDays(listOf(event(1, snapshot = File(folder.root, "1.jpg"))), emptyList()))
+        show(today(event(1, snapshot = File(folder.root, "1.jpg"))))
         compose.assertAccessible()
     }
 

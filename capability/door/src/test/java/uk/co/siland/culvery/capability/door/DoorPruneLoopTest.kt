@@ -1,32 +1,108 @@
 package uk.co.siland.culvery.capability.door
 
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.io.IOException
+import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.plugin.WallClock
 
-/** 5 §4.5: at start, then daily, and each time Culvery comes back to the front. */
+/** 5 §4.5, 15a §3.1: at start, at each household midnight, when the keep changes, and each time Culvery comes back to the front. */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(AndroidJUnit4::class)
 class DoorPruneLoopTest {
+    private val london = ZoneId.of("Europe/London")
+    private val minute = 60_000L
+
+    /** Wednesday 14 October 2026, 23:50 in London. */
+    private val lateEvening = NOW + (9 * 60 + 48) * minute
+
+    private fun TestScope.loop(
+        prune: suspend (Long) -> Unit,
+        start: Long = NOW,
+        inFront: MutableStateFlow<Boolean> = MutableStateFlow(false),
+        keep: MutableStateFlow<KeepDays> = MutableStateFlow(KeepDays.TWO),
+    ) = DoorPruneLoop(prune, WallClock { start + testScheduler.currentTime }, inFront, keep, flowOf(london), backgroundScope).also { it.start() }
+
     @Test
-    fun itPrunesAtStartEachDayAndOnEachReturnToTheFront() = runTest {
+    fun itPrunesAtStartAndOnEachReturnToTheFront() = runTest {
         val prunedAt = mutableListOf<Long>()
         val inFront = MutableStateFlow(false)
-        DoorPruneLoop({ prunedAt += it }, WallClock { NOW + testScheduler.currentTime }, inFront, backgroundScope).start()
+        loop({ prunedAt += it }, inFront = inFront)
         runCurrent()
         assertThat(prunedAt).containsExactly(NOW)
-        advanceTimeBy(DAY_MS - 1)
+        inFront.value = true
+        runCurrent()
+        assertThat(prunedAt).hasSize(2)
+    }
+
+    /** Started at 23:50, it prunes at the household's 00:00, and the next one is a day on, not 23:50 the next day. */
+    @Test
+    fun prunesAtTheHouseholdMidnight() = runTest {
+        val prunedAt = mutableListOf<Long>()
+        loop({ prunedAt += it }, start = lateEvening)
+        runCurrent()
+        assertThat(prunedAt).containsExactly(lateEvening)
+        advanceTimeBy(10 * minute - 1)
         runCurrent()
         assertThat(prunedAt).hasSize(1)
         advanceTimeBy(1)
         runCurrent()
-        assertThat(prunedAt).containsExactly(NOW, NOW + DAY_MS).inOrder()
+        assertThat(prunedAt).containsExactly(lateEvening, lateEvening + 10 * minute).inOrder()
+        advanceTimeBy(23 * 60 * minute + 50 * minute)
+        runCurrent()
+        assertThat(prunedAt).hasSize(2)
+        advanceTimeBy(10 * minute)
+        runCurrent()
+        assertThat(prunedAt).containsExactly(lateEvening, lateEvening + 10 * minute, lateEvening + 10 * minute + DAY_MS).inOrder()
+    }
+
+    /** A new keep prunes at once; the value already read at start doesn't, nor does the same value again. */
+    @Test
+    fun aKeepChangePrunes() = runTest {
+        val prunedAt = mutableListOf<Long>()
+        val keep = MutableStateFlow(KeepDays.TWO)
+        loop({ prunedAt += it }, keep = keep)
+        runCurrent()
+        assertThat(prunedAt).hasSize(1)
+        keep.value = KeepDays.SEVEN
+        runCurrent()
+        assertThat(prunedAt).hasSize(2)
+        keep.value = KeepDays.SEVEN
+        runCurrent()
+        assertThat(prunedAt).hasSize(2)
+    }
+
+    /** A prune that fails is logged by class name and tried again by the next trigger, on every path that prunes. */
+    @Test
+    fun aPruneFailureIsLoggedNotThrown() = runTest {
+        ShadowLog.clear()
+        var attempts = 0
+        val keep = MutableStateFlow(KeepDays.TWO)
+        val inFront = MutableStateFlow(false)
+        loop({ attempts++; throw IOException("disk full at Front Door") }, inFront = inFront, keep = keep)
+        runCurrent()
+        keep.value = KeepDays.THIRTY
+        runCurrent()
         inFront.value = true
         runCurrent()
-        assertThat(prunedAt).hasSize(3)
+        advanceTimeBy(DAY_MS)
+        runCurrent()
+        assertThat(attempts).isAtLeast(4)
+        val logs = ShadowLog.getLogs().filter { it.tag == "DoorPruneLoop" }
+        assertThat(logs).hasSize(attempts)
+        logs.forEach {
+            assertThat(it.msg).contains("IOException")
+            assertThat(it.msg).doesNotContain("Front Door")
+        }
     }
 }

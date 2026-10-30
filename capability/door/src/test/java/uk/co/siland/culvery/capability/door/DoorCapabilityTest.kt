@@ -18,6 +18,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
@@ -44,6 +45,7 @@ class DoorCapabilityTest {
     private fun capability(providers: Set<DoorProvider>) = DoorCapability(
         store, settings, providers, clock, householdZone(),
         DoorHealth(providers.firstOrNull(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), RecordingToaster(), FakeShowing(),
+        TestAccess(Role.ADMIN),
     )
 
     @After
@@ -70,6 +72,24 @@ class DoorCapabilityTest {
         store.record(ring())
         door.badge.first { it != null }
         assertThat(door.badge.first()).isEqualTo(RailBadge.Count(1, "1 unseen ring"))
+    }
+
+    /** 15a §3.1: with 30 days kept the tab shows them all, but the badge still counts today and yesterday. */
+    @Test
+    fun theBadgeIgnoresOlderUnseenRings() = runTest {
+        val thirty = DoorStore(db, File(folder.root, "thirty"), keepFrom = { keepFrom(dateIn(it, ZoneId.of("Europe/London")), ZoneId.of("Europe/London"), KeepDays.THIRTY) })
+        val threeDaysAgo = NOW - 3 * 24 * 60 * 60_000L
+        thirty.record(ring(key = "old", at = threeDaysAgo, whenMillis = threeDaysAgo))
+        val door = DoorCapability(
+            thirty, settings, setOf(FakeDoorProvider()), clock, householdZone(),
+            DoorHealth(FakeDoorProvider(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), RecordingToaster(), FakeShowing(),
+            TestAccess(Role.ADMIN),
+        )
+        assertThat(door.badge.first()).isNull()
+        thirty.record(ring(key = "today"))
+        door.badge.first { it != null }
+        assertThat(door.badge.first()).isEqualTo(RailBadge.Count(1, "1 unseen ring"))
+        assertThat(thirty.events.first()).hasSize(2)
     }
 
     /** 5 §5.4: Settings › Door, admin-only like the rest of Settings, only where a doorbell provider is installed. Fails if the page is missing, mislabelled, misordered, or offered with no provider. */

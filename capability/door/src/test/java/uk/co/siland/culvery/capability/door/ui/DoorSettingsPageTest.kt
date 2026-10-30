@@ -18,6 +18,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
@@ -46,10 +47,13 @@ import uk.co.siland.culvery.capability.door.DoorbellChoice
 import uk.co.siland.culvery.capability.door.DoorPrefs
 import uk.co.siland.culvery.capability.door.FakeChime
 import uk.co.siland.culvery.capability.door.FakeDoorProvider
+import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
 import uk.co.siland.culvery.capability.door.NOW
 import uk.co.siland.culvery.capability.door.RecordingToaster
+import uk.co.siland.culvery.capability.door.TestAccess
 import uk.co.siland.culvery.capability.door.doorSettings
+import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -72,6 +76,7 @@ class DoorSettingsPageTest {
     private val chime = FakeChime()
     private val toaster = RecordingToaster()
     private val navigator = RecordingNavigator()
+    private val access = TestAccess(Role.ADULT)
     private val clock = HouseholdClock(flowOf(london), WallClock { NOW }, io, flowOf(NOW))
 
     @After
@@ -92,7 +97,7 @@ class DoorSettingsPageTest {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
                 CulveryTheme(dark = true) {
-                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, clock, flowOf(london), toaster, MutableStateFlow(showing)) }
+                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, clock, flowOf(london), toaster, MutableStateFlow(showing), access) }
                 }
             }
         }
@@ -186,8 +191,8 @@ class DoorSettingsPageTest {
             CulveryTheme(dark = true) {
                 InSettingsPane {
                     DoorSettingsScreen(
-                        DoorSettingsUi("Ring", null, stored, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(21, 0), LocalTime.of(7, 0), null, "", true, true, false),
-                        DoorSettingsActions(onVolume, {}, {}, { _, _, _ -> }, {}, {}),
+                        DoorSettingsUi("Ring", null, stored, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(21, 0), LocalTime.of(7, 0), null, "", true, true, false, KeepDays.TWO),
+                        DoorSettingsActions(onVolume, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {}),
                     )
                 }
             }
@@ -255,6 +260,73 @@ class DoorSettingsPageTest {
         waitFor { prefs().captureUntilMillis != 0L }
         assertThat(prefs().captureUntilMillis).isEqualTo(NOW + CAPTURE_MS)
         waitFor { runCatching { compose.onNodeWithTag("door_capture").assertIsOn() }.isSuccess }
+    }
+
+    private fun chooseKeep(days: Int) = compose.onNodeWithTag("door_keep_$days").performScrollTo().performClick()
+
+    /** 15a §3.1: 2, 7 and 30 days, two chosen to start; a longer keep saves with no PIN. */
+    @Test
+    fun keepRowsChooseAndSave() {
+        showHost()
+        compose.onNodeWithTag("door_keep_2").assertIsSelected().assertTextContains("2 days")
+        compose.onNodeWithTag("door_keep_7").assertIsNotSelected().assertTextContains("7 days")
+        compose.onNodeWithTag("door_keep_30").assertIsNotSelected().assertTextContains("30 days")
+        compose.onNodeWithContentDescription("Keep door history for").assertExists()
+        chooseKeep(7)
+        waitFor { prefs().keep == KeepDays.SEVEN }
+        waitFor { runCatching { compose.onNodeWithTag("door_keep_7").assertIsSelected() }.isSuccess }
+        chooseKeep(30)
+        waitFor { prefs().keep == KeepDays.THIRTY }
+        assertThat(access.asked).isEmpty()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15a §3.2: a shorter keep deletes events, so it asks first, then for a fresh PIN of an Adult or Admin, whoever is signed in. */
+    @Test
+    fun aShorterKeepConfirmsThenAsksAFreshPin() {
+        runBlocking { settings.setKeep(KeepDays.THIRTY) }
+        showHost()
+        waitFor { runCatching { compose.onNodeWithTag("door_keep_30").assertIsSelected() }.isSuccess }
+        chooseKeep(2)
+        waitFor { shows("door_keep_confirm") }
+        compose.onNodeWithText("Delete door events older than 2 days?").assertExists()
+        compose.onNodeWithTag("door_keep_30").assertIsSelected()
+        assertThat(access.asked).isEmpty()
+
+        compose.onNodeWithTag("door_keep_as_is").performScrollTo().performClick()
+        waitFor { !shows("door_keep_confirm") }
+        assertThat(prefs().keep).isEqualTo(KeepDays.THIRTY)
+        assertThat(access.asked).isEmpty()
+
+        chooseKeep(2)
+        waitFor { shows("door_keep_confirm") }
+        access.role = null
+        compose.onNodeWithTag("door_keep_delete").performScrollTo().performClick()
+        waitFor { access.asked.size == 1 }
+        compose.waitForIdle()
+        assertThat(prefs().keep).isEqualTo(KeepDays.THIRTY)
+        assertThat(shows("door_keep_confirm")).isTrue()
+
+        access.role = Role.ADULT
+        compose.onNodeWithTag("door_keep_delete").performScrollTo().performClick()
+        waitFor { prefs().keep == KeepDays.TWO }
+        waitFor { !shows("door_keep_confirm") }
+        assertThat(access.asked).containsExactly(listOf("door.clear"), listOf("door.clear"))
+    }
+
+    /** A Child's PIN is refused by the permission, so the shorter keep isn't saved. */
+    @Test
+    fun aChildCantShorten() {
+        runBlocking { settings.setKeep(KeepDays.SEVEN) }
+        showHost()
+        waitFor { runCatching { compose.onNodeWithTag("door_keep_7").assertIsSelected() }.isSuccess }
+        access.role = Role.CHILD
+        chooseKeep(2)
+        waitFor { shows("door_keep_confirm") }
+        compose.onNodeWithTag("door_keep_delete").performScrollTo().performClick()
+        waitFor { access.asked.size == 1 }
+        compose.waitForIdle()
+        assertThat(prefs().keep).isEqualTo(KeepDays.SEVEN)
     }
 
     /** Fails if the line doesn't say "not yet" before a notice, or doesn't show the day and time after one. */

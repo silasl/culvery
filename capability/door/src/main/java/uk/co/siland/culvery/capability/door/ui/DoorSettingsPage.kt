@@ -8,7 +8,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
@@ -28,8 +31,11 @@ import uk.co.siland.culvery.capability.door.CHIME_VOLUME
 import uk.co.siland.culvery.capability.door.CLASSIC_CHIME
 import uk.co.siland.culvery.capability.door.Chime
 import uk.co.siland.culvery.capability.door.DONE
+import uk.co.siland.culvery.capability.door.DELETE
+import uk.co.siland.culvery.capability.door.DELETE_OLDER_EVENTS
 import uk.co.siland.culvery.capability.door.DOOR
 import uk.co.siland.culvery.capability.door.DoorHealth
+import uk.co.siland.culvery.capability.door.DoorPermissions
 import uk.co.siland.culvery.capability.door.DoorProvider
 import uk.co.siland.culvery.capability.door.DOORBELL_SOUND
 import uk.co.siland.culvery.capability.door.DoorSettings
@@ -37,6 +43,8 @@ import uk.co.siland.culvery.capability.door.DoorbellChoice
 import uk.co.siland.culvery.capability.door.FOLLOW_THE_THEME
 import uk.co.siland.culvery.capability.door.FOLLOW_THE_THEME_LINE
 import uk.co.siland.culvery.capability.door.HAUNTED_ORGAN
+import uk.co.siland.culvery.capability.door.KEEP_HISTORY_FOR
+import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
 import uk.co.siland.culvery.capability.door.NOT_DONE_YET
 import uk.co.siland.culvery.capability.door.OPEN_NOTIFICATION_ACCESS
@@ -44,10 +52,14 @@ import uk.co.siland.culvery.capability.door.PLAY_CHIME
 import uk.co.siland.culvery.capability.door.QUIET_HOURS
 import uk.co.siland.culvery.capability.door.appStep
 import uk.co.siland.culvery.capability.door.checkNotifications
+import uk.co.siland.culvery.capability.door.keepLabel
 import uk.co.siland.culvery.capability.door.lastHeard
 import uk.co.siland.culvery.capability.door.quietHoursLine
+import uk.co.siland.culvery.capability.door.shortenQuestion
 import uk.co.siland.culvery.capability.door.soundFor
+import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.plugin.HouseholdClock
+import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
@@ -57,6 +69,7 @@ import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.FROM
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhPageTitle
@@ -99,6 +112,10 @@ data class DoorSettingsUi(
     val appInstalled: Boolean,
     val accessAllowed: Boolean,
     val capturing: Boolean,
+    val keep: KeepDays,
+    /** The shorter keep waiting on its question, or null when none is. */
+    val shortenTo: KeepDays? = null,
+    val busy: Boolean = false,
 )
 
 class DoorSettingsActions(
@@ -108,6 +125,9 @@ class DoorSettingsActions(
     val onQuietHours: (on: Boolean, from: LocalTime, until: LocalTime) -> Unit,
     val onAllowAccess: () -> Unit,
     val onCapture: (Boolean) -> Unit,
+    val onKeep: (KeepDays) -> Unit,
+    val onKeepAsIs: () -> Unit,
+    val onConfirmShorter: () -> Unit,
 )
 
 @Composable
@@ -134,6 +154,20 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
         HhSwitchRow(QUIET_HOURS, quietHoursLine(ui.quietFrom, ui.quietUntil), ui.quietOn, "door_quiet", onChange = { actions.onQuietHours(it, ui.quietFrom, ui.quietUntil) })
         HhTimeStepperRow(FROM, "quiet hours start", ui.quietFrom, "door_from") { actions.onQuietHours(ui.quietOn, it, ui.quietUntil) }
         HhTimeStepperRow(UNTIL, "quiet hours end", ui.quietUntil, "door_until") { actions.onQuietHours(ui.quietOn, ui.quietFrom, it) }
+        HhSectionLabel(KEEP_HISTORY_FOR)
+        Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
+            KeepDays.entries.forEach { option ->
+                HhRadioRow(keepLabel(option), null, option == ui.keep, "door_keep_${option.days}") { actions.onKeep(option) }
+            }
+        }
+        ui.shortenTo?.let {
+            HhConfirmCard(
+                tag = "door_keep_confirm", title = shortenQuestion(it),
+                keep = KEEP, keepTag = "door_keep_as_is",
+                confirm = DELETE, confirmTag = "door_keep_delete",
+                busy = ui.busy, onKeep = actions.onKeepAsIs, onConfirm = actions.onConfirmShorter,
+            )
+        }
         HhSectionLabel(ui.service)
         ui.status?.let { DoorStatusLine(it) }
         Text(ui.lastHeard, style = HhType.body, color = c.mute, modifier = Modifier.testTag("door_last_heard"))
@@ -175,6 +209,7 @@ internal fun DoorSettingsHost(
     zone: Flow<ZoneId>,
     toaster: Toaster,
     showing: StateFlow<SeasonalTheme?>,
+    access: AccessControl,
 ) {
     val prefs by settings.prefs.collectAsStateWithLifecycle(null)
     val checks by health.checks.collectAsStateWithLifecycle()
@@ -186,6 +221,8 @@ internal fun DoorSettingsHost(
     LaunchedEffect(Unit) { health.refresh() }
     val p = prefs ?: return
     val z = householdZone ?: return
+    var shortenTo by remember { mutableStateOf<KeepDays?>(null) }
+    var asking by remember { mutableStateOf(false) }
     val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a door setting (${it::class.simpleName})") }
     val service = provider.descriptor.displayName
     DoorSettingsScreen(
@@ -202,6 +239,9 @@ internal fun DoorSettingsHost(
             appInstalled = checks?.appInstalled == true,
             accessAllowed = checks?.accessAllowed == true,
             capturing = p.capturingAt(now),
+            keep = p.keep,
+            shortenTo = shortenTo,
+            busy = asking,
         ),
         DoorSettingsActions(
             onVolume = { v -> change { settings.setVolume(v) } },
@@ -210,6 +250,31 @@ internal fun DoorSettingsHost(
             onQuietHours = { on, from, until -> change { settings.setQuietHours(on, from, until) } },
             onAllowAccess = { navigator.openSystemScreen(provider.accessScreens(), NOTIFICATION_ACCESS_MISSING) },
             onCapture = { on -> change { settings.setCapture(if (on) clock.nowMillis() + CAPTURE_MS else 0L) } },
+            onKeep = { choice ->
+                if (choice.days < p.keep.days) {
+                    shortenTo = choice
+                } else {
+                    shortenTo = null
+                    if (choice != p.keep) change { settings.setKeep(choice) }
+                }
+            },
+            onKeepAsIs = { shortenTo = null },
+            onConfirmShorter = {
+                val choice = shortenTo
+                if (choice != null && !asking) {
+                    asking = true
+                    change {
+                        try {
+                            // Deleting is a fresh PIN's decision even with Settings open, so the pad asks whoever is signed in.
+                            access.authorise(DoorPermissions.CLEAR, label = DELETE_OLDER_EVENTS) ?: return@change
+                            settings.setKeep(choice)
+                            shortenTo = null
+                        } finally {
+                            asking = false
+                        }
+                    }
+                }
+            },
         ),
     )
 }
