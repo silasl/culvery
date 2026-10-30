@@ -11,6 +11,7 @@ import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -41,7 +42,7 @@ fun startOfYesterday(today: LocalDate, zone: ZoneId): Long = today.minusDays(1).
  */
 @Singleton
 class DoorStore internal constructor(
-    db: DoorDatabase,
+    private val db: DoorDatabase,
     private val dir: File,
     private val io: CoroutineContext = Dispatchers.IO,
     keepFrom: suspend (nowMillis: Long) -> Long? = { keepFrom(dateIn(it, LONDON), LONDON, KeepDays.TWO) },
@@ -93,6 +94,18 @@ class DoorStore internal constructor(
     /** Deletes events before the keep cut-off at [nowMillis], their pictures, and pictures with no event (5 §4.5). */
     suspend fun prune(nowMillis: Long) = lock.withLock { pruneLocked(nowMillis) }
 
+    /**
+     * Deletes every event and every file in the picture folder (15a §3.3), pictures first: a row whose picture is gone draws
+     * nothing, where a picture without a row is never seen again. Not cancellable once it holds the lock, so it never stops half-way.
+     */
+    suspend fun clear() = lock.withLock {
+        withContext(NonCancellable + io) {
+            dir.listFiles()?.forEach { it.delete() }
+            dao.deleteAll()
+            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+        }
+    }
+
     /** Marks every unseen event seen and returns their ids: the rings that are new on this visit to the tab (9 §6.8). */
     suspend fun takeUnseen(): Set<Long> = dao.takeUnseen().toSet()
 
@@ -107,23 +120,26 @@ class DoorStore internal constructor(
     /** Written beside, then renamed, so a failed or interrupted save never leaves half a picture under the event's name. */
     private suspend fun save(id: Long, snapshot: Snapshot): Boolean = withContext(io) {
         val part = File(dir, "$id.jpg.part")
+        var renamed = false
         try {
             dir.mkdirs()
             snapshot.saveTo(part)
             check(part.renameTo(fileOf(id))) { "The picture couldn't be renamed" }
+            renamed = true
             true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            failed(part, e)
+            failed(e)
         } catch (e: OutOfMemoryError) {
-            failed(part, e)
+            failed(e)
+        } finally {
+            if (!renamed) part.delete()
         }
     }
 
-    private fun failed(part: File, e: Throwable): Boolean {
+    private fun failed(e: Throwable): Boolean {
         Log.w(TAG, "Couldn't save a door snapshot (${e::class.simpleName})")
-        part.delete()
         return false
     }
 

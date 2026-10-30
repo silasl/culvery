@@ -174,6 +174,24 @@ class DoorAlertsTest {
         assertThat(host.dismissed).isEqualTo(1)
     }
 
+    /** Clear history: the card goes whichever ring it shows, with nothing marked seen; with no card, nothing is dismissed. */
+    @Test
+    fun dismissCardClosesTheRingCard() = runTest {
+        val alerts = alerts()
+        alerts.dismissCard()
+        runCurrent()
+        assertThat(host.dismissed).isEqualTo(0)
+        alerts.onRecorded(rung(1))
+        alerts.dismissCard()
+        runCurrent()
+        assertThat(alerts.showing.value).isNull()
+        assertThat(host.dismissed).isEqualTo(1)
+        assertThat(seen).isEmpty()
+        advanceTimeBy(CARD_MS)
+        runCurrent()
+        assertThat(host.dismissed).isEqualTo(1)
+    }
+
     /** A Got it meant for a card a new ring has just replaced marks that ring seen and leaves the new card up. */
     @Test
     fun aLateGotItLeavesTheNewCard() = runTest {

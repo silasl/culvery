@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.door
 
+import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -9,6 +10,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.concurrent.CountDownLatch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,6 +30,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
+import uk.co.siland.culvery.capability.door.db.SecureDelete
 import uk.co.siland.culvery.core.plugin.RailBadge
 
 /** 5 §4.3–4.5, §4.7–4.8, 15a §3.1: merge on key and time, snapshots, the keep-days prune and orphans, what is unseen. */
@@ -285,6 +289,75 @@ class DoorStoreTest {
         assertThat(at("2026-10-14")).isEqualTo(Instant.parse("2026-10-12T23:00:00Z").toEpochMilli())
         assertThat(at("2026-10-26")).isEqualTo(Instant.parse("2026-10-24T23:00:00Z").toEpochMilli())
         assertThat(at("2026-10-27")).isEqualTo(Instant.parse("2026-10-26T00:00:00Z").toEpochMilli())
+    }
+
+    /** 15a §3.3: every row goes, and every file in the folder: pictures, a stray .part, an orphan. */
+    @Test
+    fun clearDeletesEveryRowAndFile() = runTest {
+        store.record(ring(key = "a", snapshot = aPicture))
+        store.record(ring(key = "b", snapshot = aPicture))
+        store.record(motion())
+        File(dir, "7.jpg.part").writeBytes(byteArrayOf(1))
+        File(dir, "999.jpg").writeBytes(byteArrayOf(1))
+        store.clear()
+        assertThat(store.events.first()).isEmpty()
+        assertThat(dir.listFiles()).isEmpty()
+    }
+
+    /** Review Focus 1: a record holding the lock when Clear is asked finishes first, so its picture is cleared with the rest. */
+    @Test
+    fun aRecordMidClearLeavesNoPicture() = runBlocking {
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val slow = Snapshot { it.writeBytes(byteArrayOf(1)); started.countDown(); release.await() }
+        val recording = async(Dispatchers.IO) { store.record(ring(snapshot = slow)) }
+        started.await()
+        val clearing = async(Dispatchers.IO) { store.clear() }
+        release.countDown()
+        val recorded = recording.await()
+        clearing.await()
+        assertThat(recorded.isNew).isTrue()
+        assertThat(store.events.first()).isEmpty()
+        assertThat(dir.listFiles()).isEmpty()
+    }
+
+    /** Cancelling the caller while the files go does not leave the pictures and take the rows: the file loop finishes. */
+    @Test
+    fun aCancelledClearLeavesNoPicture() = runBlocking {
+        repeat(3) { store.record(ring(key = "k$it", snapshot = aPicture)) }
+        val clearing = async(Dispatchers.IO) { store.clear() }
+        clearing.cancel()
+        clearing.join()
+        // Cancelled before it took the lock, or finished regardless: never rows gone with pictures left.
+        if (store.events.first().isEmpty()) assertThat(dir.listFiles()).isEmpty()
+        store.clear()
+        assertThat(dir.listFiles()).isEmpty()
+    }
+
+    /** A save stopped half-way leaves no half picture behind. */
+    @Test
+    fun aCancelledSaveLeavesNoPart() = runBlocking {
+        val halfWritten = Snapshot { it.writeBytes(byteArrayOf(1)); throw CancellationException("stopped") }
+        try {
+            store.record(ring(snapshot = halfWritten))
+        } catch (_: CancellationException) {
+        }
+        assertThat(dir.names()).isEmpty()
+    }
+
+    /** Ruling 14: the database opens with secure_delete on, so cleared rows are overwritten. */
+    @Test
+    fun theDatabaseOpensWithSecureDelete() {
+        val secure = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), DoorDatabase::class.java)
+            .allowMainThreadQueries().addCallback(SecureDelete).build()
+        try {
+            secure.openHelper.writableDatabase.query("PRAGMA secure_delete").use {
+                it.moveToFirst()
+                assertThat(it.getInt(0)).isEqualTo(1)
+            }
+        } finally {
+            secure.close()
+        }
     }
 
     @Test

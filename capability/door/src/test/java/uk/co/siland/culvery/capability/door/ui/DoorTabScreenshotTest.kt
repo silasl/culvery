@@ -36,9 +36,9 @@ class DoorTabScreenshotTest {
     private val london = ZoneId.of("Europe/London")
     private val october14 = LocalDate.of(2026, 10, 14)
 
-    private fun snap(name: String, dark: Boolean, days: List<DoorDay>, status: String? = null, newIds: Set<Long> = emptySet()) {
+    private fun snap(name: String, dark: Boolean, days: List<DoorDay>, status: String? = null, newIds: Set<Long> = emptySet(), onClear: (() -> Unit)? = null) {
         compose.setContent {
-            CulveryTheme(dark = dark) { Box(Modifier.size(1116.dp, 690.dp).background(Culvery.colors.bg)) { DoorTab(days, october14, london, status, onOpenSnapshot = {}, newIds = newIds) } }
+            CulveryTheme(dark = dark) { Box(Modifier.size(1116.dp, 690.dp).background(Culvery.colors.bg)) { DoorTab(days, october14, london, status, onOpenSnapshot = {}, newIds = newIds, onClear = onClear) } }
         }
         if (days.any { day -> day.events.any { it.snapshot != null } }) compose.waitUntil(5_000) { compose.waitForIdle(); compose.onAllNodesWithTag("door_thumb_image", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
@@ -73,6 +73,20 @@ class DoorTabScreenshotTest {
     fun tabNewDark() {
         val seen = days().map { day -> day.copy(events = day.events.map { it.copy(seen = true) }) }
         snap("door_tab_new_dark", true, seen, newIds = setOf(1, 3))
+    }
+
+    @Test fun withClearHistoryDark() = snap("door_tab_clear_dark", true, days(), onClear = {})
+    @Test fun withClearHistoryLight() = snap("door_tab_clear_light", false, days(), onClear = {})
+
+    /** Clear history's question in its sheet, over the tab. */
+    @Test
+    fun clearConfirmDark() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Box(Modifier.size(613.dp, 400.dp).background(Culvery.colors.bg)) { ClearSheet(6, onKeep = {}, onConfirm = {}) }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/test/screenshots/door_clear_confirm_dark.png")
     }
 
     @Test fun tabEmptyDark() = snap("door_tab_empty_dark", true, emptyList())

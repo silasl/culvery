@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.door
 import androidx.compose.runtime.Composable
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -15,6 +16,7 @@ import uk.co.siland.culvery.capability.door.ui.DoorSettingsHost
 import uk.co.siland.culvery.capability.door.ui.DoorTabHost
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.household.HouseholdZone
+import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HouseholdClock
@@ -39,6 +41,8 @@ class DoorCapability @Inject constructor(
     private val toaster: Toaster,
     private val showing: ShowingTheme,
     private val access: AccessControl,
+    private val alerts: DoorAlerts,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) : Capability {
     override val id = DOOR_ID
     override val label = "Door"
@@ -67,5 +71,8 @@ class DoorCapability @Inject constructor(
     override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
 
     @Composable
-    override fun TabContent() = DoorTabHost(store, clock.today, zone.zone, status = health.status, keep = settings.keep)
+    override fun TabContent() = DoorTabHost(
+        store, clock.today, zone.zone, status = health.status, keep = settings.keep,
+        access = access, toaster = toaster, alerts = alerts, appScope = appScope,
+    )
 }

@@ -20,6 +20,7 @@ import uk.co.siland.culvery.capability.door.DoorPruneLoop
 import uk.co.siland.culvery.capability.door.DoorRecorder
 import uk.co.siland.culvery.capability.door.MediaPlayerChime
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
+import uk.co.siland.culvery.capability.door.db.SecureDelete
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
@@ -53,6 +54,6 @@ abstract class DoorModule {
         @Provides
         @Singleton
         fun database(@ApplicationContext context: Context): DoorDatabase =
-            Room.databaseBuilder(context, DoorDatabase::class.java, "door.db").build()
+            Room.databaseBuilder(context, DoorDatabase::class.java, "door.db").addCallback(SecureDelete).build()
     }
 }

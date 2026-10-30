@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 import uk.co.siland.culvery.capability.door.Unseen
 
@@ -52,6 +53,9 @@ interface DoorDao {
     @Query("DELETE FROM door_event WHERE atMillis < :before")
     suspend fun deleteBefore(before: Long)
 
+    @Query("DELETE FROM door_event")
+    suspend fun deleteAll()
+
     @Query("SELECT id FROM door_event WHERE hasSnapshot = 1")
     suspend fun withSnapshots(): List<Long>
 
@@ -83,4 +87,11 @@ interface DoorDao {
 @Database(entities = [DoorEventEntity::class], version = 1, exportSchema = true)
 abstract class DoorDatabase : RoomDatabase() {
     abstract fun doorDao(): DoorDao
+}
+
+/** Deleted rows are overwritten with zeros, so Clear history leaves nothing to read back from `door.db` (15a Ruling 14). */
+object SecureDelete : RoomDatabase.Callback() {
+    override fun onOpen(db: SupportSQLiteDatabase) {
+        db.query("PRAGMA secure_delete=ON").use { it.moveToFirst() }
+    }
 }

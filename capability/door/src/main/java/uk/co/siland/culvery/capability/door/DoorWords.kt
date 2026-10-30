@@ -95,6 +95,14 @@ internal const val KEEP_HISTORY_FOR = "Keep door history for"
 internal const val DELETE = "Delete"
 internal const val DELETE_OLDER_EVENTS = "Delete older door events"
 
+internal const val CLEAR_HISTORY = "Clear history"
+internal const val HISTORY_CLEARED = "Door history cleared"
+internal const val CLEAR_FAILED = "Couldn’t clear the door history. Try again."
+
+/** The question under Clear history: stored events, not just the shown days, and the pictures go too (15a §3.3). */
+fun clearQuestion(n: Int) =
+    "Clear ${if (n == 1) "the 1 door event" else "all $n door events"}? Pictures saved on this tablet are deleted too. Ring keeps its own copies."
+
 internal fun keepLabel(keep: KeepDays) = "${keep.days} days"
 
 /** The question under a shorter keep: its events go at once, so it asks (15a §3.2). */

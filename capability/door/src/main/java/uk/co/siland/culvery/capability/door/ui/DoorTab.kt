@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import android.util.Log
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,11 +33,18 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import uk.co.siland.culvery.capability.door.CLEAR_FAILED
+import uk.co.siland.culvery.capability.door.CLEAR_HISTORY
 import uk.co.siland.culvery.capability.door.DOOR
+import uk.co.siland.culvery.capability.door.DoorAlerts
+import uk.co.siland.culvery.capability.door.DoorPermissions
+import uk.co.siland.culvery.capability.door.HISTORY_CLEARED
 import uk.co.siland.culvery.capability.door.DoorDay
 import uk.co.siland.culvery.capability.door.DoorEvent
 import uk.co.siland.culvery.capability.door.DoorKind
@@ -45,19 +53,30 @@ import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.NO_RINGS_TODAY
 import uk.co.siland.culvery.capability.door.SNAPSHOT
 import uk.co.siland.culvery.capability.door.TODAY
+import uk.co.siland.culvery.capability.door.clearQuestion
 import uk.co.siland.culvery.capability.door.dayLabel
 import uk.co.siland.culvery.capability.door.doorDays
 import uk.co.siland.culvery.capability.door.doorSubtitle
 import uk.co.siland.culvery.capability.door.eventLine
 import uk.co.siland.culvery.capability.door.subLine
+import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalTabReselected
+import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCloseButton
+import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhPageHeader
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.Icons
+
+private const val TAG = "DoorTab"
 
 /**
  * The Door tab (5 §5.2, 9 §4.6): the title with the devices and the new rings, a status line when something is wrong,
@@ -73,6 +92,8 @@ fun DoorTab(
     onOpenSnapshot: (DoorEvent) -> Unit,
     modifier: Modifier = Modifier,
     newIds: Set<Long> = emptySet(),
+    /** Clear history, shown in the header when not null: the host passes it only while the store holds an event. */
+    onClear: (() -> Unit)? = null,
 ) {
     val c = Culvery.colors
     fun isNew(event: DoorEvent) = event.kind == DoorKind.RING && (event.id in newIds || !event.seen)
@@ -83,7 +104,13 @@ fun DoorTab(
     // The header ends with its own gap, so each item after it carries the one below it.
     val gap = Modifier.padding(bottom = DoorDimens.rowGap)
     LazyColumn(modifier = modifier.fillMaxSize().testTag("door_tab")) {
-        item { HhPageHeader(DOOR, subtitle) }
+        item {
+            HhPageHeader(DOOR, subtitle) {
+                if (onClear != null) {
+                    HhButton(CLEAR_HISTORY, onClear, Modifier.testTag("door_clear"), tone = ButtonTone.Danger, icon = Icons.DELETE, on = ButtonSurface.Bg)
+                }
+            }
+        }
         if (status != null) item { Box(gap) { DoorStatusLine(status) } }
         item { HhSectionLabel(TODAY, gap.testTag("door_today")) }
         val todays = days.firstOrNull { it.date == today }?.events.orEmpty()
@@ -117,9 +144,52 @@ fun SnapshotSheet(event: DoorEvent, zone: ZoneId, onClose: () -> Unit) {
     }
 }
 
+/** Clear history's question (15a §3.3): Keep on the left, where the tap that opened it was. */
+@Composable
+internal fun ClearSheet(count: Int, onKeep: () -> Unit, onConfirm: () -> Unit) {
+    HhSheet(padding = PaddingValues(horizontal = DoorDimens.sheetPaddingH, vertical = DoorDimens.sheetPaddingV)) {
+        HhConfirmCard(
+            tag = "door_clear_confirm", title = CLEAR_HISTORY,
+            keep = KEEP, keepTag = "door_clear_confirm_keep",
+            confirm = CLEAR_HISTORY, confirmTag = "door_clear_confirm_yes",
+            busy = false, onKeep = onKeep, onConfirm = onConfirm, confirmIcon = Icons.DELETE,
+        ) { Text(clearQuestion(count), style = HhType.body, color = Culvery.colors.ink) }
+    }
+}
+
+/**
+ * Runs on [scope], so the toast shows if the tab is left meanwhile. The PIN comes first; then the ring card goes (it may show a
+ * picture about to be deleted), then the history.
+ */
+private fun clearHistory(scope: CoroutineScope, access: AccessControl, alerts: DoorAlerts, store: DoorStore, toaster: Toaster) {
+    scope.launch {
+        try {
+            access.authorise(DoorPermissions.CLEAR, label = CLEAR_HISTORY) ?: return@launch
+            alerts.dismissCard()
+            store.clear()
+            toaster.show(HISTORY_CLEARED)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't clear the door history (${e::class.simpleName})")
+            toaster.show(CLEAR_FAILED, urgent = true)
+        }
+    }
+}
+
 /** The tab as the rail opens it: the store's events over the [keep] days to the household's [today], and its [status]. */
 @Composable
-internal fun DoorTabHost(store: DoorStore, today: Flow<LocalDate>, zone: Flow<ZoneId>, status: Flow<String?>, keep: Flow<KeepDays>) {
+internal fun DoorTabHost(
+    store: DoorStore,
+    today: Flow<LocalDate>,
+    zone: Flow<ZoneId>,
+    status: Flow<String?>,
+    keep: Flow<KeepDays>,
+    access: AccessControl,
+    toaster: Toaster,
+    alerts: DoorAlerts,
+    appScope: CoroutineScope,
+) {
     val events by store.events.collectAsStateWithLifecycle(emptyList())
     val day by today.collectAsStateWithLifecycle(null)
     val householdZone by zone.collectAsStateWithLifecycle(null)
@@ -144,5 +214,21 @@ internal fun DoorTabHost(store: DoorStore, today: Flow<LocalDate>, zone: Flow<Zo
     val z = householdZone ?: return
     val k = kept ?: return
     val days = remember(events, d, z, k) { doorDays(events, d, z, k) }
-    DoorTab(days, d, z, problem, onOpenSnapshot = { event -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } }, newIds = newIds)
+    val stored = events.size
+    DoorTab(
+        days, d, z, problem,
+        onOpenSnapshot = { event -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } },
+        newIds = newIds,
+        onClear = if (stored == 0) null else ({
+            overlay.show {
+                ClearSheet(
+                    stored, onKeep = overlay::dismiss,
+                    onConfirm = {
+                        overlay.dismiss()
+                        clearHistory(appScope, access, alerts, store, toaster)
+                    },
+                )
+            }
+        }),
+    )
 }

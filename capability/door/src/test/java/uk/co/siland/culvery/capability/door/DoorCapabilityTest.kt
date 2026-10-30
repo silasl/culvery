@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
+import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -42,10 +43,14 @@ class DoorCapabilityTest {
     private val settings by lazy { doorSettings(folder.root, scope) }
     private val clock by lazy { HouseholdClock(flowOf(ZoneId.of("Europe/London")), WallClock { NOW }, scope, flowOf(NOW)) }
 
+    private fun alerts() = DoorAlerts(
+        FakeAlertHost(), {}, { DoorPrefs() }, FakeChime(), { ZoneId.of("Europe/London") }, WallClock { NOW }, scope, NightHours { false }, { null }, { null },
+    )
+
     private fun capability(providers: Set<DoorProvider>) = DoorCapability(
         store, settings, providers, clock, householdZone(),
         DoorHealth(providers.firstOrNull(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), RecordingToaster(), FakeShowing(),
-        TestAccess(Role.ADMIN),
+        TestAccess(Role.ADMIN), alerts(), scope,
     )
 
     @After
@@ -83,7 +88,7 @@ class DoorCapabilityTest {
         val door = DoorCapability(
             thirty, settings, setOf(FakeDoorProvider()), clock, householdZone(),
             DoorHealth(FakeDoorProvider(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), RecordingToaster(), FakeShowing(),
-            TestAccess(Role.ADMIN),
+            TestAccess(Role.ADMIN), alerts(), scope,
         )
         assertThat(door.badge.first()).isNull()
         thirty.record(ring(key = "today"))

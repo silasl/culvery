@@ -33,6 +33,10 @@ import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,7 +48,15 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.door.DoorAlerts
 import uk.co.siland.culvery.capability.door.DoorDay
+import uk.co.siland.culvery.capability.door.DoorPrefs
+import uk.co.siland.culvery.capability.door.FakeAlertHost
+import uk.co.siland.culvery.capability.door.FakeChime
+import uk.co.siland.culvery.capability.door.RecordingToaster
+import uk.co.siland.culvery.capability.door.TestAccess
+import uk.co.siland.culvery.capability.door.clearQuestion
+import uk.co.siland.culvery.capability.door.motion
 import uk.co.siland.culvery.capability.door.DoorEvent
 import uk.co.siland.culvery.capability.door.DoorKind
 import uk.co.siland.culvery.capability.door.DoorStore
@@ -54,9 +66,15 @@ import uk.co.siland.culvery.capability.door.aPicture
 import uk.co.siland.culvery.capability.door.doorDb
 import uk.co.siland.culvery.capability.door.ring
 import uk.co.siland.culvery.capability.door.startOfYesterday
+import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalTabReselected
+import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.OverlayHost
+import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
@@ -67,11 +85,21 @@ class DoorTabTest {
     private val london = ZoneId.of("Europe/London")
     private val october14 = LocalDate.of(2026, 10, 14)
     private val db = doorDb()
-    private val store by lazy { DoorStore(db, File(folder.root, "door")) }
+    private val dir by lazy { File(folder.root, "door") }
+    private val store by lazy { DoorStore(db, dir) }
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val toaster = RecordingToaster()
+    private var access = TestAccess(Role.ADULT)
+    private val alerts by lazy {
+        DoorAlerts(FakeAlertHost(), {}, { DoorPrefs() }, FakeChime(), { london }, WallClock { NOW }, appScope, NightHours { false }, { null }, { null })
+    }
     private val opened = mutableListOf<DoorEvent>()
 
     @After
-    fun tearDown() = db.close()
+    fun tearDown() {
+        appScope.cancel()
+        db.close()
+    }
 
     /** Robolectric's main looper runs only when the test idles it, so each check lets the UI and its effects run first. */
     private fun waitFor(condition: () -> Boolean) = compose.waitUntil(5_000) {
@@ -120,7 +148,7 @@ class DoorTabTest {
     private fun host(today: Flow<LocalDate>, overlay: DrawingOverlay = DrawingOverlay()) {
         CompositionLocalProvider(LocalOverlayHost provides overlay) {
             Box {
-                DoorTabHost(store, today, flowOf(london), flowOf(null), flowOf(KeepDays.TWO))
+                DoorTabHost(store, today, flowOf(london), flowOf(null), flowOf(KeepDays.TWO), access, toaster, alerts, appScope)
                 overlay.content?.invoke()
             }
         }
@@ -373,6 +401,99 @@ class DoorTabTest {
         assertThat(unseenRings()).isEqualTo(1)
         compose.runOnUiThread { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
         waitFor { unseenRings() == 0 }
+    }
+
+    private fun openHost() {
+        compose.setContent { CulveryTheme(dark = true) { host(flowOf(october14)) } }
+    }
+
+    private fun openConfirm() {
+        openHost()
+        waitFor { exists("door_clear") }
+        compose.onNodeWithTag("door_clear").performClick()
+        waitFor { exists("door_clear_confirm") }
+    }
+
+    private fun threeEventsTwoWithPictures() = runBlocking {
+        store.record(ring(key = "a", snapshot = aPicture))
+        store.record(ring(key = "b", at = NOW - 60_000, snapshot = aPicture))
+        store.record(motion(at = NOW - 120_000))
+    }
+
+    /** 15a §3.3: no button on an empty history; it appears with the first event. */
+    @Test
+    fun clearHistoryShowsOnlyWithEvents() {
+        openHost()
+        compose.waitForIdle()
+        compose.onNodeWithTag("door_clear").assertDoesNotExist()
+        runBlocking { store.record(ring()) }
+        waitFor { exists("door_clear") }
+        compose.onNodeWithTag("door_clear").assertHeightIsAtLeast(48.dp)
+        compose.assertAccessible()
+    }
+
+    /** Fails if Clear history skips the question, skips the PIN (a Settings session is open and must not count), or leaves a row or picture. */
+    @Test
+    fun clearAsksThenAsksForAPinThenClears() {
+        threeEventsTwoWithPictures()
+        access.session.value = Identified(Person(PersonId("alex"), "Alex", 0), Role.ADMIN)
+        openConfirm()
+        compose.onNodeWithText(clearQuestion(3)).assertIsDisplayed()
+        assertThat(access.asked).isEmpty()
+        compose.onNodeWithTag("door_clear_confirm_yes").performClick()
+        waitFor { toaster.messages.isNotEmpty() }
+        assertThat(access.asked).containsExactly(listOf("door.clear"))
+        assertThat(toaster.messages).containsExactly("Door history cleared")
+        assertThat(runBlocking { store.events.first() }).isEmpty()
+        assertThat(dir.listFiles()).isEmpty()
+        assertThat(exists("door_clear_confirm")).isFalse()
+    }
+
+    @Test
+    fun keepChangesNothing() {
+        threeEventsTwoWithPictures()
+        openConfirm()
+        compose.onNodeWithTag("door_clear_confirm_keep").performClick()
+        waitFor { !exists("door_clear_confirm") }
+        assertThat(access.asked).isEmpty()
+        assertThat(runBlocking { store.events.first() }).hasSize(3)
+        assertThat(dir.listFiles()).hasLength(2)
+        assertThat(toaster.messages).isEmpty()
+    }
+
+    /** A cancelled or wrong PIN: the rows and pictures stay and nothing is said. */
+    @Test
+    fun aRefusedPinChangesNothing() {
+        threeEventsTwoWithPictures()
+        access = TestAccess(null)
+        openConfirm()
+        compose.onNodeWithTag("door_clear_confirm_yes").performClick()
+        waitFor { access.asked.isNotEmpty() }
+        compose.waitForIdle()
+        assertThat(runBlocking { store.events.first() }).hasSize(3)
+        assertThat(dir.listFiles()).hasLength(2)
+        assertThat(toaster.messages).isEmpty()
+    }
+
+    /** A child's PIN does not clear the history. */
+    @Test
+    fun aChildIsRefused() {
+        threeEventsTwoWithPictures()
+        access = TestAccess(Role.CHILD)
+        openConfirm()
+        compose.onNodeWithTag("door_clear_confirm_yes").performClick()
+        waitFor { access.asked.isNotEmpty() }
+        compose.waitForIdle()
+        assertThat(runBlocking { store.events.first() }).hasSize(3)
+        assertThat(toaster.messages).isEmpty()
+    }
+
+    /** n counts what is stored, so the question reads "the 1 door event" for a single one. */
+    @Test
+    fun theQuestionNamesTheStoredCount() {
+        runBlocking { store.record(ring()) }
+        openConfirm()
+        compose.onNodeWithText("Clear the 1 door event? Pictures saved on this tablet are deleted too. Ring keeps its own copies.").assertIsDisplayed()
     }
 
     /** Fails if the tab keeps the day it opened on after the household's date moves on. */
