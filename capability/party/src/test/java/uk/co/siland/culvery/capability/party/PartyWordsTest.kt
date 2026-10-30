@@ -34,7 +34,7 @@ class PartyWordsTest {
 
         assertThat(plan.nothing).isTrue()
         assertThat(PartyWords.willLines(plan))
-            .containsExactly("Party mode has nothing to do yet. Choose plugs, music and lights in Settings › Party mode.")
+            .containsExactly("Party mode has nothing to do yet. Choose music and lights in Settings › Party mode.")
     }
 
     @Test

@@ -27,7 +27,7 @@ object PartyWords {
     const val WHEN_ENDS = "When Party mode ends:"
     const val TURN_ON_BUTTON = "Turn Party mode on"
     const val TURN_OFF_BUTTON = "Turn Party mode off"
-    const val NOTHING_TO_DO = "Party mode has nothing to do yet. Choose plugs, music and lights in Settings › Party mode."
+    const val NOTHING_TO_DO = "Party mode has nothing to do yet. Choose music and lights in Settings › Party mode."
     const val NOTHING_TO_PUT_BACK = "Party mode changed nothing, so there’s nothing to put back."
     const val STOP_MUSIC = "Stop the music and put the speakers back in their groups."
     const val PLUGS_BACK_NOW = "Put the plugs back as they were."

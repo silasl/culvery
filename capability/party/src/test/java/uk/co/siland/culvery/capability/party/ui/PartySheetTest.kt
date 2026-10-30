@@ -112,7 +112,7 @@ class PartySheetTest {
     fun nothingToDoStillTurnsOn() {
         show(true, PartyWords.willLines(PartyPlan(emptyList(), null, emptyList())))
 
-        assertThat(lines()).containsExactly("Party mode has nothing to do yet. Choose plugs, music and lights in Settings › Party mode.")
+        assertThat(lines()).containsExactly("Party mode has nothing to do yet. Choose music and lights in Settings › Party mode.")
         compose.onNodeWithText("Turn Party mode on", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("party_sheet_confirm").performClick()
         assertThat(confirms).isEqualTo(1)

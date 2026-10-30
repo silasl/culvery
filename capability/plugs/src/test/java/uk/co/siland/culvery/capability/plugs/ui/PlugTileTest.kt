@@ -163,7 +163,7 @@ class PlugTileTest {
     /** Fails if a name that needs two lines is cut to one, ellipsised or shortened. */
     @Test
     fun aLongNameWrapsToTwoLines() {
-        val name = "Reading lamp by the bed"
+        val name = "Reading lamp on the bedside table upstairs"
         show(PlugState(LAMP, name, PlugPower.OFF, null))
         compose.onNodeWithTag("plug_${LAMP}_name", useUnmergedTree = true).assertTextEquals(name)
         val layout = nameLayout()
@@ -194,5 +194,16 @@ class PlugTileTest {
         assertThat(layout.lineCount).isEqualTo(1)
         assertThat(layout.isLineEllipsized(0)).isFalse()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if a short name's pill sits anywhere but the tile's bottom right, or beside the name instead of under it. */
+    @Test
+    fun aShortNamesPillSitsBottomRightUnderTheName() {
+        show(LAMP_ON)
+        val tile = tile().fetchSemanticsNode().boundsInRoot
+        val pill = button().fetchSemanticsNode().boundsInRoot
+        val name = compose.onNodeWithTag("plug_${LAMP}_name", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertThat(tile.right - pill.right).isLessThan(tile.width / 10)
+        assertThat(pill.top).isAtLeast(name.bottom)
     }
 }

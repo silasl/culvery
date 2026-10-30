@@ -3,8 +3,8 @@ package uk.co.siland.culvery.capability.plugs.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,8 +29,8 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /**
- * One plug as a small tile (15a §4.5): its name over its state, and at the bottom right the lock when it needs a PIN over
- * the "Switch on" / "Switch off" pill (only for a plug that is On or Off; it reads "Switching…" while a switch is out, when taps are ignored).
+ * One plug as a small tile (15a §4.5): its name over its state at full width, and under them at the bottom right the lock
+ * when it needs a PIN over the "Switch on" / "Switch off" pill (only for a plug that is On or Off; it reads "Switching…" while a switch is out, when taps are ignored).
  * An on plug's tile has the accent fill.
  */
 @Composable
@@ -54,14 +54,11 @@ internal fun PlugTile(
         color = if (on) c.accentSoft else c.surf,
         padding = PaddingValues(horizontal = PlugsDimens.tilePaddingH, vertical = PlugsDimens.tilePaddingV),
     ) {
-        Row(
-            Modifier.fillMaxHeight().heightIn(min = PlugsDimens.tileMinHeight - PlugsDimens.tilePaddingV * 2),
-            horizontalArrangement = Arrangement.spacedBy(PlugsDimens.textGap),
+        Column(
+            Modifier.fillMaxSize().heightIn(min = PlugsDimens.tileMinHeight - PlugsDimens.tilePaddingV * 2),
+            verticalArrangement = Arrangement.spacedBy(PlugsDimens.textGap),
         ) {
-            Column(
-                Modifier.weight(1f).align(Alignment.Top).shownNotSpoken(),
-                verticalArrangement = Arrangement.spacedBy(PlugsDimens.textGap),
-            ) {
+            Column(Modifier.shownNotSpoken(), verticalArrangement = Arrangement.spacedBy(PlugsDimens.textGap)) {
                 Text(
                     state.name, style = HhType.cardTitle.copy(fontSize = PlugsDimens.nameSize), color = c.ink,
                     modifier = Modifier.testTag("${tag}_name"),
@@ -73,7 +70,8 @@ internal fun PlugTile(
                 )
             }
             if (state.isOn != null) {
-                Column(Modifier.align(Alignment.Bottom), horizontalAlignment = Alignment.End) {
+                Spacer(Modifier.weight(1f))
+                Column(Modifier.align(Alignment.End), horizontalAlignment = Alignment.End) {
                     if (needsPin) HhIcon(Icons.LOCK, size = PlugsDimens.lock, tint = c.mute, modifier = Modifier.testTag("${tag}_lock"))
                     val label = if (switching) PlugsWords.SWITCHING else if (on) PlugsWords.SWITCH_OFF else PlugsWords.SWITCH_ON
                     HhButton(
