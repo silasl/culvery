@@ -114,10 +114,8 @@ class DoorAlerts internal constructor(
         scope.launch { lock.withLock { closeShowing(eventId) } }
     }
 
-    /** Clear history: the ring card goes whichever ring it shows, as the pictures it may show are deleted. */
-    fun dismissCard() {
-        scope.launch { lock.withLock { _showing.value?.let { closeShowing(it.eventId) } } }
-    }
+    /** Clear history: the ring card goes whichever ring it shows, as the pictures it may show are deleted. Done when it returns. */
+    suspend fun dismissCard() = lock.withLock { _showing.value?.let { closeShowing(it.eventId) } }
 
     private fun closeShowing(eventId: Long) {
         if (_showing.value?.eventId == eventId) {

@@ -179,11 +179,9 @@ class DoorAlertsTest {
     fun dismissCardClosesTheRingCard() = runTest {
         val alerts = alerts()
         alerts.dismissCard()
-        runCurrent()
         assertThat(host.dismissed).isEqualTo(0)
         alerts.onRecorded(rung(1))
         alerts.dismissCard()
-        runCurrent()
         assertThat(alerts.showing.value).isNull()
         assertThat(host.dismissed).isEqualTo(1)
         assertThat(seen).isEmpty()
