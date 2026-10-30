@@ -784,6 +784,9 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - **Known:** a ring just after a restart, before the household clock is read, plays the classic chime even during Halloween; never silence.
 - **The bats' cost, fixed (2026-10-30):** each sky step made the tablet replay all of Home's drawing. Home now sits in its own cached layer and the sky is sized to the header band. The release from 7434ef82, installed with `-r` (mapping `culvery-notes/mappings/mapping-7434ef8.txt`), gave 733 frames in 60 s; 50th percentile 9 ms, 90th 11 ms, 99th 16 ms; janky frames 1.5% (from 55%); slow issue draw commands 7 (from 324); GPU 90th percentile 6 ms. Day Halloween looked right on the tablet after it. Heat log at thermal 0, battery 26.7 °C; no crash. The rail and status bar still redraw on each step; not worth a layer at these numbers.
 
+## Plan 14 (seasonal themes): from main (2026-10-30)
+- Merged with `--ff-only` at 7de2c7b4, the gate green on main; the release installed with `-r` (mapping `culvery-notes/mappings/mapping-7de2c7b.txt`). Culvery pinned itself and Android's "App is pinned" notice was dismissed with OK. Halloween shows by its dates; no crash; heat log at thermal 0. Not pushed.
+
 ## Plan 14 (seasonal themes): not in this build, on purpose (2026-10-30)
 - **For the Christmas plan:** the doorbell sound as part of a theme's look (today it's the Haunted organ's own choice in Settings › Door); the big clock's colour in the look (Home picks the accent); the sky choosing its own part of the header; other cards taking a theme's corner art (only Today does).
 - **For the end-of-v1 design review:** night bats faint across a room and the night moon muddy; the day cobweb faint; "Chime volume" and "Play chime" now cover the organ too; the dates row has no tap cue; the dates sheet's look.
