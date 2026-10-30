@@ -130,9 +130,9 @@ class DisplaySettings(private val store: DataStore<Preferences>, scope: Coroutin
 
     /** Both ends, or null when either is missing, stored as another type, or not a real month and day. */
     private fun Preferences.seasonDates(theme: SeasonalTheme): SeasonDates? {
-        val start = (asMap().entries.firstOrNull { it.key.name == theme.startKey }?.value as? Int)?.toMonthDay() ?: return null
-        val end = (asMap().entries.firstOrNull { it.key.name == theme.endKey }?.value as? Int)?.toMonthDay() ?: return null
-        return SeasonDates(start, end)
+        val stored = asMap()
+        fun packedDay(name: String) = (stored[intPreferencesKey(name)] as? Int)?.toMonthDay()
+        return SeasonDates(packedDay(theme.startKey) ?: return null, packedDay(theme.endKey) ?: return null)
     }
 
     private fun MonthDay.packed(): Int = monthValue * 100 + dayOfMonth

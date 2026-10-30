@@ -154,7 +154,7 @@ class HalloweenSkyTest {
         val density = Density(compose.density.density)
         val all = Rect(Offset.Zero, Size(bounds.width, bounds.height))
         val bat = batPositions(0, all, density).first()
-        val half = SeasonalDimens.batSpan.value * density.density / 2
+        val half = HalloweenDimens.batSpan.value * density.density / 2
         val body = image.getPixel((bounds.left + bat.x + half).toInt(), (bounds.top + bat.y + half / 2).toInt())
         assertThat(body).isEqualTo(HalloweenInks.bat(HalloweenNight).toArgb())
         val moon = moonIn(all, density).centre

@@ -232,9 +232,9 @@ private fun DatesSheet(
     val firstDay = first
     val lastDay = last
     val refusal = if (firstDay != null && lastDay != null) checkRange(firstDay, lastDay) else null
-    val picked = firstDay != null && lastDay != null && refusal == null
+    val range = if (firstDay != null && lastDay != null && refusal == null) firstDay to lastDay else null
     fun pick(day: LocalDate) {
-        if (firstDay == null || picked) {
+        if (firstDay == null || range != null) {
             first = day
             last = null
         } else {
@@ -258,8 +258,8 @@ private fun DatesSheet(
                 month = month,
                 onMonth = { month = it },
                 today = today,
-                chosen = setOfNotNull(firstDay, lastDay.takeIf { picked }),
-                band = if (picked) firstDay!!..lastDay!! else null,
+                chosen = setOfNotNull(firstDay, range?.second),
+                band = range?.let { (from, to) -> from..to },
                 allowed = { true },
                 dots = emptyMap(),
                 spoken = { "" },
@@ -270,11 +270,11 @@ private fun DatesSheet(
         HhFooterButton(
             SAVE_DATES,
             {
-                onSave(SeasonDates(MonthDay.from(firstDay!!), MonthDay.from(lastDay!!)))
+                range?.let { (from, to) -> onSave(SeasonDates(MonthDay.from(from), MonthDay.from(to))) }
                 onClose()
             },
             "display_dates_save",
-            enabled = picked,
+            enabled = range != null,
         )
         HhButton(putBack(theme.defaultDates), { onReset(); onClose() }, Modifier.testTag("display_dates_reset"), on = ButtonSurface.Bg)
         HhButton(CANCEL, onClose, Modifier.testTag("display_dates_cancel"), on = ButtonSurface.Bg)
@@ -328,6 +328,7 @@ internal fun DisplaySettingsHost(
     val p = prefs ?: return
     val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a display setting (${it::class.simpleName})") }
     DisplaySettingsScreen(
+        // The device date only places the grid until the household clock is read; it never picks the theme.
         DisplaySettingsUi(p, camera, sunKnown = sun != null, today = today ?: LocalDate.now(), previewing = previewing, dates = dates, next = next),
         DisplaySettingsActions(
             onNight = { from, until -> change { settings.setNight(from, until) } },

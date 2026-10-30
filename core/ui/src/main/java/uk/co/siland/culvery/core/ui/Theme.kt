@@ -18,10 +18,6 @@ object Culvery {
     val colors: HhColors
         @Composable get() = LocalHhColors.current
 
-    /** The theme showing, or null for the normal look. */
-    val seasonal: SeasonalTheme?
-        @Composable get() = LocalSeasonalTheme.current
-
     val look: SeasonalLook?
         @Composable get() = LocalSeasonalTheme.current?.look
 }

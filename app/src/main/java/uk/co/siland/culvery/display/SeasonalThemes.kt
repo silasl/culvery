@@ -10,11 +10,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.ui.SeasonDates
@@ -56,32 +56,23 @@ class SeasonalThemes internal constructor(
     val dates: StateFlow<Map<SeasonalTheme, SeasonDates>> = dates.stateIn(scope, SharingStarted.Eagerly, defaultSeasonDates())
 
     /** The household's date; null while the clock is unread. */
-    val today: StateFlow<LocalDate?> = now.map { it?.toLocalDate() }.stateIn(scope, SharingStarted.Eagerly, null)
+    val today: StateFlow<LocalDate?> =
+        now.map { it?.toLocalDate() }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, null)
 
     /** The theme to look for next and its first day; null while a theme is in its dates or the clock is unread. */
     val next: StateFlow<Pair<SeasonalTheme, LocalDate>?> =
-        combine(now, this.dates) { now, dates ->
-            val today = now?.toLocalDate()
+        combine(today, this.dates) { today, dates ->
             if (today == null || showingOn(today, dates, null) != null) null else nextTheme(today, dates)
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
     override val showing: StateFlow<SeasonalTheme?> =
-        combine(now, this.dates, preview) { now, dates, preview -> now?.let { showingOn(it.toLocalDate(), dates, preview) } }
+        combine(today, this.dates, preview) { today, dates, preview -> today?.let { showingOn(it, dates, preview) } }
             .stateIn(scope, SharingStarted.Eagerly, null)
 
     /** The theme previewed today, else null. */
     val previewing: StateFlow<SeasonalTheme?> =
-        combine(now, preview) { now, preview -> preview?.takeIf { it.day == now?.toLocalDate() }?.theme }
+        combine(today, preview) { today, preview -> preview?.takeIf { it.day == today }?.theme }
             .stateIn(scope, SharingStarted.Eagerly, null)
-
-    init {
-        scope.launch {
-            now.collect { time ->
-                val today = time?.toLocalDate() ?: return@collect
-                preview.update { it?.takeIf { p -> p.day == today } }
-            }
-        }
-    }
 
     /** Turning one on replaces any other; nothing happens while the clock is unread. Off clears only [theme]'s own preview. */
     fun preview(theme: SeasonalTheme, on: Boolean) {

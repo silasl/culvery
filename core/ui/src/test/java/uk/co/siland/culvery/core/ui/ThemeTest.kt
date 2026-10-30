@@ -104,7 +104,7 @@ class ThemeTest {
         var night: Triple<HhColors, SeasonalTheme?, SeasonalLook?>? = null
         var day: HhColors? = null
         compose.setContent {
-            if (nightOn) CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN) { night = Triple(Culvery.colors, Culvery.seasonal, Culvery.look) }
+            if (nightOn) CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN) { night = Triple(Culvery.colors, LocalSeasonalTheme.current, Culvery.look) }
             else CulveryTheme(dark = false, seasonal = SeasonalTheme.HALLOWEEN) { day = Culvery.colors }
         }
         compose.waitForIdle()
@@ -120,7 +120,7 @@ class ThemeTest {
     @Test
     fun noThemeIsTheNormalLook() {
         var seen: Triple<HhColors, SeasonalTheme?, SeasonalLook?>? = null
-        compose.setContent { CulveryTheme(dark = true) { seen = Triple(Culvery.colors, Culvery.seasonal, Culvery.look) } }
+        compose.setContent { CulveryTheme(dark = true) { seen = Triple(Culvery.colors, LocalSeasonalTheme.current, Culvery.look) } }
         compose.waitForIdle()
         assertThat(seen!!.first).isEqualTo(DarkColors)
         assertThat(seen!!.second).isNull()

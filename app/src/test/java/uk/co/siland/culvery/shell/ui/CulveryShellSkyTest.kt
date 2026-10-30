@@ -37,7 +37,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HalloweenDay
 import uk.co.siland.culvery.core.ui.HalloweenInks
 import uk.co.siland.culvery.core.ui.HalloweenNight
-import uk.co.siland.culvery.core.ui.SeasonalDimens
+import uk.co.siland.culvery.core.ui.HalloweenDimens
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.moonIn
 import uk.co.siland.culvery.shell.ShellUiState
@@ -107,7 +107,7 @@ class CulveryShellSkyTest {
     private fun skyStaysInTheBand(dark: Boolean) {
         show(fullHome(dark), SeasonalTheme.HALLOWEEN)
         val density = Density(compose.density.density)
-        val gap = SeasonalDimens.skyGap.value * density.density
+        val gap = HalloweenDimens.skyGap.value * density.density
         val sky = bounds("halloween_sky")
         val clock = bounds("home_clock")
         val date = bounds("home_date")

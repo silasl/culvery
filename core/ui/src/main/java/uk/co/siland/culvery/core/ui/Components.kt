@@ -42,17 +42,18 @@ fun HhCard(
     radius: Dp = 24.dp,
     color: Color = Culvery.colors.surf,
     padding: PaddingValues = PaddingValues(22.dp),
-    decoration: (DrawScope.() -> Unit)? = null,
+    decoration: (DrawScope.(HhColors) -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(radius)
+    val colors = Culvery.colors
     Column(
         modifier = modifier
             .readAsOne()
             .clip(shape)
-            .border(CardTokens.edge, Culvery.colors.border, shape)
+            .border(CardTokens.edge, colors.border, shape)
             .background(color)
-            .then(if (decoration != null) Modifier.drawBehind(decoration) else Modifier)
+            .then(if (decoration != null) Modifier.drawBehind { decoration(colors) } else Modifier)
             .padding(padding),
         content = content,
     )

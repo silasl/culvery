@@ -30,10 +30,37 @@ import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlinx.coroutines.delay
+
+object HalloweenDimens {
+    /** How far the Today card's cobweb reaches from the card's top-right corner. */
+    val webSpan = 88.dp
+    val webStroke = 1.dp
+
+    /** A bat's width, wing tip to wing tip; its height is half. */
+    val batSpan = 26.dp
+
+    /** The sky's room is Home's header, from this far right of the clock and date to this far left of the header items. */
+    val skyGap = 24.dp
+
+    /** The moon's size, and how far its edge sits inside the sky's top and right edges. */
+    val moonRadius = 30.dp
+    val moonEnd = 12.dp
+    val moonTop = 8.dp
+
+    /** The tops of the two lanes the bats fly in, from the sky's top. */
+    val batLanes = listOf(14.dp, 84.dp)
+}
+
+/** How long a bat takes to cross the sky and come back in at the left. */
+internal const val BAT_LAP_MS = 45_000L
+
+/** The sky moves at most this often, about 15 frames a second. */
+internal const val SKY_FRAME_MS = 66L
 
 // The pumpkin's viewport has the Culvery mark's aspect, so it takes the mark's place without moving anything.
 private const val PUMPKIN_W = 54f
@@ -72,7 +99,7 @@ private const val WEB_SAG = 0.86f
 fun DrawScope.drawCobweb(color: Color, span: Dp) {
     val reach = span.toPx()
     val corner = Offset(size.width, 0f)
-    val stroke = Stroke(SeasonalDimens.webStroke.toPx())
+    val stroke = Stroke(HalloweenDimens.webStroke.toPx())
 
     // 0 points left along the top edge, 90 degrees straight down the side.
     fun at(turn: Float, radius: Float) = Offset(corner.x - radius * cos(turn), corner.y + radius * sin(turn))
@@ -111,7 +138,7 @@ private const val BAT_PATH =
  */
 fun skyBand(measured: HomeSkyBand?, size: Size, density: Density): Rect {
     if (measured == null) return Rect(Offset.Zero, size)
-    val gap = with(density) { SeasonalDimens.skyGap.toPx() }
+    val gap = with(density) { HalloweenDimens.skyGap.toPx() }
     val right = if (measured.itemsWidth > 0) measured.headerWidth - measured.itemsWidth - gap else measured.headerWidth.toFloat()
     return Rect(maxOf(measured.clockWidth, measured.dateWidth) + gap, 0f, right, measured.headerHeight.toFloat())
 }
@@ -120,9 +147,9 @@ class Moon(val centre: Offset, val radius: Float)
 
 /** The moon near the band's right end, shrunk to fit a band shorter than it. */
 fun moonIn(band: Rect, density: Density): Moon = with(density) {
-    val radius = minOf(SeasonalDimens.moonRadius.toPx(), band.width / 2, band.height / 2)
-    val x = band.right - SeasonalDimens.moonEnd.toPx() - radius
-    val y = minOf(band.top + SeasonalDimens.moonTop.toPx() + radius, band.bottom - radius)
+    val radius = minOf(HalloweenDimens.moonRadius.toPx(), band.width / 2, band.height / 2)
+    val x = band.right - HalloweenDimens.moonEnd.toPx() - radius
+    val y = minOf(band.top + HalloweenDimens.moonTop.toPx() + radius, band.bottom - radius)
     Moon(Offset(x, y), radius)
 }
 
@@ -131,10 +158,10 @@ fun moonIn(band: Rect, density: Density): Moon = with(density) {
  * a lap apart and cross from a bat's width left of [band] to its right edge once every [BAT_LAP_MS] (14 §4.3).
  */
 fun batPositions(elapsedMillis: Long, band: Rect, density: Density): List<Offset> = with(density) {
-    val span = SeasonalDimens.batSpan.toPx()
+    val span = HalloweenDimens.batSpan.toPx()
     val cycle = band.width + span
     val lap = (elapsedMillis % BAT_LAP_MS).toDouble() / BAT_LAP_MS
-    val lanes = SeasonalDimens.batLanes
+    val lanes = HalloweenDimens.batLanes
     List(BATS) { i ->
         val top = band.top + minOf(lanes[i % lanes.size].toPx(), band.height - span / 2)
         Offset(band.left - span + ((lap + (i + 0.5) / BATS) % 1.0 * cycle).toFloat(), top)
@@ -169,7 +196,7 @@ fun HalloweenSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Muta
         clipRect(band.left, band.top, band.right, band.bottom) {
             val disc = moonIn(band, this)
             drawCircle(moon, disc.radius, disc.centre)
-            val fit = SeasonalDimens.batSpan.toPx() / BAT_W
+            val fit = HalloweenDimens.batSpan.toPx() / BAT_W
             batPositions(elapsed.longValue, band, this).forEach { at ->
                 translate(at.x, at.y) { scale(fit, fit, pivot = Offset.Zero) { drawPath(batShape, bat) } }
             }

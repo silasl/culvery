@@ -48,7 +48,7 @@ val HalloweenLook = SeasonalLook(
     day = HalloweenDay,
     clockFace = CreepsterClock,
     mark = { width -> PumpkinMark(width) },
-    cardCorner = { colors -> drawCobweb(HalloweenInks.web(colors), SeasonalDimens.webSpan) },
+    cardCorner = { colors -> drawCobweb(HalloweenInks.web(colors), HalloweenDimens.webSpan) },
     sky = { drifting, modifier -> HalloweenSky(drifting, modifier) },
     sound = SeasonalSound.HAUNTED_ORGAN,
 )

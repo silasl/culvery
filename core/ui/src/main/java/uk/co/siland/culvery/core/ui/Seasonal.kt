@@ -9,7 +9,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.MonthDay
 import kotlinx.coroutines.flow.StateFlow
@@ -64,32 +63,6 @@ fun colorsFor(seasonal: SeasonalTheme?, dark: Boolean): HhColors = when {
     dark -> seasonal.look.night
     else -> seasonal.look.day
 }
-
-object SeasonalDimens {
-    /** How far the Today card's cobweb reaches from the card's top-right corner. */
-    val webSpan = 88.dp
-    val webStroke = 1.dp
-
-    /** A bat's width, wing tip to wing tip; its height is half. */
-    val batSpan = 26.dp
-
-    /** The sky's room is Home's header, from this far right of the clock and date to this far left of the header items. */
-    val skyGap = 24.dp
-
-    /** The moon's size, and how far its edge sits inside the sky's top and right edges. */
-    val moonRadius = 30.dp
-    val moonEnd = 12.dp
-    val moonTop = 8.dp
-
-    /** The tops of the two lanes the bats fly in, from the sky's top. */
-    val batLanes = listOf(14.dp, 84.dp)
-}
-
-/** How long a bat takes to cross the sky and come back in at the left. */
-const val BAT_LAP_MS = 45_000L
-
-/** The sky moves at most this often, about 15 frames a second. */
-const val SKY_FRAME_MS = 66L
 
 /** What Home's header measures, in pixels; Home sets it and the sky reads it when it draws, so a change redraws only the sky. */
 class HomeSkyBand {

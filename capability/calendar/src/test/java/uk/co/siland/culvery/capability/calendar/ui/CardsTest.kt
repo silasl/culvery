@@ -57,7 +57,7 @@ import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HalloweenNight
-import uk.co.siland.culvery.core.ui.SeasonalDimens
+import uk.co.siland.culvery.core.ui.HalloweenDimens
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertAccessible
@@ -307,7 +307,7 @@ class CardsTest {
         compose.onNodeWithText("See the week").assertExists()
     }
 
-    /** The card's pixels in the [SeasonalDimens.webSpan] squares that aren't [surf], outside the buttons and the rounded corner. */
+    /** The card's pixels in the [HalloweenDimens.webSpan] squares that aren't [surf], outside the buttons and the rounded corner. */
     private inner class WebCorners(val surf: Color) {
         private val card = compose.onNodeWithTag("calendar_today")
         private val node = card.fetchSemanticsNode()
@@ -317,7 +317,7 @@ class CardsTest {
         private val buttons = listOf("today_add" to true, "See the week" to false).map { (name, tag) ->
             (if (tag) compose.onNodeWithTag(name) else compose.onNodeWithText(name)).fetchSemanticsNode().boundsInWindow
         }
-        private val span = (SeasonalDimens.webSpan.value * density).toInt()
+        private val span = (HalloweenDimens.webSpan.value * density).toInt()
         private val arc = (CalendarDimens.cardRadius.value * density).toInt()
 
         private fun differs(x: Int, y: Int) = image.getPixel(x, y) != surf.toArgb() && buttons.none { it.contains(Offset(x + 0.5f, y + 0.5f)) }

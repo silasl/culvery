@@ -51,15 +51,15 @@ fun HomeScreen(now: () -> LocalDateTime, layout: HomeLayout, headerItems: List<H
     }
 }
 
+/** Tells the sky how big a part of the header is, where the theme has a sky to place (14 §4.3). */
+private fun Modifier.measuring(band: HomeSkyBand?, set: HomeSkyBand.(Int, Int) -> Unit): Modifier =
+    if (band == null) this else onSizeChanged { band.set(it.width, it.height) }
+
 /**
  * Clock and date, the date [ShellDimens.clockToDate] below the clock's line box (9 §4.2); the
  * capabilities' items at the right, in the width the clock and date leave less [HEADER_ITEM_GAP], their bottom
  * [HEADER_ITEMS_BOTTOM] above the date's (4b design §4.1, 4d-1 §6.2).
  */
-/** Tells the sky how big a part of the header is, where the theme has a sky to place (14 §4.3). */
-private fun Modifier.measuring(band: HomeSkyBand?, set: HomeSkyBand.(Int, Int) -> Unit): Modifier =
-    if (band == null) this else onSizeChanged { band.set(it.width, it.height) }
-
 @Composable
 fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modifier = Modifier) {
     val c = Culvery.colors
