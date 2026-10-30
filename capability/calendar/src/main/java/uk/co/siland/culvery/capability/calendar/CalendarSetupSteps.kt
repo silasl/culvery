@@ -48,5 +48,5 @@ class CalendarsPage(private val review: CalendarReview, private val connections:
     override val order = 400
 
     @Composable
-    override fun Content() = ReviewCalendarsHost(review, connections, clock, CALENDARS, offerConnect = true)
+    override fun Content() = ReviewCalendarsHost(review, connections, clock, CALENDARS, offerConnect = true, offerWeeks = true)
 }

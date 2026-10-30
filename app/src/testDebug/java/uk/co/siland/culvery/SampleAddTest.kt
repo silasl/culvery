@@ -19,6 +19,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarPermissionSource
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
+import uk.co.siland.culvery.capability.calendar.CalendarSettings
 import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.CalendarSync
 import uk.co.siland.culvery.capability.calendar.CalendarSyncLoop
@@ -112,8 +113,8 @@ class SampleAddTest {
         val lock = CalendarWriteLock()
         val undone = UndoneKeys()
         val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock, SourceRefresher(store, household, clock, toasts), undone)
-        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, FirstDraw().also { it.markDrawn() }, backgroundScope), lock, household, setOf(fake), undone)
-        val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake))
+        val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake), CalendarSettings(ApplicationProvider.getApplicationContext(), backgroundScope))
+        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, FirstDraw().also { it.markDrawn() }, backgroundScope), lock, household, setOf(fake), undone, repo)
         sync.syncAll()
 
         val today = LocalDate.now(london)

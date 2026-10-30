@@ -28,7 +28,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
 import kotlinx.coroutines.delay
-import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.MonthTitle
 import uk.co.siland.culvery.capability.calendar.isStaleAt
 import uk.co.siland.culvery.capability.calendar.monthTitle
@@ -110,7 +109,7 @@ internal fun WeekHeader(
         if (state.weeksAhead > 0) {
             HhButton("This week", { onWeeksAhead(0) }, Modifier.testTag("week_this_week"), on = ButtonSurface.Bg)
         }
-        NavPill(state.weeksAhead, onWeeksAhead)
+        NavPill(state.weeksAhead, state.maxWeeksAhead, onWeeksAhead)
         if (onAdd != null) {
             HhButton(
                 "Add event", { onAdd(null) }, Modifier.testTag("week_add_event"),
@@ -138,7 +137,7 @@ private fun MonthTitleText(title: MonthTitle) {
 
 /** ‹ and › on one `surf2` pill; an arrow at its end is the shared disabled button. */
 @Composable
-private fun NavPill(weeksAhead: Int, onWeeksAhead: (Int) -> Unit) {
+private fun NavPill(weeksAhead: Int, max: Int, onWeeksAhead: (Int) -> Unit) {
     Row(
         modifier = Modifier
             .testTag("week_nav_pill")
@@ -151,7 +150,7 @@ private fun NavPill(weeksAhead: Int, onWeeksAhead: (Int) -> Unit) {
         )
         HhRoundButton(
             Icons.CHEVRON_RIGHT, "Later week", { onWeeksAhead(weeksAhead + 1) }, Modifier.testTag("week_later"),
-            enabled = weeksAhead < MAX_WEEKS_AHEAD, on = ButtonSurface.Surf,
+            enabled = weeksAhead < max, on = ButtonSurface.Surf,
         )
     }
 }

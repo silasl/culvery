@@ -38,6 +38,7 @@ import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.stubEditor
+import uk.co.siland.culvery.capability.calendar.testCalendarSettings
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
@@ -88,7 +89,7 @@ class OpenEventTest {
             ),
             TEST_TODAY,
         )
-        repo = CalendarRepository(store, household, zone, emptySet(), emptySet())
+        repo = CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings())
         editor = stubEditor(store, zone)
     }
 
@@ -101,7 +102,7 @@ class OpenEventTest {
     /** The Family calendar as a writable master whose provider has a writer, so the add entry points show. */
     private fun makeFamilyTheWritableMaster() {
         runBlocking { store.setMaster("c1", "s-family", TEST_TODAY, TEST_ZONE) }
-        repo = CalendarRepository(store, household, zone, emptySet(), setOf(ScriptedWriter("calendar.test")))
+        repo = CalendarRepository(store, household, zone, emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings())
         editor = stubEditor(store, zone, WallClock { SampleUi.NOW })
     }
 
@@ -164,7 +165,7 @@ class OpenEventTest {
 
     @Test
     fun withNoMasterThereIsNowhereToAdd() {
-        repo = CalendarRepository(store, household, zone, emptySet(), setOf(ScriptedWriter("calendar.test")))
+        repo = CalendarRepository(store, household, zone, emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings())
         showBothHosts()
         assertNowhereToAdd()
     }

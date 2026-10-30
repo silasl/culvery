@@ -176,7 +176,7 @@ internal fun EventEditorHost(
 
     // The event's first date shows on the week (9 §3.1 After Add); past the weeks shown, the toast names it instead (9 §3.4).
     fun showAdded(day: LocalDate) {
-        val weeks = weeksTo(form.today, day) ?: return
+        val weeks = weeksTo(form.today, day, repo.shown.value) ?: return
         weekFocus.show(weeks)
         navigator?.openTab(CALENDAR_TAB_ID)
     }

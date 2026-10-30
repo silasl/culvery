@@ -16,6 +16,7 @@ import uk.co.siland.culvery.capability.calendar.EventWhen
 import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
@@ -37,7 +38,7 @@ class ClashLineTest {
                 EventTime.Timed(friday.plusDays(1).atTime(0, 25).atZone(LONDON).toInstant()),
             ),
         ),
-        lastDay = lastShownDay(SampleUi.TODAY),
+        lastDay = lastShownDay(SampleUi.TODAY, WeeksShown.EIGHT),
         unhealthy = emptySet(),
         firstDay = SampleUi.TODAY,
     )

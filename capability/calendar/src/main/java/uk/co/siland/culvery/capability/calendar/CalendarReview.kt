@@ -56,11 +56,15 @@ class CalendarReview @Inject constructor(
     private val toaster: Toaster,
     private val zone: HouseholdZone,
     private val clock: WallClock,
+    private val settings: CalendarSettings,
     private val accountUses: Set<@JvmSuppressWildcards AccountUse> = emptySet(),
 ) {
     val connections: Flow<List<ReviewConnection>> = combine(calendarConnections.rows, store.sources()) { rows, sources ->
         rows.map { row -> ReviewConnection(row, sources.filter { it.connectionId == row.connection.id }) }
     }
+
+    /** How many weeks the Calendar tab shows (15a §2.3). */
+    val weeksShown: Flow<WeeksShown> = settings.shown
 
     /** Family first, then the household: the person chips. */
     val people: Flow<List<Person>> = household.peopleWithFamily
@@ -83,6 +87,11 @@ class CalendarReview @Inject constructor(
     suspend fun makeMaster(source: StoredSource): Boolean = change {
         setup.setMaster(source.connectionId, source.source.id, today(), zone.current())
         toaster.show(newEventsGoTo(source.source.name))
+    }
+
+    /** The weeks ahead the Calendar tab steps through; the sync reads 12 whatever is chosen, so nothing is requested. */
+    suspend fun setShown(shown: WeeksShown): Boolean = change {
+        settings.setShown(shown)
     }
 
     /** For the disconnect confirmation; changes nothing, so it asks for no PIN. */

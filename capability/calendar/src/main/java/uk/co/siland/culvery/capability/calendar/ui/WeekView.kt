@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -74,11 +75,11 @@ import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
-import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.MONTH_SHORT
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.whoLineForms
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.ui.Culvery
@@ -97,6 +98,8 @@ data class WeekViewState(
     val nowMillis: Long,
     val weeksAhead: Int = 0,
     val loadedWeeksAhead: Int? = null,
+    /** The furthest week › steps to: the weeks Settings shows, less this one. */
+    val maxWeeksAhead: Int = WeeksShown.EIGHT.weeksAfter,
 )
 
 /** One chip for every connection needing sign-in: the service by name, or how many accounts (4d-2 C20). */
@@ -105,7 +108,7 @@ internal fun reconnectLabel(services: List<String>): String =
 
 /**
  * Seven days with person-tinted chips and the sync state (9 §4.7). ‹ › step a week at a time, from this week (today and
- * six days) to [MAX_WEEKS_AHEAD] weeks on, inside the synced window (4c D10), through [onWeeksAhead]; This week jumps
+ * six days) to the last week Settings shows, inside the synced window (4c D10; 15a §2.3), through [onWeeksAhead]; This week jumps
  * back. With [onAdd] (there is a writable master calendar), Add event adds with no day chosen (9 §5 call 9), and a tap on
  * the space below a column's chips adds on that column's day, with a ghost while pressed; chip taps still open their event. The
  * reconnect chip runs [onReconnect] (3a design §4.3) and Update now runs [onUpdateNow] ([WeekHeader]).
@@ -440,14 +443,21 @@ internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Un
 /** After this long without a touch, a later week goes back to this week (4c §6.6). */
 internal const val BACK_TO_THIS_WEEK_MS = 120_000L
 
-/** Which week the Calendar tab shows (4c D10): [weeks] after this one, 0 to [MAX_WEEKS_AHEAD]. */
+/** Which week the Calendar tab shows (4c D10): [weeks] after this one, 0 to [max], which Settings can lower (15a §2.3). */
 @Stable
-internal class WeekShown {
+internal class WeekShown(max: Int) {
+    var max by mutableIntStateOf(max)
+        private set
     var weeks by mutableIntStateOf(0)
         private set
 
     fun show(weeks: Int) {
-        this.weeks = weeks.coerceIn(0, MAX_WEEKS_AHEAD)
+        this.weeks = weeks.coerceIn(0, max)
+    }
+
+    fun limit(max: Int) {
+        this.max = max
+        weeks = weeks.coerceIn(0, max)
     }
 }
 
@@ -457,8 +467,9 @@ internal class WeekShown {
  * is on, where it would move the page under a reader (4d-2 §6.4).
  */
 @Composable
-internal fun rememberWeekShown(today: LocalDate): WeekShown {
-    val shown = remember(today) { WeekShown() }
+internal fun rememberWeekShown(today: LocalDate, max: Int): WeekShown {
+    val shown = remember(today) { WeekShown(max) }
+    SideEffect { shown.limit(max) }
     val activity = LocalUserActivity.current
     val exploring by activity.exploring.collectAsState()
     // Collecting inside the effect keeps a touch from recomposing the host.

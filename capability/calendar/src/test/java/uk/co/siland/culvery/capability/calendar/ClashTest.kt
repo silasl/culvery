@@ -45,7 +45,7 @@ class ClashTest {
 
     private val piano = timed("Piano", thu1, "15:30", "16:15")
 
-    private fun held(vararg events: HeldEvent, lastDay: LocalDate = lastShownDay(today), unhealthy: Set<PersonId> = emptySet()) =
+    private fun held(vararg events: HeldEvent, lastDay: LocalDate = lastShownDay(today, WeeksShown.EIGHT), unhealthy: Set<PersonId> = emptySet()) =
         Held(events.toList(), lastDay, unhealthy, firstDay = today)
 
     private fun Held.check(people: List<Person>, day: LocalDate, start: String, length: Duration = fortyFive, except: EventRef? = null) =
@@ -195,7 +195,7 @@ class ClashTest {
 
     @Test
     fun aDayPastTheHeldWindowHasNoLine() {
-        val lastDay = lastShownDay(today)
+        val lastDay = lastShownDay(today, WeeksShown.EIGHT)
         val onLast = timed("Piano", lastDay, "15:30", "16:15")
         val after = timed("Piano next", lastDay.plusDays(1), "15:30", "16:15")
         val h = held(onLast, after)

@@ -27,6 +27,7 @@ import uk.co.siland.culvery.capability.calendar.READ_REFUSED
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.SourceMapping
 import uk.co.siland.culvery.capability.calendar.StoredSource
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
@@ -67,8 +68,8 @@ class ReviewScreenshotTest {
         listOf(ReviewConnection(CalendarRow(google, "Google Calendar", "calendar_month", health, now - 2 * 60_000), sources))
 
     @Composable
-    private fun Review(title: String, health: ConnectionHealth, picking: String? = null, confirming: Confirming? = null) = ReviewCalendars(
-        title, connections(health), listOf(Person.Family, sam, mia), now, false, picking, confirming, emptyList(), ReviewActions(),
+    private fun Review(title: String, health: ConnectionHealth, picking: String? = null, confirming: Confirming? = null, weeks: WeeksShown? = null) = ReviewCalendars(
+        title, connections(health), listOf(Person.Family, sam, mia), now, false, picking, confirming, emptyList(), ReviewActions(), weeks = weeks,
     )
 
     /** Draws [content] on the canvas, runs [before] (a tap, say), then captures it as [name]. */
@@ -164,7 +165,7 @@ class ReviewScreenshotTest {
             StillPage("people", "People", 100) {},
             StillPage("calendars", "Calendars", 400) {
                 if (connected) {
-                    Review("Calendars", ConnectionHealth.Ok)
+                    Review("Calendars", ConnectionHealth.Ok, weeks = WeeksShown.EIGHT)
                 } else {
                     ReviewCalendars(
                         title = "Calendars", connections = emptyList(), people = listOf(Person.Family), nowMillis = now, busy = false,

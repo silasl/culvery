@@ -81,6 +81,7 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.testAccess
 import uk.co.siland.culvery.capability.calendar.testEditor
+import uk.co.siland.culvery.capability.calendar.testCalendarSettings
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -160,7 +161,7 @@ class EventEditorHostTest {
             ),
             TEST_TODAY,
         )
-        repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer))
+        repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer), testCalendarSettings())
         editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { now }, scope)
     }
 
@@ -358,7 +359,7 @@ class EventEditorHostTest {
         access.answer(TestAccess.ALEX)
         showWeek()
         waitForTag("week_add_event")
-        compose.runOnIdle { open(EditorRequest.New(day.plusDays(40), EditorFrom.Calendar)) }
+        compose.runOnIdle { open(EditorRequest.New(day.plusDays(60), EditorFrom.Calendar)) }
         waitForTag("editor_title")
         fillTitleAndAlex()
         compose.onNodeWithTag("editor_save").performClick()
@@ -366,7 +367,7 @@ class EventEditorHostTest {
         compose.waitForIdle()
         compose.onNode(androidx.compose.ui.test.hasText("This week", substring = true)).assertExists()
         assertThat(weekFocus.requested.value).isNull()
-        assertThat(access.toasts.messages).containsExactly("Added Dinner, Mon 2 Nov.")
+        assertThat(access.toasts.messages).containsExactly("Added Dinner, Sun 22 Nov.")
         assertThat(access.toasts.actions.single().label).isEqualTo(UNDO)
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -402,14 +403,14 @@ class EventEditorHostTest {
     @Test
     fun afterAddFromHomePastTheWeeksReachStaysOnHome() {
         access.answer(TestAccess.ALEX)
-        newEvent(day.plusDays(40), EditorFrom.Home)
+        newEvent(day.plusDays(60), EditorFrom.Home)
         waitForText("Add event")
         fillTitleAndAlex()
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(navigator.tabs).isEmpty()
         assertThat(weekFocus.requested.value).isNull()
-        assertThat(access.toasts.messages).containsExactly("Added Dinner, Mon 2 Nov.")
+        assertThat(access.toasts.messages).containsExactly("Added Dinner, Sun 22 Nov.")
         compose.assertClickablesHaveRoleAndLabel()
     }
 

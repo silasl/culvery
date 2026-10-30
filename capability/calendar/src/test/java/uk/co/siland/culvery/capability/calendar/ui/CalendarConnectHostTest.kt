@@ -45,6 +45,7 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.stubEditor
 import uk.co.siland.culvery.capability.calendar.testAccess
+import uk.co.siland.culvery.capability.calendar.testCalendarSettings
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -102,7 +103,7 @@ class CalendarConnectHostTest {
         access = testAccess(household, scope, clock, scope)
         val setup = CalendarSetup(store, setOf(google), { household.people.first() }, access.toasts, clock, EmptyCoroutineContext, PROVIDER_TIMEOUT_MS)
         connections = CalendarConnections(store, setup, access.control, setOf(google), scope)
-        review = CalendarReview(store, setup, connections, household, access.control, access.toasts, HouseholdZone(household), clock)
+        review = CalendarReview(store, setup, connections, household, access.control, access.toasts, HouseholdZone(household), clock, testCalendarSettings())
     }
 
     @After
@@ -205,7 +206,7 @@ class CalendarConnectHostTest {
     fun theWizardsCalendarsStepHasItsLine() {
         runBlocking { store.addConnection(googleConnection, google.sourceList, emptyMap(), masterSourceId = "family@example.com") }
         val clock = HouseholdClock(HouseholdZone(household).zone, WallClock { System.currentTimeMillis() }, scope)
-        val step = ReviewCalendarsStep(CalendarRepository(store, household, HouseholdZone(household), setOf(google), emptySet()), review, connections, clock)
+        val step = ReviewCalendarsStep(CalendarRepository(store, household, HouseholdZone(household), setOf(google), emptySet(), testCalendarSettings()), review, connections, clock)
         compose.setContent { CulveryTheme(dark = true) { CompositionLocalProvider(LocalOverlayHost provides overlay, LocalShellNavigator provides RecordingNavigator()) { step.Content(onNext = {}) } } }
         waitFor { compose.onAllNodesWithText(YOUR_CALENDARS_LINE).fetchSemanticsNodes().isNotEmpty() }
     }
@@ -352,7 +353,7 @@ class CalendarConnectHostTest {
         google.connectsAs = googleConnection
         access.answer(TestAccess.ALEX)
         val zone = HouseholdZone(household)
-        val repo = CalendarRepository(store, household, zone, emptySet(), emptySet())
+        val repo = CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings())
         val editor = stubEditor(store, zone)
         compose.setContent {
             CompositionLocalProvider(

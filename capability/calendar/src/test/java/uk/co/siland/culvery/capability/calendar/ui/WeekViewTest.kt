@@ -60,10 +60,10 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import uk.co.siland.culvery.capability.calendar.DAY_AND_DATE
 import uk.co.siland.culvery.capability.calendar.EventRef
-import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.SyncProblem
 import uk.co.siland.culvery.capability.calendar.WeekUi
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
@@ -635,12 +635,12 @@ class WeekViewTest {
     fun theArrowsStepAWeekAndStopAtEachEnd() {
         val asked = mutableListOf<Int>()
         var weeks by mutableStateOf(0)
-        show { WeekView(state().copy(weeksAhead = weeks), onWeeksAhead = { asked += it; weeks = it }) }
+        show { WeekView(state().copy(weeksAhead = weeks, maxWeeksAhead = 3), onWeeksAhead = { asked += it; weeks = it }) }
         compose.onNodeWithTag("week_earlier").assertIsNotEnabled()
         compose.onNodeWithTag("week_this_week").assertDoesNotExist()
         compose.onNodeWithTag("week_later").performClick()
         compose.onNodeWithTag("week_subtitle").assert(hasText("Next week", substring = true))
-        repeat(MAX_WEEKS_AHEAD) { compose.onNodeWithTag("week_later").performClick() }
+        repeat(2) { compose.onNodeWithTag("week_later").performClick() }
         compose.onNodeWithTag("week_subtitle").assert(hasText("In 3 weeks", substring = true))
         compose.onNodeWithTag("week_later").assertIsNotEnabled()
         compose.onNodeWithTag("week_earlier").assertIsEnabled()
@@ -650,9 +650,21 @@ class WeekViewTest {
         compose.onNodeWithTag("week_this_week").assertDoesNotExist()
     }
 
+    /** 15a §2.3: with eight weeks chosen, › stops at the seventh week on. */
+    @Test
+    fun laterStopsAtTheLastChosenWeek() {
+        var weeks by mutableStateOf(0)
+        show { WeekView(state().copy(weeksAhead = weeks, maxWeeksAhead = WeeksShown.EIGHT.weeksAfter), onWeeksAhead = { weeks = it }) }
+        repeat(6) { compose.onNodeWithTag("week_later").performClick() }
+        compose.onNodeWithTag("week_later").assertIsEnabled()
+        compose.onNodeWithTag("week_later").performClick()
+        compose.onNodeWithTag("week_subtitle").assert(hasText("In 7 weeks", substring = true))
+        compose.onNodeWithTag("week_later").assertIsNotEnabled()
+    }
+
     @Test
     fun eachWeekHasItsTitle() {
-        assertThat((0..MAX_WEEKS_AHEAD).map(::weekTitle)).containsExactly("This week", "Next week", "In 2 weeks", "In 3 weeks").inOrder()
+        assertThat((0..3).map(::weekTitle)).containsExactly("This week", "Next week", "In 2 weeks", "In 3 weeks").inOrder()
     }
 
     /** 4c §6.6: on a later week, Add event opens with no day and a column on its own day; no column says Today. */
@@ -672,7 +684,7 @@ class WeekViewTest {
     private fun showShown(): () -> WeekShown {
         lateinit var shown: WeekShown
         show {
-            shown = rememberWeekShown(SampleUi.TODAY)
+            shown = rememberWeekShown(SampleUi.TODAY, max = 3)
             Text(weekTitle(shown.weeks))
         }
         return { shown }
@@ -744,16 +756,31 @@ class WeekViewTest {
         compose.onNodeWithTag("week_title").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
     }
 
+    /** 15a §2.3: a shorter setting steps a week past it back to its last. */
+    @Test
+    fun aShorterSettingStepsBack() {
+        var max by mutableStateOf(11)
+        lateinit var shown: WeekShown
+        show {
+            shown = rememberWeekShown(SampleUi.TODAY, max)
+            Text(weekTitle(shown.weeks))
+        }
+        compose.runOnIdle { shown.show(10) }
+        compose.onNodeWithText("In 10 weeks").assertExists()
+        max = 3
+        compose.onNodeWithText("In 3 weeks").assertExists()
+    }
+
     /** 4c §6.6: at midnight the view is back on this week, whatever it showed. */
     @Test
     fun aLaterWeekGoesBackToThisWeekAtMidnight() {
         var today by mutableStateOf(SampleUi.TODAY)
         lateinit var shown: WeekShown
         show {
-            shown = rememberWeekShown(today)
+            shown = rememberWeekShown(today, max = 3)
             Text(weekTitle(shown.weeks))
         }
-        compose.runOnIdle { shown.show(MAX_WEEKS_AHEAD + 1) }
+        compose.runOnIdle { shown.show(10) }
         compose.onNodeWithText("In 3 weeks").assertExists()
         today = today.plusDays(1)
         compose.onNodeWithText("This week").assertExists()

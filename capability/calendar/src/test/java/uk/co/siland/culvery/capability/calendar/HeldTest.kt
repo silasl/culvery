@@ -31,24 +31,24 @@ class HeldTest {
     fun dotsAreUpToThreeInHouseholdOrder() {
         val held = Held(
             listOf(event("Bins", sat26, Person.Family), event("Piano", sat26, mia), event("Swim", sat26, sam), event("Gym", sat26, alex)),
-            lastShownDay(today), emptySet(), firstDay = today,
+            lastShownDay(today, WeeksShown.EIGHT), emptySet(), firstDay = today,
         )
         assertThat(held.dots(sat26)).containsExactly(alex.color, sam.color, mia.color).inOrder()
         val sun27 = sat26.plusDays(1)
-        val withFamily = Held(listOf(event("Bins", sun27, Person.Family), event("Piano", sun27, mia)), lastShownDay(today), emptySet(), firstDay = today)
+        val withFamily = Held(listOf(event("Bins", sun27, Person.Family), event("Piano", sun27, mia)), lastShownDay(today, WeeksShown.EIGHT), emptySet(), firstDay = today)
         assertThat(withFamily.dots(sun27)).containsExactly(mia.color, Person.Family.color).inOrder()
     }
 
     @Test
     fun aSharedEventGivesEachPersonADot() {
-        val held = Held(listOf(event("Cinema", sat26, sam, mia)), lastShownDay(today), emptySet(), firstDay = today)
+        val held = Held(listOf(event("Cinema", sat26, sam, mia)), lastShownDay(today, WeeksShown.EIGHT), emptySet(), firstDay = today)
         assertThat(held.dots(sat26)).containsExactly(sam.color, mia.color).inOrder()
         assertThat(held.dots(sat26.plusDays(1))).isEmpty()
     }
 
     @Test
     fun noDotsPastTheHeldWindow() {
-        val lastDay = lastShownDay(today)
+        val lastDay = lastShownDay(today, WeeksShown.EIGHT)
         val held = Held(listOf(event("Piano", lastDay, mia), event("Piano", lastDay.plusDays(1), mia)), lastDay, emptySet(), firstDay = today)
         assertThat(held.dots(lastDay)).containsExactly(mia.color)
         assertThat(held.dots(lastDay.plusDays(1))).isEmpty()

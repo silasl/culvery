@@ -180,14 +180,11 @@ internal val FULL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d 
 
 internal const val DAYS_PER_WEEK = 7
 
-/** How many weeks past this one the Calendar tab steps to (4c D10): four weeks in all, inside the synced window. */
-const val MAX_WEEKS_AHEAD = 3
-
 /** Home's Today row for a multi-day event: where the time would be (9 §2.1). */
 fun dayOf(span: DaySpan): String = "Day ${span.day} of ${span.of}"
 
-/** The last day the Calendar tab can show from [today]: the seventh day of its furthest week. */
-fun lastShownDay(today: LocalDate): LocalDate = today.plusWeeks(MAX_WEEKS_AHEAD + 1L).minusDays(1)
+/** The last day the Calendar tab can show from [today] with [shown] weeks chosen: the seventh day of its furthest week. */
+fun lastShownDay(today: LocalDate, shown: WeeksShown): LocalDate = today.plusWeeks(shown.weeks.toLong()).minusDays(1)
 
 /** The Calendar tab's title for the week [weeksAhead] after this one. */
 fun weekTitle(weeksAhead: Int): String = when (weeksAhead) {
@@ -223,8 +220,8 @@ fun weekSubtitleLine(weeksAhead: Int, start: LocalDate, sync: String): String {
 private val AGE_LINES = listOf("Updated", "Out of date", "Not updated")
 
 /** How many weeks after this one the Calendar tab shows [date] in; null before [today] or past [lastShownDay]. */
-internal fun weeksTo(today: LocalDate, date: LocalDate): Int? =
-    if (date < today || date > lastShownDay(today)) null else (ChronoUnit.DAYS.between(today, date) / DAYS_PER_WEEK).toInt()
+internal fun weeksTo(today: LocalDate, date: LocalDate, shown: WeeksShown): Int? =
+    if (date < today || date > lastShownDay(today, shown)) null else (ChronoUnit.DAYS.between(today, date) / DAYS_PER_WEEK).toInt()
 
 /**
  * The toast after adding (9 §3.1): "Added Guitar lesson.", with a series' [wording] ("every Saturday"), and the first

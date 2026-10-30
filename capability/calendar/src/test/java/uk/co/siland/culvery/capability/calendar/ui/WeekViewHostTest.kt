@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -29,12 +30,14 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.WeekFocus
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDao
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.EventRow
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.stubEditor
+import uk.co.siland.culvery.capability.calendar.testCalendarSettings
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
@@ -97,12 +100,12 @@ class WeekViewHostTest {
         ).isTrue()
     }
 
-    private suspend fun showHost() {
+    private suspend fun showHost(focus: WeekFocus = WeekFocus(), shown: WeeksShown = WeeksShown.EIGHT) {
         val store = CalendarStore(calendar, dao)
         val household = HouseholdRepository(householdDb)
         val zone = HouseholdZone(household)
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
-        val repo = CalendarRepository(store, household, zone, emptySet(), emptySet())
+        val repo = CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings(shown))
         val editor = stubEditor(store, zone)
         val now = LocalDateTime.of(2026, 9, 23, 12, 0).atZone(london).toInstant().toEpochMilli()
         val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, MutableStateFlow(now))
@@ -114,7 +117,7 @@ class WeekViewHostTest {
             ) {
                 CulveryTheme(dark = true) {
                     val today = rememberToday(clock) ?: return@CulveryTheme
-                    WeekViewHost(repo, editor, WeekFocus(), today, rememberNowMillis(clock), onReconnect = {})
+                    WeekViewHost(repo, editor, focus, today, rememberNowMillis(clock), onReconnect = {})
                 }
             }
         }
@@ -154,6 +157,23 @@ class WeekViewHostTest {
         gate.complete(Unit)
         stepUntil("2026-09-30")
         assertThat(subtitle()).startsWith("Next week · Wed 30 Sep – Tue 6 Oct")
+    }
+
+    /** 15a §2.3: a week asked for past the setting's last shows the last. */
+    @Test
+    fun aFocusPastTheMaxShowsTheLastWeek() = runTest {
+        val focus = WeekFocus()
+        showHost(focus, WeeksShown.FOUR)
+        focus.show(10)
+        val deadline = System.currentTimeMillis() + 5_000
+        while (compose.onAllNodesWithTag("week_day_2026-10-14").fetchSemanticsNodes().isEmpty()) {
+            check(System.currentTimeMillis() < deadline) { "The last week never loaded" }
+            compose.mainClock.advanceTimeByFrame()
+            Thread.sleep(10)
+        }
+        compose.mainClock.advanceTimeByFrame()
+        assertThat(subtitle()).startsWith("In 3 weeks · Wed 14 – Tue 20 Oct")
+        compose.onNodeWithTag("week_later").assertIsNotEnabled()
     }
 
     @Test

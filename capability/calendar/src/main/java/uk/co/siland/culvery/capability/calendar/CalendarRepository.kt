@@ -9,6 +9,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -31,6 +32,7 @@ class CalendarRepository @Inject constructor(
     private val zone: HouseholdZone,
     providers: Set<@JvmSuppressWildcards CalendarProvider>,
     writers: Set<@JvmSuppressWildcards CalendarWriter>,
+    settings: CalendarSettings,
     private val clock: WallClock = WallClock(System::currentTimeMillis),
 ) {
     private val writerIds = writers.map { it.providerId }.toSet()
@@ -41,6 +43,9 @@ class CalendarRepository @Inject constructor(
             .filter { Feature.WRITE in it.descriptor.features && it.descriptor.id !in writerIds }
             .forEach { Log.w(TAG, "${it.descriptor.id} declares WRITE but binds no CalendarWriter; its events are read-only") }
     }
+
+    /** How many weeks the Calendar tab shows; the sync reads 12 whatever it is (15a §2.3). */
+    val shown: StateFlow<WeeksShown> = settings.current
 
     /** Titles remembered from visible calendars, matched as a new event's title is typed (9c §4). */
     val suggestions = TitleSuggestions(store)
@@ -114,20 +119,21 @@ class CalendarRepository @Inject constructor(
 
     /**
      * What the editor's dots and clash check read (9 §3.1): today to the last day every connection's last sync covers
-     * (no later than [lastShownDay]), with queued changes laid over it. A connection that needs signing in, is out of
+     * (no later than [lastShownDay] for the weeks [shown]), with queued changes laid over it. A connection that needs signing in, is out of
      * date or has never synced, and a calendar the service refuses, mark their people unhealthy; on the master
      * calendar, where anyone's events are tagged, that is everyone.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun held(today: LocalDate): Flow<Held> = zone.zone.flatMapLatest { z ->
+    fun held(today: LocalDate): Flow<Held> = combine(zone.zone, shown, ::Pair).flatMapLatest { (z, weeks) ->
         val from = millis(today, z) - ZONE_MARGIN_MS
-        val to = millis(lastShownDay(today).plusDays(1), z) + ZONE_MARGIN_MS
+        val shownLast = lastShownDay(today, weeks)
+        val to = millis(shownLast.plusDays(1), z) + ZONE_MARGIN_MS
         combine(store.eventsBetween(from, to), store.pending(), store.sources(), store.connections(), household.peopleWithFamily) { events, pending, sources, connections, people ->
             val cat = SourceCatalog(sources, connections, writerIds, serviceNames)
             val byId = people.associateBy { it.id }
             val order = people.map { it.id }
             val synced = connections.mapNotNull { c -> c.lastSyncMillis?.let { Instant.ofEpochMilli(it).atZone(z).toLocalDate().plusDays(SYNC_FUTURE_DAYS) } }
-            val lastDay = (synced + lastShownDay(today)).min()
+            val lastDay = (synced + shownLast).min()
             val shown = overlayPending(events, pending, cat::source, z, from, to)
                 .map { it.event }
                 .filter { e -> daySpan(e.start, e.end, z).let { (first, last) -> first <= lastDay && last >= today } }

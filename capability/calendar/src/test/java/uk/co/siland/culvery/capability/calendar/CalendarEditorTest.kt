@@ -94,10 +94,10 @@ class CalendarEditorTest {
      * write open use Dispatchers.Default, so its 10 s timeout runs on real time and runTest can't skip past it
      * while the test waits for Room.
      */
-    private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext) = testEditor(
+    private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext, shown: WeeksShown = WeeksShown.EIGHT) = testEditor(
         store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { opened + testScheduler.currentTime },
         backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock, personOf = household::person,
-        order = { household.people.first().map { it.id } }, undone = undone,
+        order = { household.people.first().map { it.id } }, undone = undone, shown = { shown },
     )
 
     /** As the sheet chooses them: "key-1", "key-2"… in the order Save is tapped. */
@@ -130,10 +130,20 @@ class CalendarEditorTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
         val editor = editor(access)
-        val last = lastShownDay(LocalDate.of(2026, 9, 23))
+        val last = lastShownDay(LocalDate.of(2026, 9, 23), WeeksShown.EIGHT)
         assertThat(editor.create(draftOn(last, "Last shown"))).isEqualTo(EditResult.Done)
         assertThat(editor.create(draftOn(last.plusDays(1), "Beyond"))).isEqualTo(EditResult.Done)
         assertThat(access.toasts.messages).containsExactly(addedLine("Last shown", null, null), addedLine("Beyond", null, last.plusDays(1))).inOrder()
+    }
+
+    @Test
+    fun aShorterSettingNamesTheDayWhereALongerOneWouldNot() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access, shown = WeeksShown.FOUR)
+        val day = lastShownDay(LocalDate.of(2026, 9, 23), WeeksShown.FOUR).plusDays(1)
+        assertThat(editor.create(draftOn(day, "Past four weeks"))).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages).containsExactly(addedLine("Past four weeks", null, day))
     }
 
     @Test
@@ -141,10 +151,10 @@ class CalendarEditorTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
         val editor = editor(access)
-        val start = LocalDate.of(2026, 10, 23).atTime(18, 0).atZone(london).toInstant()
-        val end = LocalDate.of(2026, 10, 25).atTime(16, 0).atZone(london).toInstant()
+        val start = LocalDate.of(2026, 11, 20).atTime(18, 0).atZone(london).toInstant()
+        val end = LocalDate.of(2026, 11, 22).atTime(16, 0).atZone(london).toInstant()
         assertThat(editor.create(EventDraft("Camp", EventTime.Timed(start), EventTime.Timed(end), PersonId.FAMILY.value, null))).isEqualTo(EditResult.Done)
-        assertThat(access.toasts.messages).containsExactly("Added Camp, Fri 23 – Sun 25 Oct.")
+        assertThat(access.toasts.messages).containsExactly("Added Camp, Fri 20 – Sun 22 Nov.")
     }
 
     @Test

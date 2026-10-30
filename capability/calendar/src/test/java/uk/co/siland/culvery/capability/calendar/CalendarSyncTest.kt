@@ -115,12 +115,34 @@ class CalendarSyncTest {
 
     private suspend fun health(id: String) = store.connectionsNow().single { it.connection.id == id }.health
 
-    /** 4c D10: the Calendar tab's furthest day is inside the window each pass keeps. */
+    /** 15a §2.3: the furthest day the longest setting shows is inside the window each pass keeps. */
     @Test
     fun theFurthestWeekShownIsInsideTheWindow() {
         val today = LocalDate.of(2026, 9, 24)
-        assertThat(lastShownDay(today)).isEqualTo(LocalDate.of(2026, 10, 21))
-        assertThat(lastShownDay(today)).isAtMost(today.plusDays(SYNC_FUTURE_DAYS))
+        assertThat(lastShownDay(today, WeeksShown.TWELVE)).isEqualTo(LocalDate.of(2026, 12, 16))
+        assertThat(lastShownDay(today, WeeksShown.TWELVE)).isAtMost(today.plusDays(SYNC_FUTURE_DAYS))
+    }
+
+    /** 15a §2.3: the sync always reads twelve weeks, whatever Settings shows. */
+    @Test
+    fun theWindowIsTwelveWeeks() = runTest {
+        connect("c1", "calendar.a", s1)
+        engine().syncAll()
+        val today = LocalDate.of(2026, 9, 23)
+        assertThat(a.calls.single().range.endExclusive).isEqualTo(today.plusDays(85 + SYNC_AHEAD_DAYS))
+    }
+
+    /** A token from the old four-week window doesn't cover twelve: one full read, then the new token serves. */
+    @Test
+    fun aWiderWindowReadsInFullOnce() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = engine()
+        val today = LocalDate.of(2026, 9, 23)
+        val old = DateRange(today.minusDays(1), today.plusDays(29), london)
+        store.applySync("c1", "s1", DateRange(old.start, old.endExclusive.plusDays(SYNC_AHEAD_DAYS), london), SyncResult(emptyList(), emptyList(), SyncCursor("old"), fullReplace = true), today)
+        sync.syncAll()
+        sync.syncAll()
+        assertThat(a.calls.map { it.cursor }).containsExactly(null, SyncCursor("k1")).inOrder()
     }
 
     @Test
@@ -161,7 +183,7 @@ class CalendarSyncTest {
         now = Instant.parse("2026-09-23T13:00:00Z") // already 24 September in Auckland
         sync.syncAll()
         val auckland = ZoneId.of("Pacific/Auckland")
-        assertThat(a.calls.single().range).isEqualTo(DateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 12, 4), auckland))
+        assertThat(a.calls.single().range).isEqualTo(DateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2027, 1, 29), auckland))
     }
 
     @Test
@@ -204,7 +226,7 @@ class CalendarSyncTest {
         val sync = engine()
         a.events = { listOf(swim()) }
         sync.syncAll()
-        a.events = { listOf(swim(), at("2026-12-25T12:00:00Z", "Christmas lunch"), at("2026-09-01T10:00:00Z", "Long ago")) }
+        a.events = { listOf(swim(), at("2027-02-01T12:00:00Z", "Far away"), at("2026-09-01T10:00:00Z", "Long ago")) }
         now = now.plusSeconds(300)
         sync.syncAll()
         assertThat(a.calls.last().cursor).isNotNull()

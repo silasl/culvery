@@ -49,6 +49,7 @@ class WeekScreenshotTest {
     private fun snap(name: String, dark: Boolean, sync: SyncStatusUi, week: WeekUi = SampleUi.week,
         canAdd: Boolean = false,
         weeksAhead: Int = 0,
+        maxWeeksAhead: Int = 7,
         fontScale: Float = 1f,
         whileHolding: (() -> Unit)? = null,
     ) {
@@ -57,7 +58,7 @@ class WeekScreenshotTest {
                 CulveryTheme(dark = dark) {
                     WithFontScale(fontScale) {
                         Box(Modifier.testTag("shot").background(Culvery.colors.bg).size(CONTENT_W, CONTENT_H)) {
-                            WeekView(WeekViewState(week, SampleUi.TODAY, sync, now, weeksAhead), onAdd = addNothing.takeIf { canAdd })
+                            WeekView(WeekViewState(week, SampleUi.TODAY, sync, now, weeksAhead, maxWeeksAhead = maxWeeksAhead), onAdd = addNothing.takeIf { canAdd })
                         }
                     }
                 }
@@ -124,6 +125,6 @@ class WeekScreenshotTest {
         assertThat(labelTop).isAtLeast(column.top)
         assertThat(labelTop + labelNode.size.height).isLessThan(date.top + date.height / 2)
     }
-    @Test fun weekFurthestLight() = snap("week_furthest_light", false, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
-    @Test fun weekFurthestDark() = snap("week_furthest_dark", true, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
+    @Test fun weekFurthestLight() = snap("week_furthest_light", false, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3, maxWeeksAhead = 3)
+    @Test fun weekFurthestDark() = snap("week_furthest_dark", true, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3, maxWeeksAhead = 3)
 }

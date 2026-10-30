@@ -50,7 +50,7 @@ class CalendarRepositoryTest {
         householdDb = householdDb()
         store = CalendarStore(calendar)
         household = HouseholdRepository(householdDb)
-        repo = CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")))
+        repo = CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings())
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
         sam = household.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
@@ -300,7 +300,7 @@ class CalendarRepositoryTest {
     fun hasConnectionsFollowsTheStore() = runTest {
         val emptyDb = calendarDb()
         val emptyStore = CalendarStore(emptyDb)
-        val emptyRepo = CalendarRepository(emptyStore, household, HouseholdZone(household), emptySet(), emptySet())
+        val emptyRepo = CalendarRepository(emptyStore, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings())
         assertThat(emptyRepo.hasConnections.first()).isFalse()
         emptyStore.addConnection(Connection("c9", "calendar.test", "Other", emptyMap()), emptyList(), emptyMap())
         assertThat(emptyRepo.hasConnections.first()).isTrue()
@@ -408,7 +408,7 @@ class CalendarRepositoryTest {
 
     @Test
     fun aMasterWhoseProviderHasNoWriterIsReadOnly() = runTest {
-        val noWriter = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet())
+        val noWriter = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings())
         put("s-family", timed("Boiler service", 23, 10, 0, 60))
         assertThat(noWriter.day(sept(23)).first().single().readOnlyReason).isEqualTo(ReadOnlyReason.OtherCalendar)
     }
@@ -544,14 +544,14 @@ class CalendarRepositoryTest {
 
     @Test
     fun thereIsNowhereToAddWithoutAWriterForTheMaster() = runTest {
-        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet())
+        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings())
         assertThat(readOnly.masterService.first()).isNull()
     }
 
     @Test
     fun theMasterCalendarNameIsTheCalendarNewEventsGoTo() = runTest {
         assertThat(repo.masterCalendarName.first()).isEqualTo("Family")
-        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet())
+        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings())
         assertThat(readOnly.masterCalendarName.first()).isNull()
     }
 
@@ -608,7 +608,7 @@ class CalendarRepositoryTest {
     @Test
     fun eventsNameTheirServiceAndSayHowTheyRepeat() = runTest {
         val google = ScriptedProvider("calendar.test", displayName = "Google Calendar")
-        val named = CalendarRepository(store, household, HouseholdZone(household), setOf(google), setOf(ScriptedWriter("calendar.test")))
+        val named = CalendarRepository(store, household, HouseholdZone(household), setOf(google), setOf(ScriptedWriter("calendar.test")), testCalendarSettings())
         put("s-family", timed("Piano", 23, 15, 30, 60).copy(recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY"))
         val piano = named.day(LocalDate.of(2026, 9, 23)).first().single { it.title == "Piano" }
         assertThat(piano.serviceName).isEqualTo("Google Calendar")
@@ -621,10 +621,10 @@ class CalendarRepositoryTest {
 
     private fun noonOn(date: LocalDate) = date.atTime(12, 0).atZone(london).toInstant().toEpochMilli()
 
-    private val wideWindow = DateRange(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 11, 1), london)
+    private val wideWindow = DateRange(LocalDate.of(2026, 9, 1), LocalDate.of(2027, 1, 1), london)
 
-    private fun heldRepo(nowMillis: Long = noonOn(sept(23))) =
-        CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), WallClock { nowMillis })
+    private fun heldRepo(nowMillis: Long = noonOn(sept(23)), shown: WeeksShown = WeeksShown.EIGHT) =
+        CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings(shown), WallClock { nowMillis })
 
     private fun onDay(title: String, date: LocalDate, forPerson: String? = null): RemoteEvent {
         val start = date.atTime(10, 0).atZone(london).toInstant()
@@ -633,7 +633,7 @@ class CalendarRepositoryTest {
 
     @Test
     fun heldCoversTodayToTheLastShownDayWithQueuedChanges() = runTest {
-        val last = lastShownDay(sept(23))
+        val last = lastShownDay(sept(23), WeeksShown.EIGHT)
         store.applySync(
             "c1", "s-family", wideWindow,
             SyncResult(
@@ -660,15 +660,26 @@ class CalendarRepositoryTest {
     @Test
     fun aStaleSyncHoldsFewerDays() = runTest {
         val syncDay = sept(23).minusDays(5)
-        store.applySync("c1", "s-family", wideWindow, SyncResult(listOf(onDay("Held", sept(23).plusDays(23)), onDay("Not held", sept(23).plusDays(24))), emptyList(), null, fullReplace = true), TEST_TODAY)
+        store.applySync("c1", "s-family", wideWindow, SyncResult(listOf(onDay("Held", sept(23).plusDays(79)), onDay("Not held", sept(23).plusDays(80))), emptyList(), null, fullReplace = true), TEST_TODAY)
         store.markSynced("c1", noonOn(syncDay))
 
-        val held = heldRepo().held(sept(23)).first()
+        val held = heldRepo(shown = WeeksShown.TWELVE).held(sept(23)).first()
 
         assertThat(held.lastDay).isEqualTo(syncDay.plusDays(SYNC_FUTURE_DAYS))
-        assertThat(held.lastDay).isEqualTo(sept(23).plusDays(23))
-        assertThat(held.lastDay).isEqualTo(lastShownDay(sept(23)).minusDays(4))
+        assertThat(held.lastDay).isEqualTo(sept(23).plusDays(79))
+        assertThat(held.lastDay).isEqualTo(lastShownDay(sept(23), WeeksShown.TWELVE).minusDays(4))
         assertThat(held.events.map { it.title }).containsExactly("Held")
+    }
+
+    @Test
+    fun heldStopsAtTheLastShownDayOfAShorterSetting() = runTest {
+        store.applySync("c1", "s-family", wideWindow, SyncResult(listOf(onDay("In", sept(23).plusDays(27)), onDay("Out", sept(23).plusDays(28))), emptyList(), null, fullReplace = true), TEST_TODAY)
+        store.markSynced("c1", noonOn(sept(23)))
+
+        val held = heldRepo(shown = WeeksShown.FOUR).held(sept(23)).first()
+
+        assertThat(held.lastDay).isEqualTo(lastShownDay(sept(23), WeeksShown.FOUR))
+        assertThat(held.events.map { it.title }).containsExactly("In")
     }
 
     @Test

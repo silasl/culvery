@@ -25,6 +25,7 @@ import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.Suggestion
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -155,7 +156,7 @@ class AddEventScreenshotTest {
             val date = LocalDate.of(2026, 9, d)
             HeldEvent(EventRef("c1", "s1", "e$d"), "Sample", people, EventTime.AllDay(date), EventTime.AllDay(date.plusDays(1)))
         }
-        Held(events, lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY)
+        Held(events, lastShownDay(SampleUi.TODAY, WeeksShown.EIGHT), emptySet(), firstDay = SampleUi.TODAY)
     }
 
     /** Handoff 6c as Starts: "Guitar lesson" for Mia from Sat 26 Sep, with the month's dots and today ringed. */

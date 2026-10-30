@@ -53,7 +53,8 @@ internal fun WeekViewHost(
 ) {
     val open = rememberEventOpener(repo, editor, weekFocus, today, EditorFrom.Calendar)
     val add = rememberEventAdder(repo, editor, weekFocus, today, EditorFrom.Calendar)
-    val shown = rememberWeekShown(today)
+    val chosen by repo.shown.collectAsState()
+    val shown = rememberWeekShown(today, chosen.weeksAfter)
     LaunchedEffect(shown) {
         weekFocus.requested.filterNotNull().collect {
             shown.show(it)
@@ -68,7 +69,9 @@ internal fun WeekViewHost(
     val w = week ?: return
     val s = sync ?: return
     WeekView(
-        WeekViewState(w, today, s, nowMillis, shown.weeks, weeksTo(today, w.days.first().date) ?: shown.weeks),
+        WeekViewState(
+            w, today, s, nowMillis, shown.weeks, weeksTo(today, w.days.first().date, chosen) ?: shown.weeks, chosen.weeksAfter,
+        ),
         onOpen = open,
         onAdd = add,
         onWeeksAhead = shown::show,

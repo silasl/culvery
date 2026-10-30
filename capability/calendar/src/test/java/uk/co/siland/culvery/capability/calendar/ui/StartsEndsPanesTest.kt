@@ -38,6 +38,7 @@ import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.EventWhen
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -67,7 +68,7 @@ class StartsEndsPanesTest {
     private val c = DarkColors
     private val today = SampleUi.TODAY
     private val saturday = LocalDate.of(2026, 9, 26)
-    private val lastShown = lastShownDay(today)
+    private val lastShown = lastShownDay(today, WeeksShown.EIGHT)
     private val household = EditorPeople(SampleUi.members)
     private val flow = EditorFlow(listOf(EditorStep.Who, EditorStep.StartDate, EditorStep.Check), EditorStep.StartDate)
 

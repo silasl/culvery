@@ -36,6 +36,7 @@ import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HhAlpha
@@ -200,7 +201,7 @@ class CheckPaneTest {
                     EventTime.Timed(saturday.atTime(16, 15).atZone(LONDON).toInstant()),
                 ),
             ),
-            lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY,
+            lastShownDay(SampleUi.TODAY, WeeksShown.EIGHT), emptySet(), firstDay = SampleUi.TODAY,
         )
         show(guitar().apply { repeat(5) { stepStart(ClockField.Hour, up = true) } })
         node("editor_save_hint").assertTextEquals("Clashes are allowed; both show on the week")

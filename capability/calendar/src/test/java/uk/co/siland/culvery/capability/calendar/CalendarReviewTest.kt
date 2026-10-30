@@ -60,12 +60,14 @@ class CalendarReviewTest {
         people.close()
     }
 
+    private val settings = testCalendarSettings()
+
     private suspend fun TestScope.review(uses: Set<AccountUse> = emptySet()): Pair<CalendarReview, TestAccess> {
         val access = testAccess(household)
         val setup = CalendarSetup(store, setOf(google), { household.people.first() }, toaster, WallClock { 0L }, EmptyCoroutineContext)
         val connections = CalendarConnections(store, setup, access.control, setOf(google), backgroundScope)
         store.addConnection(connection, google.sourceList, emptyMap(), masterSourceId = family.id)
-        return CalendarReview(store, setup, connections, household, access.control, toaster, HouseholdZone(household), WallClock { 0L }, uses) to access
+        return CalendarReview(store, setup, connections, household, access.control, toaster, HouseholdZone(household), WallClock { 0L }, settings, uses) to access
     }
 
     private suspend fun source(id: String): StoredSource = store.source("g1", id)!!
@@ -181,6 +183,19 @@ class CalendarReviewTest {
         assertThat(review.setShown(source("swim"), shown = false)).isFalse()
         assertThat(source("swim").mapping.visible).isTrue()
         assertThat(toaster.messages).isEmpty()
+    }
+
+    /** 15a §3: choosing the weeks takes the Settings PIN; a refused one saves nothing. */
+    @Test
+    fun weeksChangeAsksForTheSettingsPin() = runTest {
+        val (review, access) = review()
+        access.answer(null)
+        assertThat(review.setShown(WeeksShown.TWELVE)).isFalse()
+        assertThat(settings.shown.first()).isEqualTo(WeeksShown.EIGHT)
+        access.answer(TestAccess.ALEX)
+        assertThat(review.setShown(WeeksShown.TWELVE)).isTrue()
+        assertThat(settings.shown.first()).isEqualTo(WeeksShown.TWELVE)
+        assertThat(access.requests.map { it.label }).containsExactly("Change settings", "Change settings")
     }
 
     @Test

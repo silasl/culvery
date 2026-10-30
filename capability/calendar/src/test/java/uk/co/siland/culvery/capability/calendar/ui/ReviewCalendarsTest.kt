@@ -24,10 +24,12 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -58,6 +60,7 @@ import uk.co.siland.culvery.capability.calendar.READ_REFUSED
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.SourceMapping
 import uk.co.siland.culvery.capability.calendar.StoredSource
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
@@ -134,6 +137,37 @@ class ReviewCalendarsTest {
                 actions = ReviewActions(onShown = { source, visible -> shown = source.source.id to visible }),
             )
         }
+    }
+
+    /** 15a §3: the weeks section shows with a connection, marks the chosen one and reports a tap. */
+    @Test
+    fun weeksRowsShowAndChoose() {
+        var weeks: WeeksShown? = null
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars(
+                    title = "Calendars",
+                    connections = listOf(ReviewConnection(row(), listOf(family, swim))),
+                    people = listOf(Person.Family, mia),
+                    nowMillis = now, busy = false, picking = null, confirming = null, connectable = emptyList(),
+                    actions = ReviewActions(onWeeks = { weeks = it }),
+                    weeks = WeeksShown.EIGHT,
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Weeks ahead in the Calendar").assertExists()
+        listOf(4, 8, 12).forEach { compose.onNodeWithTag("calendars_weeks_$it").assertExists().assertHasClickAction() }
+        compose.onNodeWithText("8 weeks").assertExists()
+        compose.onNodeWithTag("calendars_weeks_8").assertIsSelected()
+        compose.onNodeWithTag("calendars_weeks_12").assertIsNotSelected()
+        compose.onNodeWithTag("calendars_weeks_12").performClick()
+        assertThat(weeks).isEqualTo(WeeksShown.TWELVE)
+    }
+
+    @Test
+    fun noWeeksSectionWithoutOne() {
+        show()
+        compose.onNodeWithContentDescription("Weeks ahead in the Calendar").assertDoesNotExist()
     }
 
     @Test

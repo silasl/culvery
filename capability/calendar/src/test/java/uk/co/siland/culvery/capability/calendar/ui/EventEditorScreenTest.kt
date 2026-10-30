@@ -67,6 +67,7 @@ import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.Suggestion
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
@@ -260,7 +261,7 @@ class EventEditorScreenTest {
                         EventTime.Timed(day.atTime(10, 30).atZone(LONDON).toInstant()),
                     ),
                 ),
-                lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY,
+                lastShownDay(SampleUi.TODAY, WeeksShown.EIGHT), emptySet(), firstDay = SampleUi.TODAY,
             )
         }
         compose.onNodeWithTag("editor_save_hint").assertTextEquals("Clashes are allowed; both show on the week")
@@ -494,7 +495,7 @@ class EventEditorScreenTest {
             EventTime.Timed(SampleUi.TODAY.atTime(19, 45).atZone(LONDON).toInstant()),
             EventTime.Timed(SampleUi.TODAY.atTime(20, 15).atZone(LONDON).toInstant()),
         )
-        val clashing = Held(listOf(overlap), lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY)
+        val clashing = Held(listOf(overlap), lastShownDay(SampleUi.TODAY, WeeksShown.EIGHT), emptySet(), firstDay = SampleUi.TODAY)
         compose.setContent { ShowEditor(form, flow, held = clashing, busy = busy) }
         val tags = listOf("editor_save", "editor_delete", "editor_save_hint")
         val before = tags.map { bounds(it) }
@@ -811,7 +812,7 @@ class EventEditorScreenTest {
                         EventTime.Timed(saturday.atTime(10, 30).atZone(LONDON).toInstant()),
                     ),
                 ),
-                lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY,
+                lastShownDay(SampleUi.TODAY, WeeksShown.EIGHT), emptySet(), firstDay = SampleUi.TODAY,
             )
             form.pickStartDate(saturday)
         }

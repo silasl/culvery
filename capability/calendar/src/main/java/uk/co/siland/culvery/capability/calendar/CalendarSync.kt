@@ -20,8 +20,8 @@ import uk.co.siland.culvery.core.plugin.backoffMillis
 
 const val SYNC_PAST_DAYS = 1L
 
-/** How far ahead the tablet shows: the Calendar tab's four weeks (4c D10); the window is today − 1 to today + 28. */
-const val SYNC_FUTURE_DAYS = 28L
+/** How far ahead the tablet reads whatever Settings shows: twelve weeks (15a §2.3); the window is today − 1 to today + 84. */
+const val SYNC_FUTURE_DAYS = 84L
 const val PROVIDER_TIMEOUT_MS = 60_000L
 
 /**

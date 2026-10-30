@@ -114,6 +114,7 @@ class CalendarEditor internal constructor(
     private val serviceOf: (providerId: String) -> String?,
     private val order: suspend () -> List<PersonId>,
     private val undone: UndoneKeys,
+    private val shown: () -> WeeksShown,
 ) {
     @Inject
     constructor(
@@ -129,9 +130,11 @@ class CalendarEditor internal constructor(
         household: HouseholdRepository,
         providers: Set<@JvmSuppressWildcards CalendarProvider>,
         undone: UndoneKeys,
+        repo: CalendarRepository,
     ) : this(
         store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS, writeLock,
         household::person, providers::displayNameOf, { household.people.first().map { it.id } }, undone,
+        repo.shown::value,
     )
 
     /** The week's Update now: a sync pass at once. It changes nothing, so it asks for no PIN. */
@@ -150,7 +153,7 @@ class CalendarEditor internal constructor(
         val (day, last) = daySpan(draft.start, draft.end, zone.current())
         val today = today()
         val wording = draft.recurrence?.let { choiceOf(it.rule, day) }?.wording(day, nthOf(draft.recurrence.rule, day))
-        return addedLine(draft.title, wording, day.takeIf { weeksTo(today, day) == null }, through = last)
+        return addedLine(draft.title, wording, day.takeIf { weeksTo(today, day, shown()) == null }, through = last)
     }
 
     /** A signed-in child tapped someone else's Who chip: say why it is locked (2b-2 design §4.2). */

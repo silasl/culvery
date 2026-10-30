@@ -43,6 +43,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarReview
 import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.StoredSource
+import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.disconnectQuestion
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Connection
@@ -61,10 +62,13 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhPageTitle
+import uk.co.siland.culvery.core.ui.HhRadioRow
+import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.PersonChipInk
+import uk.co.siland.culvery.core.ui.RadioRowTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.hhToggleable
 import uk.co.siland.culvery.core.ui.listRowCard
@@ -100,6 +104,10 @@ internal fun healthWords(row: CalendarRow, nowMillis: Long): String = when (row.
     ConnectionHealth.NeedsSignIn -> NEEDS_RECONNECTING
     is ConnectionHealth.Error -> STOPPED_UPDATING
 }
+
+const val WEEKS_AHEAD = "Weeks ahead in the Calendar"
+
+internal fun weeksLabel(shown: WeeksShown): String = "${shown.weeks} weeks"
 
 /** "{Service} · {account}", or the service alone when the connection names no account. */
 internal fun serviceAndAccount(row: CalendarRow): String = row.connection.config[CONFIG_ACCOUNT]?.let { "${row.service} · $it" } ?: row.service
@@ -141,12 +149,13 @@ internal fun ConnectedStepCard(rows: List<CalendarRow>) {
 }
 
 @Composable
-internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: HouseholdClock, title: String, offerConnect: Boolean, line: String? = null) {
+internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: HouseholdClock, title: String, offerConnect: Boolean, line: String? = null, offerWeeks: Boolean = false) {
     // Null until the store answers, so the page draws nothing rather than "Connect…" first.
     val list by review.connections.collectAsStateWithLifecycle<List<ReviewConnection>?>(null)
     val people by review.people.collectAsStateWithLifecycle<List<Person>?>(null)
     val connectable by connections.connectable.collectAsStateWithLifecycle<List<CalendarProvider>?>(null)
     val descriptors = remember(connectable, offerConnect) { if (offerConnect) connectable.orEmpty().map { it.descriptor } else emptyList() }
+    val weeks by review.weeksShown.collectAsStateWithLifecycle<WeeksShown?>(null)
     val connector = rememberConnector(connections)
     var picking by remember { mutableStateOf<String?>(null) }
     var confirming by remember { mutableStateOf<Confirming?>(null) }
@@ -161,6 +170,7 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
         confirming = confirming,
         connectable = descriptors,
         line = line,
+        weeks = weeks.takeIf { offerWeeks },
         actions = ReviewActions(
             onConnect = { connector.connect(it.id) },
             onReconnect = connector::reconnect,
@@ -170,6 +180,7 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
                 action.run { review.setPerson(source, person) }
             },
             onShown = { source, shown -> action.run { review.setShown(source, shown) } },
+            onWeeks = { weeks -> action.run { review.setShown(weeks) } },
             onMakeMaster = { source -> action.run { review.makeMaster(source) } },
             onDisconnect = { row -> action.run { confirming = Confirming(row, review.queuedChanges(row.connection.id), review.shoppingUses(row)) } },
             onKeep = { confirming = null },
@@ -185,6 +196,7 @@ internal class ReviewActions(
     val onPick: (String) -> Unit = {},
     val onPerson: (StoredSource, Person) -> Unit = { _, _ -> },
     val onShown: (StoredSource, Boolean) -> Unit = { _, _ -> },
+    val onWeeks: (WeeksShown) -> Unit = {},
     val onMakeMaster: (StoredSource) -> Unit = {},
     val onDisconnect: (CalendarRow) -> Unit = {},
     val onKeep: () -> Unit = {},
@@ -194,7 +206,8 @@ internal class ReviewActions(
 /**
  * 9 §4.12: per connection, "{Service} · {account}", its health, Reconnect when needed and Disconnect (confirmed first);
  * per calendar, a card: its name and, on the main one, the badge; who it is for (a dropdown of Family and the people);
- * Show; Use for new events; and a read problem in a strip at the foot. Draws nothing while [connections] or [people] is null.
+ * Show; Use for new events; and a read problem in a strip at the foot. With [weeks], once there is a connection, the weeks
+ * the Calendar tab shows (15a §3). Draws nothing while [connections] or [people] is null.
  */
 @Composable
 internal fun ReviewCalendars(
@@ -208,6 +221,7 @@ internal fun ReviewCalendars(
     connectable: List<ProviderDescriptor>,
     actions: ReviewActions,
     line: String? = null,
+    weeks: WeeksShown? = null,
 ) {
     if (connections == null || people == null) return
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.reviewBlockGap), modifier = Modifier.testTag("review_calendars")) {
@@ -235,11 +249,22 @@ internal fun ReviewCalendars(
                 CalendarRowCard(source, connection.row, people, busy, picking == sourceKey(source), actions.onPick, actions.onPerson, actions.onShown, actions.onMakeMaster)
             }
         }
+        if (weeks != null && connections.isNotEmpty()) WeeksAheadRows(weeks, actions.onWeeks)
         connectable.forEach { d ->
             HhButton(
                 "Connect ${d.displayName}", { actions.onConnect(d) }, Modifier.testTag("settings_connect_${d.id}"),
                 tone = ButtonTone.Primary, icon = Icons.ADD, enabled = !busy, on = ButtonSurface.Bg,
             )
+        }
+    }
+}
+
+@Composable
+private fun WeeksAheadRows(chosen: WeeksShown, onWeeks: (WeeksShown) -> Unit) {
+    HhSectionLabel(WEEKS_AHEAD)
+    Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
+        WeeksShown.entries.forEach { option ->
+            HhRadioRow(weeksLabel(option), null, option == chosen, "calendars_weeks_${option.weeks}") { onWeeks(option) }
         }
     }
 }

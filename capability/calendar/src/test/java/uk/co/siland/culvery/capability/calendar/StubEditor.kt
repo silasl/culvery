@@ -63,4 +63,5 @@ internal fun stubReview(store: CalendarStore, household: HouseholdRepository): C
     RecordingToaster(),
     HouseholdZone(household),
     WallClock { 0L },
+    testCalendarSettings(),
 )

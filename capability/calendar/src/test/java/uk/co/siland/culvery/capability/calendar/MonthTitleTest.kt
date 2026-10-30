@@ -49,11 +49,14 @@ class MonthTitleTest {
 
     @Test
     fun weeksToTheDate() {
-        assertThat(weeksTo(wed23Sep, wed23Sep)).isEqualTo(0)
-        assertThat(weeksTo(wed23Sep, wed23Sep.plusDays(6))).isEqualTo(0)
-        assertThat(weeksTo(wed23Sep, wed23Sep.plusDays(7))).isEqualTo(1)
-        assertThat(weeksTo(wed23Sep, lastShownDay(wed23Sep))).isEqualTo(3)
-        assertThat(weeksTo(wed23Sep, lastShownDay(wed23Sep).plusDays(1))).isNull()
-        assertThat(weeksTo(wed23Sep, wed23Sep.minusDays(1))).isNull()
+        val eight = WeeksShown.EIGHT
+        assertThat(weeksTo(wed23Sep, wed23Sep, eight)).isEqualTo(0)
+        assertThat(weeksTo(wed23Sep, wed23Sep.plusDays(6), eight)).isEqualTo(0)
+        assertThat(weeksTo(wed23Sep, wed23Sep.plusDays(7), eight)).isEqualTo(1)
+        assertThat(weeksTo(wed23Sep, lastShownDay(wed23Sep, eight), eight)).isEqualTo(7)
+        assertThat(weeksTo(wed23Sep, lastShownDay(wed23Sep, eight).plusDays(1), eight)).isNull()
+        assertThat(weeksTo(wed23Sep, wed23Sep.minusDays(1), eight)).isNull()
+        assertThat(weeksTo(wed23Sep, lastShownDay(wed23Sep, WeeksShown.FOUR), WeeksShown.FOUR)).isEqualTo(3)
+        assertThat(weeksTo(wed23Sep, lastShownDay(wed23Sep, WeeksShown.FOUR).plusDays(1), WeeksShown.FOUR)).isNull()
     }
 }
