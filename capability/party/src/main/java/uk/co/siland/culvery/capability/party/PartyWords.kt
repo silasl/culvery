@@ -23,8 +23,6 @@ enum class PartyRun { TURNING_ON, TURNING_OFF }
 /** Party mode's words (13 §5). */
 object PartyWords {
     const val LABEL = "Party mode"
-    const val ON = "On"
-    const val OFF = "Off"
     const val WILL = "Party mode will:"
     const val WHEN_ENDS = "When Party mode ends:"
     const val TURN_ON_BUTTON = "Turn Party mode on"

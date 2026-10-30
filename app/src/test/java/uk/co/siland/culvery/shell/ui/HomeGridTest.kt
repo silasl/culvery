@@ -23,6 +23,7 @@ import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.TrayButton
+import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.ShellUiState
 
@@ -178,6 +179,21 @@ class HomeGridTest {
         assertThat(l.height.value).isWithin(0.5f).of(212f)
         assertThat(bounds("music").height.value).isWithin(0.5f).of(212f)
         assertThat(l.top.value - t.bottom.value).isWithin(0.5f).of(15f)
+    }
+
+    /** Fails if one mode in the tray collapses the three rows to its own height, or a lone half isn't the row's full width. */
+    @Test
+    fun trayKeepsThreeRowsWithOnlyOneMode() {
+        val holiday = TrayButton("holiday.mode", 10, TrayWidth.HALF) { Box(Modifier.fillMaxWidth().height(56.dp)) }
+        show(today, shopping, lights, music, tray = listOf(holiday))
+        val tray = bounds("home_tray")
+        val label = compose.onNodeWithTag("tray_label", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val row = bounds("tray_row_holiday.mode")
+        val padding = 11f
+        val gap = 8f
+        val third = (tray.height.value - 2 * padding - label.height.value - 3 * gap) / 3
+        assertThat(row.height.value).isWithin(1f).of(third)
+        assertThat(row.width.value).isWithin(1f).of(tray.width.value - 2 * padding)
     }
 
     @Test

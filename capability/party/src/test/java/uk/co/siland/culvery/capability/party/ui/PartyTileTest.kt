@@ -2,6 +2,9 @@ package uk.co.siland.culvery.capability.party.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.party.PartyRun
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.HhTrayColumn
+import uk.co.siland.culvery.core.ui.HhTrayGrid
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 
@@ -47,7 +50,7 @@ class PartyTileTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 Box(Modifier.background(Culvery.colors.bg)) {
-                    HhTrayColumn("One-tap", listOf("party" to { PartyTile(on, line, running) { taps++ } }), Modifier.width(333.dp))
+                    HhTrayGrid("One-tap", listOf(listOf("party" to { PartyTile(on, line, running) { taps++ } }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
                 }
             }
         }
@@ -57,11 +60,12 @@ class PartyTileTest {
 
     /** Fails if the words, what TalkBack hears or its click label differ from the spec. */
     @Test
-    fun offReadsOff() {
+    fun offShowsNoStateLine() {
         show()
         compose.onNodeWithTag("party_tile").assertIsDisplayed()
         compose.onNodeWithText("Party mode", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("party_tile_state", useUnmergedTree = true).assertTextEquals("Off")
+        compose.onNodeWithTag("party_tile_state", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("party_tile_on", useUnmergedTree = true).assertDoesNotExist()
         compose.onNode(hasContentDescription("Party mode, off.")).assertExists()
         assertThat(clickLabel()).isEqualTo("Turn on")
         compose.assertNothingReadTwice()
@@ -70,11 +74,12 @@ class PartyTileTest {
         assertThat(taps).isEqualTo(1)
     }
 
+    /** Fails if a lit tile doesn't show the "ON" pill, say on to TalkBack, or offer to turn off. */
     @Test
-    fun onReadsOn() {
+    fun onShowsTheOnPill() {
         on = true
         show()
-        compose.onNodeWithTag("party_tile_state", useUnmergedTree = true).assertTextEquals("On")
+        compose.onNodeWithTag("party_tile_on", useUnmergedTree = true).assertTextEquals("ON")
         compose.onNode(hasContentDescription("Party mode, on.")).assertExists()
         assertThat(clickLabel()).isEqualTo("Turn off")
         compose.assertNothingReadTwice()

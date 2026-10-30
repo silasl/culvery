@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.hoover.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,7 +40,7 @@ import uk.co.siland.culvery.capability.hoover.TestAccess
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.HhTrayColumn
+import uk.co.siland.culvery.core.ui.HhTrayGrid
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 
@@ -61,7 +62,7 @@ class HooverRowTest {
             CulveryTheme(dark = true) {
                 Box(Modifier.background(Culvery.colors.bg)) {
                     if (shown) {
-                        HhTrayColumn("One-tap", listOf("hoover" to { HooverRowHost(system, HooverActions(access, setOf(system))) }), Modifier.width(333.dp))
+                        HhTrayGrid("One-tap", listOf(listOf("hoover" to { HooverRowHost(system, HooverActions(access, setOf(system))) })), Modifier.width(333.dp).height(359.dp))
                     }
                 }
             }

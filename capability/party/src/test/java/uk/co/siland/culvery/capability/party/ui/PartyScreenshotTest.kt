@@ -1,6 +1,9 @@
 package uk.co.siland.culvery.capability.party.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,7 +26,7 @@ import uk.co.siland.culvery.capability.party.PartyPlan
 import uk.co.siland.culvery.capability.party.PartyRecord
 import uk.co.siland.culvery.capability.party.PartyWords
 import uk.co.siland.culvery.core.house.PlugChange
-import uk.co.siland.culvery.core.ui.HhTrayColumn
+import uk.co.siland.culvery.core.ui.HhTrayGrid
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.test.snap
 
@@ -36,7 +39,7 @@ class PartyScreenshotTest {
 
     private fun tile(name: String, dark: Boolean, on: Boolean, line: String? = null) =
         compose.snap(name, dark, Modifier.padding(16.dp)) {
-            HhTrayColumn("One-tap", listOf("party" to { PartyTile(on, line, null) {} }), Modifier.width(333.dp))
+            HhTrayGrid("One-tap", listOf(listOf("party" to { PartyTile(on, line, null) {} }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
         }
 
     private fun sheet(name: String, dark: Boolean, turningOn: Boolean, lines: List<String>, seasonal: SeasonalTheme? = null) =

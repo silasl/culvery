@@ -3,6 +3,7 @@ package uk.co.siland.culvery.core.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
@@ -41,17 +42,20 @@ class PageHeaderScreenshotTest {
         compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
     }
 
-    private fun snapColumn(name: String, dark: Boolean) {
+    private fun snapGrid(name: String, dark: Boolean) {
         compose.setContent {
             CulveryTheme(dark = dark) {
                 Box(Modifier.testTag("shot").background(Culvery.colors.bg).padding(16.dp)) {
-                    HhTrayColumn(
+                    HhTrayGrid(
                         "One-tap",
                         listOf(
-                            "a" to { HhButton("Start cleaning", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) },
-                            "b" to { HhButton("Holiday mode", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) },
+                            listOf(
+                                "a" to { HhButton("Holiday mode", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) },
+                                "b" to { HhButton("Party mode", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) },
+                            ),
+                            listOf("c" to { HhButton("Start cleaning", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) }),
                         ),
-                        Modifier.width(333.dp),
+                        Modifier.width(333.dp).height(300.dp),
                     )
                 }
             }
@@ -61,6 +65,6 @@ class PageHeaderScreenshotTest {
 
     @Test fun headerDark() = snap("page_header_dark", true)
     @Test fun headerLight() = snap("page_header_light", false)
-    @Test fun trayColumnDark() = snapColumn("page_header_tray_column_dark", true)
-    @Test fun trayColumnLight() = snapColumn("page_header_tray_column_light", false)
+    @Test fun trayGridDark() = snapGrid("page_header_tray_grid_dark", true)
+    @Test fun trayGridLight() = snapGrid("page_header_tray_grid_light", false)
 }

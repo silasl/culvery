@@ -1,30 +1,20 @@
 package uk.co.siland.culvery.capability.holiday.ui
 
 import android.util.Log
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import java.time.LocalDate
 import uk.co.siland.culvery.capability.holiday.HolidayActions
 import uk.co.siland.culvery.capability.holiday.HolidayHouse
 import uk.co.siland.culvery.capability.holiday.HolidayRun
 import uk.co.siland.culvery.capability.holiday.HolidayWords
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
-import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HouseModeOnPill
 import uk.co.siland.culvery.core.ui.HouseModeTile
 import uk.co.siland.culvery.core.ui.HouseModeWords
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.rememberSingleAction
-import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 private const val TAG = "HolidayTile"
 
@@ -51,22 +41,7 @@ internal fun HolidayTile(on: Boolean, back: LocalDate?, line: String?, running: 
         enabled = running == null,
         onTap = onTap,
     ) {
-        if (on) OnPill()
-    }
-}
-
-@Composable
-private fun OnPill() {
-    val colors = Culvery.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .shownNotSpoken()
-            .height(HolidayDimens.pillHeight)
-            .background(colors.accentInk, RoundedCornerShape(percent = 50))
-            .padding(horizontal = HolidayDimens.pillPaddingH),
-    ) {
-        Text(HolidayWords.ON, style = HolidayDimens.onStyle, color = colors.accent, maxLines = 1, modifier = Modifier.testTag("holiday_tile_on"))
+        if (on) HouseModeOnPill("holiday_tile_on")
     }
 }
 

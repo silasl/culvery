@@ -2,12 +2,15 @@ package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,10 +31,13 @@ object HouseModeDimens {
     val radius = 17.dp
     val paddingV = 10.dp
     val paddingH = 12.dp
-    val gap = 12.dp
+    val gap = 6.dp
     val icon = 24.dp
     val secondStyle = HhType.secondary.copy(fontSize = 12.sp)
     val lineGap = 6.dp
+    val pillHeight = 24.dp
+    val pillPaddingH = 10.dp
+    val pillStyle = HhType.labelSmall
 
     val sheetPaddingH = 30.dp
     val sheetPaddingV = 28.dp
@@ -46,11 +52,28 @@ object HouseModeWords {
     const val CLICK_ON = "Turn on"
     const val CLICK_OFF = "Turn off"
     const val CANCEL = "Cancel"
+    const val ON = "ON"
+}
+
+/** The "ON" pill a lit mode tile shows on its right; the text is tagged [tag] and not spoken, the tile says it. */
+@Composable
+fun HouseModeOnPill(tag: String) {
+    val colors = Culvery.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .shownNotSpoken()
+            .height(HouseModeDimens.pillHeight)
+            .background(colors.accentInk, RoundedCornerShape(percent = 50))
+            .padding(horizontal = HouseModeDimens.pillPaddingH),
+    ) {
+        Text(HouseModeWords.ON, style = HouseModeDimens.pillStyle, color = colors.accent, maxLines = 1, modifier = Modifier.testTag(tag))
+    }
 }
 
 /**
- * A mode's tray tile: [icon], [label] and [second] shown and spoken as [spoken], then [trailing], then what didn't
- * happen as [line] under it. A tap does nothing unless [enabled]. Its tags start with [tag]; [second]'s is [secondTag].
+ * A mode's tray tile, narrow enough for half the tray: [icon] with [trailing] on its right, then [label] and [second]
+ * under them, all spoken as [spoken], then what didn't happen as [line] under the tile. A tap does nothing unless [enabled]. Its tags start with [tag]; [second]'s is [secondTag].
  */
 @Composable
 fun HouseModeTile(
@@ -69,9 +92,8 @@ fun HouseModeTile(
     val colors = Culvery.colors
     val ink = if (on) colors.accentInk else colors.ink
     Column(Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(HouseModeDimens.gap),
+        Column(
+            verticalArrangement = Arrangement.spacedBy(HouseModeDimens.gap),
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(tag)
@@ -80,8 +102,12 @@ fun HouseModeTile(
                 .hhClickable(onTap, label = if (on) HouseModeWords.CLICK_OFF else HouseModeWords.CLICK_ON, enabled = enabled, spoken = spoken)
                 .padding(horizontal = HouseModeDimens.paddingH, vertical = HouseModeDimens.paddingV),
         ) {
-            HhIcon(icon, size = HouseModeDimens.icon, filled = true, tint = if (on) ink else colors.accent)
-            Column(Modifier.weight(1f).shownNotSpoken()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                HhIcon(icon, size = HouseModeDimens.icon, filled = true, tint = if (on) ink else colors.accent)
+                Spacer(Modifier.weight(1f))
+                trailing()
+            }
+            Column(Modifier.shownNotSpoken()) {
                 Text(label, style = HhType.buttonLabel, color = ink, maxLines = 1)
                 if (second != null) {
                     Text(
@@ -93,7 +119,6 @@ fun HouseModeTile(
                     )
                 }
             }
-            trailing()
         }
         if (line != null) {
             Text(

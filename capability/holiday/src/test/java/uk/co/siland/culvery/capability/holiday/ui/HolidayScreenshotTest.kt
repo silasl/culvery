@@ -3,7 +3,10 @@ package uk.co.siland.culvery.capability.holiday.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,7 +28,7 @@ import uk.co.siland.culvery.capability.holiday.BackDatePick
 import uk.co.siland.culvery.capability.holiday.HolidayStep
 import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhTrayColumn
+import uk.co.siland.culvery.core.ui.HhTrayGrid
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.test.snap
 
@@ -41,10 +44,13 @@ class HolidayScreenshotTest {
 
     private fun tile(name: String, dark: Boolean, on: Boolean, line: String? = null) =
         compose.snap(name, dark, Modifier.padding(16.dp)) {
-            HhTrayColumn(
+            HhTrayGrid(
                 "One-tap",
-                listOf("holiday" to { HolidayTile(on, back.takeIf { on }, line, null) {} }, "hoover" to { HooverSizedRow() }),
-                Modifier.width(333.dp),
+                listOf(
+                    listOf("holiday" to { HolidayTile(on, back.takeIf { on }, line, null) {} }, "party" to { Spacer(Modifier.fillMaxSize()) }),
+                    listOf("hoover" to { HooverSizedRow() }),
+                ),
+                Modifier.width(333.dp).height(359.dp),
             )
         }
 

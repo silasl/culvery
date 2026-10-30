@@ -2,6 +2,9 @@ package uk.co.siland.culvery.capability.party.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -48,7 +51,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.HhTrayColumn
+import uk.co.siland.culvery.core.ui.HhTrayGrid
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 import uk.co.siland.culvery.core.ui.test.waitFor
@@ -158,7 +161,7 @@ class PartySheetTest {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Row(Modifier.background(Culvery.colors.bg)) {
-                        HhTrayColumn("One-tap", listOf("party" to { PartyTileHost(actions, rig.house) }), Modifier.width(333.dp))
+                        HhTrayGrid("One-tap", listOf(listOf("party" to { PartyTileHost(actions, rig.house) }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
                         overlay.content?.invoke()
                     }
                 }
@@ -181,7 +184,7 @@ class PartySheetTest {
         assertThat(rig.plugs.begins.single().granted).contains(HousePermissions.PARTY_MODE)
         assertThat(rig.music.startedWith).hasSize(1)
         compose.waitForIdle()
-        compose.onNodeWithTag("party_tile_state", useUnmergedTree = true).assertTextEquals("On")
+        compose.onNodeWithTag("party_tile_on", useUnmergedTree = true).assertTextEquals("ON")
     }
 
     /** Review Focus 5. Fails if Holiday mode turned on while the sheet was open lets the confirm turn Party on, or the tile doesn't say why. */
@@ -212,7 +215,7 @@ class PartySheetTest {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Row(Modifier.background(Culvery.colors.bg)) {
-                        HhTrayColumn("One-tap", listOf("party" to { PartyTileHost(actions, rig.house) }), Modifier.width(333.dp))
+                        HhTrayGrid("One-tap", listOf(listOf("party" to { PartyTileHost(actions, rig.house) }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
                         overlay.content?.invoke()
                     }
                 }

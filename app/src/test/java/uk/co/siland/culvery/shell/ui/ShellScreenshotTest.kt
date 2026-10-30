@@ -110,6 +110,7 @@ import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.TrayButton
+import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
@@ -272,13 +273,16 @@ class ShellScreenshotTest {
         HhCard(Modifier.fillMaxWidth().height(68.dp)) { Text("Tray row", style = HhType.cardTitle, color = Culvery.colors.ink) }
     }
 
-    /** The Holiday tile's place, first in the tray at its height (11 §5.2). */
-    private val trayHoliday = TrayButton("holiday.mode", 10) {
+    /** The Holiday and Party tiles' places, side by side first in the tray (15a §2.1). */
+    private fun trayMode(id: String, order: Int, label: String) = TrayButton(id, order, TrayWidth.HALF) {
         Box(
             Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(17.dp)).background(Culvery.colors.surf2).padding(horizontal = 12.dp),
             contentAlignment = Alignment.CenterStart,
-        ) { Text("Holiday mode", style = HhType.cardTitle, color = Culvery.colors.ink) }
+        ) { Text(label, style = HhType.cardTitle, color = Culvery.colors.ink, maxLines = 1) }
     }
+
+    private val trayHoliday = trayMode("holiday.mode", 10, "Holiday")
+    private val trayParty = trayMode("party.mode", 15, "Party")
 
     private fun trayHome(dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true) = calendarHome(dark).copy(
         tabs = allTabs,
@@ -289,7 +293,7 @@ class ShellScreenshotTest {
                         HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
                     }.takeIf { shopping },
                 ),
-            listOf(trayRow, trayHoliday),
+            listOf(trayRow, trayHoliday, trayParty),
         ),
     )
 

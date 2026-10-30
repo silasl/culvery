@@ -2,6 +2,9 @@ package uk.co.siland.culvery.capability.holiday.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -46,7 +49,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.HhTrayColumn
+import uk.co.siland.culvery.core.ui.HhTrayGrid
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 import uk.co.siland.culvery.core.ui.test.waitFor
@@ -82,7 +85,7 @@ class HolidaySheetTest {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Row(Modifier.background(Culvery.colors.bg)) {
-                        HhTrayColumn("One-tap", listOf("holiday" to { HolidayTileHost(actions, rig.house) }), Modifier.width(333.dp))
+                        HhTrayGrid("One-tap", listOf(listOf("holiday" to { HolidayTileHost(actions, rig.house) }, "neighbour" to { Spacer(Modifier.fillMaxSize()) })), Modifier.width(333.dp).height(359.dp))
                         overlay.content?.invoke()
                     }
                 }

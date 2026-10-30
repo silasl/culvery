@@ -191,25 +191,43 @@ class PageHeaderTest {
         compose.onNodeWithTag("tray_label", useUnmergedTree = true).assertDoesNotExist()
     }
 
-    /** 11 §4.4. Fails if the label isn't on top and unspoken, or the rows aren't 8 apart at their own heights. */
+    /** 15a §2.1. Fails if the label isn't on top and unspoken, the rows aren't 8 apart and equal, or an empty row is missing. */
     @Test
-    fun theColumnTrayStacksRowsUnderItsLabel() {
+    fun theGridKeepsThreeEqualRowsUnderItsLabel() {
         show {
-            HhTrayColumn(
+            HhTrayGrid(
                 "One-tap",
-                listOf(
-                    "a" to { Box(Modifier.fillMaxWidth().height(40.dp)) },
-                    "b" to { Box(Modifier.fillMaxWidth().height(60.dp)) },
-                ),
+                listOf(listOf("a" to { Box(Modifier.fillMaxWidth().height(40.dp)) }), listOf("b" to { Box(Modifier.fillMaxWidth().height(60.dp)) })),
+                Modifier.height(300.dp),
             )
         }
         val label = compose.onNodeWithTag("tray_label", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val a = compose.onNodeWithTag("tray_row_a").getUnclippedBoundsInRoot()
         val b = compose.onNodeWithTag("tray_row_b").getUnclippedBoundsInRoot()
+        val tray = compose.onNodeWithTag("tray_column").getUnclippedBoundsInRoot()
         assertThat(a.top.value - label.bottom.value).isWithin(0.5f).of(8f)
-        assertThat(a.height.value).isWithin(0.5f).of(40f)
+        assertThat(a.height.value).isWithin(0.5f).of(b.height.value)
         assertThat(b.top.value - a.bottom.value).isWithin(0.5f).of(8f)
-        assertThat(b.height.value).isWithin(0.5f).of(60f)
+        // The third row is empty but still takes its share: the tray ends 8 + a row + 11 under b.
+        assertThat(tray.bottom.value - b.bottom.value).isWithin(0.5f).of(8f + a.height.value + 11f)
         compose.onNodeWithTag("tray_label", useUnmergedTree = true).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+    }
+
+    /** 15a §2.1. Fails if two cells in a row aren't the same width and top, 8 apart. */
+    @Test
+    fun halvesAreEqualWidthAndShareATop() {
+        show {
+            HhTrayGrid(
+                "One-tap",
+                listOf(listOf("a" to { Box(Modifier.fillMaxWidth().height(40.dp)) }, "b" to { Box(Modifier.fillMaxWidth().height(40.dp)) })),
+                Modifier.width(333.dp).height(300.dp),
+            )
+        }
+        val a = compose.onNodeWithTag("tray_row_a").getUnclippedBoundsInRoot()
+        val b = compose.onNodeWithTag("tray_row_b").getUnclippedBoundsInRoot()
+        assertThat(a.width.value).isWithin(0.5f).of(b.width.value)
+        assertThat(a.width.value).isWithin(0.5f).of((333f - 22f - 8f) / 2)
+        assertThat(b.left.value - a.right.value).isWithin(0.5f).of(8f)
+        assertThat(a.top.value).isEqualTo(b.top.value)
     }
 }

@@ -16,6 +16,7 @@ import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.TrayButton
+import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.ui.Icons
 
 /** Party mode's tile, beside Holiday's in Home's One-tap tray (13 §2.6), and its Settings page (13 §3): no tab and no card. */
@@ -40,7 +41,7 @@ class PartyCapability @Inject constructor(
     override fun TabContent() = Unit
 
     // Always there: what it can do depends on which seams are set up, which the sheet reads when it opens.
-    override fun trayButtons(): Flow<List<TrayButton>> = flowOf(listOf(TrayButton("party.mode", 15) { PartyTileHost(actions, house) }))
+    override fun trayButtons(): Flow<List<TrayButton>> = flowOf(listOf(TrayButton("party.mode", 15, TrayWidth.HALF) { PartyTileHost(actions, house) }))
 
     override fun settingsPages(): List<SettingsPage> = listOf(PartyPage { PartySettingsHost(settings, music.orElse(null), lights.orElse(null)) })
 }

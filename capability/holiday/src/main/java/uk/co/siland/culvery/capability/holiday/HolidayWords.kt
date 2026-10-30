@@ -10,7 +10,6 @@ import uk.co.siland.culvery.core.house.PlugChange
 /** Holiday mode's words (11 §5.2, §5.8). */
 object HolidayWords {
     const val LABEL = "Holiday mode"
-    const val ON = "ON"
     const val WHEN_BACK = "When are you back?"
     const val CHANGE_DATE = "Change date"
     const val WILL = "Holiday mode will:"

@@ -9,6 +9,7 @@ import uk.co.siland.culvery.capability.party.PartyHouse
 import uk.co.siland.culvery.capability.party.PartyRun
 import uk.co.siland.culvery.capability.party.PartyWords
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.ui.HouseModeOnPill
 import uk.co.siland.culvery.core.ui.HouseModeTile
 import uk.co.siland.culvery.core.ui.HouseModeWords
 import uk.co.siland.culvery.core.ui.Icons
@@ -17,15 +18,16 @@ import uk.co.siland.culvery.core.ui.rememberSingleAction
 private const val TAG = "PartyTile"
 
 /**
- * The tray tile (13 §2.6): the icon, the label and "Off" or "On" spoken as one item, then what didn't happen as [line]
- * under it. A tap does nothing while [running] says a change is out.
+ * The tray tile (13 §2.6, 15a §2.1): the icon and label spoken as one item with "on" or "off", the "ON" pill while it is
+ * on and no state line while it is off, then what didn't happen as [line] under it. A tap does nothing while [running]
+ * says a change is out.
  */
 @Composable
 internal fun PartyTile(on: Boolean, line: String?, running: PartyRun?, onTap: () -> Unit) {
     val state = when (running) {
         PartyRun.TURNING_ON -> HouseModeWords.TURNING_ON
         PartyRun.TURNING_OFF -> HouseModeWords.TURNING_OFF
-        null -> if (on) PartyWords.ON else PartyWords.OFF
+        null -> null
     }
     HouseModeTile(
         tag = "party_tile",
@@ -38,7 +40,9 @@ internal fun PartyTile(on: Boolean, line: String?, running: PartyRun?, onTap: ()
         spoken = if (running != null) PartyWords.runningSpoken(running) else PartyWords.tileSpoken(on),
         enabled = running == null,
         onTap = onTap,
-    )
+    ) {
+        if (on) HouseModeOnPill("party_tile_on")
+    }
 }
 
 /**

@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -136,12 +138,18 @@ object TrayTokens {
     val gap = 8.dp
 }
 
+/** One cell of [HhTrayGrid]: a key for its `tray_row_{key}` tag and what it draws. */
+typealias TrayCell = Pair<String, @Composable () -> Unit>
+
+/** How many rows [HhTrayGrid] always lays out, so a tray with few buttons keeps its rows' height (15a §2.1). */
+const val TRAY_ROWS = 3
+
 /**
- * [HhTray]'s Home form: the [label] on top, not spoken, and the [rows] stacked under it at their own height, each tagged
- * `tray_row_{key}`.
+ * [HhTray]'s Home form: the [label] on top, not spoken, then [TRAY_ROWS] rows of equal height. A row holds one cell at
+ * full width or two side by side; rows past `rows.size` are empty. Each cell is tagged `tray_row_{key}`.
  */
 @Composable
-fun HhTrayColumn(label: String, rows: List<Pair<String, @Composable () -> Unit>>, modifier: Modifier = Modifier) {
+fun HhTrayGrid(label: String, rows: List<List<TrayCell>>, modifier: Modifier = Modifier) {
     Column(
         verticalArrangement = Arrangement.spacedBy(TrayTokens.gap),
         modifier = modifier
@@ -150,9 +158,17 @@ fun HhTrayColumn(label: String, rows: List<Pair<String, @Composable () -> Unit>>
             .padding(TrayTokens.padding),
     ) {
         TrayLabel(label)
-        rows.forEach { (id, content) ->
-            key(id) { Box(Modifier.fillMaxWidth().testTag("tray_row_$id")) { content() } }
+        rows.forEach { cells ->
+            Row(horizontalArrangement = Arrangement.spacedBy(TrayTokens.gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                cells.forEach { (id, content) ->
+                    key(id) {
+                        // A tile's "didn't happen" line can run past its row, so the content measures at its own height from the row's top.
+                        Box(Modifier.weight(1f).fillMaxHeight().testTag("tray_row_$id").wrapContentHeight(Alignment.Top, unbounded = true)) { content() }
+                    }
+                }
+            }
         }
+        repeat(TRAY_ROWS - rows.size) { Spacer(Modifier.fillMaxWidth().weight(1f)) }
     }
 }
 
