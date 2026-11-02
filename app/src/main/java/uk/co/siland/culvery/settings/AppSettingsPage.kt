@@ -12,8 +12,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.positionInRoot
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.LocalSettingsStart
@@ -32,6 +38,45 @@ import uk.co.siland.culvery.display.ui.SEASONAL_PAGE_ID
 internal const val APP_SETTINGS = "App settings"
 internal const val APP_SETTINGS_LINE = "The home, the people who use the wall, the screen and the lock."
 internal const val APP_SETTINGS_PAGE_ID = "app"
+
+/** How long a section opened on is kept in view while the sections above it grow. */
+private const val SETTLE_NANOS = 2_000_000_000L
+
+/** A section Settings can open on, and where it was last laid out: in the page, and on screen. */
+private class Section {
+    private val requester = BringIntoViewRequester()
+    private var inPage = Float.NaN
+    private var onScreen = Float.NaN
+    val modifier = Modifier.bringIntoViewRequester(requester).onGloballyPositioned {
+        inPage = it.positionInParent().y
+        onScreen = it.positionInRoot().y
+    }
+
+    /**
+     * Brings the section into view, and again each time a section above it grows, until its place in the page holds
+     * across a frame. It stops when the user scrolls, and after [SETTLE_NANOS].
+     */
+    suspend fun settle() {
+        val start = withFrameNanos { it }
+        var aimed = Float.NaN
+        while (inPage != aimed) {
+            aimed = inPage
+            try {
+                requester.bringIntoView()
+            } catch (e: CancellationException) {
+                // A user scroll cancels the request.
+                currentCoroutineContext().ensureActive()
+                return
+            }
+            withFrameNanos {}
+            val now = withFrameNanos { it }
+            val shown = onScreen
+            withFrameNanos {}
+            if (inPage == aimed && onScreen != shown) return
+            if (now - start > SETTLE_NANOS) return
+        }
+    }
+}
 
 /** App settings' sub-pages, each opened from its row and left by "‹ App settings" (15b §3). */
 private val SUB_PAGES = setOf(SettingsPageIds.LOCATION, DISPLAY_PAGE_ID, SEASONAL_PAGE_ID)
@@ -70,20 +115,18 @@ class AppSettingsPage @Inject constructor(
             LaunchedEffect(sub) { top.bringIntoView() }
             return
         }
-        val sections = remember { SECTIONS.associateWith { BringIntoViewRequester() } }
+        val sections = remember { SECTIONS.associateWith { Section() } }
         HhPageTitle(APP_SETTINGS, APP_SETTINGS_LINE)
         location.HomeLocationRow { open = SettingsPageIds.LOCATION }
-        Box(Modifier.bringIntoViewRequester(sections.getValue(SettingsPageIds.PEOPLE))) { PeopleSection(people) }
+        Box(sections.getValue(SettingsPageIds.PEOPLE).modifier) { PeopleSection(people) }
         display.Rows { open = it }
-        Box(Modifier.bringIntoViewRequester(sections.getValue(SettingsPageIds.TABLET_LOCK))) { TabletLockSection(homeApp) }
+        Box(sections.getValue(SettingsPageIds.TABLET_LOCK).modifier) { TabletLockSection(homeApp) }
         LaunchedEffect(Unit) {
             scrollTo?.let { target ->
-                // People and Display grow as their data arrives; scroll once that has been laid out.
+                // People and Display grow as their data arrives; scroll once it is read, and again while it lays out.
                 people.members.first()
                 display.awaitRead()
-                withFrameNanos {}
-                withFrameNanos {}
-                sections.getValue(target).bringIntoView()
+                sections.getValue(target).settle()
             }
             scrollTo = null
         }

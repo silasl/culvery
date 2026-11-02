@@ -5,12 +5,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.width
@@ -46,12 +48,23 @@ class AppSettingsPageTest {
 
     private fun show(start: String? = null, town: Boolean = true) {
         rig.household(town)
+        setPage(start)
+        compose.awaitAppSettings(if (town) "Brighton" else "No town chosen yet")
+    }
+
+    private fun setPage(start: String?) {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator, LocalOverlayHost provides TestOverlay(), LocalSettingsStart provides start) {
                 CulveryTheme(dark = true) { Box { InSettingsPane { rig.page.Content() } } }
             }
         }
-        compose.awaitAppSettings(if (town) "Brighton" else "No town chosen yet")
+    }
+
+    /** Advances the paused clock a frame at a time until [condition] holds. */
+    private fun stepUntil(condition: () -> Boolean) = compose.waitUntil(5_000) {
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        condition()
     }
 
     /** Fails if the page's id, name, place in the list or sub-pages change, or it isn't bound into Settings. */
@@ -162,6 +175,27 @@ class AppSettingsPageTest {
         // Scrolled to Tablet lock: the page's title has gone above the top, and the status row is on screen.
         compose.waitForIdle()
         assertThat(compose.onNode(isHeading() and hasText("App settings")).getUnclippedBoundsInRoot().top.value).isLessThan(0f)
+        compose.onNodeWithTag("tablet_lock_status").assertIsDisplayed()
+    }
+
+    /** Fails if the scroll to a section is made once, so People growing above Tablet lock after it pushes the lock off screen. */
+    @Test
+    fun aStartOnASectionHoldsWhileASectionAboveGrows() {
+        rig.household()
+        compose.mainClock.autoAdvance = false
+        setPage(start = "kiosk")
+        // The first scroll has begun once the page's title is above the top, and ended once the title holds for a frame.
+        fun titleTop() = compose.onNode(isHeading() and hasText("App settings")).getUnclippedBoundsInRoot().top.value
+        stepUntil { titleTop() < 0f }
+        var last = titleTop()
+        stepUntil { titleTop().let { now -> (now == last).also { last = now } } }
+        rig.addChildren("Ada", "Ben")
+        stepUntil { compose.onAllNodes(hasTestTag("person_Ben")).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        // The section's last row is wholly on screen, not pushed half off by the taller People.
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        assertThat(compose.onNodeWithTag("choose_home_app").getUnclippedBoundsInRoot().bottom.value).isAtMost(screen.bottom.value)
         compose.onNodeWithTag("tablet_lock_status").assertIsDisplayed()
     }
 

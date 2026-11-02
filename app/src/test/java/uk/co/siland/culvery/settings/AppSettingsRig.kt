@@ -67,6 +67,11 @@ internal class AppSettingsRig(dir: File) {
         pins.addPerson("Mia", PersonPalette.colors[2], Role.CHILD, null)
     }
 
+    /** Adds children called [names] in the colours left after [household]'s three, to make People taller. */
+    fun addChildren(vararg names: String) = runBlocking {
+        names.forEachIndexed { i, name -> pins.addPerson(name, PersonPalette.colors[3 + i], Role.CHILD, null) }
+    }
+
     fun close() {
         io.cancel()
         db.close()
