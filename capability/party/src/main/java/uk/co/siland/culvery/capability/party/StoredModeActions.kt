@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.house.HouseLines
@@ -50,7 +49,7 @@ class StoredModeActions @Inject internal constructor(
         if (!on && refuses(modeId)) return
         if (on) holiday.refusesTap(turningOn = false)
         refused.value = null
-        val name = store.prefs.first().mode(modeId)?.name ?: return
+        val name = store.prefsSoon().mode(modeId)?.name ?: return
         val grant = if (house.needsPin(modeId)) {
             ModeGrant.Person(access.authorise(HousePermissions.STORED_MODE, label = ModesWords.turnLabel(name, !on)) ?: return)
         } else {

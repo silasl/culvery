@@ -126,7 +126,7 @@ class StoredModesHouse internal constructor(
         require(grant.allows(modeId)) { "Turning a stored mode on needs its own grant" }
         exclusive(ModeRunning(modeId, ModeRun.TURNING_ON)) {
             if (load().on) return@exclusive
-            val mode = settings.prefs.first().mode(modeId) ?: return@exclusive
+            val mode = settings.prefsSoon().mode(modeId) ?: return@exclusive
             // A plug locked since the tap is left out by the plug store instead (15b Ruling 4).
             require(grant is ModeGrant.Person || !mode.needsPin) { "A stored mode that needs a PIN can't turn on with none" }
             orphansChecked = true
@@ -162,7 +162,7 @@ class StoredModesHouse internal constructor(
             require(grant.allows(id)) { "Turning a stored mode off needs its own grant" }
             if (grant is ModeGrant.Wall && needsPin(id)) {
                 Log.w(TAG, "A stored mode wasn't turned off with no PIN, as it needs one now")
-                lines.pin = ModesWords.turnOffWithPin(settings.prefs.first().mode(id)?.name ?: A_MODE)
+                lines.pin = ModesWords.turnOffWithPin(settings.prefsSoon().mode(id)?.name ?: A_MODE)
                 showLine()
                 return@exclusive
             }
@@ -186,7 +186,7 @@ class StoredModesHouse internal constructor(
             val record = load()
             if (!orphansChecked) {
                 orphansChecked = true
-                if (!record.on && plugSeam != null) settings.prefs.first().modes.forEach { ModePlugs(plugSeam, it.id, logName).leaveQuietly() }
+                if (!record.on && plugSeam != null) settings.prefsSoon().modes.forEach { ModePlugs(plugSeam, it.id, logName).leaveQuietly() }
             }
             putGroupsBack()?.let(::showGroupsLine)
             if (unsaved) persist()

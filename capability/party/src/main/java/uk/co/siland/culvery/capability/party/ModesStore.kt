@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.house.GroupBefore
@@ -65,6 +66,9 @@ class ModesStore(private val store: DataStore<Preferences>, scope: CoroutineScop
 
     /** [prefs] as last read, for what can't wait for a read (a mode's name in another mode's refusal); null until then. */
     val prefsNow: StateFlow<ModesPrefs?> = prefs.stateIn(scope, SharingStarted.Eagerly, null)
+
+    /** [prefsNow] once read, else the first read. */
+    suspend fun prefsSoon(): ModesPrefs = prefsNow.value ?: prefs.first()
 
     /** Null until the file is first read, so nothing takes "off" for the saved answer. */
     val record: StateFlow<ModeRecord?> = data.map { it.toRecord() }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, null)
