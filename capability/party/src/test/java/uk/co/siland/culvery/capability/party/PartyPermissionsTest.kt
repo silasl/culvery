@@ -14,11 +14,11 @@ class PartyPermissionsTest {
     /** 13 §2.7: fails if the label, roles or fresh PIN differ, or a child can start a party. */
     @Test
     fun partyModeIsForAdultsAndAdminsWithAFreshPin() = runTest {
-        assertThat(Role.entries.filter { registry.isGranted(it, HousePermissions.PARTY_MODE) }).containsExactly(Role.ADMIN, Role.ADULT)
-        val def = registry.require(HousePermissions.PARTY_MODE)
-        assertThat(def.label).isEqualTo("Turn Party mode on and off")
+        assertThat(Role.entries.filter { registry.isGranted(it, HousePermissions.STORED_MODE) }).containsExactly(Role.ADMIN, Role.ADULT)
+        val def = registry.require(HousePermissions.STORED_MODE)
+        assertThat(def.label).isEqualTo("Turn modes on and off")
         assertThat(def.freshPin).isTrue()
-        assertThat(HousePermissions.PARTY_MODE).isEqualTo("party.mode")
-        assertThat(TestAccess(Role.CHILD).authorise(HousePermissions.PARTY_MODE)).isNull()
+        assertThat(HousePermissions.STORED_MODE).isEqualTo("party.mode")
+        assertThat(TestAccess(Role.CHILD).authorise(HousePermissions.STORED_MODE)).isNull()
     }
 }

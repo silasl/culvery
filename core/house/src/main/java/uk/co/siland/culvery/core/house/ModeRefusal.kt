@@ -39,7 +39,7 @@ class ModeRefusal(private val own: HouseModeSwitch, private val switches: Set<Ho
     /** Runs [turnOn] and answers true, unless another mode went on since the tap: then it is logged and false. */
     suspend fun turnOnUnlessRefused(turnOn: suspend () -> Unit): Boolean {
         if (refuse()) {
-            Log.w(TAG, "${own.modeName} wasn't turned on because another mode is on")
+            Log.w(TAG, "${own.logName} wasn't turned on because another mode is on")
             return false
         }
         turnOn()

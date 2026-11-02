@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -44,8 +45,11 @@ data class PlugNote(val before: Boolean, val holders: List<Holder>) {
     override fun toString() = "PlugNote"
 }
 
-/** A begun mode: [place] orders it among the others, [pending] are the plugs it has yet to reach. [toString] leaves out the plugs. */
-data class ModeRun(val place: Long, val pending: Map<String, Boolean>) {
+/**
+ * A begun mode: [place] orders it among the others, [pending] are the plugs it has yet to reach, and [wall] is true for a
+ * run begun with no PIN, which never switches a plug that needs one (15b Ruling 4). [toString] leaves out the plugs.
+ */
+data class ModeRun(val place: Long, val pending: Map<String, Boolean>, val wall: Boolean = false) {
     override fun toString() = "ModeRun"
 }
 
@@ -118,7 +122,9 @@ class PlugSettings(private val store: DataStore<Preferences>) {
             needsPin = strings(PIN).filter(::isPlugId).toSet(),
             modes = named("mode.").filter(::isModeId).associateWith { entries("mode.$it") }.filterValues { it.isNotEmpty() },
             runs = named("started.").filter(::isModeId).mapNotNull { mode ->
-                (values[longPreferencesKey("started.$mode")] as? Long)?.let { mode to ModeRun(it, entries("pending.$mode")) }
+                (values[longPreferencesKey("started.$mode")] as? Long)?.let { started ->
+                    mode to ModeRun(started, entries("pending.$mode"), values[booleanPreferencesKey("wall.$mode")] == true)
+                }
             }.toMap(),
             notes = named("note.").filter(::isPlugId).mapNotNull { id ->
                 parseNote(values[stringPreferencesKey("note.$id")] as? String)?.let { id to it }
@@ -135,6 +141,7 @@ class PlugSettings(private val store: DataStore<Preferences>) {
         prefs.runs.forEach { (mode, run) ->
             this[longPreferencesKey("started.$mode")] = run.place
             if (run.pending.isNotEmpty()) this[stringSetPreferencesKey("pending.$mode")] = run.pending.toEntries()
+            if (run.wall) this[booleanPreferencesKey("wall.$mode")] = true
         }
         prefs.notes.forEach { (id, note) ->
             if (note.holders.isNotEmpty()) {

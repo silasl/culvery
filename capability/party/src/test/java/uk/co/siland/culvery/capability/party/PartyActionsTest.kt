@@ -31,7 +31,7 @@ class PartyActionsTest {
     private fun actions(access: FakeAccess, rig: HouseRig) =
         PartyActions(access, rig.house, setOf(TestSwitch(HouseModes.HOLIDAY, "Holiday mode", holiday)))
 
-    private suspend fun turnOn(rig: HouseRig) = rig.house.turnOn(TestAccess(Role.ADULT).authorise(HousePermissions.PARTY_MODE)!!)
+    private suspend fun turnOn(rig: HouseRig) = rig.house.turnOn(TestAccess(Role.ADULT).authorise(HousePermissions.STORED_MODE)!!)
 
     /** Fails if the pad asks for anything but `party.mode`, or the sheet opens for the wrong direction. */
     @Test
@@ -45,7 +45,7 @@ class PartyActionsTest {
 
         assertThat(access.asked).containsExactly(listOf("party.mode"))
         assertThat(opened.map { it.second }).containsExactly(true)
-        assertThat(opened.single().first.granted).contains(HousePermissions.PARTY_MODE)
+        assertThat(opened.single().first.granted).contains(HousePermissions.STORED_MODE)
         assertThat(rig.trace.calls).isEmpty()
 
         turnOn(rig)
@@ -211,7 +211,7 @@ class PartyActionsTest {
         turnOn(rig)
         val gate = CompletableDeferred<Unit>()
         rig.trace.gates["music.stop"] = gate
-        val by = access.authorise(HousePermissions.PARTY_MODE)!!
+        val by = access.authorise(HousePermissions.STORED_MODE)!!
         val off = launch { actions(access, rig).turnOff(by) }
         runCurrent()
         assertThat(rig.house.running.value).isEqualTo(PartyRun.TURNING_OFF)

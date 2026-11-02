@@ -28,7 +28,7 @@ class PartyActions @Inject internal constructor(
         if (house.running.value != null) return
         val on = house.isOn.value ?: return
         if (refusal.refusesTap(turningOn = !on)) return
-        val by = access.authorise(HousePermissions.PARTY_MODE) ?: return
+        val by = access.authorise(HousePermissions.STORED_MODE) ?: return
         open(by, !on)
     }
 

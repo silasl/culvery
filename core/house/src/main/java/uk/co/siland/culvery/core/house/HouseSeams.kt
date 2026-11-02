@@ -98,18 +98,43 @@ interface HouseMode {
     val holiday: StateFlow<Boolean?>
 }
 
-/** A mode that can list plugs (12 §5.1): [order] sorts it among the modes, [permission] is what turning it on takes. */
-data class HouseModeInfo(val id: String, val name: String, val order: Int, val permission: String)
-
 object HouseModes {
     const val HOLIDAY = "holiday"
     const val PARTY = "party"
+
+    /** The one switch every stored mode shares (15b Ruling 8). */
+    const val STORED = "stored"
+}
+
+/** What lets a mode's run change the house (15b Ruling 3). Neither [toString] prints a person or an id. */
+sealed interface ModeGrant {
+    class Person(val by: Authorised) : ModeGrant {
+        override fun toString() = "ModeGrant.Person"
+    }
+
+    /** No PIN (15b decision 7): the wall vouches for [modeId]'s own choices only, and never for Holiday mode. */
+    class Wall(val modeId: String) : ModeGrant {
+        init {
+            require(modeId != HouseModes.HOLIDAY) { "Holiday mode always needs a PIN" }
+        }
+
+        override fun toString() = "ModeGrant.Wall"
+    }
+}
+
+/** A person needs [modeId]'s permission; the wall must be vouching for [modeId] itself. */
+fun ModeGrant.allows(modeId: String): Boolean = when (this) {
+    is ModeGrant.Person -> modePermission(modeId) in by.granted
+    is ModeGrant.Wall -> this.modeId == modeId
 }
 
 /** A mode's on state, for the rule that two modes are never on together (13 §2.6). */
 interface HouseModeSwitch {
     val modeId: String
     val modeName: String
+
+    /** How a log line names the mode: "Holiday" or "a stored mode", never its name or id (15b §5). */
+    val logName: String
 
     /** Null until it has been read. */
     val isOn: StateFlow<Boolean?>
@@ -132,12 +157,37 @@ interface HousePlugs {
     fun ready(modeId: String): Flow<Boolean>
     suspend fun preview(modeId: String): List<PlugChange>
 
-    /** Takes the mode's snapshot (12 §5.2); [by] must hold the mode's permission (12 §2.13). Switches nothing. */
-    suspend fun begin(modeId: String, by: Authorised)
+    /** Takes the mode's snapshot (12 §5.2); [grant] must allow [modeId], and a wall's leaves out every plug that needs a PIN (15b Ruling 4). Switches nothing. */
+    suspend fun begin(modeId: String, grant: ModeGrant)
 
     /** Switches a begun mode's pending plugs, with no grant; null with no snapshot, and nothing switched. */
     suspend fun enter(modeId: String): HouseStep?
     suspend fun leave(modeId: String): HouseStep
+
+    /** The plugs on the Lights tab, named, in tab order; empty with no plug system (15b §4.2). */
+    suspend fun options(): List<PlugOption>
+
+    /** [modeId]'s added plugs, in tab order. */
+    fun added(modeId: String): Flow<List<AddedPlug>>
+
+    /** Adds the plug at [on], or takes it out with null; nothing for a plug not on the Lights tab. */
+    suspend fun choose(modeId: String, plugId: String, on: Boolean?)
+
+    /** Puts back anything [modeId]'s run still holds, then drops its choices and run (15b §4.2 Delete). Throws when the put-back can't be saved. */
+    suspend fun forget(modeId: String)
+
+    /** True while [modeId]'s run holds a plug that now needs a PIN, in its notes or pending (S1); true when the store can't be read. */
+    suspend fun holdsPinPlug(modeId: String): Boolean
+}
+
+/** A plug a mode's page can add. [toString] leaves out the id and the name. */
+data class PlugOption(val id: String, val name: String, val needsPin: Boolean) {
+    override fun toString() = "PlugOption"
+}
+
+/** A plug a mode switches to [on]. [toString] leaves out the id. */
+data class AddedPlug(val id: String, val on: Boolean, val needsPin: Boolean) {
+    override fun toString() = "AddedPlug"
 }
 
 interface MultiDayEvents {
@@ -151,8 +201,14 @@ data class MultiDayEvent(val title: String, val first: LocalDate, val last: Loca
 
 object HousePermissions {
     const val HOLIDAY_MODE = "holiday.mode"
-    const val PARTY_MODE = "party.mode"
+
+    /** Party mode's id kept, for every stored mode (15b Ruling 2). */
+    const val STORED_MODE = "party.mode"
 }
+
+/** What turning [modeId] on or off takes: Holiday mode its own, every stored mode the one (15b Ruling 2). */
+fun modePermission(modeId: String): String =
+    if (modeId == HouseModes.HOLIDAY) HousePermissions.HOLIDAY_MODE else HousePermissions.STORED_MODE
 
 /** A speaker room. [toString] leaves out the id and name. */
 data class HouseRoom(val id: String, val name: String) {

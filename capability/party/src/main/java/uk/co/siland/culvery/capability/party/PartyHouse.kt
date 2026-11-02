@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
 import uk.co.siland.culvery.core.house.HouseTimings
+import uk.co.siland.culvery.core.house.ModeGrant
 import uk.co.siland.culvery.core.house.ModePlugs
 import uk.co.siland.culvery.core.house.PartyGroup
 import uk.co.siland.culvery.core.house.RoomBefore
@@ -72,8 +73,9 @@ class PartyHouse internal constructor(
 
     override val modeId = HouseModes.PARTY
     override val modeName = PartyWords.LABEL
+    override val logName = "a stored mode"
 
-    private val plugs = plugs?.let { ModePlugs(it, HouseModes.PARTY) }
+    private val plugs = plugs?.let { ModePlugs(it, HouseModes.PARTY, logName) }
     private val mutex = Mutex()
 
     // The rest is in memory and changed under the mutex: a restart forgets the lines and the last try.
@@ -107,7 +109,7 @@ class PartyHouse internal constructor(
         PartyWords.backLines(current.value ?: PartyRecord(), readyPlugs() != null)
 
     suspend fun turnOn(by: Authorised) {
-        require(HousePermissions.PARTY_MODE in by.granted) { "Turning Party mode on needs its own grant" }
+        require(HousePermissions.STORED_MODE in by.granted) { "Turning Party mode on needs its own grant" }
         exclusive(PartyRun.TURNING_ON) {
             if (load().on) return@exclusive
             orphansChecked = true
@@ -118,7 +120,7 @@ class PartyHouse internal constructor(
             set(PartyRecord(on = true, since = wall.nowMillis(), musicBefore = groupsWaiting()))
             if (plugs != null) {
                 plugsPending = true
-                plugs.begin(by)
+                plugs.begin(ModeGrant.Person(by))
                 enterPlugs()
             }
             startMusic(prefs)
@@ -130,7 +132,7 @@ class PartyHouse internal constructor(
 
     /** Every part is tried and Party mode ends whatever they answer (13 §4.2). */
     suspend fun turnOff(by: Authorised) {
-        require(HousePermissions.PARTY_MODE in by.granted) { "Turning Party mode off needs its own grant" }
+        require(HousePermissions.STORED_MODE in by.granted) { "Turning Party mode off needs its own grant" }
         exclusive(PartyRun.TURNING_OFF) {
             val record = load()
             if (!record.on) return@exclusive

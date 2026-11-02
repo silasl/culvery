@@ -11,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -18,6 +19,7 @@ import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.house.GroupBefore
 import uk.co.siland.culvery.core.house.HouseLights
+import uk.co.siland.culvery.core.house.AddedPlug
 import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
@@ -26,7 +28,9 @@ import uk.co.siland.culvery.core.house.HouseStep
 import uk.co.siland.culvery.core.house.LightOptions
 import uk.co.siland.culvery.core.house.MusicOptions
 import uk.co.siland.culvery.core.house.MusicStart
+import uk.co.siland.culvery.core.house.ModeGrant
 import uk.co.siland.culvery.core.house.PlugChange
+import uk.co.siland.culvery.core.house.PlugOption
 import uk.co.siland.culvery.core.house.PartyGroup
 import uk.co.siland.culvery.core.house.RoomBefore
 import uk.co.siland.culvery.core.house.SceneChoice
@@ -120,10 +124,10 @@ internal class FakePlugs(private val trace: Trace = Trace()) : HousePlugs {
 
     override suspend fun preview(modeId: String): List<PlugChange> = changes
 
-    override suspend fun begin(modeId: String, by: Authorised) {
+    override suspend fun begin(modeId: String, grant: ModeGrant) {
         trace.hit("plugs.begin", modeId)
         begun += modeId
-        begins += by
+        begins += (grant as ModeGrant.Person).by
     }
 
     override suspend fun enter(modeId: String): HouseStep? {
@@ -137,6 +141,16 @@ internal class FakePlugs(private val trace: Trace = Trace()) : HousePlugs {
         begun -= modeId
         return leaves.poll() ?: leaveOtherwise
     }
+
+    override suspend fun options() = emptyList<PlugOption>()
+
+    override fun added(modeId: String): Flow<List<AddedPlug>> = flowOf(emptyList())
+
+    override suspend fun choose(modeId: String, plugId: String, on: Boolean?) = Unit
+
+    override suspend fun forget(modeId: String) = Unit
+
+    override suspend fun holdsPinPlug(modeId: String) = false
 }
 
 internal class FakeMusic(private val trace: Trace = Trace()) : HouseMusic {
@@ -231,6 +245,7 @@ internal class TestSwitch(
     override val modeId: String,
     override val modeName: String,
     override val isOn: MutableStateFlow<Boolean?>,
+    override val logName: String = modeName,
 ) : HouseModeSwitch {
     override suspend fun tick() = Unit
 }

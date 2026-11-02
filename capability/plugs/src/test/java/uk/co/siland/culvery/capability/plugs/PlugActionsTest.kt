@@ -14,7 +14,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.culvery.capability.plugs.ModeChoice.IGNORE
 import uk.co.siland.culvery.capability.plugs.ModeChoice.OFF
 import uk.co.siland.culvery.capability.plugs.ModeChoice.ON
 import uk.co.siland.culvery.capability.plugs.PlugPower.GONE
@@ -284,27 +283,21 @@ class PlugActionsTest {
         }
     }
 
-    /** 12r §4.2: fails if show doubles, an Ignore keeps its entry, or hide loses the plug's choices or PIN setting. */
+    /** 12r §4.2: fails if show doubles, or hide loses the plug's choices or PIN setting. */
     @Test
-    fun showHidePinAndChoiceReachTheStore() = runTest {
+    fun showHideAndPinReachTheStore() = runTest {
         val rig = Rig(this, Role.ADULT, fan(ON_NOW))
         rig.actions.show(FAN, true)
         rig.actions.show(FAN, true)
         rig.actions.show(LAMP, true)
         rig.actions.setNeedsPin(FAN, true)
-        rig.actions.setChoice(HOLIDAY, FAN, ON)
-        rig.actions.setChoice(PARTY, FAN, OFF)
-        rig.actions.setChoice(HOLIDAY, LAMP, OFF)
+        rig.plugs.configure { it.with(HOLIDAY, FAN, ON).with(PARTY, FAN, OFF) }
         assertThat(rig.plugs.prefs().plugs).containsExactly(FAN, LAMP).inOrder()
         assertThat(rig.plugs.prefs().needsPin).containsExactly(FAN)
-        assertThat(rig.plugs.prefs().choice(HOLIDAY, FAN)).isEqualTo(ON)
 
-        rig.actions.setChoice(HOLIDAY, FAN, IGNORE)
-        assertThat(rig.plugs.prefs().choice(HOLIDAY, FAN)).isEqualTo(IGNORE)
         rig.actions.setNeedsPin(FAN, false)
         assertThat(rig.plugs.prefs().needsPin).isEmpty()
 
-        rig.actions.setChoice(HOLIDAY, FAN, ON)
         rig.actions.setNeedsPin(FAN, true)
         rig.actions.show(FAN, false)
         val hidden = rig.plugs.prefs()
@@ -317,18 +310,15 @@ class PlugActionsTest {
         assertThat(rig.plugs.prefs().choice(HOLIDAY, FAN)).isEqualTo(ON)
     }
 
-    /** Fails if a chip tap or a PIN switch landing after a hide writes for a plug that isn't shown. */
+    /** Fails if a PIN switch landing after a hide writes for a plug that isn't shown. */
     @Test
-    fun choiceAndPinAreOnlyWrittenWhileShown() = runTest {
+    fun pinIsOnlyWrittenWhileShown() = runTest {
         val rig = Rig(this, Role.ADULT, fan(ON_NOW))
         rig.actions.show(FAN, true)
         rig.actions.show(FAN, false)
-        rig.actions.setChoice(HOLIDAY, FAN, ON)
         rig.actions.setNeedsPin(FAN, true)
 
-        val prefs = rig.plugs.prefs()
-        assertThat(prefs.modes).isEmpty()
-        assertThat(prefs.needsPin).isEmpty()
+        assertThat(rig.plugs.prefs().needsPin).isEmpty()
     }
 
     /** Fails if a write that throws escapes the tab. */

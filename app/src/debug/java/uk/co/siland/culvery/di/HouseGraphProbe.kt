@@ -12,7 +12,6 @@ import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseMode
-import uk.co.siland.culvery.core.house.HouseModeInfo
 import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
@@ -32,7 +31,6 @@ interface HouseGraphProbe {
     fun heating(): Optional<HouseHeating>
     fun hoover(): Optional<HouseHoover>
     fun plugs(): Optional<HousePlugs>
-    fun modes(): Set<@JvmSuppressWildcards HouseModeInfo>
     fun switches(): Set<@JvmSuppressWildcards HouseModeSwitch>
     fun music(): Optional<HouseMusic>
     fun speakers(): Speakers

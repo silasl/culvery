@@ -7,13 +7,11 @@ import uk.co.siland.culvery.core.household.Role
 
 object PlugsPermissions {
     const val SWITCH = "plugs.switch"
-    const val MANAGE = "plugs.manage"
 }
 
-/** Both need an Adult or Admin PIN each time (12 §4.4). */
+/** An Adult or Admin PIN each time (12 §4.4). */
 class PlugsPermissionSource @Inject constructor() : PermissionSource {
     override val permissions = listOf(
         PermissionDef(PlugsPermissions.SWITCH, "Switch plugs that need a PIN", setOf(Role.ADMIN, Role.ADULT), freshPin = true),
-        PermissionDef(PlugsPermissions.MANAGE, "Choose what modes do with plugs", setOf(Role.ADMIN, Role.ADULT), freshPin = true),
     )
 }

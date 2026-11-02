@@ -66,7 +66,7 @@ class PartyHouseTest {
 
     private fun TestScope.rig() = Rig(backgroundScope)
 
-    private fun by(): Authorised = grant(HousePermissions.PARTY_MODE)
+    private fun by(): Authorised = grant(HousePermissions.STORED_MODE)
 
     /** Fails if another mode's grant turns Party on, or anything is called or saved before the refusal. */
     @Test

@@ -8,11 +8,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 
 /** 13 §2.6: one mode's tile refuses while the other is on, and says so until that mode goes off. */
 @RunWith(AndroidJUnit4::class)
 class ModeRefusalTest {
-    private class Switch(override val modeId: String, override val modeName: String, val on: MutableStateFlow<Boolean?>) : HouseModeSwitch {
+    private class Switch(
+        override val modeId: String,
+        override val modeName: String,
+        val on: MutableStateFlow<Boolean?>,
+        override val logName: String = modeName,
+    ) : HouseModeSwitch {
         override val isOn: StateFlow<Boolean?> = on
 
         override suspend fun tick() = Unit
@@ -76,5 +82,20 @@ class ModeRefusalTest {
             expectNoEvents()
         }
         assertThat(refusal.current()).isNull()
+    }
+
+    /** 15b §5: fails if a refused turn-on logs the mode's name or id instead of its log name. */
+    @Test
+    fun logsNameNoMode() = runTest {
+        ShadowLog.clear()
+        val film = Switch("modeabcdef", "Film night", MutableStateFlow(false), logName = "a stored mode")
+        holiday.on.value = true
+
+        assertThat(ModeRefusal(film, setOf(film, holiday)).turnOnUnlessRefused { }).isFalse()
+
+        val logs = ShadowLog.getLogs().filter { it.tag == "ModeRefusal" }.map { it.msg }
+        assertThat(logs).containsExactly("a stored mode wasn't turned on because another mode is on")
+        assertThat(logs.single()).doesNotContain("Film night")
+        assertThat(logs.single()).doesNotContain("modeabcdef")
     }
 }

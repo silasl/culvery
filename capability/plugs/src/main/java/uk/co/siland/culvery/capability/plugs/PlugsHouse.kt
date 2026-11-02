@@ -13,31 +13,33 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import uk.co.siland.culvery.core.access.Authorised
-import uk.co.siland.culvery.core.house.HouseModeInfo
+import uk.co.siland.culvery.core.house.AddedPlug
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.ModeGrant
 import uk.co.siland.culvery.core.house.PlugChange
+import uk.co.siland.culvery.core.house.PlugOption
+import uk.co.siland.culvery.core.house.allows
+import uk.co.siland.culvery.core.plugin.attempt
 
 private const val TAG = "PlugsHouse"
 
 /**
  * What the modes do to the plugs (12 §5): a mode begins with its own grant, then `enter` switches its plugs and `leave`
  * puts them back. `enter` and `leave` take no grant and share one lock; Remove and the PIN setting don't, so every
- * write here is a transform that re-checks the plug is still added.
+ * write here is a transform that re-checks the plug is still added. A wall's run never switches a plug that needs a
+ * PIN (15b Ruling 4).
  */
 @Singleton
 class PlugsHouse internal constructor(
     private val settings: PlugSettings,
     private val system: PlugSystem?,
-    private val modes: Set<HouseModeInfo>,
 ) : HousePlugs {
     @Inject
     constructor(
         settings: PlugSettings,
         systems: Set<@JvmSuppressWildcards PlugSystem>,
-        modes: Set<HouseModeInfo>,
-    ) : this(settings, systems.firstOrNull(), modes)
+    ) : this(settings, systems.firstOrNull())
 
     private val mutex = Mutex()
 
@@ -51,8 +53,9 @@ class PlugsHouse internal constructor(
         }
     }
 
-    override suspend fun begin(modeId: String, by: Authorised) {
-        require(modes.any { it.id == modeId && it.permission in by.granted }) { "A mode begins with its own grant" }
+    override suspend fun begin(modeId: String, grant: ModeGrant) {
+        require(isModeId(modeId) && grant.allows(modeId)) { "A mode begins with its own grant" }
+        val wall = grant is ModeGrant.Wall
         mutex.withLock {
             // A run still here is a leave whose last write threw: put it back before the new snapshot (12 §5.2).
             if (modeId in settings.current().runs) leaveLocked(modeId)
@@ -61,7 +64,7 @@ class PlugsHouse internal constructor(
                     .filterValues { it.holders.isNotEmpty() }
                 p.copy(
                     notes = notes,
-                    runs = p.runs + (modeId to ModeRun(p.next, listed(p, modeId).toMap())),
+                    runs = p.runs + (modeId to ModeRun(p.next, snapshot(p, modeId, wall), wall)),
                     next = p.next + 1,
                 )
             }
@@ -71,12 +74,71 @@ class PlugsHouse internal constructor(
     override suspend fun enter(modeId: String): HouseStep? = mutex.withLock {
         val prefs = settings.current()
         val run = prefs.runs[modeId] ?: return@withLock null
+        val locked = if (run.wall) dropLocked(modeId, prefs) else emptySet()
         fanOut(run.pending.entries.sortedBy { prefs.plugs.indexOf(it.key) }, PlugsWords::enterLine) { (id, wanted) ->
-            reach(modeId, id, wanted)
+            if (id in locked) missed(id, wanted) else reach(modeId, id, wanted)
         }
     }
 
     override suspend fun leave(modeId: String): HouseStep = mutex.withLock { leaveLocked(modeId) }
+
+    override suspend fun options(): List<PlugOption> {
+        if (system == null) return emptyList()
+        val prefs = settings.current()
+        return coroutineScope {
+            prefs.plugs.map { id -> async { PlugOption(id, read(id).name, id in prefs.needsPin) } }.awaitAll()
+        }
+    }
+
+    override fun added(modeId: String): Flow<List<AddedPlug>> = settings.prefs.map { p ->
+        listed(p, modeId).map { (id, on) -> AddedPlug(id, on, id in p.needsPin) }
+    }.distinctUntilChanged()
+
+    override suspend fun choose(modeId: String, plugId: String, on: Boolean?) {
+        val choice = when (on) {
+            true -> ModeChoice.ON
+            false -> ModeChoice.OFF
+            null -> ModeChoice.IGNORE
+        }
+        settings.update { if (plugId in it.plugs) it.with(modeId, plugId, choice) else it }
+    }
+
+    override suspend fun forget(modeId: String) = mutex.withLock {
+        leaveLocked(modeId)
+        settings.update { it.copy(modes = it.modes - modeId) }
+    }
+
+    override suspend fun holdsPinPlug(modeId: String): Boolean = attempt({
+        val p = settings.current()
+        val noted = p.notes.filterValues { note -> note.holders.any { it.mode == modeId } }.keys
+        (noted + p.runs[modeId]?.pending?.keys.orEmpty()).any { it in p.needsPin }
+    }) { e ->
+        Log.w(TAG, "Plugs: couldn't read the runs (${e::class.simpleName}); counting a plug that needs a PIN")
+        true
+    }
+
+    /** The plugs a run begins with: a wall's leaves out those that need a PIN. */
+    private fun snapshot(p: PlugPrefs, modeId: String, wall: Boolean): Map<String, Boolean> =
+        listed(p, modeId).filterNot { wall && it.first in p.needsPin }.toMap()
+
+    /** Drops the pending plugs of [modeId]'s wall run that have come to need a PIN, in one write; the ids dropped. */
+    private suspend fun dropLocked(modeId: String, seen: PlugPrefs): Set<String> {
+        if (seen.runs[modeId]?.pending.orEmpty().keys.none { it in seen.needsPin }) return emptySet()
+        var dropped = emptySet<String>()
+        settings.update { p ->
+            val run = p.runs[modeId]?.takeIf { it.wall } ?: return@update p
+            dropped = run.pending.keys intersect p.needsPin
+            p.copy(runs = p.runs + (modeId to run.copy(pending = run.pending - dropped)))
+        }
+        if (dropped.isNotEmpty()) Log.w(TAG, "Plugs: a no-PIN run left out a plug that needs a PIN")
+        return dropped
+    }
+
+    /** The change for a plug a wall's run left out, named by a read. */
+    private suspend fun missed(id: String, wanted: Boolean): PlugChange? = guarded(wanted) { touched ->
+        touched.name = read(id).name
+        false
+    }
 
     private suspend fun leaveLocked(modeId: String): HouseStep {
         val prefs = settings.current()
@@ -128,12 +190,15 @@ class PlugsHouse internal constructor(
     private suspend fun reachFrom(modeId: String, id: String, wanted: Boolean, state: PlugState): Boolean {
         val now = state.isOn ?: return false
         var written: PlugNote? = null
+        var locked = false
         settings.update { p ->
             if (id !in p.plugs || modeId !in p.runs) return@update p
+            if (p.runs[modeId]?.wall == true && id in p.needsPin) return@update p.also { locked = true }
             val note = noted(p, id, modeId, wanted, now)
             written = note
             p.copy(notes = p.notes + (id to note))
         }
+        if (locked) return false
         val note = written ?: return true
         if (note.holders.last().mode != modeId || now == note.expected) return true
         return send(id, note.expected).let { it == null || it == PlugResult.Done }

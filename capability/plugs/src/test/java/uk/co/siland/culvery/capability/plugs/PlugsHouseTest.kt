@@ -1,6 +1,10 @@
 package uk.co.siland.culvery.capability.plugs
 
+import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,8 +23,11 @@ import uk.co.siland.culvery.capability.plugs.ModeChoice.ON
 import uk.co.siland.culvery.capability.plugs.PlugPower.GONE
 import uk.co.siland.culvery.capability.plugs.PlugPower.UNKNOWN
 import uk.co.siland.culvery.capability.plugs.PlugPower.UNREACHABLE
+import uk.co.siland.culvery.core.house.AddedPlug
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.ModeGrant
 import uk.co.siland.culvery.core.house.PlugChange
+import uk.co.siland.culvery.core.house.PlugOption
 import uk.co.siland.culvery.capability.plugs.PlugPower.OFF as OFF_NOW
 import uk.co.siland.culvery.capability.plugs.PlugPower.ON as ON_NOW
 
@@ -30,6 +37,8 @@ class PlugsHouseTest {
     private val offLine = "Lamp didn’t switch off. It’ll keep trying."
 
     private fun keys(rig: PlugsRig) = rig.store.state.value!!.asMap().keys.map { it.name }
+
+    private fun person(vararg permissions: String) = ModeGrant.Person(grant(*permissions))
 
     private suspend fun refused(block: suspend () -> Unit): Throwable? = try {
         block()
@@ -45,9 +54,9 @@ class PlugsHouseTest {
         rig.holiday(lamp = OFF)
         val house = rig.house()
 
-        assertThat(refused { house.begin(HOLIDAY, grant("plugs.manage")) }).isInstanceOf(IllegalArgumentException::class.java)
-        assertThat(refused { house.begin("sleep", grant("sleep.mode")) }).isInstanceOf(IllegalArgumentException::class.java)
-        assertThat(refused { house.begin(HOLIDAY, grant("party.mode")) }).isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(refused { house.begin(HOLIDAY, person("plugs.manage")) }).isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(refused { house.begin("sleep", person("sleep.mode")) }).isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(refused { house.begin(HOLIDAY, person("party.mode")) }).isInstanceOf(IllegalArgumentException::class.java)
 
         assertThat(rig.prefs().runs).isEmpty()
     }
@@ -573,7 +582,7 @@ class PlugsHouseTest {
 
         assertThat(house.ready(HOLIDAY).first()).isTrue()
         assertThat(house.ready(PARTY).first()).isFalse()
-        assertThat(PlugsHouse(rig.settings, null, MODES).ready(HOLIDAY).first()).isFalse()
+        assertThat(PlugsHouse(rig.settings, null).ready(HOLIDAY).first()).isFalse()
     }
 
     /** 12 §5.1: fails if the preview takes its names from the tab's flow instead of a read, or lists Leave plugs, or reorders. */
@@ -584,5 +593,181 @@ class PlugsHouseTest {
         rig.system.added.value = emptyList()
 
         assertThat(rig.house().preview(HOLIDAY)).containsExactly(PlugChange("Lamp", false), PlugChange("Desk", true)).inOrder()
+    }
+
+    /** Lamp and Heater added and On for Party, Heater needing a PIN. */
+    private suspend fun pinRig(heater: PlugPower = OFF_NOW) = PlugsRig(lamp(OFF_NOW), heater(heater)).also { rig ->
+        rig.configure { it.showing(LAMP).showing(HEATER).with(PARTY, LAMP, ON).with(PARTY, HEATER, ON).copy(needsPin = setOf(HEATER)) }
+    }
+
+    /** 15b Ruling 4: fails if a no-PIN run switches a plug that needs a PIN. */
+    @Test
+    fun aWallRunLeavesOutAPinPlug() = runTest {
+        val rig = pinRig()
+        val house = rig.house()
+
+        house.begin(PARTY, ModeGrant.Wall(PARTY))
+
+        assertThat(rig.prefs().runs.getValue(PARTY).wall).isTrue()
+        assertThat(house.enter(PARTY)).isEqualTo(HouseStep.Done)
+        assertThat(rig.system.switches).containsExactly(LAMP to true)
+    }
+
+    /** Review Focus 2: fails if a plug locked after a no-PIN run began is switched by its retry, or goes unmentioned. */
+    @Test
+    fun aPlugLockedAfterAWallBeginIsNotSwitched() = runTest {
+        val rig = pinRig(heater = UNREACHABLE)
+        rig.configure { it.copy(needsPin = emptySet()) }
+        val house = rig.house()
+        house.begin(PARTY, ModeGrant.Wall(PARTY))
+        assertThat(house.enter(PARTY)).isEqualTo(HouseStep.Failed("Heater didn’t switch on. It’ll keep trying."))
+        rig.power(HEATER, OFF_NOW)
+        rig.configure { it.copy(needsPin = setOf(HEATER)) }
+
+        val again = house.enter(PARTY)
+
+        assertThat(again).isEqualTo(HouseStep.Failed(PlugsWords.enterLine(listOf(PlugChange("Heater", true)))))
+        assertThat(rig.system.switches).containsExactly(LAMP to true)
+        assertThat(rig.prefs().runs.getValue(PARTY).pending).isEmpty()
+        assertThat(house.enter(PARTY)).isEqualTo(HouseStep.Done)
+    }
+
+    /** 15b Ruling 4: fails if a person's run leaves out a plug that needs a PIN. */
+    @Test
+    fun aPersonRunStillSwitchesAPinPlug() = runTest {
+        val rig = pinRig()
+
+        rig.house().start(PARTY)
+
+        assertThat(rig.system.switches).containsExactly(LAMP to true, HEATER to true)
+        assertThat(rig.prefs().runs.getValue(PARTY).wall).isFalse()
+    }
+
+    /** 15b decision 7: fails if the wall's word for one mode begins another, or a refused begin leaves a run. */
+    @Test
+    fun aWallGrantForAnotherModeIsRefused() = runTest {
+        val rig = pinRig()
+
+        assertThat(refused { rig.house().begin(PARTY, ModeGrant.Wall("modeabcdef")) }).isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(rig.prefs().runs).isEmpty()
+    }
+
+    /** 15b §4.2: fails if an option's name isn't read afresh, a plug off the tab is offered, the order isn't the tab's, or a missing system offers any. */
+    @Test
+    fun optionsAreNamedInTabOrder() = runTest {
+        val rig = PlugsRig(lamp(ON_NOW), fan(ON_NOW), desk(OFF_NOW))
+        rig.configure { it.showing(FAN).showing(LAMP).copy(needsPin = setOf(LAMP)) }
+        rig.system.added.value = emptyList()
+
+        assertThat(rig.house().options())
+            .containsExactly(PlugOption(FAN, "Fan", false), PlugOption(LAMP, "Lamp", true)).inOrder()
+        assertThat(PlugsHouse(rig.settings, null).options()).isEmpty()
+    }
+
+    /** 15b §4.2: fails if choosing doesn't add, change or take out the plug, or the list doesn't follow. */
+    @Test
+    fun chooseAddsSwitchesAndRemoves() = runTest {
+        val rig = PlugsRig(lamp(ON_NOW))
+        rig.configure { it.showing(LAMP) }
+        val house = rig.house()
+
+        house.added(PARTY).test {
+            assertThat(awaitItem()).isEmpty()
+            house.choose(PARTY, LAMP, true)
+            assertThat(awaitItem()).containsExactly(AddedPlug(LAMP, true, false))
+            house.choose(PARTY, LAMP, false)
+            assertThat(awaitItem()).containsExactly(AddedPlug(LAMP, false, false))
+            house.choose(PARTY, LAMP, null)
+            assertThat(awaitItem()).isEmpty()
+        }
+    }
+
+    /** 15b §4.2: fails if a plug not on the Lights tab can be added to a mode. */
+    @Test
+    fun chooseIgnoresAPlugNotOnTheTab() = runTest {
+        val rig = PlugsRig(lamp(ON_NOW), fan(ON_NOW))
+        rig.configure { it.showing(LAMP) }
+
+        rig.house().choose(PARTY, FAN, true)
+
+        assertThat(rig.prefs().modes).isEmpty()
+    }
+
+    /** Review Focus 5: fails if forgetting a mode left by a leave whose last write threw keeps its run or choices. */
+    @Test
+    fun forgetPutsBackFirst() = runTest {
+        val rig = PlugsRig(lamp(OFF_NOW))
+        rig.configure { it.showing(LAMP).with(PARTY, LAMP, ON) }
+        val house = rig.house()
+        house.start(PARTY)
+        // The leave's read, the put-back's read, the check before the switch and the holder drop, then the last write.
+        rig.store.failOnWrite = rig.store.writeCount + 5
+        assertThat(runCatching { house.leave(PARTY) }.exceptionOrNull()).isNotNull()
+        assertThat(rig.prefs().runs).containsKey(PARTY)
+
+        house.forget(PARTY)
+
+        assertThat(rig.system.switches).containsExactly(LAMP to true, LAMP to false).inOrder()
+        assertThat(rig.system.states.value.getValue(LAMP).power).isEqualTo(OFF_NOW)
+        assertThat(house.added(PARTY).first()).isEmpty()
+        assertThat(rig.prefs().runs).doesNotContainKey(PARTY)
+    }
+
+    /** 15b §4.2 Delete: fails if forgetting a mode whose run still holds a plug drops it without putting the plug back. */
+    @Test
+    fun forgetPutsBackARunStillOn() = runTest {
+        val rig = PlugsRig(lamp(OFF_NOW))
+        rig.configure { it.showing(LAMP).with(PARTY, LAMP, ON) }
+        val house = rig.house()
+        house.start(PARTY)
+
+        house.forget(PARTY)
+
+        assertThat(rig.system.switches).containsExactly(LAMP to true, LAMP to false).inOrder()
+        val prefs = rig.prefs()
+        assertThat(prefs.runs).isEmpty()
+        assertThat(prefs.notes).isEmpty()
+        assertThat(prefs.modes).isEmpty()
+    }
+
+    /** S1: fails if a locked plug the run still holds stops counting once it is taken out of the mode, or counts after the run left. */
+    @Test
+    fun holdsPinPlugCountsTheRunsPlugs() = runTest {
+        val rig = pinRig()
+        rig.configure { it.copy(needsPin = emptySet()) }
+        val house = rig.house()
+        house.start(PARTY)
+        assertThat(house.holdsPinPlug(PARTY)).isFalse()
+
+        rig.configure { it.with(PARTY, HEATER, IGNORE).copy(needsPin = setOf(HEATER)) }
+
+        assertThat(house.holdsPinPlug(PARTY)).isTrue()
+        assertThat(house.holdsPinPlug(HOLIDAY)).isFalse()
+        house.leave(PARTY)
+        assertThat(house.holdsPinPlug(PARTY)).isFalse()
+    }
+
+    /** S1: fails if a store that can't be read lets a tap go without a PIN. */
+    @Test
+    fun holdsPinPlugIsTrueWhenTheStoreCantBeRead() = runTest {
+        val rig = pinRig()
+        rig.store.failReads = true
+
+        assertThat(rig.house().holdsPinPlug(PARTY)).isTrue()
+    }
+
+    /** T2: fails if the plug choices stored before 15b don't read as each mode's added plugs. */
+    @Test
+    fun existingPartyAndHolidayChoicesReadAsAdded() = runTest {
+        val rig = PlugsRig(lamp(ON_NOW), fan(ON_NOW))
+        rig.store.state.value = mutablePreferencesOf(
+            stringPreferencesKey("plugs") to "$LAMP,$FAN",
+            stringSetPreferencesKey("mode.party") to setOf("$LAMP=on", "$FAN=off"),
+            stringSetPreferencesKey("mode.holiday") to setOf("$FAN=on"),
+        )
+        val house = rig.house()
+
+        assertThat(house.added(PARTY).first()).containsExactly(AddedPlug(LAMP, true, false), AddedPlug(FAN, false, false)).inOrder()
+        assertThat(house.added(HOLIDAY).first()).containsExactly(AddedPlug(FAN, true, false))
     }
 }

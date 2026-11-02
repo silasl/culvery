@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.plugin.WallClock
 class HouseModeSchedulerTest {
     private class Mode(override val modeId: String, private val held: CompletableDeferred<Unit>? = null) : HouseModeSwitch {
         override val modeName = modeId
+        override val logName = modeId
         override val isOn: StateFlow<Boolean?> = MutableStateFlow(false)
         var ticks = 0
 

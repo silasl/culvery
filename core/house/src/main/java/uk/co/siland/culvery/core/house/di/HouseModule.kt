@@ -10,7 +10,6 @@ import dagger.multibindings.Multibinds
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
-import uk.co.siland.culvery.core.house.HouseModeInfo
 import uk.co.siland.culvery.core.house.HouseModeScheduler
 import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseMusic
@@ -32,10 +31,6 @@ abstract class HouseModule {
 
     @BindsOptionalOf
     abstract fun plugs(): HousePlugs
-
-    // With no mode bound plugs have no mode choices (12 §5.1).
-    @Multibinds
-    abstract fun modes(): Set<HouseModeInfo>
 
     @BindsOptionalOf
     abstract fun multiDayEvents(): MultiDayEvents

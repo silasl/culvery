@@ -29,6 +29,7 @@ import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
 import uk.co.siland.culvery.core.house.HouseTimings
+import uk.co.siland.culvery.core.house.ModeGrant
 import uk.co.siland.culvery.core.house.ModePlugs
 import uk.co.siland.culvery.core.house.isReady
 import uk.co.siland.culvery.core.house.PlugChange
@@ -78,12 +79,13 @@ class HolidayHouse internal constructor(
     override val isOn: StateFlow<Boolean?> = holiday
     override val modeId = HouseModes.HOLIDAY
     override val modeName = HolidayWords.LABEL
+    override val logName = "Holiday"
     val running: StateFlow<HolidayRun?> = run.asStateFlow()
 
     /** The tile's line: what didn't happen. */
     val line: StateFlow<String?> = shown.asStateFlow()
 
-    private val plugs = plugs?.let { ModePlugs(it, HouseModes.HOLIDAY) }
+    private val plugs = plugs?.let { ModePlugs(it, HouseModes.HOLIDAY, logName) }
     private val mutex = Mutex()
 
     // The rest is in memory and changed under the mutex: a restart forgets the grant, the failures and the last tries.
@@ -121,7 +123,7 @@ class HolidayHouse internal constructor(
             grant = by
             resetRun()
             offLine = null
-            if (PLUGS_ON in steps) plugs?.begin(by)
+            if (PLUGS_ON in steps) plugs?.begin(ModeGrant.Person(by))
             set(HolidayRecord(on = true, back = back, since = wall.nowMillis(), steps = steps.associateWith { StepState.PENDING }))
             runDue()
         }

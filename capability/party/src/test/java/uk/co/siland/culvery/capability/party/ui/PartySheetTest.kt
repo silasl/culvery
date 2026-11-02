@@ -177,7 +177,7 @@ class PartySheetTest {
         compose.waitFor { overlay.content == null }
 
         assertThat(rig.house.isOn.value).isTrue()
-        assertThat(rig.plugs.begins.single().granted).contains(HousePermissions.PARTY_MODE)
+        assertThat(rig.plugs.begins.single().granted).contains(HousePermissions.STORED_MODE)
         assertThat(rig.music.startedWith).hasSize(1)
         compose.waitForIdle()
         compose.onNodeWithTag("party_tile_on", useUnmergedTree = true).assertTextEquals("ON")
@@ -204,7 +204,7 @@ class PartySheetTest {
         runBlocking {
             rig.loaded()
             rig.choose()
-            rig.house.turnOn(access.authorise(HousePermissions.PARTY_MODE)!!)
+            rig.house.turnOn(access.authorise(HousePermissions.STORED_MODE)!!)
         }
         val actions = PartyActions(access, rig.house, emptySet())
         compose.setContent {

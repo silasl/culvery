@@ -40,8 +40,6 @@ class HouseGraphTest {
     @Test
     fun thePlugsAreInTheHouse() {
         assertThat(probe.plugs().isPresent).isTrue()
-        val holiday = probe.modes().single { it.id == "holiday" }
-        assertThat(holiday.permission).isEqualTo("holiday.mode")
     }
 
     @Test
@@ -53,9 +51,6 @@ class HouseGraphTest {
 
     @Test
     fun partyIsInTheHouse() {
-        val party = probe.modes().single { it.id == "party" }
-        assertThat(party.permission).isEqualTo("party.mode")
-        assertThat(party.order).isEqualTo(20)
         assertThat(probe.switches().map { it.modeId }).containsExactly("holiday", "party")
         assertThat(probe.music().isPresent).isTrue()
     }

@@ -19,7 +19,7 @@ private const val TAG = "PlugActions"
 
 /**
  * What the Lights tab's plugs do (12 §4.2): a switch by hand runs on the application scope, so its toast shows if the tab
- * goes, and asks a fresh Adult or Admin PIN only for a plug set to need one. Set-up sits behind `plugs.manage`.
+ * goes, and asks a fresh Adult or Admin PIN only for a plug set to need one.
  */
 @Singleton
 class PlugActions internal constructor(
@@ -81,11 +81,6 @@ class PlugActions internal constructor(
     /** Nothing is written for a plug that isn't shown. */
     suspend fun setNeedsPin(entityId: String, on: Boolean) = write {
         if (entityId in it.plugs) it.copy(needsPin = if (on) it.needsPin + entityId else it.needsPin - entityId) else it
-    }
-
-    /** Nothing is written for a plug that is no longer shown: a chip tap can land after it is hidden. */
-    suspend fun setChoice(modeId: String, entityId: String, choice: ModeChoice) = write {
-        if (entityId in it.plugs) it.with(modeId, entityId, choice) else it
     }
 
     private suspend fun needsPin(entityId: String): Boolean = try {

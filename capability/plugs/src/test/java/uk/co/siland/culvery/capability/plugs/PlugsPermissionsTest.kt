@@ -9,21 +9,14 @@ import uk.co.siland.culvery.core.household.Role
 class PlugsPermissionsTest {
     private val registry = PermissionRegistry(setOf(CorePermissionSource(), PlugsPermissionSource()))
 
-    /** 12 §4.4: Adult or Admin with a fresh PIN each time, so a Child's PIN is refused. Fails if an id, label, role or freshPin differs. */
+    /** 12 §4.4: Adult or Admin with a fresh PIN each time, so a Child's PIN is refused. Fails if the id, label, roles or freshPin differ, or another permission is defined. */
     @Test
-    fun bothAreForAdultsAndAdminsWithAFreshPin() {
+    fun switchIsForAdultsAndAdminsWithAFreshPin() {
         assertThat(PlugsPermissions.SWITCH).isEqualTo("plugs.switch")
-        assertThat(PlugsPermissions.MANAGE).isEqualTo("plugs.manage")
-        val labels = mapOf(
-            PlugsPermissions.SWITCH to "Switch plugs that need a PIN",
-            PlugsPermissions.MANAGE to "Choose what modes do with plugs",
-        )
-        for ((id, label) in labels) {
-            assertThat(Role.entries.filter { registry.isGranted(it, id) }).containsExactly(Role.ADMIN, Role.ADULT)
-            assertThat(registry.isGranted(Role.CHILD, id)).isFalse()
-            val def = registry.require(id)
-            assertThat(def.label).isEqualTo(label)
-            assertThat(def.freshPin).isTrue()
-        }
+        assertThat(PlugsPermissionSource().permissions.map { it.id }).containsExactly(PlugsPermissions.SWITCH)
+        assertThat(Role.entries.filter { registry.isGranted(it, PlugsPermissions.SWITCH) }).containsExactly(Role.ADMIN, Role.ADULT)
+        val def = registry.require(PlugsPermissions.SWITCH)
+        assertThat(def.label).isEqualTo("Switch plugs that need a PIN")
+        assertThat(def.freshPin).isTrue()
     }
 }

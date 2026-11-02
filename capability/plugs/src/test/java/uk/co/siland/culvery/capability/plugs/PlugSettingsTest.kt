@@ -160,4 +160,18 @@ class PlugSettingsTest {
         settings.update { it.showing("switch.lamp") }
         assertThat(settings.prefs.first().plugs).containsExactly("switch.lamp")
     }
+
+    /** 15b Ruling 4: fails if a no-PIN run forgets it is one over a restart, or a run stored before 15b reads as one. */
+    @Test
+    fun aWallRunIsKept() = runTest {
+        val store = MemoryStore()
+        val settings = PlugSettings(store)
+        settings.update { it.copy(runs = mapOf("party" to ModeRun(1, emptyMap(), wall = true), "holiday" to ModeRun(2, emptyMap()))) }
+
+        assertThat(store.state.value!!.asMap().keys.map { it.name }).contains("wall.party")
+        assertThat(store.state.value!!.asMap().keys.map { it.name }).doesNotContain("wall.holiday")
+        val read = PlugSettings(store).prefs.first().runs
+        assertThat(read.getValue("party").wall).isTrue()
+        assertThat(read.getValue("holiday").wall).isFalse()
+    }
 }

@@ -122,7 +122,7 @@ internal object LogHygiene {
      *
      * `step.name` is a Holiday mode step's name (`HolidayStep`: LIGHTS_ON, ECO_ON, PLUGS_ON, HOOVER, ECO_OFF), never a date (11 §6).
      *
-     * `own.modeName` is a mode's fixed name, "Holiday mode" or "Party mode" (`ModeRefusal`); `this.modeId` its id, "holiday" or "party" (`ModePlugs`).
+     * `own.logName` and `this.logName` in `ModePlugs` are how a mode is logged, "Holiday" or "a stored mode", never its name or id (15b §5).
      *
      * `sound.name` is a doorbell sound's fixed name, CLASSIC or ORGAN (`DoorSound`).
      */
@@ -131,7 +131,7 @@ internal object LogHygiene {
         "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
         "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
-        "step.name", "own.modeName", "this.modeId", "sound.name",
+        "step.name", "own.logName", "sound.name",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|wtf|println)\(""")
