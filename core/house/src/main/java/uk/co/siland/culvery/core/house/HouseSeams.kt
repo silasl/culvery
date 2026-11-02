@@ -268,8 +268,8 @@ data class HouseScene(val id: String, val name: String) {
     override fun toString() = "HouseScene"
 }
 
-/** A Hue room and its scenes. [toString] leaves out the id, name and scenes. */
-data class LightRoomOption(val id: String, val name: String, val scenes: List<HouseScene>) {
+/** A Hue room and its scenes; [dimmable] false offers it On only, with no percent (15b Ruling 10). [toString] leaves out the id, name and scenes. */
+data class LightRoomOption(val id: String, val name: String, val scenes: List<HouseScene>, val dimmable: Boolean = true) {
     override fun toString() = "LightRoomOption"
 }
 

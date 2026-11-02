@@ -9,8 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import uk.co.siland.culvery.capability.party.ui.ModesPage
-import uk.co.siland.culvery.capability.party.ui.PartyPage
-import uk.co.siland.culvery.capability.party.ui.PartySettingsHost
+import uk.co.siland.culvery.capability.party.ui.ModeControls
 import uk.co.siland.culvery.capability.party.ui.StoredModeTileHost
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseModeSwitch
@@ -25,7 +24,7 @@ import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.ui.Icons
 
-/** The stored modes' tiles in Home's One-tap tray, placed by [ModesShelf] (15b decision 3), and Settings › Modes beside Party's old page: no tab and no card. */
+/** The stored modes' tiles in Home's One-tap tray, placed by [ModesShelf] (15b decision 3), and Settings › Modes: no tab and no card. */
 @Singleton
 class ModesCapability @Inject constructor(
     private val actions: StoredModeActions,
@@ -59,9 +58,8 @@ class ModesCapability @Inject constructor(
     }
 
     override fun settingsPages(): List<SettingsPage> = listOf(
-        PartyPage { PartySettingsHost(settings, music.orElse(null), lights.orElse(null)) },
         ModesPage(
-            settings, house.onMode,
+            settings, ModeControls(actions, house, shelf::place, music.orElse(null), lights.orElse(null)),
             switches.firstOrNull { it.modeId == HouseModes.HOLIDAY }?.isOn ?: MutableStateFlow(false),
             shelf.room, plugs.orElse(null), toaster,
         ),

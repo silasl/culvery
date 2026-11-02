@@ -2,6 +2,8 @@ package uk.co.siland.culvery.capability.party
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import uk.co.siland.culvery.core.house.LightChoice
+import uk.co.siland.culvery.core.house.RoomChoice
 
 class ModesWordsTest {
     /** 15b §7: fails if the nothing-to-do line differs from the copy. */
@@ -51,6 +53,14 @@ class ModesWordsTest {
 
         assertThat(ModesWords.summary(mode, on = false, plugs = 0)).isEqualTo("Not on Home · No PIN · Party mix on every speaker")
         assertThat(ModesWords.summary(mode.copy(speakers = listOf(KITCHEN)), on = false, plugs = 0)).endsWith("Party mix on 1 speaker")
+    }
+
+    /** Ledger 1: fails if a room set On or Off is left out of the count that a scene is in. */
+    @Test
+    fun aRoomCountsWhateverItIsSetTo() {
+        val rooms = listOf(KITCHEN_BRIGHT, RoomChoice("r2", "Lounge", LightChoice.On(60)), RoomChoice("r3", "Hall", LightChoice.Off))
+
+        assertThat(ModesWords.summary(film.copy(lights = rooms), on = false, plugs = 0)).isEqualTo("On Home · PIN · 3 rooms")
     }
 
     @Test

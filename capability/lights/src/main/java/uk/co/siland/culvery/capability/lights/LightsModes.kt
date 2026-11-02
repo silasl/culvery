@@ -25,7 +25,7 @@ class LightsModes internal constructor(private val system: () -> LightsSystem?) 
     suspend fun options(): LightOptions {
         val s = system() ?: return LightOptions(emptyList(), problemLine(LightsProblem.UNREACHABLE))
         readAll(s, Step.OPTIONS)?.let { return LightOptions(emptyList(), failureLine(it)) }
-        return LightOptions(s.rooms.value.map { r -> LightRoomOption(r.id, r.name, r.scenes.map { HouseScene(it.id, it.name) }) }, null)
+        return LightOptions(s.rooms.value.map { r -> LightRoomOption(r.id, r.name, r.scenes.map { HouseScene(it.id, it.name) }, r.dimmable) }, null)
     }
 
     /** Throws when the bridge can't be read. */

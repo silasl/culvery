@@ -241,6 +241,14 @@ class LightsModesTest {
         ).inOrder()
     }
 
+    /** S5: fails if a room none of whose lights dim is offered as dimmable. */
+    @Test
+    fun optionsMarkARoomThatCantDim() = runTest {
+        system.rooms.value = system.rooms.value + room("Hall", dimmable = false)
+
+        assertThat(modes.options().rooms.map { it.name to it.dimmable }).containsExactly("Kitchen" to true, "Lounge" to true, "Hall" to false).inOrder()
+    }
+
     /** Fails if a failed read gives rooms, or no line saying why. */
     @Test
     fun optionsWithTheBridgeDownGiveTheLine() = runTest {

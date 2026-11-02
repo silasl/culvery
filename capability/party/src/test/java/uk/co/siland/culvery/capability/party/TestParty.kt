@@ -158,13 +158,30 @@ internal class FakePlugs(private val trace: Trace = Trace()) : HousePlugs {
         return leaves.poll() ?: leaveOtherwise
     }
 
-    override suspend fun options() = emptyList<PlugOption>()
+    /** The plugs on the Lights tab; [choose] adds one of these to [addedNow] with its own PIN flag. */
+    @Volatile var offered: List<PlugOption> = emptyList()
+    val chosen = CopyOnWriteArrayList<Triple<String, String, Boolean?>>()
+    val forgotten = CopyOnWriteArrayList<String>()
+
+    /** Runs as [forget] begins, before it answers. */
+    @Volatile var onForget: suspend () -> Unit = {}
+    @Volatile var forgetThrows = false
+
+    override suspend fun options() = offered
 
     override fun added(modeId: String): Flow<List<AddedPlug>> = addedNow.onEach { check(!addedThrows) { "added threw" } }
 
-    override suspend fun choose(modeId: String, plugId: String, on: Boolean?) = Unit
+    override suspend fun choose(modeId: String, plugId: String, on: Boolean?) {
+        chosen += Triple(modeId, plugId, on)
+        val option = offered.firstOrNull { it.id == plugId } ?: return
+        addedNow.value = addedNow.value.filterNot { it.id == plugId } + listOfNotNull(on?.let { AddedPlug(plugId, it, option.needsPin) })
+    }
 
-    override suspend fun forget(modeId: String) = Unit
+    override suspend fun forget(modeId: String) {
+        forgotten += modeId
+        onForget()
+        if (forgetThrows) throw IOException("No space left")
+    }
 
     override suspend fun holdsPinPlug(modeId: String) = holdsPin
 }

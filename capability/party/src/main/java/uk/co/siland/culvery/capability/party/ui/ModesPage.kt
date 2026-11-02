@@ -45,7 +45,7 @@ private const val TAG = "ModesPage"
 /** Settings › Modes (15b §4.1): the list of modes, and the page of the one opened. Between Lights (470) and Other integrations (480). */
 class ModesPage internal constructor(
     private val store: ModesStore,
-    private val onMode: StateFlow<String?>,
+    private val controls: ModeControls,
     private val holidayOn: StateFlow<Boolean?>,
     private val room: Flow<Int>,
     private val plugs: HousePlugs?,
@@ -59,7 +59,7 @@ class ModesPage internal constructor(
     override fun Content() {
         // The mode whose page shows; null shows the list.
         var open by rememberSaveable { mutableStateOf<String?>(null) }
-        ModesHost(store, onMode, holidayOn, room, plugs, toaster, open) { open = it }
+        ModesHost(store, controls, holidayOn, room, plugs, toaster, open) { open = it }
     }
 }
 
@@ -71,7 +71,7 @@ data class ModeRowUi(val id: String, val icon: String, val name: String, val sum
 @Composable
 private fun ModesHost(
     store: ModesStore,
-    onMode: StateFlow<String?>,
+    controls: ModeControls,
     holidayOn: StateFlow<Boolean?>,
     room: Flow<Int>,
     plugs: HousePlugs?,
@@ -80,7 +80,8 @@ private fun ModesHost(
     setOpen: (String?) -> Unit,
 ) {
     val prefs by store.prefs.collectAsStateWithLifecycle(null)
-    val on by onMode.collectAsStateWithLifecycle()
+    val on by controls.house.onMode.collectAsStateWithLifecycle()
+    val homeRoom by room.collectAsStateWithLifecycle(null)
     val holiday by holidayOn.collectAsStateWithLifecycle()
     val overlay = LocalOverlayHost.current
     val scope = rememberCoroutineScope()
@@ -130,6 +131,7 @@ private fun ModesHost(
                         }
                     },
                 )
+                StoredModePage(opened, p, homeRoom, controls, plugs, store, toaster)
             }
         }
     }
@@ -143,7 +145,7 @@ internal fun modeRows(prefs: ModesPrefs, holidayOn: Boolean, on: String?, plugCo
 /** Stands for Holiday mode while its page is open; it is not a stored mode. */
 private val HOLIDAY_ENTRY = StoredMode(HouseModes.HOLIDAY, ModesWords.HOLIDAY_NAME, Icons.BEACH_ACCESS, showOnHome = true, needsPin = true)
 
-private fun ModesPrefs.onHome() = (if (holidayOnHome) 1 else 0) + modes.count { it.showOnHome }
+internal fun ModesPrefs.onHome() = (if (holidayOnHome) 1 else 0) + modes.count { it.showOnHome }
 
 private fun OverlayHost.showAddSheet(prefs: ModesPrefs, onAdd: (String, String) -> Unit) = show {
     AddModeSheet(prefs.modes.map { it.name }, onAdd, onClose = ::dismiss)

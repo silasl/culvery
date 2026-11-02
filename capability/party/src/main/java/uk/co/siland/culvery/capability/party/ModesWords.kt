@@ -71,21 +71,51 @@ object ModesWords {
     const val LABEL = "Party mode"
     const val NOTHING_TO_DO = "Nothing to do yet. Choose music, lights or plugs in Settings › Modes."
 
-    const val SETTINGS_TITLE = "Party mode"
     const val MUSIC_SECTION = "Music"
     const val SPEAKERS = "Speakers"
     const val NONE = "None"
-    const val MUSIC_SHEET_TITLE = "Music for Party mode"
-    const val CHOOSE_MUSIC = "Choose the music for Party mode"
-    const val LIGHTS_SECTION = "Lights"
-    const val LEAVE_ALONE = "Leave alone"
-    const val PLUGS_SECTION = "Plugs"
-    const val PLUGS_LINE = "Party mode keeps the plug choices it has. A later update lets you change them here."
+    const val LIGHTS_SECTION = "Lights · every other light is left alone"
+    const val PLUGS_SECTION = "Plugs · every other plug is left alone"
     const val SET_UP_SONOS = "Set up Sonos in Settings › Music to choose the music."
     const val SET_UP_HUE = "Set up Hue in Settings › Lights to choose scenes."
+    const val ADD_LIGHT = "Add a light"
+    const val ADD_PLUG = "Add a plug"
+    const val ADD_LIGHT_TITLE = "Choose a room"
+    const val ADD_PLUG_TITLE = "Choose a plug"
+    const val SAVE_LIGHT = "Save light"
+    const val LIGHT_ON = "On"
+    const val LIGHT_OFF = "Off"
+    const val SHOW_ON_HOME = "Show on Home"
+    const val NEEDS_A_PIN = "Needs a PIN"
+    const val PLUG_NEEDS_PIN = "A plug in this mode needs a PIN."
+    const val DELETE_MODE = "Delete mode"
+    const val MISSING_PLUG = "A plug that is no longer on the Lights tab"
 
-    /** What a tap on a light room's row does. */
-    fun chooseScene(room: String) = "Choose a scene for $room"
+    fun turnNow(on: Boolean) = if (on) "Turn off now" else "Turn on now"
+
+    fun appliesNext(name: String) = "Changes apply the next time $name turns on."
+
+    fun homeHasRoom(room: Int) = "Home has room for $room ${if (room == 1) "mode" else "modes"}."
+
+    fun deleteQuestion(name: String) = "Delete $name? Its music, lights and plugs choices go too."
+
+    fun musicSheetTitle(name: String) = "Music for $name"
+
+    fun chooseMusic(name: String) = "Choose the music for $name"
+
+    fun removeLight(room: String) = "Remove $room"
+
+    fun removePlug(plug: String) = "Remove $plug"
+
+    fun changeLight(room: String) = "change what $room does"
+
+    fun plugSpoken(plug: String, on: Boolean) = "$plug, ${if (on) "on" else "off"}"
+
+    fun switchPlug(plug: String, on: Boolean) = "switch $plug ${if (on) "off" else "on"}"
+
+    fun lower(room: String) = "Lower the brightness of $room by 10 percent"
+
+    fun raise(room: String) = "Raise the brightness of $room by 10 percent"
 
     /** What the PIN pad says the PIN is for (15b Ruling 2). */
     fun turnLabel(name: String, on: Boolean) = if (on) "Turn $name on" else "Turn $name off"

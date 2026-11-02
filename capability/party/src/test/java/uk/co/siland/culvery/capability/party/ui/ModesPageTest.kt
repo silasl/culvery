@@ -28,7 +28,6 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -38,13 +37,13 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.party.FILM_ID
 import uk.co.siland.culvery.capability.party.FILM_NIGHT
-import uk.co.siland.culvery.capability.party.FakePlugs
 import uk.co.siland.culvery.capability.party.LOCKED_HEATER
-import uk.co.siland.culvery.capability.party.MemoryStore
 import uk.co.siland.culvery.capability.party.ModesPrefs
-import uk.co.siland.culvery.capability.party.ModesStore
 import uk.co.siland.culvery.capability.party.PARTY_MODE
 import uk.co.siland.culvery.capability.party.StoredMode
+import uk.co.siland.culvery.capability.party.grant
+import uk.co.siland.culvery.core.house.HousePermissions
+import uk.co.siland.culvery.core.house.ModeGrant
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
@@ -60,17 +59,16 @@ class ModesPageTest {
     @get:Rule val compose = createComposeRule()
     private val overlay = TestOverlay()
     private val scope = CoroutineScope(Job())
-    private val memory = MemoryStore()
-    private val settings = ModesStore(memory, scope)
-    private val onMode = MutableStateFlow<String?>(null)
-    private val holidayOn = MutableStateFlow<Boolean?>(false)
-    private val room = MutableStateFlow(4)
-    private val plugs = FakePlugs()
+    private val rig = PageRig(scope)
+    private val memory = rig.memory
+    private val settings = rig.settings
+    private val room = rig.room
+    private val plugs = rig.plugs
     private val toaster = RecordingToaster()
 
     @After fun stop() = scope.cancel()
 
-    private fun page() = ModesPage(settings, onMode, holidayOn, room, plugs, toaster)
+    private fun page() = rig.page(toaster)
 
     private fun show(vararg modes: StoredMode) {
         runBlocking { settings.update { ModesPrefs(true, modes.toList()) } }
@@ -126,7 +124,11 @@ class ModesPageTest {
     @Test
     fun anOnModeSaysOnFirst() {
         plugs.addedNow.value = listOf(LOCKED_HEATER, LOCKED_HEATER.copy(id = "lamp"))
-        onMode.value = FILM_ID
+        runBlocking {
+            settings.update { ModesPrefs(true, listOf(PARTY_MODE, FILM_NIGHT)) }
+            rig.house.tick()
+            rig.house.turnOn(FILM_ID, ModeGrant.Person(grant(HousePermissions.STORED_MODE)))
+        }
         show(PARTY_MODE, FILM_NIGHT)
 
         compose.waitFor { hasSummary(FILM_ID, "On · On Home · No PIN · Party mix on every speaker · 1 room · 2 plugs") }
@@ -267,6 +269,20 @@ class ModesPageTest {
 
         compose.onAllNodesWithTag("mode_header").assertCountEquals(0)
         compose.onNodeWithTag("modes_add").assertExists()
+    }
+
+    /** Ledger 3: fails if a page left open by a deleted mode stays up. */
+    @Test
+    fun aModeDeletedWhileItsPageIsOpenSendsTheViewBackToTheList() {
+        show(PARTY_MODE, FILM_NIGHT)
+        compose.onNodeWithTag("mode_row_$FILM_ID").performClick()
+        compose.onNodeWithTag("mode_header").assertExists()
+
+        runBlocking { settings.update { it.copy(modes = it.modes.filterNot { m -> m.id == FILM_ID }) } }
+
+        compose.waitFor { exists("modes_add") }
+        compose.onAllNodesWithTag("mode_header").assertCountEquals(0)
+        compose.onAllNodesWithTag("mode_row_$FILM_ID").assertCountEquals(0)
     }
 
     @Test

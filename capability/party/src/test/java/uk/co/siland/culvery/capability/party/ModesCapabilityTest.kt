@@ -46,12 +46,11 @@ class ModesCapabilityTest {
             .containsExactly(Triple("mode.party", 11, TrayWidth.HALF), Triple("mode.$FILM_ID", 12, TrayWidth.HALF)).inOrder()
     }
 
-    /** 15b §4.1: Settings › Modes sits beside Party mode's old page, between Lights (470) and Other integrations (480), until Task 6 removes that page. */
+    /** 15b §4.1: Settings › Modes alone sits between Lights (470) and Other integrations (480); Party mode's old page is gone. */
     @Test
-    fun theSettingsPagesSitAfterLights() = runTest {
+    fun theSettingsPageSitsAfterLights() = runTest {
         val pages = capability().settingsPages()
 
-        assertThat(pages.map { Triple(it.id, it.title, it.order) })
-            .containsExactly(Triple("party", "Party mode", 475), Triple("modes", "Modes", 475)).inOrder()
+        assertThat(pages.map { Triple(it.id, it.title, it.order) }).containsExactly(Triple("modes", "Modes", 475))
     }
 }
