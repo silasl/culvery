@@ -46,7 +46,7 @@ class ModesShelfTest {
     private suspend fun shelf(scope: CoroutineScope, prefs: ModesPrefs, vararg capabilities: Capability): ModesShelf {
         val store = ModesStore(MemoryStore(), scope)
         store.update { prefs }
-        return ModesShelf(store, Provider { capabilities.toSet() })
+        return ModesShelf(store, Provider { capabilities.toSet() }, scope)
     }
 
     private suspend fun ModesShelf.places(vararg ids: String) = ids.map { place(it).first() }
@@ -129,6 +129,31 @@ class ModesShelfTest {
         assertThat(shown.last()).containsExactly("party")
     }
 
+    /** Fails if two readers each ask the capabilities again, or get counts of their own that can put a fifth half on Home. */
+    @Test
+    fun everyReaderSharesOneCount() = runTest {
+        var asked = 0
+        val late = object : Capability by Buttons("late", emptyList()) {
+            override fun trayButtons(): Flow<List<TrayButton>> = flow {
+                asked++
+                delay(50)
+                emit(listOf(TrayButton("late.start", 90, TrayWidth.HALF) {}))
+            }
+        }
+        val shelf = shelf(backgroundScope, ModesPrefs(modes = listOf(mode("party"), mode("modeb"), mode("modec"))), late)
+        val rooms = mutableListOf<Int>()
+        val places = mutableListOf<Int?>()
+        backgroundScope.launch { shelf.room.toList(rooms) }
+        advanceTimeBy(30)
+        backgroundScope.launch { shelf.place("modec").toList(places) }
+
+        advanceTimeBy(100)
+
+        assertThat(asked).isEqualTo(1)
+        assertThat(rooms).containsExactly(3)
+        assertThat(places).containsExactly(null)
+    }
+
     /** Fails if a half button that arrives after the wait doesn't take its spot back from the modes. */
     @Test
     fun aHalfButtonAfterTheWaitBringsTheRoomToThree() = runTest {
@@ -152,10 +177,12 @@ class ModesShelfTest {
     fun holidayBackOnHomePushesTheLastOff() = runTest {
         val store = ModesStore(MemoryStore(), backgroundScope)
         store.update { ModesPrefs(holidayOnHome = false, modes = listOf(mode("party"), mode("modeb"), mode("modec"), mode("moded"))) }
-        val shelf = ModesShelf(store, Provider { emptySet() })
+        val shelf = ModesShelf(store, Provider { emptySet() }, backgroundScope)
         assertThat(shelf.places("party", "moded")).containsExactly(0, 3).inOrder()
 
         store.update { it.copy(holidayOnHome = true) }
+        // The shared shelf catches up with the store as its readers do.
+        shelf.shown.first { HouseModes.HOLIDAY in it }
 
         assertThat(shelf.places(HouseModes.HOLIDAY, "party", "moded")).containsExactly(0, 1, null).inOrder()
     }

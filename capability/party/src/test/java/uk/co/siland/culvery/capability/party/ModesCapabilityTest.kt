@@ -18,7 +18,7 @@ import uk.co.siland.culvery.core.ui.Icons
 class ModesCapabilityTest {
     private fun TestScope.capability(rig: HouseRig = HouseRig(backgroundScope)) = ModesCapability(
         StoredModeActions(TestAccess(Role.ADULT), rig.house, rig.settings, emptySet()), rig.house, rig.settings,
-        ModesShelf(rig.settings, Provider { emptySet() }),
+        ModesShelf(rig.settings, Provider { emptySet() }, backgroundScope),
         Optional.of(rig.music), Optional.of(rig.lights), Optional.of(rig.plugs), emptySet(), emptySet(), RecordingToaster(),
     )
 
