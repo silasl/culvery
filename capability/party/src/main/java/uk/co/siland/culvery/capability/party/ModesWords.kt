@@ -77,7 +77,7 @@ object ModesWords {
     const val LIGHTS_SECTION = "Lights · every other light is left alone"
     const val PLUGS_SECTION = "Plugs · every other plug is left alone"
     const val SET_UP_SONOS = "Set up Sonos in Settings › Music to choose the music."
-    const val SET_UP_HUE = "Set up Hue on the Lights tab to choose rooms."
+    const val SET_UP_HUE = "Set up Hue in Settings › Lights to choose rooms."
     const val ADD_LIGHT = "Add a light"
     const val ADD_PLUG = "Add a plug"
     const val ADD_LIGHT_TITLE = "Choose a room"
