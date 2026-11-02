@@ -84,9 +84,11 @@ class StoredModesHouse internal constructor(
     /** The id of the stored mode that is on, or null. */
     val onMode: StateFlow<String?> = onId.asStateFlow()
     val running: StateFlow<ModeRunning?> = run.asStateFlow()
+    private val claiming = MutableStateFlow(false)
+    override val turningOn: StateFlow<Boolean> = claiming.asStateFlow()
 
     override val modeId = HouseModes.STORED
-    override val modeName: String get() = onId.value?.let { settings.prefsNow.value?.mode(it)?.name } ?: A_MODE
+    override val modeName: String get() = (onId.value ?: run.value?.modeId)?.let { settings.prefsNow.value?.mode(it)?.name } ?: A_MODE
     override val logName = "a stored mode"
 
     private val mutex = Mutex()
@@ -201,9 +203,11 @@ class StoredModesHouse internal constructor(
 
     private suspend fun exclusive(change: ModeRunning, block: suspend () -> Unit) {
         if (!run.compareAndSet(null, change)) return
+        claiming.value = change.change == PartyRun.TURNING_ON
         try {
             mutex.withLock { block() }
         } finally {
+            claiming.value = false
             run.value = null
         }
     }

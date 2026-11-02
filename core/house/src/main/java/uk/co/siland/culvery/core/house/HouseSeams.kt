@@ -139,6 +139,9 @@ interface HouseModeSwitch {
     /** Null until it has been read. */
     val isOn: StateFlow<Boolean?>
 
+    /** True from a turn-on's start until it ends, so one at a time counts the mode as on before its slow steps (15b I1). */
+    val turningOn: StateFlow<Boolean>
+
     /** Runs what is due, at start and each minute; a tick that finds a change running leaves it to the next. */
     suspend fun tick()
 }
@@ -149,8 +152,11 @@ interface ModeShelf {
     fun place(modeId: String): Flow<Int?>
 }
 
-/** The first mode other than [modeId] that is on. */
-fun Set<HouseModeSwitch>.blockedBy(modeId: String): HouseModeSwitch? = firstOrNull { it.modeId != modeId && it.isOn.value == true }
+/** True while the mode is on or turning on. */
+fun HouseModeSwitch.onOrTurningOn(): Boolean = isOn.value == true || turningOn.value
+
+/** The first mode other than [modeId] that is on or turning on. */
+fun Set<HouseModeSwitch>.blockedBy(modeId: String): HouseModeSwitch? = firstOrNull { it.modeId != modeId && it.onOrTurningOn() }
 
 /** A plug a mode will switch, or put back, to [on]. [toString] leaves out the name. */
 data class PlugChange(val name: String, val on: Boolean) {

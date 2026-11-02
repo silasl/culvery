@@ -9,6 +9,7 @@ import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -34,6 +35,7 @@ import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
 import uk.co.siland.culvery.core.house.HouseTimings
+import uk.co.siland.culvery.core.house.ModeRefusal
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -110,6 +112,31 @@ class HolidayHouseTest {
         assertThat(rig.lights.calls).hasSize(1)
         assertThat(rig.heating.calls).hasSize(1)
         assertThat(house.running.value).isNull()
+    }
+
+    /** 15b I1: fails if a no-PIN stored mode can turn on while Holiday mode's plugs begin is held, or both end up on. */
+    @Test
+    fun turningOnCountsAsOnForOneAtATime() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        val house = rig.house()
+        val held = CompletableDeferred<Unit>()
+        rig.plugs.onCall = { if (it == "begin:holiday") held.await() }
+        val filmOn = MutableStateFlow<Boolean?>(false)
+        val film = TestSwitch("modeabcdef", "Film night", filmOn, logName = "a stored mode")
+        val filmRefusal = ModeRefusal(film, setOf(film, house))
+        val turning = launch { house.turnOn(SAT_31_OCT, adult()) }
+        runCurrent()
+        assertThat(house.holiday.value).isFalse()
+
+        assertThat(filmRefusal.turnOnUnlessRefused { filmOn.value = true }).isFalse()
+        assertThat(filmRefusal.current()).isEqualTo("Turn Holiday mode off first.")
+        held.complete(Unit)
+        turning.join()
+
+        assertThat(house.holiday.value).isTrue()
+        assertThat(filmOn.value).isFalse()
+        assertThat(filmRefusal.current()).isEqualTo("Turn Holiday mode off first.")
     }
 
     /** Fails if a part with no seam, or one not ready, is planned, recorded or called. */

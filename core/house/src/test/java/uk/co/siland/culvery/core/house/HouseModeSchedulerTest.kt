@@ -24,6 +24,7 @@ class HouseModeSchedulerTest {
         override val modeName = modeId
         override val logName = modeId
         override val isOn: StateFlow<Boolean?> = MutableStateFlow(false)
+        override val turningOn: StateFlow<Boolean> = MutableStateFlow(false)
         var ticks = 0
 
         override suspend fun tick() {

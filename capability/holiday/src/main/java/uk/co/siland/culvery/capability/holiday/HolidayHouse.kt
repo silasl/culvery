@@ -81,6 +81,8 @@ class HolidayHouse internal constructor(
     override val modeName = HolidayWords.LABEL
     override val logName = "Holiday"
     val running: StateFlow<HolidayRun?> = run.asStateFlow()
+    private val claiming = MutableStateFlow(false)
+    override val turningOn: StateFlow<Boolean> = claiming.asStateFlow()
 
     /** The tile's line: what didn't happen. */
     val line: StateFlow<String?> = shown.asStateFlow()
@@ -171,9 +173,11 @@ class HolidayHouse internal constructor(
 
     private suspend fun exclusive(change: HolidayRun, block: suspend () -> Unit) {
         if (!run.compareAndSet(null, change)) return
+        claiming.value = change == HolidayRun.TURNING_ON
         try {
             mutex.withLock { block() }
         } finally {
+            claiming.value = false
             run.value = null
         }
     }

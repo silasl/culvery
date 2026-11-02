@@ -15,6 +15,7 @@ class HouseSeamsTest {
         override val modeName = "$modeId mode"
         override val logName = "a stored mode"
         override val isOn: StateFlow<Boolean?> = MutableStateFlow(on)
+        override val turningOn: StateFlow<Boolean> = MutableStateFlow(false)
 
         override suspend fun tick() = Unit
     }

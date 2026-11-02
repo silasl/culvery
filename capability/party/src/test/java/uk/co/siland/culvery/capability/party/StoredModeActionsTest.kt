@@ -16,6 +16,7 @@ import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.house.ModeGrant
+import uk.co.siland.culvery.core.house.ModeRefusal
 import uk.co.siland.culvery.core.household.Role
 
 /** 15b §4.3: one tap on Home, a fresh PIN only where the mode needs one, and one mode at a time. */
@@ -23,11 +24,12 @@ import uk.co.siland.culvery.core.household.Role
 @RunWith(AndroidJUnit4::class)
 class StoredModeActionsTest {
     private val holiday = MutableStateFlow<Boolean?>(false)
+    private val holidayTurningOn = MutableStateFlow(false)
 
     private fun TestScope.rig() = HouseRig(backgroundScope)
 
     private fun actions(access: FakeAccess, rig: HouseRig) =
-        StoredModeActions(access, rig.house, rig.settings, setOf(TestSwitch(HouseModes.HOLIDAY, "Holiday mode", holiday), rig.house))
+        StoredModeActions(access, rig.house, rig.settings, setOf(TestSwitch(HouseModes.HOLIDAY, "Holiday mode", holiday, turningOn = holidayTurningOn), rig.house))
 
     /** Party mode needing a PIN, Film night not, both with nothing to do but Film night's music and lights. */
     private suspend fun HouseRig.withFilmNight(film: StoredMode = FILM_NIGHT) = choose(PARTY_MODE, film).also { loaded() }
@@ -144,6 +146,53 @@ class StoredModeActionsTest {
         assertThat(rig.house.isOn.value).isFalse()
         assertThat(rig.trace.calls).isEmpty()
         assertThat(actions.refusal(PARTY).first()).isEqualTo("Turn Holiday mode off first.")
+    }
+
+    /** 15b I1: fails if a no-PIN tap turns a mode on while Holiday mode is turning on, or the tile doesn't say why. */
+    @Test
+    fun holidayTurningOnRefusesANoPinTap() = runTest {
+        val rig = rig()
+        rig.withFilmNight()
+        val access = TestAccess(Role.CHILD)
+        val actions = actions(access, rig)
+        holidayTurningOn.value = true
+
+        actions.tap(FILM_ID, sawOn = false)
+
+        assertThat(access.asked).isEmpty()
+        assertThat(rig.house.isOn.value).isFalse()
+        assertThat(actions.refusal(FILM_ID).first()).isEqualTo("Turn Holiday mode off first.")
+        holiday.value = true
+        holidayTurningOn.value = false
+        assertThat(rig.house.isOn.value).isFalse()
+        assertThat(actions.refusal(FILM_ID).first()).isEqualTo("Turn Holiday mode off first.")
+    }
+
+    /** 15b I1: fails if Holiday mode can turn on while a no-PIN stored mode is turning on, or both end up on. */
+    @Test
+    fun aStoredModeTurningOnRefusesHoliday() = runTest {
+        val rig = rig()
+        rig.choose(PARTY_MODE, FILM_NIGHT)
+        val gate = CompletableDeferred<Unit>()
+        rig.trace.gates["plugs.leave"] = gate
+        // The first tick's put-back of leftover plugs holds the house's lock, as a slow plug would.
+        val tick = launch { rig.house.tick() }
+        runCurrent()
+        val tap = launch { actions(TestAccess(Role.CHILD), rig).tap(FILM_ID, sawOn = false) }
+        runCurrent()
+        assertThat(rig.house.isOn.value).isFalse()
+        val holidaySwitch = TestSwitch(HouseModes.HOLIDAY, "Holiday mode", holiday)
+        val holidayRefusal = ModeRefusal(holidaySwitch, setOf(holidaySwitch, rig.house))
+
+        assertThat(holidayRefusal.turnOnUnlessRefused { holiday.value = true }).isFalse()
+        assertThat(holidayRefusal.current()).isEqualTo("Turn Film night off first.")
+        gate.complete(Unit)
+        tick.join()
+        tap.join()
+
+        assertThat(rig.house.onMode.value).isEqualTo(FILM_ID)
+        assertThat(holiday.value).isFalse()
+        assertThat(holidayRefusal.current()).isEqualTo("Turn Film night off first.")
     }
 
     /** Fails if a tap made on what the tile showed before the mode went on still acts. */

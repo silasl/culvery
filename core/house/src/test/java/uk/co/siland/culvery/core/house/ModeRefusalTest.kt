@@ -20,6 +20,7 @@ class ModeRefusalTest {
         override val logName: String = modeName,
     ) : HouseModeSwitch {
         override val isOn: StateFlow<Boolean?> = on
+        override val turningOn = MutableStateFlow(false)
 
         override suspend fun tick() = Unit
     }

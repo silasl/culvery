@@ -10,18 +10,18 @@ private const val TAG = "ModeRefusal"
 
 /**
  * The line [own]'s tile shows when another mode being on kept it from turning on (13 §2.6): "Turn {mode} off first."
- * from a refusal until the next refusal or a turn-off, and only while that mode is still on: it goes, and is forgotten,
+ * from a refusal until the next refusal or a turn-off, and only while that mode is still on or turning on: it goes, and is forgotten,
  * once the mode is turned off. It is read from [switches] as they change, so no scope is needed to keep it current.
  */
 class ModeRefusal(private val own: HouseModeSwitch, private val switches: Set<HouseModeSwitch>) {
     private val refusedBy = MutableStateFlow<HouseModeSwitch?>(null)
 
     /** The line as it changes, starting with [current]. */
-    val line: Flow<String?> = combine(switches.map { it.isOn } + refusedBy) { current() }.distinctUntilChanged()
+    val line: Flow<String?> = combine(switches.flatMap { listOf(it.isOn, it.turningOn) } + refusedBy) { current() }.distinctUntilChanged()
 
     fun current(): String? {
         val other = refusedBy.value ?: return null
-        if (other.isOn.value != true) {
+        if (!other.onOrTurningOn()) {
             // Forgotten once that mode is off, so its next turn-on doesn't bring the line back without a tap.
             refusedBy.compareAndSet(other, null)
             return null
