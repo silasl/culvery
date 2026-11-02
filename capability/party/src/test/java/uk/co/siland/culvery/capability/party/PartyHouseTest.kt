@@ -722,7 +722,7 @@ class PartyHouseTest {
     /** Review Focus 1, the house half: fails if Party on during the move doesn't load as on, or turning it off doesn't put back what 13 saved. */
     @Test
     fun aMovedOnRecordTurnsOffAndPutsBack() = runTest {
-        val sep = "001F"
+        val sep = "\u001F"
         val old = mutablePreferencesOf(
             booleanPreferencesKey("on") to true,
             longPreferencesKey("since") to 1_000L,
