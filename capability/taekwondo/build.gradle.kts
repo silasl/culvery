@@ -8,7 +8,6 @@ plugins {
 dependencies {
     testImplementation(testFixtures(project(":core:ui")))
     testImplementation(testFixtures(project(":core:plugin")))
-    testImplementation(testFixtures(project(":core:access")))
     // Capability appears in this module's public API.
     api(project(":core:plugin"))
     implementation(project(":core:ui"))

@@ -23,6 +23,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.taekwondo.CHOONG_MOO
 import uk.co.siland.culvery.capability.taekwondo.FakeSpeaker
 import uk.co.siland.culvery.capability.taekwondo.RunState
+import uk.co.siland.culvery.capability.taekwondo.move
 import uk.co.siland.culvery.capability.taekwondo.TaekwondoSettings
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.settingsDataStore
@@ -66,6 +67,10 @@ class TaekwondoScreenshotTest {
     @Test fun gridDark() = snap("taekwondo_grid_dark", RunState.Idle)
 
     @Test fun countingDark() = snap("taekwondo_counting_dark", RunState.Counting(10))
+
+    @Test fun movingLongDark() = snap("taekwondo_moving_long_dark", RunState.Moving(21, move("21")), detailed = true)
+
+    @Test fun movingLongestDark() = snap("taekwondo_moving_longest_dark", RunState.Moving(24, move("24")), detailed = true)
 
     @Test fun movingDark() = snap("taekwondo_moving_dark", RunState.Moving(1, CHOONG_MOO.moves[1]), detailed = true)
 }

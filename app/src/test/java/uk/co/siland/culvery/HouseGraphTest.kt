@@ -12,6 +12,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import uk.co.siland.culvery.core.house.HouseModeScheduler
+import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.di.HouseGraphProbe
 import uk.co.siland.culvery.provider.lights_hue.HUE_PROVIDER_ID
 import uk.co.siland.culvery.provider.music_sonos.SONOS_PROVIDER_ID
@@ -70,11 +71,14 @@ class HouseGraphTest {
         assertThat(probe.bridges().connectable?.descriptor?.id).isEqualTo(HUE_PROVIDER_ID)
     }
 
-    /** 15b §8: Taekwondo's half-width button takes a spot, so Home has room for 3 modes, and never for 4 first. */
+    /** 15b decision 3: Home has room for four modes less the bound half-width buttons that aren't modes (Taekwondo's is one). */
     @Test
-    fun taekwondoHoldsOneTraySpot() = runBlocking {
-        assertThat(probe.capabilities().map { it.id }).contains("taekwondo")
-        assertThat(withTimeout(10_000) { probe.modesShelf().room.first() }).isEqualTo(3)
+    fun theRoomIsFourLessTheOtherHalfButtons() = runBlocking {
+        val halves = withTimeout(10_000) {
+            probe.capabilities().filter { it.id != "holiday" && it.id != "party" }
+                .sumOf { cap -> cap.trayButtons().first().count { it.width == TrayWidth.HALF && !it.id.startsWith("mode.") && it.id != "holiday.mode" } }
+        }
+        assertThat(withTimeout(10_000) { probe.modesShelf().room.first() }).isEqualTo(4 - halves)
     }
 
     @Test

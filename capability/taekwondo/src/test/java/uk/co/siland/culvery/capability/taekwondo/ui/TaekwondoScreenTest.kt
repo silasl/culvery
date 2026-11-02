@@ -32,8 +32,6 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.taekwondo.FakeAlerts
 import uk.co.siland.culvery.capability.taekwondo.FakeSpeaker
 import uk.co.siland.culvery.capability.taekwondo.TaekwondoSettings
-import uk.co.siland.culvery.core.access.test.FakeAccess
-import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.LocalAlertHost
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.settingsDataStore
@@ -205,6 +203,21 @@ class TaekwondoScreenTest {
     }
 
     @Test
+    fun aRunDoesntStartWhileADoorCardIsUp() {
+        show()
+        compose.runOnIdle { alerts.show(loud = false) {} }
+        settle()
+
+        start()
+        after(10_500)
+
+        assertThat(open("pattern_0")).isTrue()
+        assertThat(open("count")).isFalse()
+        assertThat(speaker.calls).isEmpty()
+        assertThat(overlay.keptOpen).isFalse()
+    }
+
+    @Test
     fun anyDoorAlertStops() {
         show()
         for (loud in listOf(false, true)) {
@@ -222,19 +235,5 @@ class TaekwondoScreenTest {
             compose.runOnIdle { alerts.dismiss() }
             settle()
         }
-    }
-
-    /** The screen takes no access control at all, so a start, a cancel and a close can't reach a PIN pad. */
-    @Test
-    fun noPinIsAsked() {
-        val access = FakeAccess(Role.ADULT)
-        show()
-
-        start()
-        after(10_500)
-        tag("taekwondo_cancel").performClick()
-        tag("taekwondo_close").performClick()
-
-        assertThat(access.asked).isEmpty()
     }
 }

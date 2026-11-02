@@ -22,7 +22,7 @@ fun TaekwondoTile(settings: TaekwondoSettings, speaker: Provider<Speaker>) {
         line = null,
         spoken = TaekwondoWords.TITLE,
         enabled = true,
-        clickLabel = "Open",
+        clickLabel = TaekwondoWords.OPEN,
         onTap = { overlay.showFullScreen { TaekwondoScreen(settings, speaker.get(), onClose = overlay::dismiss) } },
     )
 }

@@ -900,9 +900,9 @@ A throwaway module (§8): deleting it means deleting `capability/taekwondo/`, th
 
 - [ ] **Step 6: Commit:** `git commit -m "Add a throwaway Taekwondo practice screen that reads Choong-Moo's moves aloud from a tray button"`
 
-**Deleting it later:** delete `capability/taekwondo/`, the `include`, and the app's `implementation` line. Then the leftovers can go too, or stay harmless:
+**Deleting it later:** delete `capability/taekwondo/`, the `include`, the app's `implementation` line, and the `capability/taekwondo` lines in `core/ui/src/test/resources/copy-scan-allow.txt`. Then the leftovers can go too, or stay harmless:
 - `OverlayHost.keepOpen` and its `OverlayLayersTest` cases.
-- `AlertHost.shown` (Ruling 18).
+- `AlertHost.showing` (Ruling 18's `shown`, as built).
 - `Icons.SPORTS_MARTIAL_ARTS` and its glyph.
 - The shelf's room-for-3 branch is only exercised by `ModesShelfTest.anotherHalfButtonLeavesThree`, which stays valid.
 - The `taekwondo_settings` DataStore file on the tablet, which nothing reads once the module is gone.

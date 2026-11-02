@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,13 +50,26 @@ object TaekwondoWords {
     const val DETAILED = "Detailed mode"
     const val CANCEL = "Cancel"
     const val CLOSE = "Close"
+    const val OPEN = "Open"
 
     fun again(seconds: Int) = "Again in $seconds"
 }
 
 private val CountStyle = HhType.clock.copy(fontSize = 240.sp, lineHeight = 260.sp, letterSpacing = 0.sp)
 private val AgainStyle = CountStyle.copy(fontSize = 96.sp, lineHeight = 112.sp)
-private val HangulStyle = HhType.screenTitle.copy(fontSize = 96.sp, lineHeight = 112.sp)
+private val HangulStyle = HhType.screenTitle.copy(
+    lineBreak = LineBreak(LineBreak.Strategy.Balanced, LineBreak.Strictness.Normal, LineBreak.WordBreak.Phrase),
+)
+
+/** The long moves (9, 21, 24) get smaller type so they wrap between words and still fit above Cancel. */
+private fun hangulStyle(text: String): TextStyle {
+    val size = when {
+        text.length <= 14 -> 96
+        text.length <= 24 -> 72
+        else -> 56
+    }
+    return HangulStyle.copy(fontSize = size.sp, lineHeight = (size + 16).sp)
+}
 
 /**
  * The practice screen: pick a pattern, then after 10 s it reads the moves aloud until Cancel. It keeps the overlay open
@@ -79,7 +93,12 @@ fun TaekwondoScreen(settings: TaekwondoSettings, speaker: Speaker, onClose: () -
     TaekwondoPanel(
         state = state, pattern = chosen, detailed = detailed,
         onDetailed = { on -> scope.launch { settings.setDetailed(on) } },
-        onPattern = { chosen = it; run.start(it, detailed) },
+        onPattern = {
+            if (!alerts.showing.value) {
+                chosen = it
+                run.start(it, detailed)
+            }
+        },
         onCancel = run::stop,
         onClose = { run.stop(); onClose() },
     )
@@ -164,7 +183,7 @@ private fun MoveView(s: RunState.Moving, detailed: Boolean) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(move.number, style = HhType.headerValue.copy(fontSize = 48.sp), color = Culvery.colors.accent, modifier = Modifier.testTag("move_number"))
         Text(
-            move.hangul ?: move.romanised, style = HangulStyle, color = Culvery.colors.ink, textAlign = TextAlign.Center,
+            move.hangul ?: move.romanised, style = hangulStyle(move.hangul ?: move.romanised), color = Culvery.colors.ink, textAlign = TextAlign.Center,
             modifier = Modifier.testTag("move_korean"),
         )
         if (move.hangul != null) {

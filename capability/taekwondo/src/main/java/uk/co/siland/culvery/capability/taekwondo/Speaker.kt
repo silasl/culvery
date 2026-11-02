@@ -57,6 +57,9 @@ class TtsSpeaker @Inject constructor(@ApplicationContext context: Context) : Spe
             override fun onError(utteranceId: String?) = finished(utteranceId)
 
             override fun onError(utteranceId: String?, errorCode: Int) = finished(utteranceId)
+
+            // Reported when the engine is stopped or flushed elsewhere, so that say() doesn't wait for a done that never comes.
+            override fun onStop(utteranceId: String?, interrupted: Boolean) = finished(utteranceId)
         })
         hasKorean = engine.isLanguageAvailable(Locale.KOREAN) >= TextToSpeech.LANG_AVAILABLE
         ready = true

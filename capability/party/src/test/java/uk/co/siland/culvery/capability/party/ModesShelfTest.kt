@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -106,6 +107,44 @@ class ModesShelfTest {
         advanceTimeBy(100)
         assertThat(rooms).containsExactly(3)
         assertThat(shown.flatten()).containsExactly("party")
+    }
+
+    /** Fails if a capability that never answers keeps the room, and so every mode, off Home. */
+    @Test
+    fun aSilentCapabilityCountsAsNoneAfterASecond() = runTest {
+        val silent = object : Capability by Buttons("silent", emptyList()) {
+            override fun trayButtons(): Flow<List<TrayButton>> = flow { awaitCancellation() }
+        }
+        val shelf = shelf(backgroundScope, ModesPrefs(holidayOnHome = false, modes = listOf(mode("party"))), silent)
+        val rooms = mutableListOf<Int>()
+        val shown = mutableListOf<List<String>>()
+        backgroundScope.launch { shelf.room.toList(rooms) }
+        backgroundScope.launch { shelf.shown.toList(shown) }
+
+        advanceTimeBy(999)
+        assertThat(rooms).isEmpty()
+        assertThat(shown).isEmpty()
+        advanceTimeBy(2)
+        assertThat(rooms).containsExactly(4)
+        assertThat(shown.last()).containsExactly("party")
+    }
+
+    /** Fails if a half button that arrives after the wait doesn't take its spot back from the modes. */
+    @Test
+    fun aHalfButtonAfterTheWaitBringsTheRoomToThree() = runTest {
+        val late = object : Capability by Buttons("late", emptyList()) {
+            override fun trayButtons(): Flow<List<TrayButton>> = flow {
+                delay(1_500)
+                emit(listOf(TrayButton("late.start", 90, TrayWidth.HALF) {}))
+            }
+        }
+        val shelf = shelf(backgroundScope, ModesPrefs(holidayOnHome = false, modes = listOf(mode("party"))), late)
+        val rooms = mutableListOf<Int>()
+        backgroundScope.launch { shelf.room.toList(rooms) }
+
+        advanceTimeBy(2_000)
+
+        assertThat(rooms).containsExactly(4, 3).inOrder()
     }
 
     /** Review Focus 3: fails if Holiday mode back on Home doesn't take the first place and push the last mode off. */
