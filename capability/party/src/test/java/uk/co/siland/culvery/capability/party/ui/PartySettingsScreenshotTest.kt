@@ -17,7 +17,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.party.KITCHEN
 import uk.co.siland.culvery.capability.party.LOUNGE
 import uk.co.siland.culvery.capability.party.PARTY_MIX
-import uk.co.siland.culvery.capability.party.PartyPrefs
+import uk.co.siland.culvery.capability.party.PARTY_MODE
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.test.snap
@@ -30,7 +30,7 @@ class PartySettingsScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
     private val chosen = PartySettingsUi(
-        PartyPrefs(music = PARTY_MIX, rooms = listOf(KITCHEN, LOUNGE), scenes = listOf(BRIGHT_IN_KITCHEN)),
+        PARTY_MODE.copy(music = PARTY_MIX, speakers = listOf(KITCHEN, LOUNGE), lights = listOf(BRIGHT_IN_KITCHEN)),
         MUSIC_OPTIONS, LIGHT_OPTIONS,
     )
 

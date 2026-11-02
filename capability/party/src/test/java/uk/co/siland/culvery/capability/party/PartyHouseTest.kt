@@ -1,6 +1,11 @@
 package uk.co.siland.culvery.capability.party
 
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
@@ -33,7 +38,7 @@ class PartyHouseTest {
     /** The settings over one store, the three fake seams sharing one call list, and the wall millis the test sets. */
     private class Rig(private val scope: CoroutineScope, val store: MemoryStore = MemoryStore()) {
         val trace = Trace()
-        val settings = PartySettings(store, scope)
+        val settings = ModesStore(store, scope)
         val plugs = FakePlugs(trace)
         val music = FakeMusic(trace)
         val lights = FakeLights(trace)
@@ -44,7 +49,7 @@ class PartyHouseTest {
             plugs: HousePlugs? = this.plugs,
             music: HouseMusic? = this.music,
             lights: HouseLights? = this.lights,
-            settings: PartySettings = this.settings,
+            settings: ModesStore = this.settings,
         ) = PartyHouse(settings, plugs, music, lights, WallClock { wall })
 
         /** The process starting again: a new store reader over the same file, and a new house. */
@@ -52,14 +57,14 @@ class PartyHouseTest {
             plugs: HousePlugs? = this.plugs,
             music: HouseMusic? = this.music,
             lights: HouseLights? = this.lights,
-        ) = house(plugs, music, lights, PartySettings(store, scope))
+        ) = house(plugs, music, lights, ModesStore(store, scope))
 
         /** Party mix on every speaker, Bright in Kitchen and Relax in Lounge. */
-        suspend fun choose(prefs: PartyPrefs = PartyPrefs(music = PARTY_MIX, scenes = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX))) =
-            settings.update { prefs }
+        suspend fun choose(mode: StoredMode = PARTY_MODE.copy(music = PARTY_MIX, lights = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX))) =
+            settings.update { ModesPrefs(modes = listOf(mode)) }
 
         /** What the file holds now, read by a fresh reader. */
-        suspend fun saved(): PartyRecord = PartySettings(store, scope).record.filterNotNull().first()
+        suspend fun saved(): ModeRecord = ModesStore(store, scope).record.filterNotNull().first()
 
         fun enters() = calls.count { it == "plugs.enter party" }
     }
@@ -79,7 +84,7 @@ class PartyHouseTest {
 
         assertThat(failure).isInstanceOf(IllegalArgumentException::class.java)
         assertThat(rig.calls).isEmpty()
-        assertThat(rig.saved()).isEqualTo(PartyRecord())
+        assertThat(rig.saved()).isEqualTo(ModeRecord())
     }
 
     /** Fails if the steps run in another order, the begin lacks the grant, or the record lacks a snapshot. */
@@ -96,7 +101,7 @@ class PartyHouseTest {
             "plugs.begin party", "plugs.enter party", "music.before", "music.start FV:2/3 null", "lights.modeBefore", "lights.modeOn",
         ).inOrder()
         assertThat(rig.plugs.begins).containsExactly(by)
-        val expected = PartyRecord(on = true, since = rig.wall, musicBefore = GROUPS_BEFORE, made = MADE, lights = LIGHTS_BEFORE)
+        val expected = ModeRecord(modeId = HouseModes.PARTY, on = true, since = rig.wall, musicBefore = GROUPS_BEFORE, made = MADE, lights = LIGHTS_BEFORE)
         assertThat(rig.saved()).isEqualTo(expected)
         assertThat(house.record.value).isEqualTo(expected)
         assertThat(house.isOn.value).isTrue()
@@ -295,7 +300,7 @@ class PartyHouseTest {
         assertThat(rig.calls.drop(before)).containsExactly("music.stop", "lights.modeBack", "plugs.leave party").inOrder()
         assertThat(rig.music.stops).containsExactly(MADE to GROUPS_BEFORE)
         assertThat(rig.lights.backs).containsExactly(LIGHTS_BEFORE)
-        assertThat(rig.saved()).isEqualTo(PartyRecord())
+        assertThat(rig.saved()).isEqualTo(ModeRecord())
         assertThat(house.isOn.value).isFalse()
         assertThat(house.line.value).isNull()
     }
@@ -343,7 +348,7 @@ class PartyHouseTest {
         house.turnOff(by())
 
         assertThat(house.isOn.value).isFalse()
-        assertThat(rig.saved()).isEqualTo(PartyRecord())
+        assertThat(rig.saved()).isEqualTo(ModeRecord())
         assertThat(house.line.value).isEqualTo(
             "$MUSIC_STOP_LINE\nSome plugs may not have gone back. Check them on the Lights tab.\nSome lights didn’t go back: Kitchen and Lounge.",
         )
@@ -392,14 +397,14 @@ class PartyHouseTest {
         assertThat(rig.lights.backs).containsExactly(LIGHTS_BEFORE)
         assertThat(rig.music.putBacks).isEmpty()
         assertThat(rig.calls.last()).isEqualTo("plugs.leave party")
-        assertThat(rig.saved()).isEqualTo(PartyRecord())
+        assertThat(rig.saved()).isEqualTo(ModeRecord())
     }
 
     /** Review Focus 3: fails if a restart that finds the snapshot but no group stops the music or shows a line. */
     @Test
     fun aRestartBeforeTheGroupWasMadeLeavesTheMusic() = runTest {
         val rig = rig()
-        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.settings.save(ModeRecord(modeId = HouseModes.PARTY, on = true, since = 1, musicBefore = GROUPS_BEFORE))
         val house = rig.restarted()
         house.tick()
 
@@ -415,7 +420,7 @@ class PartyHouseTest {
     fun aRestartThatFindsASnapshotButNoGroupPutsTheSpeakersBackOnce() = runTest {
         val rig = rig()
         rig.plugs.readyNow.value = false
-        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.settings.save(ModeRecord(modeId = HouseModes.PARTY, on = true, since = 1, musicBefore = GROUPS_BEFORE))
         val house = rig.restarted()
 
         house.tick()
@@ -436,7 +441,7 @@ class PartyHouseTest {
     fun aStartThatLeftNoGroupDoesntKeepTheSnapshot() = runTest {
         val rig = rig()
         rig.plugs.readyNow.value = false
-        rig.choose(PartyPrefs(music = PARTY_MIX))
+        rig.choose(PARTY_MODE.copy(music = PARTY_MIX))
         rig.music.started = MusicStart(null, HouseStep.Failed(MUSIC_START_LINE))
         rig.house().turnOn(by())
 
@@ -452,7 +457,7 @@ class PartyHouseTest {
     fun theSpeakersArePutBackOnceTheMusicSystemIsReady() = runTest {
         val rig = rig()
         rig.plugs.readyNow.value = false
-        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.settings.save(ModeRecord(modeId = HouseModes.PARTY, on = true, since = 1, musicBefore = GROUPS_BEFORE))
         rig.music.readyNow.value = false
         val house = rig.restarted()
 
@@ -472,7 +477,7 @@ class PartyHouseTest {
     fun aTurnOffBeforeTheSpeakersOpenStillPutsTheSavedGroupsBack() = runTest {
         val rig = rig()
         rig.plugs.readyNow.value = false
-        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.settings.save(ModeRecord(modeId = HouseModes.PARTY, on = true, since = 1, musicBefore = GROUPS_BEFORE))
         rig.music.readyNow.value = false
         rig.restarted().turnOff(by())
 
@@ -485,7 +490,7 @@ class PartyHouseTest {
 
         assertThat(rig.music.putBacks).containsExactly(GROUPS_BEFORE)
         assertThat(house.isOn.value).isFalse()
-        assertThat(rig.saved()).isEqualTo(PartyRecord())
+        assertThat(rig.saved()).isEqualTo(ModeRecord())
     }
 
     /** Fails if a put-back after Party is off fails without saying so. */
@@ -493,7 +498,7 @@ class PartyHouseTest {
     fun aPutBackAfterTurningOffThatFailsShowsItsLine() = runTest {
         val rig = rig()
         rig.plugs.readyNow.value = false
-        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.settings.save(ModeRecord(modeId = HouseModes.PARTY, on = true, since = 1, musicBefore = GROUPS_BEFORE))
         rig.music.readyNow.value = false
         val house = rig.restarted()
         house.turnOff(by())
@@ -503,7 +508,7 @@ class PartyHouseTest {
         house.tick()
 
         assertThat(house.line.value).isEqualTo(SPEAKERS_NOT_BACK_LINE)
-        assertThat(rig.saved()).isEqualTo(PartyRecord())
+        assertThat(rig.saved()).isEqualTo(ModeRecord())
     }
 
     /** Fails if turning on puts the waiting groups back without saying when they didn't go back. */
@@ -511,7 +516,7 @@ class PartyHouseTest {
     fun aTurnOnWithGroupsWaitingPutsThemBackAndShowsARefusal() = runTest {
         val rig = rig()
         rig.plugs.readyNow.value = false
-        rig.settings.save(PartyRecord(musicBefore = GROUPS_BEFORE))
+        rig.settings.save(ModeRecord(musicBefore = GROUPS_BEFORE))
         rig.music.putBackAnswer = HouseStep.Failed(SPEAKERS_NOT_BACK_LINE)
         val house = rig.restarted()
 
@@ -526,7 +531,7 @@ class PartyHouseTest {
     fun aRestartPutBackThatFailsShowsItsLine() = runTest {
         val rig = rig()
         rig.plugs.readyNow.value = false
-        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.settings.save(ModeRecord(modeId = HouseModes.PARTY, on = true, since = 1, musicBefore = GROUPS_BEFORE))
         rig.music.putBackAnswer = HouseStep.Failed(SPEAKERS_NOT_BACK_LINE)
         val house = rig.restarted()
 
@@ -578,7 +583,7 @@ class PartyHouseTest {
         house.turnOn(by())
 
         assertThat(house.isOn.value).isTrue()
-        assertThat(rig.saved()).isEqualTo(PartyRecord())
+        assertThat(rig.saved()).isEqualTo(ModeRecord())
         house.tick()
 
         assertThat(rig.saved().on).isTrue()
@@ -647,7 +652,7 @@ class PartyHouseTest {
     @Test
     fun anEmptyRoomListIsNoSpeakerChosen() = runTest {
         val rig = rig()
-        rig.choose(PartyPrefs(music = PARTY_MIX, rooms = emptyList()))
+        rig.choose(PARTY_MODE.copy(music = PARTY_MIX, speakers = emptyList()))
         val house = rig.house()
 
         assertThat(house.plan().music).isNull()
@@ -662,7 +667,7 @@ class PartyHouseTest {
     @Test
     fun chosenRoomsAreWhatTheMusicPlaysOn() = runTest {
         val rig = rig()
-        rig.choose(PartyPrefs(music = PARTY_MIX, rooms = listOf(KITCHEN, LOUNGE)))
+        rig.choose(PARTY_MODE.copy(music = PARTY_MIX, speakers = listOf(KITCHEN, LOUNGE)))
 
         rig.house().turnOn(by())
 
@@ -704,7 +709,7 @@ class PartyHouseTest {
         house.turnOn(by())
         house.turnOff(by())
         rig.trace.throws.clear()
-        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.settings.save(ModeRecord(modeId = HouseModes.PARTY, on = true, since = 1, musicBefore = GROUPS_BEFORE))
         rig.restarted().tick()
 
         val logs = ShadowLog.getLogs().filter { it.tag == "PartyHouse" }
@@ -712,6 +717,33 @@ class PartyHouseTest {
         for (secret in listOf("Kitchen", "Lounge", "Party mix", "Lamp", "FV:", "-id")) {
             logs.forEach { assertThat(it.msg).doesNotContain(secret) }
         }
+    }
+
+    /** Review Focus 1, the house half: fails if Party on during the move doesn't load as on, or turning it off doesn't put back what 13 saved. */
+    @Test
+    fun aMovedOnRecordTurnsOffAndPutsBack() = runTest {
+        val sep = ""
+        val old = mutablePreferencesOf(
+            booleanPreferencesKey("on") to true,
+            longPreferencesKey("since") to 1_000L,
+            stringPreferencesKey("music.made") to "Lounge-id${sep}Kitchen-id,Lounge-id,Dining-id",
+            stringSetPreferencesKey("music.before") to setOf("Kitchen-id${sep}Kitchen-id", "Lounge-id${sep}Lounge-id,Dining-id"),
+            stringSetPreferencesKey("lights.before") to setOf("r1${sep}Kitchen${sep}s1${sep}true${sep}40${sep}s2", "r2${sep}Lounge${sep}s3${sep}false${sep}0$sep"),
+            stringSetPreferencesKey("scenes") to setOf("r1${sep}Kitchen${sep}s1${sep}Bright"),
+        )
+        val rig = Rig(backgroundScope, MemoryStore(PartyMove.migrate(old)))
+        val house = rig.house()
+        house.tick()
+        assertThat(house.record.value).isEqualTo(FULL_RECORD)
+        rig.calls.clear()
+
+        house.turnOff(by())
+
+        assertThat(rig.calls).containsExactly("music.stop", "lights.modeBack", "plugs.leave party").inOrder()
+        assertThat(rig.music.stops).containsExactly(MADE to GROUPS_BEFORE)
+        assertThat(rig.lights.backs).containsExactly(LIGHTS_BEFORE)
+        assertThat(rig.saved()).isEqualTo(ModeRecord())
+        assertThat(house.isOn.value).isFalse()
     }
 
     private companion object {

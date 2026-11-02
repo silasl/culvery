@@ -42,7 +42,7 @@ private const val KEEP_NAME = "keep_days"
 
 /** The door's store: a corrupt file keeps the longest history rather than cutting it (15a §3.1). */
 internal fun doorDataStore(scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO), produceFile: () -> File): DataStore<Preferences> =
-    settingsDataStore(scope, { preferencesOf(stringPreferencesKey(KEEP_NAME) to KeepDays.THIRTY.name) }, produceFile)
+    settingsDataStore(scope, { preferencesOf(stringPreferencesKey(KEEP_NAME) to KeepDays.THIRTY.name) }, produceFile = produceFile)
 private const val TAG = "DoorSettings"
 private const val SECONDS_PER_MINUTE = 60
 

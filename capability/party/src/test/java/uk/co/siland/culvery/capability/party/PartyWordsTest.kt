@@ -39,7 +39,7 @@ class PartyWordsTest {
 
     @Test
     fun backLines() {
-        val record = PartyRecord(on = true, made = MADE, lights = LIGHTS_BEFORE)
+        val record = ModeRecord(on = true, made = MADE, lights = LIGHTS_BEFORE)
 
         assertThat(PartyWords.backLines(record, plugsListed = true)).containsExactly(
             "Stop the music and put the speakers back in their groups.",
@@ -47,7 +47,7 @@ class PartyWordsTest {
             "Put the lights back in Kitchen and Lounge.",
             "Anything changed by hand during the party stays as it is.",
         ).inOrder()
-        assertThat(PartyWords.backLines(PartyRecord(on = true), plugsListed = false))
+        assertThat(PartyWords.backLines(ModeRecord(on = true), plugsListed = false))
             .containsExactly("Party mode changed nothing, so there’s nothing to put back.")
     }
 

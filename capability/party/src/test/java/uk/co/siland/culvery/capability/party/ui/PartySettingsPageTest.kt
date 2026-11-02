@@ -50,8 +50,11 @@ import uk.co.siland.culvery.capability.party.KITCHEN
 import uk.co.siland.culvery.capability.party.LOUNGE
 import uk.co.siland.culvery.capability.party.MemoryStore
 import uk.co.siland.culvery.capability.party.MusicChoice
-import uk.co.siland.culvery.capability.party.PartyPrefs
-import uk.co.siland.culvery.capability.party.PartySettings
+import uk.co.siland.culvery.capability.party.ModesPrefs
+import uk.co.siland.culvery.capability.party.ModesStore
+import uk.co.siland.culvery.capability.party.PARTY_MODE
+import uk.co.siland.culvery.capability.party.StoredMode
+import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HouseRoom
 import uk.co.siland.culvery.core.house.HouseScene
 import uk.co.siland.culvery.core.house.LightChoice
@@ -93,7 +96,7 @@ class PartySettingsPageTest {
     @get:Rule val compose = createComposeRule()
     private val overlay = TestOverlay()
     private val scope = CoroutineScope(Job())
-    private val settings = PartySettings(MemoryStore(), scope)
+    private val settings = ModesStore(MemoryStore(), scope)
     private val music = FakeMusic().apply { offered = MUSIC_OPTIONS }
     private val lights = FakeLights().apply { offered = LIGHT_OPTIONS }
     private val picked = mutableListOf<MusicPick?>()
@@ -102,7 +105,7 @@ class PartySettingsPageTest {
 
     @After fun stop() = scope.cancel()
 
-    private val ui = PartySettingsUi(PartyPrefs(), MUSIC_OPTIONS, LIGHT_OPTIONS)
+    private val ui = PartySettingsUi(PARTY_MODE, MUSIC_OPTIONS, LIGHT_OPTIONS)
 
     private fun page(content: @Composable () -> Unit) = compose.setContent {
         CulveryTheme(dark = true) {
@@ -122,17 +125,17 @@ class PartySettingsPageTest {
         )
     }
 
-    private fun host(prefs: PartyPrefs? = null, withMusic: Boolean = true, withLights: Boolean = true, waitFor: String = "party_music") {
-        if (prefs != null) runBlocking { settings.update { prefs } }
+    private fun host(mode: StoredMode? = null, withMusic: Boolean = true, withLights: Boolean = true, waitFor: String = "party_music") {
+        if (mode != null) runBlocking { settings.update { ModesPrefs(modes = listOf(mode)) } }
         page { PartySettingsHost(settings, music.takeIf { withMusic }, lights.takeIf { withLights }) }
         compose.waitFor { count(waitFor) > 0 }
     }
 
     private fun count(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size
 
-    private fun saved() = runBlocking { settings.prefs.first() }
+    private fun saved() = runBlocking { settings.prefs.first().mode(HouseModes.PARTY)!! }
 
-    private fun savedAfter(change: () -> Unit, until: (PartyPrefs) -> Boolean): PartyPrefs {
+    private fun savedAfter(change: () -> Unit, until: (StoredMode) -> Boolean): StoredMode {
         change()
         compose.waitFor { until(saved()) }
         return saved()
@@ -170,10 +173,10 @@ class PartySettingsPageTest {
 
     @Test
     fun noneClearsTheMusicAndKeepsTheRooms() {
-        host(PartyPrefs(music = MusicChoice("FV:2/3", "Party mix"), rooms = listOf(KITCHEN, LOUNGE)))
+        host(PARTY_MODE.copy(music = MusicChoice("FV:2/3", "Party mix"), speakers = listOf(KITCHEN, LOUNGE)))
         compose.onNodeWithTag("party_music").performClick()
         val after = savedAfter({ compose.onNodeWithTag("party_music_0").performClick() }) { it.music == null }
-        assertThat(after.rooms).containsExactly(KITCHEN, LOUNGE).inOrder()
+        assertThat(after.speakers).containsExactly(KITCHEN, LOUNGE).inOrder()
     }
 
     @Test
@@ -194,7 +197,7 @@ class PartySettingsPageTest {
 
     @Test
     fun theLastSpeakerCantBeSwitchedOff() {
-        screen(ui.copy(prefs = PartyPrefs(rooms = listOf(DINING))))
+        screen(ui.copy(mode = PARTY_MODE.copy(speakers = listOf(DINING))))
         compose.onNodeWithTag("party_speaker_0").assertIsOff().assertIsEnabled()
         compose.onNodeWithTag("party_speaker_2").assertIsOn().assertIsNotEnabled()
         compose.assertClickablesHaveRoleAndLabel()
@@ -203,19 +206,19 @@ class PartySettingsPageTest {
     @Test
     fun switchingARoomOffSavesTheRest() {
         host()
-        val off = savedAfter({ compose.onNodeWithTag("party_speaker_2").performClick() }) { it.rooms != null }
-        assertThat(off.rooms).containsExactly(KITCHEN, LOUNGE).inOrder()
+        val off = savedAfter({ compose.onNodeWithTag("party_speaker_2").performClick() }) { it.speakers != null }
+        assertThat(off.speakers).containsExactly(KITCHEN, LOUNGE).inOrder()
         compose.onNodeWithTag("party_speaker_2").assertIsOff()
-        val on = savedAfter({ compose.onNodeWithTag("party_speaker_2").performClick() }) { it.rooms == null }
-        assertThat(on.rooms).isNull()
+        val on = savedAfter({ compose.onNodeWithTag("party_speaker_2").performClick() }) { it.speakers == null }
+        assertThat(on.speakers).isNull()
     }
 
     @Test
     fun theRoomsSaveWithNoMusicPicked() {
         host()
         assertThat(saved().music).isNull()
-        val after = savedAfter({ compose.onNodeWithTag("party_speaker_0").performClick() }) { it.rooms != null }
-        assertThat(after.rooms).containsExactly(LOUNGE, DINING).inOrder()
+        val after = savedAfter({ compose.onNodeWithTag("party_speaker_0").performClick() }) { it.speakers != null }
+        assertThat(after.speakers).containsExactly(LOUNGE, DINING).inOrder()
     }
 
     @Test
@@ -244,19 +247,19 @@ class PartySettingsPageTest {
     fun pickingASceneSavesIt() {
         host()
         compose.onNodeWithTag("party_light_0").performClick()
-        val picked = savedAfter({ compose.onNodeWithTag("party_scene_1").performClick() }) { it.scenes.isNotEmpty() }
-        assertThat(picked.scenes).containsExactly(BRIGHT_IN_KITCHEN)
+        val picked = savedAfter({ compose.onNodeWithTag("party_scene_1").performClick() }) { it.lights.isNotEmpty() }
+        assertThat(picked.lights).containsExactly(BRIGHT_IN_KITCHEN)
         compose.onNodeWithTag("party_light_0").assertTextEquals("Kitchen", "Bright")
         compose.onNodeWithTag("party_light_0").performClick()
-        val cleared = savedAfter({ compose.onNodeWithTag("party_scene_0").performClick() }) { it.scenes.isEmpty() }
-        assertThat(cleared.scenes).isEmpty()
+        val cleared = savedAfter({ compose.onNodeWithTag("party_scene_0").performClick() }) { it.lights.isEmpty() }
+        assertThat(cleared.lights).isEmpty()
     }
 
     @Test
     fun aSavedChoiceNoLongerOfferedStillShows() {
         screen(
             ui.copy(
-                prefs = PartyPrefs(music = MusicChoice("FV:9/9", "Old mix"), scenes = listOf(RoomChoice("r1", "Kitchen", LightChoice.Scene("gone", "Candlelight")))),
+                mode = PARTY_MODE.copy(music = MusicChoice("FV:9/9", "Old mix"), lights = listOf(RoomChoice("r1", "Kitchen", LightChoice.Scene("gone", "Candlelight")))),
             ),
         )
         compose.onNodeWithTag("party_music").assertTextEquals("Music", "Old mix")
@@ -319,15 +322,15 @@ class PartySettingsPageTest {
     @Test
     fun turningOffTheOnlyChosenRoomChangesNothing() {
         val all = listOf(KITCHEN, LOUNGE, DINING)
-        val prefs = PartyPrefs(rooms = listOf(DINING))
+        val prefs = PARTY_MODE.copy(speakers = listOf(DINING))
         assertThat(prefs.withSpeaker(all, DINING, on = false)).isEqualTo(prefs)
     }
 
     @Test
     fun switchingOneOnWhenEverySavedRoomHasGoneSavesJustThatRoom() {
         val all = listOf(KITCHEN, LOUNGE, DINING)
-        val prefs = PartyPrefs(rooms = listOf(HouseRoom("Gone-id", "Gone")))
-        assertThat(prefs.withSpeaker(all, LOUNGE, on = true).rooms).containsExactly(LOUNGE)
+        val prefs = PARTY_MODE.copy(speakers = listOf(HouseRoom("Gone-id", "Gone")))
+        assertThat(prefs.withSpeaker(all, LOUNGE, on = true).speakers).containsExactly(LOUNGE)
     }
 
     @Test
@@ -347,7 +350,7 @@ class PartySettingsPageTest {
 
     @Test
     fun theRowsSpeakTheirValue() {
-        screen(ui.copy(prefs = PartyPrefs(music = MusicChoice("FV:2/3", "Party mix"), scenes = listOf(BRIGHT_IN_KITCHEN))))
+        screen(ui.copy(mode = PARTY_MODE.copy(music = MusicChoice("FV:2/3", "Party mix"), lights = listOf(BRIGHT_IN_KITCHEN))))
         compose.onNodeWithTag("party_music").assertContentDescriptionEquals("Music, Party mix")
         compose.onNodeWithTag("party_light_0").assertContentDescriptionEquals("Kitchen, Bright")
         compose.onNodeWithTag("party_speaker_2").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)).assert(hasText("Dining"))
@@ -356,6 +359,6 @@ class PartySettingsPageTest {
 
     @Test
     fun theToStringNamesNothing() {
-        assertThat(ui.copy(prefs = PartyPrefs(music = MusicChoice("FV:2/3", "Party mix"))).toString()).doesNotContain("Party mix")
+        assertThat(ui.copy(mode = PARTY_MODE.copy(music = MusicChoice("FV:2/3", "Party mix"))).toString()).doesNotContain("Party mix")
     }
 }

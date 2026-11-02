@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.party.HouseRig
 import uk.co.siland.culvery.capability.party.PartyActions
 import uk.co.siland.culvery.capability.party.PartyPlan
-import uk.co.siland.culvery.capability.party.PartyRecord
+import uk.co.siland.culvery.capability.party.ModeRecord
 import uk.co.siland.culvery.capability.party.PartyWords
 import uk.co.siland.culvery.capability.party.PARTY_MIX
 import uk.co.siland.culvery.capability.party.KITCHEN_BRIGHT
@@ -121,7 +121,7 @@ class PartySheetTest {
 
     @Test
     fun theOffSheetListsWhatGoesBack() {
-        val back = PartyWords.backLines(PartyRecord(on = true, made = MADE, lights = LIGHTS_BEFORE), plugsListed = true)
+        val back = PartyWords.backLines(ModeRecord(on = true, made = MADE, lights = LIGHTS_BEFORE), plugsListed = true)
         show(false, back)
 
         compose.onNodeWithText("When Party mode ends:", useUnmergedTree = true).assertExists()

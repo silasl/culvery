@@ -24,11 +24,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.party.MusicChoice
-import uk.co.siland.culvery.capability.party.PartyPrefs
-import uk.co.siland.culvery.capability.party.PartySettings
+import uk.co.siland.culvery.capability.party.ModesStore
 import uk.co.siland.culvery.capability.party.PartyWords
+import uk.co.siland.culvery.capability.party.StoredMode
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseLines
+import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HouseRoom
 import uk.co.siland.culvery.core.house.HouseScene
@@ -69,7 +70,7 @@ class PartyPage internal constructor(private val content: @Composable () -> Unit
  * [lightsReading], that its first read hasn't come back, when the section shows nothing. [toString] leaves out the choices.
  */
 data class PartySettingsUi(
-    val prefs: PartyPrefs,
+    val mode: StoredMode,
     val music: MusicOptions?,
     val lights: LightOptions?,
     val musicReading: Boolean = false,
@@ -104,7 +105,7 @@ private fun MusicSection(ui: PartySettingsUi, onMusic: (MusicPick?) -> Unit, onS
     }
     music.line?.let { Line(it, "party_music_line", problem = true) }
     val overlay = LocalOverlayHost.current
-    val chosen = ui.prefs.music
+    val chosen = ui.mode.music
     ChoiceRow(PartyWords.MUSIC_SECTION, chosen?.pickName ?: PartyWords.NONE, PartyWords.CHOOSE_MUSIC, "party_music") {
         overlay.show {
             PartyMusicSheet(
@@ -118,7 +119,7 @@ private fun MusicSection(ui: PartySettingsUi, onMusic: (MusicPick?) -> Unit, onS
         }
     }
     if (music.rooms.isEmpty()) return
-    val on = music.rooms.map { ui.prefs.rooms == null || ui.prefs.rooms.any { saved -> saved.id == it.id } }
+    val on = music.rooms.map { ui.mode.speakers == null || ui.mode.speakers.any { saved -> saved.id == it.id } }
     Text(PartyWords.SPEAKERS, style = HhType.label, color = Culvery.colors.mute, modifier = Modifier.semantics { heading() })
     music.rooms.forEachIndexed { i, room ->
         HhSwitchRow(
@@ -140,7 +141,7 @@ private fun LightsSection(ui: PartySettingsUi, onScene: (LightRoomOption, HouseS
     lights.line?.let { Line(it, "party_lights_line", problem = true) }
     val overlay = LocalOverlayHost.current
     lights.rooms.forEachIndexed { i, room ->
-        val chosen = ui.prefs.scenes.firstOrNull { it.roomId == room.id }?.choice as? LightChoice.Scene
+        val chosen = ui.mode.lights.firstOrNull { it.roomId == room.id }?.choice as? LightChoice.Scene
         ChoiceRow(room.name, chosen?.sceneName ?: PartyWords.LEAVE_ALONE, PartyWords.chooseScene(room.name), "party_light_$i") {
             overlay.show {
                 PartySceneSheet(
@@ -216,7 +217,7 @@ private fun <T> NoneFirstSheet(
 
 /** Settings › Party mode with its data; reads what Sonos and Hue offer once as it opens, and saves each choice as it is made. */
 @Composable
-fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: HouseLights?) {
+fun PartySettingsHost(settings: ModesStore, music: HouseMusic?, lights: HouseLights?) {
     val prefs by settings.prefs.collectAsStateWithLifecycle(null)
     val musicReady by remember(music) { music?.ready ?: flowOf(false) }.collectAsStateWithLifecycle<Boolean?>(null)
     val lightsReady by remember(lights) { lights?.ready ?: flowOf(false) }.collectAsStateWithLifecycle<Boolean?>(null)
@@ -241,33 +242,35 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
         }
     }
     val scope = rememberCoroutineScope()
-    val p = prefs ?: return
-    fun save(change: (PartyPrefs) -> PartyPrefs) {
+    val mode = prefs?.mode(HouseModes.PARTY) ?: return
+    fun save(change: (StoredMode) -> StoredMode) {
         scope.launch {
-            attempt({ settings.update(change) }) { e -> Log.w(TAG, "Couldn't save a Party mode setting (${e::class.simpleName})") }
+            attempt({ settings.update { it.withMode(HouseModes.PARTY, change) } }) { e ->
+                Log.w(TAG, "Couldn't save a Party mode setting (${e::class.simpleName})")
+            }
         }
     }
     PartySettingsScreen(
         PartySettingsUi(
-            p, musicOptions, lightOptions,
+            mode, musicOptions, lightOptions,
             musicReading = music != null && musicReady != false && musicOptions == null,
             lightsReading = lights != null && lightsReady != false && lightOptions == null,
         ),
         onMusic = { pick -> save { it.copy(music = pick?.let { chosen -> MusicChoice(chosen.id, chosen.name) }) } },
         onSpeaker = { room, on -> save { it.withSpeaker(musicOptions?.rooms.orEmpty(), room, on) } },
         onScene = { room, scene ->
-            save { if (scene == null) it.withoutScene(room.id) else it.withScene(RoomChoice(room.id, room.name, LightChoice.Scene(scene.id, scene.name))) }
+            save { if (scene == null) it.withoutLight(room.id) else it.withLight(RoomChoice(room.id, room.name, LightChoice.Scene(scene.id, scene.name))) }
         },
     )
 }
 
 /** Every speaker saves as "all" (null); turning the last one off changes nothing, as an empty list would fail the music step. */
-internal fun PartyPrefs.withSpeaker(all: List<HouseRoom>, room: HouseRoom, on: Boolean): PartyPrefs {
-    val chosen = rooms?.map { it.id }?.toSet() ?: all.map { it.id }.toSet()
+internal fun StoredMode.withSpeaker(all: List<HouseRoom>, room: HouseRoom, on: Boolean): StoredMode {
+    val chosen = speakers?.map { it.id }?.toSet() ?: all.map { it.id }.toSet()
     val next = all.filter { if (it.id == room.id) on else it.id in chosen }
     return when {
         next.isEmpty() -> this
-        next.size == all.size -> copy(rooms = null)
-        else -> copy(rooms = next)
+        next.size == all.size -> copy(speakers = null)
+        else -> copy(speakers = next)
     }
 }

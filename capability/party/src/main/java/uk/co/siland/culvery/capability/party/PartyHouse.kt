@@ -43,7 +43,7 @@ private enum class PartyStep { MUSIC, LIGHTS }
  */
 @Singleton
 class PartyHouse internal constructor(
-    private val settings: PartySettings,
+    private val settings: ModesStore,
     plugs: HousePlugs?,
     private val music: HouseMusic?,
     private val lights: HouseLights?,
@@ -51,20 +51,20 @@ class PartyHouse internal constructor(
 ) : HouseModeSwitch {
     @Inject
     constructor(
-        settings: PartySettings,
+        settings: ModesStore,
         plugs: Optional<HousePlugs>,
         music: Optional<HouseMusic>,
         lights: Optional<HouseLights>,
         wall: WallClock,
     ) : this(settings, plugs.orElse(null), music.orElse(null), lights.orElse(null), wall)
 
-    private val current = MutableStateFlow<PartyRecord?>(null)
+    private val current = MutableStateFlow<ModeRecord?>(null)
     private val on = MutableStateFlow<Boolean?>(null)
     private val run = MutableStateFlow<PartyRun?>(null)
     private val shown = MutableStateFlow<String?>(null)
 
     /** Null until the store has answered. */
-    val record: StateFlow<PartyRecord?> = current.asStateFlow()
+    val record: StateFlow<ModeRecord?> = current.asStateFlow()
     override val isOn: StateFlow<Boolean?> = on.asStateFlow()
     val running: StateFlow<PartyRun?> = run.asStateFlow()
 
@@ -94,38 +94,38 @@ class PartyHouse internal constructor(
 
     /** What turning on would do, for the sheet. Speaker rooms saved as an empty list count as no speaker chosen. */
     suspend fun plan(): PartyPlan {
-        val prefs = settings.prefs.first()
-        val musicReady = music?.ready.isReady() && prefs.rooms?.isEmpty() != true
+        val mode = partyMode()
+        val musicReady = music?.ready.isReady() && mode?.speakers?.isEmpty() != true
         return PartyPlan(
             plugs = readyPlugs()?.preview().orEmpty(),
-            music = prefs.music.takeIf { musicReady },
-            scenes = if (lights?.ready.isReady()) prefs.scenes else emptyList(),
-            rooms = prefs.rooms,
+            music = mode?.music.takeIf { musicReady },
+            scenes = if (lights?.ready.isReady()) mode?.lights.orEmpty() else emptyList(),
+            rooms = mode?.speakers,
         )
     }
 
     /** The off sheet's list, from what the record says Party changed. */
     suspend fun backLines(): List<String> =
-        PartyWords.backLines(current.value ?: PartyRecord(), readyPlugs() != null)
+        PartyWords.backLines(current.value ?: ModeRecord(), readyPlugs() != null)
 
     suspend fun turnOn(by: Authorised) {
         require(HousePermissions.STORED_MODE in by.granted) { "Turning Party mode on needs its own grant" }
         exclusive(PartyRun.TURNING_ON) {
             if (load().on) return@exclusive
             orphansChecked = true
-            val prefs = settings.prefs.first()
+            val mode = partyMode()
             val plugs = readyPlugs()
             resetRun()
             offLine = null
-            set(PartyRecord(on = true, since = wall.nowMillis(), musicBefore = groupsWaiting()))
+            set(ModeRecord(modeId = HouseModes.PARTY, on = true, since = wall.nowMillis(), musicBefore = groupsWaiting()))
             if (plugs != null) {
                 plugsPending = true
                 plugs.begin(ModeGrant.Person(by))
                 enterPlugs()
             }
-            startMusic(prefs)
+            startMusic(mode)
             showLine()
-            startLights(prefs)
+            startLights(mode)
             showLine()
         }
     }
@@ -142,7 +142,7 @@ class PartyHouse internal constructor(
             resetRun()
             offLine = Lines(musicLine, plugsLine, lightsLine).joined()
             offAt = wall.nowMillis()
-            set(PartyRecord(musicBefore = groupsWaiting()))
+            set(ModeRecord(musicBefore = groupsWaiting()))
         }
     }
 
@@ -178,7 +178,7 @@ class PartyHouse internal constructor(
     }
 
     /** The first read. A party that was on gets its plugs retry back. */
-    private suspend fun load(): PartyRecord = current.value ?: settings.record.filterNotNull().first().also { record ->
+    private suspend fun load(): ModeRecord = current.value ?: settings.record.filterNotNull().first().also { record ->
         publish(record)
         if (record.on) plugsPending = readyPlugs() != null
     }
@@ -209,12 +209,12 @@ class PartyHouse internal constructor(
         showLine()
     }
 
-    private suspend fun startMusic(prefs: PartyPrefs) {
+    private suspend fun startMusic(mode: StoredMode?) {
         // Before the snapshot below, so it is taken of the groups as they went back.
         lines.music = putGroupsBack()
-        val choice = prefs.music ?: return
+        val choice = mode?.music ?: return
         if (music == null || !music.ready.isReady()) return
-        val rooms = prefs.rooms
+        val rooms = mode.speakers
         if (rooms?.isEmpty() == true) {
             Log.w(TAG, "Party mode's MUSIC step has no speaker chosen")
             lines.music = HouseLines.MUSIC_DIDNT_START
@@ -233,8 +233,8 @@ class PartyHouse internal constructor(
         if (lines.music != null) Log.w(TAG, "Party mode's MUSIC step didn't work")
     }
 
-    private suspend fun startLights(prefs: PartyPrefs) {
-        val choices = prefs.scenes
+    private suspend fun startLights(mode: StoredMode?) {
+        val choices = mode?.lights.orEmpty()
         if (choices.isEmpty() || lights == null || !lights.ready.isReady()) return
         val rooms = answer(PartyStep.LIGHTS) { lights.modeBefore(choices) }
         if (rooms == null) {
@@ -297,7 +297,7 @@ class PartyHouse internal constructor(
     }
 
     /** Shows [record] and saves it; one that can't be saved still runs, and is saved again at each tick until it lands. */
-    private suspend fun set(record: PartyRecord) {
+    private suspend fun set(record: ModeRecord) {
         publish(record)
         persist()
     }
@@ -305,7 +305,7 @@ class PartyHouse internal constructor(
     private suspend fun persist() {
         val record = current.value ?: return
         unsaved = attempt({
-            if (record == PartyRecord()) settings.clearRecord() else settings.save(record)
+            if (record == ModeRecord()) settings.clearRecord() else settings.save(record)
             false
         }) { e ->
             Log.w(TAG, "Couldn't save the Party mode record (${e::class.simpleName}); trying again at the next tick")
@@ -313,7 +313,7 @@ class PartyHouse internal constructor(
         }
     }
 
-    private fun publish(record: PartyRecord) {
+    private fun publish(record: ModeRecord) {
         current.value = record
         on.value = record.on
         showLine()
@@ -326,6 +326,9 @@ class PartyHouse internal constructor(
             offLine
         }
     }
+
+    /** Party's stored mode, or null once it is deleted. */
+    private suspend fun partyMode(): StoredMode? = settings.prefs.first().mode(HouseModes.PARTY)
 
     /** The plugs, while Party's list switches any. */
     private suspend fun readyPlugs(): ModePlugs? = plugs?.takeIf { it.ready() }

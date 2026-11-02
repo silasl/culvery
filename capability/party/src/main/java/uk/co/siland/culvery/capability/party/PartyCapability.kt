@@ -24,7 +24,7 @@ import uk.co.siland.culvery.core.ui.Icons
 class PartyCapability @Inject constructor(
     private val actions: PartyActions,
     private val house: PartyHouse,
-    private val settings: PartySettings,
+    private val settings: ModesStore,
     private val music: Optional<HouseMusic>,
     private val lights: Optional<HouseLights>,
     plugs: Optional<HousePlugs>,

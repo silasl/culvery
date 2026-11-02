@@ -68,7 +68,7 @@ object PartyWords {
     }
 
     /** The off sheet's list: only what the record says Party changed. */
-    fun backLines(record: PartyRecord, plugsListed: Boolean): List<String> {
+    fun backLines(record: ModeRecord, plugsListed: Boolean): List<String> {
         val lightRooms = record.lights.orEmpty().map { it.name }
         val lines = buildList {
             if (record.made != null) add(STOP_MUSIC)

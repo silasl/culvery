@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.access.Authorised
@@ -21,6 +22,7 @@ import uk.co.siland.culvery.core.house.GroupBefore
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.AddedPlug
 import uk.co.siland.culvery.core.house.HouseModeSwitch
+import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseRoom
@@ -40,11 +42,14 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.WallClock
 
+/** What a fresh file holds once [PartyMove] has run: Party mode with nothing to do. */
+internal val MOVED: Preferences = runBlocking { PartyMove.migrate(emptyPreferences()) }
+
 /**
- * A settings store in memory; null holds [data] back, as a file not yet read. The write numbered [failOnWrite], counting
- * from the next one, throws, and the others go through.
+ * A settings store in memory, which runs no move, so it starts [MOVED]; null holds [data] back, as a file not yet read.
+ * The write numbered [failOnWrite], counting from the next one, throws, and the others go through.
  */
-internal class MemoryStore(initial: Preferences? = emptyPreferences()) : DataStore<Preferences> {
+internal class MemoryStore(initial: Preferences? = MOVED) : DataStore<Preferences> {
     val state = MutableStateFlow(initial)
     @Volatile var failOnWrite: Int? = null
     private val mutex = Mutex()
@@ -82,8 +87,11 @@ internal val LIGHTS_BEFORE = listOf(
     RoomBefore("r2", "Lounge", LightChoice.Scene("s3", ""), false, 0, null),
 )
 
-internal val FULL_PREFS = PartyPrefs(music = PARTY_MIX, rooms = listOf(KITCHEN, LOUNGE), scenes = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX))
-internal val FULL_RECORD = PartyRecord(
+internal val PARTY_MODE = StoredMode(HouseModes.PARTY, "Party mode", PARTY_ICON, showOnHome = true, needsPin = true)
+internal val FULL_MODE = PARTY_MODE.copy(music = PARTY_MIX, speakers = listOf(KITCHEN, LOUNGE), lights = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX))
+internal val FULL_PREFS = ModesPrefs(modes = listOf(FULL_MODE))
+internal val FULL_RECORD = ModeRecord(
+    modeId = HouseModes.PARTY,
     on = true,
     since = 1_000,
     musicBefore = GROUPS_BEFORE,
@@ -257,7 +265,7 @@ internal class HouseRig(scope: CoroutineScope) {
     val plugs = FakePlugs(trace)
     val music = FakeMusic(trace)
     val lights = FakeLights(trace)
-    val settings = PartySettings(MemoryStore(), scope)
+    val settings = ModesStore(MemoryStore(), scope)
     val house = PartyHouse(settings, plugs, music, lights, WallClock { 1_000_000L })
 
     /** Reads the stored record, as the scheduler's first tick does; the plugs put back on that first read are not counted. */
@@ -267,6 +275,6 @@ internal class HouseRig(scope: CoroutineScope) {
     }
 
     /** Party mix on every speaker, Bright in Kitchen and Relax in Lounge. */
-    suspend fun choose(prefs: PartyPrefs = PartyPrefs(music = PARTY_MIX, scenes = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX))) =
-        settings.update { prefs }
+    suspend fun choose(mode: StoredMode = PARTY_MODE.copy(music = PARTY_MIX, lights = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX))) =
+        settings.update { ModesPrefs(modes = listOf(mode)) }
 }

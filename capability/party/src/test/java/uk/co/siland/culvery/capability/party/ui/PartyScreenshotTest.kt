@@ -19,7 +19,7 @@ import uk.co.siland.culvery.capability.party.LOUNGE_RELAX
 import uk.co.siland.culvery.capability.party.MADE
 import uk.co.siland.culvery.capability.party.PARTY_MIX
 import uk.co.siland.culvery.capability.party.PartyPlan
-import uk.co.siland.culvery.capability.party.PartyRecord
+import uk.co.siland.culvery.capability.party.ModeRecord
 import uk.co.siland.culvery.capability.party.PartyWords
 import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.ui.SeasonalTheme
@@ -73,6 +73,6 @@ class PartyScreenshotTest {
         val LINES = listOf("The music didn’t start. Check the Sonos app.", "Some lights didn’t change: Kitchen.").joinToString("\n")
         val WILL = PartyWords.willLines(PartyPlan(listOf(PlugChange("Lamp", false), PlugChange("Desk", true)), PARTY_MIX, listOf(KITCHEN_BRIGHT, LOUNGE_RELAX)))
         val NOTHING = PartyWords.willLines(PartyPlan(emptyList(), null, emptyList()))
-        val BACK = PartyWords.backLines(PartyRecord(on = true, made = MADE, lights = LIGHTS_BEFORE), plugsListed = true)
+        val BACK = PartyWords.backLines(ModeRecord(on = true, made = MADE, lights = LIGHTS_BEFORE), plugsListed = true)
     }
 }
