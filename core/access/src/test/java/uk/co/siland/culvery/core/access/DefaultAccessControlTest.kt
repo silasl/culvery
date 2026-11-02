@@ -557,6 +557,58 @@ class DefaultAccessControlTest {
         assertThat(access.session.value).isNull()
     }
 
+    /** 15b Ruling 16: Settings sets its own 90 s, and a touch restarts the 90 s. */
+    @Test
+    fun settingsSessionEndsAfterNinetySeconds() = runTest {
+        val access = access()
+        signedInAlex(access)
+        access.sessionTimeout(SETTINGS_TIMEOUT_MS)
+        advanceTimeBy(89_000)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun aTouchInSettingsRestartsItsNinetySeconds() = runTest {
+        val access = access()
+        signedInAlex(access)
+        access.sessionTimeout(SETTINGS_TIMEOUT_MS)
+        advanceTimeBy(60_000)
+        access.touch()
+        assertThat(access.expiresAt.value).isEqualTo(testScheduler.currentTime + SETTINGS_TIMEOUT_MS)
+    }
+
+    @Test
+    fun otherSessionsKeepTwoMinutes() = runTest {
+        val access = access()
+        signedInAlex(access)
+        access.sessionTimeout(SETTINGS_TIMEOUT_MS)
+        access.sessionTimeout(SESSION_TIMEOUT_MS)
+        advanceTimeBy(119_000)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun theEditHoldStillWins() = runTest {
+        val access = access()
+        signedInAlex(access)
+        access.sessionTimeout(SETTINGS_TIMEOUT_MS)
+        access.touch(holdForEdits = true)
+        advanceTimeBy(EDIT_HOLD_MS - 1)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
     @Test
     fun editsHoldTheSessionTenMinutesAndNoLonger() = runTest {
         val access = access()

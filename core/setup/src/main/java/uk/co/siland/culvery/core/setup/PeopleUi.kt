@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -26,37 +28,48 @@ import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.label
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
-import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhAddRow
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 /**
- * 4a design §4.4: each person with their colour, name, role and whether they have a PIN; tap to edit. With [onMove]
- * (Settings › People, 4c §7.1) each row has Move up and Move down, none above the first or below the last.
+ * 4a design §4.4: each person with their colour, name, role and whether they have a PIN; tap to edit; then the dashed
+ * Add a person row. With [onMove] (App settings › People, 4c §7.1; 15b §3) the rows sit two to a row, read left to right
+ * in the list's order, each with Move up and Move down, none above the first or below the last.
  */
 @Composable
 internal fun PeopleList(members: List<Member>, onEdit: (Member) -> Unit, onAdd: (() -> Unit)?, onMove: ((Member, Boolean) -> Unit)?) {
-    Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.rowGap), modifier = Modifier.testTag("people_list")) {
-        members.forEachIndexed { i, member ->
-            // Keyed by the person, so a move moves this row's node, and TalkBack's focus with it.
-            key(member.person.id) {
-                PersonRow(
-                    member,
-                    reorderable = onMove != null,
-                    onUp = if (onMove != null && i > 0) ({ onMove(member, true) }) else null,
-                    onDown = if (onMove != null && i < members.lastIndex) ({ onMove(member, false) }) else null,
-                    onClick = { onEdit(member) },
-                )
+    val inSettings = onMove != null
+    val gap = if (inSettings) SettingsTokens.rowGap else SetupDimens.rowGap
+    val perRow = if (inSettings) 2 else 1
+    Column(verticalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.testTag("people_list")) {
+        members.withIndex().chunked(perRow).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                row.forEach { (i, member) ->
+                    // Keyed by the person, so a move moves this row's node, and TalkBack's focus with it.
+                    key(member.person.id) {
+                        Box(Modifier.weight(1f)) {
+                            PersonRow(
+                                member,
+                                reorderable = onMove != null,
+                                onUp = if (onMove != null && i > 0) ({ onMove(member, true) }) else null,
+                                onDown = if (onMove != null && i < members.lastIndex) ({ onMove(member, false) }) else null,
+                                onClick = { onEdit(member) },
+                            )
+                        }
+                    }
+                }
+                repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-        if (onAdd != null) HhButton(ADD_PERSON, onAdd, Modifier.testTag("people_add"), icon = Icons.PERSON_ADD, on = ButtonSurface.Bg)
+        if (onAdd != null) HhAddRow(ADD_PERSON, "people_add", onAdd)
     }
 }
 
@@ -116,7 +129,7 @@ private fun MoveButton(icon: String, label: String, tag: String, onClick: (() ->
     }
 }
 
-/** The people list and its editor sheet: the wizard's Household step and Settings › People ([reorder]). Add person goes at [MAX_PEOPLE]. */
+/** The people list and its editor sheet: the wizard's Household step and App settings › People ([reorder]). Add a person goes at [MAX_PEOPLE]. */
 @Composable
 internal fun PeoplePane(editor: PeopleEditor, reorder: Boolean) {
     val members by editor.members.collectAsState(initial = emptyList())

@@ -30,7 +30,7 @@ import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DisplayPrefs
 
-/** Settings › Display as Settings shows it: in the page area beside the 320 dp page list. */
+/** App settings › Brightness and night and Seasonal looks as Settings shows them: in the page area beside the 320 dp page list. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w1280dp-h1000dp-land-hdpi")
@@ -52,6 +52,7 @@ class DisplaySettingsScreenshotTest {
         camera: CameraState,
         previewing: SeasonalTheme? = null,
         next: Pair<SeasonalTheme, LocalDate>? = null,
+        seasonal: Boolean = false,
         beforeShot: () -> Unit = {},
     ) {
         compose.setContent {
@@ -59,7 +60,8 @@ class DisplaySettingsScreenshotTest {
                 CulveryTheme(dark = dark, seasonal = previewing) {
                     Box(Modifier.size(960.dp, 1000.dp).background(Culvery.colors.bg)) {
                         InSettingsPane {
-                            DisplaySettingsScreen(DisplaySettingsUi(DisplayPrefs(), camera, sunKnown = true, today = TODAY, previewing = previewing, next = next), actions)
+                            val ui = DisplaySettingsUi(DisplayPrefs(), camera, sunKnown = true, today = TODAY, previewing = previewing, next = next)
+                            if (seasonal) SeasonalLooksScreen(ui, actions) else BrightnessAndNightScreen(ui, actions)
                         }
                         Box(Modifier.align(Alignment.CenterEnd)) { overlay.content?.invoke() }
                     }
@@ -76,7 +78,7 @@ class DisplaySettingsScreenshotTest {
         compose.waitForIdle()
     }
 
-    private fun datesSheet(name: String, dark: Boolean) = snap(name, dark, CameraState.ALLOWED) {
+    private fun datesSheet(name: String, dark: Boolean) = snap(name, dark, CameraState.ALLOWED, seasonal = true) {
         compose.onNodeWithTag("display_dates_halloween").performScrollTo().performClick()
         compose.waitForIdle()
     }
@@ -87,17 +89,17 @@ class DisplaySettingsScreenshotTest {
 
     @Test fun notAskedDark() = snap("settings_display_not_asked_dark", true, CameraState.NOT_ASKED)
 
-    @Test fun previewDark() = snap("settings_display_preview_dark", true, CameraState.ALLOWED, SeasonalTheme.HALLOWEEN)
+    @Test fun previewDark() = snap("settings_display_preview_dark", true, CameraState.ALLOWED, SeasonalTheme.HALLOWEEN, seasonal = true)
 
-    @Test fun previewLight() = snap("settings_display_preview_light", false, CameraState.ALLOWED, SeasonalTheme.HALLOWEEN)
+    @Test fun previewLight() = snap("settings_display_preview_light", false, CameraState.ALLOWED, SeasonalTheme.HALLOWEEN, seasonal = true)
 
     @Test fun datesSheetDark() = datesSheet("settings_display_dates_sheet_dark", true)
 
     @Test fun datesSheetLight() = datesSheet("settings_display_dates_sheet_light", false)
 
-    @Test fun nextDark() = snap("settings_display_next_dark", true, CameraState.ALLOWED, next = NEXT, beforeShot = ::scrollToEnd)
+    @Test fun nextDark() = snap("settings_display_next_dark", true, CameraState.ALLOWED, next = NEXT, seasonal = true, beforeShot = ::scrollToEnd)
 
-    @Test fun nextLight() = snap("settings_display_next_light", false, CameraState.ALLOWED, next = NEXT, beforeShot = ::scrollToEnd)
+    @Test fun nextLight() = snap("settings_display_next_light", false, CameraState.ALLOWED, next = NEXT, seasonal = true, beforeShot = ::scrollToEnd)
 
     @Test fun refusedDark() = snap("settings_display_refused_dark", true, CameraState.REFUSED)
 }

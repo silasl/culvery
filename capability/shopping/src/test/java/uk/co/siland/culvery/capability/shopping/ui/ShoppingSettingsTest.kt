@@ -18,6 +18,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -68,6 +69,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.waitFor
@@ -120,6 +122,16 @@ class ShoppingSettingsTest {
 
     private fun on(rig: SettingsRig, health: ShoppingHealth = ShoppingHealth.OK, lastRead: Long? = NOW - 2 * 60_000) =
         SettingsState.On(rig.provider, FAMILY, health, lastRead)
+
+    /** 15b §3: the account rows sit the Settings row gap apart. */
+    @Test
+    fun accountRowsAreSevenApart() {
+        val rig = rig()
+        stateless(SettingsState.ChoosingAccount(rig.provider, listOf(FAMILY, SAM), FAMILY))
+        val first = compose.onNodeWithTag("shopping_account_0").getUnclippedBoundsInRoot()
+        val second = compose.onNodeWithTag("shopping_account_1").getUnclippedBoundsInRoot()
+        assertThat((second.top - first.bottom).value).isWithin(0.5f).of(SettingsTokens.rowGap.value)
+    }
 
     @Test
     fun withNoGoogleAccountItSaysConnectTheCalendarFirst() {

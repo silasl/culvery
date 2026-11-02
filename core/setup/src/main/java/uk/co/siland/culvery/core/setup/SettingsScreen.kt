@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -40,16 +41,20 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import uk.co.siland.culvery.core.plugin.LocalSettingsStart
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.LocalSectionLabelStyle
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.readAsOne
 
 /**
  * Settings (4a design §4.6): the pages' titles on the left with Close, the chosen page on the right, the first chosen on
- * open. Taps on empty space stop here rather than reaching the shell underneath. The touches that keep it open are
- * counted on the shell's layers, so its sheets and PIN pads count too.
+ * open. [initialPage] is a page's id or one of its sub-pages' (15b Ruling 15). Taps on empty space stop here rather than
+ * reaching the shell underneath. The touches that keep it open are counted on the shell's layers, so its sheets and PIN
+ * pads count too.
  */
 @Composable
 fun SettingsScreen(
@@ -59,7 +64,11 @@ fun SettingsScreen(
     keyboard: WindowInsets = WindowInsets.ime,
 ) {
     val c = Culvery.colors
-    var chosen by rememberSaveable { mutableStateOf(pages.firstOrNull { it.id == initialPage }?.id ?: pages.firstOrNull()?.id) }
+    var chosen by rememberSaveable {
+        mutableStateOf(pages.firstOrNull { it.id == initialPage || initialPage in it.opens }?.id ?: pages.firstOrNull()?.id)
+    }
+    // The sub-page to open, used once: choosing a page from the list clears it.
+    var start by rememberSaveable { mutableStateOf(initialPage) }
     val page = pages.firstOrNull { it.id == chosen } ?: pages.firstOrNull()
     Row(
         Modifier
@@ -84,12 +93,21 @@ fun SettingsScreen(
                     bottom = SetupDimens.settingsListPaddingBottom,
                 ),
         ) {
-            Text(SETTINGS, style = SetupType.panelTitle, color = c.ink, modifier = Modifier.semantics { heading() })
+            Text(SETTINGS, style = SetupType.settingsTitle, color = c.ink, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(SetupDimens.settingsTitleGap))
-            Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.settingsItemGap), modifier = Modifier.selectableGroup()) {
-                pages.forEach { p -> PageItem(p.title, chosen = p.id == page?.id, tag = "settings_page_${p.id}") { chosen = p.id } }
+            // The list scrolls above Close, which keeps its own space (15b §3).
+            Column(
+                verticalArrangement = Arrangement.spacedBy(SetupDimens.settingsItemGap),
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).selectableGroup().testTag("settings_list"),
+            ) {
+                pages.forEach { p ->
+                    PageItem(p.title, chosen = p.id == page?.id, tag = "settings_page_${p.id}") {
+                        chosen = p.id
+                        start = null
+                    }
+                }
             }
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(SetupDimens.settingsCloseGap))
             HhButton(CLOSE, onClose, Modifier.testTag("settings_close"), on = ButtonSurface.Surf)
         }
         // Each page scrolls from its top.
@@ -105,7 +123,9 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap),
                     modifier = Modifier.widthIn(max = SetupDimens.settingsPane).testTag("settings_pane"),
                 ) {
-                    page?.Content()
+                    CompositionLocalProvider(LocalSectionLabelStyle provides SettingsTokens.sectionLabel, LocalSettingsStart provides start) {
+                        page?.Content()
+                    }
                 }
             }
         }

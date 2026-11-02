@@ -69,6 +69,7 @@ import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.PersonChipInk
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.hhToggleable
 import uk.co.siland.culvery.core.ui.listRowCard
@@ -224,7 +225,7 @@ internal fun ReviewCalendars(
     weeks: WeeksShown? = null,
 ) {
     if (connections == null || people == null) return
-    Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.reviewBlockGap), modifier = Modifier.testTag("review_calendars")) {
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("review_calendars")) {
         HhPageTitle(title, line)
         if (connections.isEmpty()) {
             Text(

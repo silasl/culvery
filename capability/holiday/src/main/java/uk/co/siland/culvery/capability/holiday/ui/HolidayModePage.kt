@@ -25,6 +25,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "HolidayModePage"
@@ -58,7 +59,7 @@ class HolidayModePage @Inject constructor(
 
     @Composable
     override fun Sections() {
-        Column(verticalArrangement = Arrangement.spacedBy(HolidayDimens.pageGap)) {
+        Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap)) {
             if (lights.isNotEmpty()) {
                 HhSectionLabel(HolidayWords.LIGHTS_WHILE_AWAY)
                 lights.forEach { it.Content(Modifier) }

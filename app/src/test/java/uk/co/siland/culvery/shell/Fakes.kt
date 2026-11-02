@@ -102,6 +102,10 @@ class FakeAccessControl(var result: Authorised? = null, private val startsSessio
         touches++
         holds += holdForEdits
     }
+    val timeouts = mutableListOf<Long>()
+    override fun sessionTimeout(millis: Long) {
+        timeouts += millis
+    }
 }
 
 /** A capability whose hasTab flow fails once, as a store hiccup would, then says it has a tab. */

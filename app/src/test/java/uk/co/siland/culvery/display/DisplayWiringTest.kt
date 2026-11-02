@@ -33,7 +33,6 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.NightHours
-import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -46,7 +45,6 @@ import uk.co.siland.culvery.display.camera.FrameSource
 import uk.co.siland.culvery.display.camera.Luma
 import uk.co.siland.culvery.display.camera.Presence
 import uk.co.siland.culvery.display.di.DisplayModule
-import uk.co.siland.culvery.display.ui.DisplayPage
 import uk.co.siland.culvery.display.ui.SleepLayer
 import uk.co.siland.culvery.display.ui.THE_CAMERA_IS_ON
 import uk.co.siland.culvery.holding
@@ -274,7 +272,6 @@ class DisplayWiringTest {
             "animatorsOn" to Binding(AndroidAnimatorsOn::class.java, AnimatorsOn::class.java, intoSet = false),
             "showingTheme" to Binding(SeasonalThemes::class.java, ShowingTheme::class.java, intoSet = false),
             "heatLog" to Binding(HeatLog::class.java, Startable::class.java, intoSet = true),
-            "displayPage" to Binding(DisplayPage::class.java, SettingsPage::class.java, intoSet = true),
         )
         assertThat(bindings(CameraModule::class.java)).containsExactly(
             "frames" to Binding(Camera2Frames::class.java, FrameSource::class.java, intoSet = false),

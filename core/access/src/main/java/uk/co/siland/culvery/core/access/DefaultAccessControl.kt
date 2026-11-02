@@ -44,6 +44,9 @@ class DefaultAccessControl @Inject constructor(
     // whoever is signed in changes (sign-out included). Written only under stateLock.
     @Volatile private var holding = false
 
+    // The signed-in session's length (15b Ruling 16).
+    @Volatile private var timeout = SESSION_TIMEOUT_MS
+
     /** The one place the session changes. Every caller but sign-out restarts the expiry next, which sets [expiresAt] again. */
     private fun set(next: SignedIn?) = synchronized(stateLock) {
         if (next?.who != signedIn.value?.who) holding = false
@@ -154,7 +157,13 @@ class DefaultAccessControl @Inject constructor(
         if (endIfPastByWallClock()) return
         // Read and written together, so an expiry in between can't leave the hold behind for the next person.
         val setup = synchronized(stateLock) { signedIn.value?.setup?.also { holding = holdForEdits } } ?: return
-        restartExpiry(if (setup) SETUP_IDLE_MS else SESSION_TIMEOUT_MS)
+        restartExpiry(if (setup) SETUP_IDLE_MS else timeout)
+    }
+
+    override fun sessionTimeout(millis: Long) {
+        timeout = millis
+        if (endIfPastByWallClock()) return
+        if (signedIn.value?.setup == false) restartExpiry()
     }
 
     override fun checkExpiry() {
@@ -178,7 +187,7 @@ class DefaultAccessControl @Inject constructor(
         anyOf.filter { registry.isGranted(role, it) }.toSet()
 
     /** [baseMillis], or the edit hold while [holding]; stretched by TalkBack's time; [expiresAt] set to match. */
-    private fun restartExpiry(baseMillis: Long = SESSION_TIMEOUT_MS) = synchronized(expiryLock) {
+    private fun restartExpiry(baseMillis: Long = timeout) = synchronized(expiryLock) {
         expiry?.cancel()
         val guarded = signedIn.value
         val millis = userActivity.timeout(if (holding) maxOf(baseMillis, EDIT_HOLD_MS) else baseMillis)

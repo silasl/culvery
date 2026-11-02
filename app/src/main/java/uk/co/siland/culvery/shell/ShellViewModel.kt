@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -25,6 +26,8 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.FrontTracker
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.access.SESSION_TIMEOUT_MS
+import uk.co.siland.culvery.core.access.SETTINGS_TIMEOUT_MS
 import uk.co.siland.culvery.core.access.mayManageConnections
 import uk.co.siland.culvery.core.household.label
 import uk.co.siland.culvery.core.plugin.Capability
@@ -183,6 +186,12 @@ class ShellViewModel @Inject constructor(
     init {
         viewModelScope.launch { scheduledDark.drop(1).collect { previewing.value = false } }
         viewModelScope.launch { access.session.collect { if (it == null) settings.value = null } }
+        // 15b Ruling 16: Settings' own 90 s while it is open.
+        viewModelScope.launch {
+            settings.map { it != null }.distinctUntilChanged().collect { open ->
+                access.sessionTimeout(if (open) SETTINGS_TIMEOUT_MS else SESSION_TIMEOUT_MS)
+            }
+        }
     }
 
     fun selectTab(id: String) {

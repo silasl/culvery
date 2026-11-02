@@ -39,6 +39,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhSwitchRow
+import uk.co.siland.culvery.core.ui.SettingsTokens
 
 private const val TAG = "StoredModePage"
 
@@ -94,7 +95,7 @@ internal fun StoredModePage(
     refusal?.let { HhStatusLine(it, "mode_turn_line") }
     if (on) Line(ModesWords.appliesNext(mode.name), "mode_applies_line")
 
-    Row(horizontalArrangement = Arrangement.spacedBy(PartyDimens.rowGap), modifier = Modifier.fillMaxWidth()) {
+    Row(horizontalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.weight(1f)) {
             ShowOnHomeSwitch(mode.showOnHome, place, room, prefs) { save { m -> m.copy(showOnHome = it) } }
         }

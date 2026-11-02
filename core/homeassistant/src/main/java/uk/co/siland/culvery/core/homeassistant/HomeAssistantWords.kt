@@ -27,10 +27,9 @@ fun entityTrouble(entityId: String, entities: Map<String, EntityState?>, problem
         else -> null
     }
 
-/** Settings › Other integrations (11 §4.1, §6). */
-const val OTHER_INTEGRATIONS = "Other integrations"
-const val OTHER_INTEGRATIONS_LINE = "Devices Culvery reaches through Home Assistant."
+/** Settings › Home Assistant (11 §4.1, §6; 15b §3): the page's title, and its link section's label. */
 const val HOME_ASSISTANT = "Home Assistant"
+const val OTHER_INTEGRATIONS_LINE = "Devices Culvery reaches through Home Assistant."
 const val NOT_LINKED_YET = "Not linked yet. Enter Home Assistant’s address and a token for Culvery, then Check."
 const val LINKED = "Linked."
 const val HA_ADDRESS = "Home Assistant’s address"

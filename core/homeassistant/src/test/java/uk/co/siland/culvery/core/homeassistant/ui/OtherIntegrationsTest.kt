@@ -24,6 +24,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -130,6 +131,17 @@ class OtherIntegrationsTest {
         compose.onNodeWithTag("ha_check").performClick()
         compose.waitFor { ha.link.value != null }
         compose.waitFor { compose.onAllNodes(hasText("Linked.")).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    /** 15b §3: "Home Assistant", last in Settings' list. */
+    @Test
+    fun theTitleIsHomeAssistant() {
+        ha = testHomeAssistant(api, settings.link, MutableStateFlow(true), scope)
+        val page = OtherIntegrationsPage(ha, HomeAssistantLinking(ha, settings, access, emptySet()) { homeAssistantUrl(it) }, emptySet(), emptySet(), toaster)
+        assertThat(page.title).isEqualTo("Home Assistant")
+        assertThat(page.order).isEqualTo(900)
+        setPage { OtherIntegrations(NOTHING_LINKED, "", {}, "", {}, {}, { _, _ -> }) }
+        compose.onAllNodes(isHeading())[0].assertTextEquals("Home Assistant")
     }
 
     @Test

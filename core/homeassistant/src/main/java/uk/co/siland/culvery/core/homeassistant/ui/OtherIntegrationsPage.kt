@@ -45,7 +45,6 @@ import uk.co.siland.culvery.core.homeassistant.HomeAssistantLinking
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantSection
 import uk.co.siland.culvery.core.homeassistant.LINKED
 import uk.co.siland.culvery.core.homeassistant.NOT_LINKED_YET
-import uk.co.siland.culvery.core.homeassistant.OTHER_INTEGRATIONS
 import uk.co.siland.culvery.core.homeassistant.OTHER_INTEGRATIONS_LINE
 import uk.co.siland.culvery.core.homeassistant.TOKEN_REFUSED_ON_PAGE
 import uk.co.siland.culvery.core.homeassistant.problemLine
@@ -65,12 +64,13 @@ import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.SettingsTokens
 
 private const val TAG = "OtherIntegrations"
 
 const val OTHER_INTEGRATIONS_PAGE_ID = "other_integrations"
 
-/** Settings › Other integrations (11 §4.1), admin-only as the rest of Settings; after Lights (470), before Door (500). */
+/** Settings › Home Assistant (11 §4.1, 15b §3), admin-only as the rest of Settings; last in the list. */
 class OtherIntegrationsPage @Inject constructor(
     private val ha: HomeAssistant,
     private val linking: HomeAssistantLinking,
@@ -79,8 +79,8 @@ class OtherIntegrationsPage @Inject constructor(
     private val toaster: Toaster,
 ) : SettingsPage {
     override val id = OTHER_INTEGRATIONS_PAGE_ID
-    override val title = OTHER_INTEGRATIONS
-    override val order = 480
+    override val title = HOME_ASSISTANT
+    override val order = 900
 
     @Composable
     override fun Content() = OtherIntegrationsHost(ha, linking, devices, sections, toaster)
@@ -122,8 +122,8 @@ fun OtherIntegrations(
     sections: List<HomeAssistantSection> = emptyList(),
 ) {
     val c = Culvery.colors
-    Column(verticalArrangement = Arrangement.spacedBy(HomeAssistantDimens.settingsGap), modifier = Modifier.testTag("settings_other")) {
-        HhPageTitle(OTHER_INTEGRATIONS, OTHER_INTEGRATIONS_LINE)
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("settings_other")) {
+        HhPageTitle(HOME_ASSISTANT, OTHER_INTEGRATIONS_LINE)
         HhSectionLabel(HOME_ASSISTANT)
         Text(
             ui.status ?: if (ui.linked) LINKED else NOT_LINKED_YET, style = HhType.body,
@@ -147,7 +147,7 @@ fun OtherIntegrations(
 @Composable
 private fun DevicePicker(device: DeviceUi, showLine: Boolean, onChoose: (String, String?) -> Unit) {
     val c = Culvery.colors
-    Column(verticalArrangement = Arrangement.spacedBy(HomeAssistantDimens.settingsGap), modifier = Modifier.testTag("ha_device_${device.domain}")) {
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("ha_device_${device.domain}")) {
         HhSectionLabel(device.title)
         val choices = device.choices
         when {

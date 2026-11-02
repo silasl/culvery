@@ -124,7 +124,8 @@ class LightsHolidaySectionTest {
         compose.setContent {
             CulveryTheme(dark = true) { InSettingsPane { LightsHolidayHost(lights.settings, bridges, RecordingToaster()) } }
         }
-        compose.waitForIdle()
+        // The prefs arrive from DataStore off the main thread, after the first idle.
+        compose.waitFor { compose.onAllNodesWithTag("lights_holiday_set_up").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("lights_holiday_set_up").assertTextEquals("Set up Hue in Settings › Lights to choose what the lights do while you’re away.")
         compose.onAllNodesWithTag("lights_no_automations").assertCountEquals(0)
         compose.onAllNodesWithTag("lights_holiday_note").assertCountEquals(0)

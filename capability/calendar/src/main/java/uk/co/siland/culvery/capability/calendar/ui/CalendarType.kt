@@ -481,8 +481,7 @@ internal object CalendarDimens {
     // Settings' Calendars block (3a design §4.1): rows are ListRowTokens'; a connection's 26 dp icon leads it.
     val settingsIcon = 26.dp
 
-    // Settings › Calendars (9 §4.12): blocks 12 apart; a calendar is a 69 dp line (an account row 75) in the shared row look.
-    val reviewBlockGap = 12.dp
+    // Settings › Calendars (9 §4.12): blocks SettingsTokens.rowGap apart; a calendar is a 69 dp line (an account row 75) in the shared row look.
     val reviewItemGap = 12.dp
     val accountRowMinHeight = 75.dp
 

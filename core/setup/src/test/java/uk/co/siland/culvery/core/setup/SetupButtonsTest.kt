@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasAnyAncestor
@@ -37,7 +38,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role as HouseholdRole
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
-import uk.co.siland.culvery.core.setup.pages.KioskPage
+import uk.co.siland.culvery.core.setup.pages.TabletLockSection
 import uk.co.siland.culvery.core.setup.steps.WelcomeContent
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhToast
@@ -79,7 +80,9 @@ class SetupButtonsTest {
             }
         }
         listOf("wizard_back", "wizard_next").forEach { assertButton(it, 60.dp) }
-        listOf("welcome_sample", "people_add").forEach { assertButton(it, 48.dp) }
+        assertButton("welcome_sample", 48.dp)
+        // 15b §3: Add a person is the dashed list row, a list row's height.
+        compose.onNodeWithTag("people_add").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)).assertHeightIsAtLeast(59.dp)
         // The arrow (an icon with no semantics of its own) is the one node inside Next that is not its label, and follows it.
         val inNext = hasAnyAncestor(hasTestTag("wizard_next"))
         val label = compose.onNode(hasText("Next") and inNext, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -165,8 +168,8 @@ class SetupButtonsTest {
     }
 
     @Test
-    fun settingsCloseAndTheKioskPageAreButtons() {
-        show { SettingsScreen(listOf(KioskPage(FakeHomeApp(default = false))), onClose = {}) }
+    fun settingsCloseAndTabletLocksButtonsAreButtons() {
+        show { SettingsScreen(listOf(StillPage("app", "App settings", 0) { TabletLockSection(FakeHomeApp(default = false)) }), onClose = {}) }
         listOf("settings_close", "choose_home_app", "settings_exit_kiosk").forEach { assertButton(it, 48.dp) }
         compose.assertClickablesHaveRoleAndLabel()
     }

@@ -52,8 +52,6 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -69,6 +67,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
@@ -92,10 +91,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.setup.pages.LocationPage
-import uk.co.siland.culvery.core.setup.pages.PeoplePage
 import uk.co.siland.culvery.core.setup.steps.HouseholdStep
-import uk.co.siland.culvery.core.ui.ButtonTone
-import uk.co.siland.culvery.core.ui.ButtonToneKey
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
@@ -159,17 +155,35 @@ class PeopleUiTest {
         compose.onNodeWithText("Admin · No PIN").assertExists()
     }
 
-    /** Pin: Task 2 made Add person quiet with its icon, and Task 3 keeps it so. */
+    /** 15b Ruling 19: "Add a person" is the list's dashed last row, the wizard's included. */
     @Test
-    fun addPersonIsQuietWithItsIcon() {
+    fun addAPersonIsTheDashedRow() {
         show()
-        compose.onNodeWithTag("people_add").assertHeightIsEqualTo(48.dp)
-            .assert(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Quiet))
-        // The icon's glyph is hidden from TalkBack, so it is the one node without text.
-        val parts = compose.onAllNodes(hasAnyAncestor(hasTestTag("people_add")), useUnmergedTree = true).fetchSemanticsNodes()
-        val label = parts.single { node -> node.config.getOrNull(SemanticsProperties.Text)?.any { it.text == "Add person" } == true }
-        val icon = parts.single { node -> node.config.getOrNull(SemanticsProperties.Text) == null }
-        assertThat(icon.boundsInRoot.left).isLessThan(label.boundsInRoot.left)
+        val add = compose.onNodeWithTag("people_add").assertTextEquals("Add a person").getUnclippedBoundsInRoot()
+        val alex = compose.onNodeWithTag("person_Alex").getUnclippedBoundsInRoot()
+        assertThat(add.height.value).isAtLeast(69f)
+        assertThat(add.top).isGreaterThan(alex.bottom)
+        assertThat(add.width.value).isWithin(0.5f).of(compose.onNodeWithTag("people_list").getUnclippedBoundsInRoot().width.value)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15b §3: in App settings two to a row, read left to right in the list's order, with Move up and Move down. */
+    @Test
+    fun peopleTwoToARow() {
+        addSam()
+        runBlocking { access.pins.addPerson("Mia", PersonPalette.colors[2], Role.CHILD, null) }
+        show { Box(Modifier.width(720.dp)) { PeoplePane(editor, reorder = true) } }
+        compose.awaitTag("person_Mia")
+        val alex = compose.onNodeWithTag("person_Alex").getUnclippedBoundsInRoot()
+        val sam = compose.onNodeWithTag("person_Sam").getUnclippedBoundsInRoot()
+        val mia = compose.onNodeWithTag("person_Mia").getUnclippedBoundsInRoot()
+        assertThat(sam.top).isEqualTo(alex.top)
+        assertThat(sam.width.value).isWithin(1f).of(alex.width.value)
+        assertThat((sam.left - alex.right).value).isWithin(0.5f).of(7f)
+        assertThat((mia.top - alex.bottom).value).isWithin(0.5f).of(7f)
+        assertThat(mia.width.value).isWithin(1f).of(alex.width.value)
+        compose.onNodeWithTag("person_up_Sam").assertExists()
+        compose.onNodeWithTag("person_down_Sam").assertExists()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -190,7 +204,7 @@ class PeopleUiTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay, LocalDensity provides Density(LocalDensity.current.density, 1.3f)) {
-                    Box(Modifier.width(360.dp)) { PeoplePane(editor, reorder = true) }
+                    Box(Modifier.width(720.dp)) { PeoplePane(editor, reorder = true) }
                 }
             }
         }
@@ -205,9 +219,9 @@ class PeopleUiTest {
     }
 
     @Test
-    fun personRowsSitTwelveApart() {
+    fun inTheWizardPersonRowsSitTwelveApart() {
         addSam()
-        show()
+        show { PeoplePane(editor, reorder = false) }
         compose.awaitTag("person_Sam")
         val gap = compose.onNodeWithTag("person_Sam").getUnclippedBoundsInRoot().top - compose.onNodeWithTag("person_Alex").getUnclippedBoundsInRoot().bottom
         assertThat(gap.value).isWithin(0.5f).of(12f)
@@ -299,11 +313,12 @@ class PeopleUiTest {
         assertThat(samRow.config[SemanticsActions.CustomActions].map { it.label }).containsExactly("Move Sam up")
         compose.onNodeWithContentDescription("Move Sam up").performClick()
         // singleOrNull: a fetch mid-recomposition must not throw out of waitUntil.
-        fun top(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().singleOrNull()?.boundsInRoot?.top
+        fun at(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().singleOrNull()?.boundsInRoot
+        // Two to a row: Sam first means Sam's row is higher, or Sam is to the left on the same row.
         compose.waitUntil(5_000) {
-            val sam = top("person_Sam")
-            val alex = top("person_Alex")
-            sam != null && alex != null && sam < alex
+            val sam = at("person_Sam")
+            val alex = at("person_Alex")
+            sam != null && alex != null && (sam.top < alex.top || (sam.top == alex.top && sam.left < alex.left))
         }
         assertThat(compose.onNodeWithTag("person_Sam").fetchSemanticsNode().id).isEqualTo(samRow.id)
         assertThat(compose.onNodeWithTag("person_Sam").fetchSemanticsNode().config[SemanticsActions.CustomActions].map { it.label })
@@ -495,14 +510,12 @@ class PeopleUiTest {
     }
 
     @Test
-    fun theLocationAndPeoplePageTitlesAreTheSharedPageTitle() {
+    fun theHomeLocationSubPageTitleIsTheSharedPageTitle() {
         val noTowns = object : LocationSearch {
             override suspend fun search(query: String) = emptyList<PlaceMatch>()
         }
-        show { Column { PeoplePage(editor).Content(); LocationPage(household, noTowns, access.control).Content() } }
-        listOf(HOME_LOCATION, PEOPLE).forEach { title ->
-            assertThat(compose.onNode(isHeading() and hasText(title)).textLayout().layoutInput.style.fontSize).isEqualTo(37.sp)
-        }
+        compose.setContent { CulveryTheme(dark = true) { Column { LocationPage(household, noTowns, access.control).Content() } } }
+        assertThat(compose.onNode(isHeading() and hasText(HOME_LOCATION)).textLayout().layoutInput.style.fontSize).isEqualTo(37.sp)
     }
 
     @Test
@@ -634,7 +647,7 @@ class PeopleUiTest {
     fun thePersonSheetsTitleIsAHeading() {
         show()
         compose.onNodeWithTag("people_add").performClick()
-        compose.onAllNodesWithText("Add person", useUnmergedTree = true).filterToOne(isHeading()).assertExists()
+        compose.onAllNodesWithText("Add a person", useUnmergedTree = true).filterToOne(isHeading()).assertExists()
     }
 
     @Test

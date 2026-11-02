@@ -1,23 +1,33 @@
 package uk.co.siland.culvery
 
+import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dagger.hilt.android.EntryPointAccessors
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -26,7 +36,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import uk.co.siland.culvery.capability.door.DoorbellChoice
 import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.ui.DoorSettingsActions
@@ -46,15 +58,21 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
-import uk.co.siland.culvery.core.setup.pages.KioskPage
+import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrations
+import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrationsUi
+import uk.co.siland.culvery.core.setup.SettingsScreen
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SettingsTokens
+import uk.co.siland.culvery.core.ui.test.waitFor
 import uk.co.siland.culvery.core.ui.HhPageTitle
+import uk.co.siland.culvery.di.HouseGraphProbe
 import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DisplayPrefs
 import uk.co.siland.culvery.display.ui.DisplaySettingsActions
-import uk.co.siland.culvery.display.ui.DisplaySettingsScreen
+import uk.co.siland.culvery.display.ui.BrightnessAndNightScreen
 import uk.co.siland.culvery.display.ui.DisplaySettingsUi
 import uk.co.siland.culvery.shell.FakeAccessControl
+import uk.co.siland.culvery.settings.AppSettingsRig
 import uk.co.siland.culvery.shell.FakeCapability
 
 private class Step(override val id: String, override val order: Int) : SetupStep {
@@ -85,9 +103,17 @@ private class WithSetup(private val steps: List<SetupStep>, private val pages: L
     override fun TabContent() = Unit
 }
 
+private val DOOR_UI =
+    DoorSettingsUi("Ring", null, 0.5f, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(22, 0), LocalTime.of(7, 0), null, "never", true, true, false, KeepDays.TWO)
+private val DOOR_ACTIONS = DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {})
+private val LIGHTS_UI = LightsSettingsUi(true, null, null, false, emptyList(), null, emptySet(), 0)
+private val MUSIC_UI = MusicSettingsUi(true, null, null, false, emptyList(), null, 50)
+private val MUSIC_ACTIONS = MusicSettingsActions({}, {}, {}, {})
+
 @RunWith(AndroidJUnit4::class)
 class SetupWiringTest {
     @get:Rule val compose = createComposeRule()
+    @get:Rule val folder = TemporaryFolder()
 
     private val calendar = WithSetup(listOf(Step("calendar.review", 410), Step("calendar.connect", 400)), listOf(Page("calendars", 400)))
 
@@ -96,6 +122,26 @@ class SetupWiringTest {
         val core = setOf(Step("done", 1000), Step("welcome", 0), Step("household", 300), Step("you", 200), Step("location", 100))
         assertThat(wizardSteps(core, setOf(calendar)).map { it.id })
             .containsExactly("welcome", "location", "you", "household", "calendar.connect", "calendar.review", "done").inOrder()
+    }
+
+    /** 15b §3: the real graph's list, built as MainActivity builds it. */
+    @Test
+    @Config(application = CulveryApp::class)
+    fun theListIsEightInOrder() {
+        assertThat(realPages().map { it.title })
+            .containsExactly("App settings", "Calendars", "Shopping", "Music", "Lights", "Modes", "Door", "Home Assistant").inOrder()
+    }
+
+    @Test
+    @Config(application = CulveryApp::class)
+    fun noPartyOrOtherIntegrations() {
+        val titles = realPages().map { it.title }
+        listOf("Party mode", "Other integrations", "Home location", "People", "Display", "Tablet lock").forEach { assertThat(titles).doesNotContain(it) }
+    }
+
+    private fun realPages(): List<SettingsPage> {
+        val probe = EntryPointAccessors.fromApplication(ApplicationProvider.getApplicationContext<Application>(), HouseGraphProbe::class.java)
+        return settingsPages(probe.corePages(), probe.capabilities())
     }
 
     @Test
@@ -181,35 +227,25 @@ class SetupWiringTest {
         .also { fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(it) }
         .single().layoutInput.style.fontSize
 
-    /** Display, Door, Lights, Music and Tablet lock draw their title through the same `HhPageTitle` as the wizard's steps; Home location and People are checked in core:setup, Calendars in core:ui. */
+    /** Brightness and night, Door, Lights and Music draw their title through the same `HhPageTitle` as the wizard's steps; Home location is checked in core:setup, Calendars in core:ui. */
     @Test
     fun everySettingsPageTitleIsTheSharedTitle() {
         val pages: List<Pair<String, @Composable () -> Unit>> = listOf(
             "display" to {
-                DisplaySettingsScreen(
+                BrightnessAndNightScreen(
                     DisplaySettingsUi(DisplayPrefs(), CameraState.ALLOWED, sunKnown = true, today = LocalDate.of(2026, 10, 29)),
                     DisplaySettingsActions({ _, _ -> }, {}, {}, {}, {}, {}, {}),
                 )
             },
             "door" to {
-                DoorSettingsScreen(
-                    DoorSettingsUi("Ring", null, 0.5f, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(22, 0), LocalTime.of(7, 0), null, "never", true, true, false, KeepDays.TWO),
-                    DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {}),
-                )
+                DoorSettingsScreen(DOOR_UI, DOOR_ACTIONS)
             },
             "lights" to {
-                LightsSettingsPage(
-                    LightsSettingsUi(true, null, null, false, emptyList(), null, emptySet(), 0),
-                    {}, {}, {}, {},
-                )
+                LightsSettingsPage(LIGHTS_UI, {}, {}, {}, {})
             },
             "music" to {
-                MusicSettingsScreen(
-                    MusicSettingsUi(true, null, null, false, emptyList(), null, 50),
-                    MusicSettingsActions({}, {}, {}, {}),
-                )
+                MusicSettingsScreen(MUSIC_UI, MUSIC_ACTIONS)
             },
-            "kiosk" to { KioskPage(object : HomeApp { override val isDefault = MutableStateFlow(false) }).Content() },
         )
         compose.setContent {
             CulveryTheme(dark = true) {
@@ -227,5 +263,52 @@ class SetupWiringTest {
             val title = compose.onAllNodes(isHeading() and hasAnyAncestor(hasTestTag("page_$id")))[0]
             assertThat(title.fontSize()).isEqualTo(shared)
         }
+    }
+
+    /** 15b §3: inside the real Settings, each page's labels are 12 sp and its rows 7 dp apart. */
+    @Test
+    fun labelsAndGapsOnEveryPage() {
+        val rig = AppSettingsRig(folder.root)
+        rig.household()
+        val cases = listOf(
+            Gaps(rig.page, "Display", "app_display_display", "app_display_seasonal"),
+            Gaps(Wrapped("door") { DoorSettingsScreen(DOOR_UI, DOOR_ACTIONS) }, "Doorbell sound", "door_from", "door_until"),
+            Gaps(Wrapped("lights") { LightsSettingsPage(LIGHTS_UI, {}, {}, {}, {}) }, "Hue Bridge", "lights_connection", "lights_find"),
+            Gaps(Wrapped("music") { MusicSettingsScreen(MUSIC_UI, MUSIC_ACTIONS) }, "Sonos", "music_connection", "music_find"),
+            Gaps(
+                Wrapped("other_integrations") { OtherIntegrations(OtherIntegrationsUi(false, null, false, null, emptyList()), "", {}, "", {}, {}, { _, _ -> }) },
+                "Home Assistant", "ha_address", "ha_token",
+            ),
+        )
+        var showing by mutableStateOf(0)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides TestOverlay()) {
+                    key(showing) { SettingsScreen(listOf(cases[showing].page), onClose = {}) }
+                }
+            }
+        }
+        try {
+            cases.forEachIndexed { i, case ->
+                showing = i
+                compose.waitFor { compose.onAllNodes(hasTestTag(case.below)).fetchSemanticsNodes().isNotEmpty() }
+                assertThat(compose.onNode(isHeading() and hasContentDescription(case.label)).fontSize()).isEqualTo(12.sp)
+                val above = compose.onNodeWithTag(case.above).getUnclippedBoundsInRoot()
+                val below = compose.onNodeWithTag(case.below).getUnclippedBoundsInRoot()
+                assertThat((below.top - above.bottom).value).isWithin(0.5f).of(SettingsTokens.rowGap.value)
+            }
+        } finally {
+            rig.close()
+        }
+    }
+
+    private class Gaps(val page: SettingsPage, val label: String, val above: String, val below: String)
+
+    private class Wrapped(override val id: String, private val content: @Composable () -> Unit) : SettingsPage {
+        override val title = id
+        override val order = 0
+
+        @Composable
+        override fun Content() = content()
     }
 }

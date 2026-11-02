@@ -24,6 +24,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.SettingsTokens
 
 /** One plug's row. [line] is set for a shown plug Home Assistant no longer has. */
 data class PlugRowUi(val entityId: String, val name: String, val shown: Boolean, val needsPin: Boolean, val line: String?) {
@@ -36,12 +37,12 @@ data class PlugsSettingsUi(val rows: List<PlugRowUi>, val line: String?)
 @Composable
 fun PlugsSettings(ui: PlugsSettingsUi, onShow: (String, Boolean) -> Unit, onNeedsPin: (String, Boolean) -> Unit) {
     val c = Culvery.colors
-    Column(verticalArrangement = Arrangement.spacedBy(PlugsDimens.settingsGap), modifier = Modifier.testTag("plugs_settings")) {
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("plugs_settings")) {
         HhSectionLabel(PlugsWords.PLUGS)
         Text(PlugsWords.PLUGS_HELP, style = HhType.body, color = c.mute, modifier = Modifier.testTag("plugs_help"))
         ui.line?.let { Text(it, style = HhType.body, color = c.mute, modifier = Modifier.testTag("plugs_line")) }
         ui.rows.forEachIndexed { index, row ->
-            Column(verticalArrangement = Arrangement.spacedBy(PlugsDimens.settingsRowGap)) {
+            Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap)) {
                 HhSectionLabel(row.name, Modifier.testTag("plugs_name_$index"))
                 row.line?.let { Text(it, style = HhType.body, color = c.mute, modifier = Modifier.testTag("plugs_gone_$index")) }
                 HhSwitchRow(

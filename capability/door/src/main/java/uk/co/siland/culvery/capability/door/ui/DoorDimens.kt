@@ -50,7 +50,6 @@ internal object DoorDimens {
     val sheetPaddingH = 30.dp
     val sheetPaddingV = 28.dp
 
-    // Settings › Door: blocks spaced as Settings' other pages; the volume in tenths.
-    val settingsGap = 16.dp
+    // Settings › Door: the volume in tenths.
     const val VOLUME_STEPS = 9
 }

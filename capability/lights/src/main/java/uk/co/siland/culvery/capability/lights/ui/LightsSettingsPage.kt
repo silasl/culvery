@@ -67,6 +67,7 @@ import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.SettingsTokens
 
 private const val TAG = "LightsSettings"
 
@@ -105,7 +106,7 @@ fun LightsSettingsPage(
     onLeftOut: (Set<String>) -> Unit,
 ) {
     val c = Culvery.colors
-    Column(verticalArrangement = Arrangement.spacedBy(LightsDimens.settingsGap), modifier = Modifier.testTag("settings_lights")) {
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("settings_lights")) {
         HhPageTitle(LIGHTS)
         HhSectionLabel(HUE_BRIDGE)
         if (ui.status != null) {

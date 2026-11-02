@@ -20,6 +20,7 @@ import uk.co.siland.culvery.core.plugin.BuiltInModePage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.save
 import uk.co.siland.culvery.core.ui.HhSwitchRow
+import uk.co.siland.culvery.core.ui.SettingsTokens
 
 private const val TAG = "HolidayPage"
 
@@ -41,7 +42,7 @@ internal fun HolidayPage(
     val place by remember { controls.place(HouseModes.HOLIDAY) }.collectAsStateWithLifecycle(null)
 
     page?.TurnButton()
-    Row(horizontalArrangement = Arrangement.spacedBy(PartyDimens.rowGap), modifier = Modifier.fillMaxWidth()) {
+    Row(horizontalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.weight(1f)) {
             ShowOnHomeSwitch(prefs.holidayOnHome, place, room, prefs) { on ->
                 scope.launch {

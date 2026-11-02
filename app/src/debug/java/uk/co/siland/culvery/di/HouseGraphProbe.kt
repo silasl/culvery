@@ -16,11 +16,13 @@ import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.MultiDayEvents
+import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.ui.ShowingTheme
 import uk.co.siland.culvery.display.SeasonalThemes
 
-/** Debug builds only: lets the unit test read what the real graph gives Holiday mode and the stored modes (11 §4.2, 13 §6a). */
+/** Debug builds only: lets the unit test read what the real graph gives Holiday mode and the stored modes (11 §4.2, 13 §6a), and the Settings pages MainActivity lists (15b §3). */
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface HouseGraphProbe {
@@ -39,4 +41,6 @@ interface HouseGraphProbe {
     fun startables(): Set<@JvmSuppressWildcards Startable>
     fun showingTheme(): ShowingTheme
     fun seasonalThemes(): SeasonalThemes
+    fun corePages(): Set<@JvmSuppressWildcards SettingsPage>
+    fun capabilities(): Set<@JvmSuppressWildcards Capability>
 }

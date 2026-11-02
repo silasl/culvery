@@ -30,7 +30,6 @@ import java.time.YearMonth
 import javax.inject.Inject
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
-import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.saving
@@ -43,6 +42,7 @@ import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhDateGrid
 import uk.co.siland.culvery.core.ui.HhFooterButton
+import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhPageTitle
@@ -52,12 +52,17 @@ import uk.co.siland.culvery.core.ui.HhSliderRow
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhTimeStepperRow
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.SeasonDates
 import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.UNTIL
+import uk.co.siland.culvery.core.ui.clockText
 import uk.co.siland.culvery.core.ui.defaultSeasonDates
 import uk.co.siland.culvery.display.ALLOW_THE_CAMERA
 import uk.co.siland.culvery.display.BRIGHTNESS
+import uk.co.siland.culvery.display.BRIGHTNESS_AND_NIGHT
 import uk.co.siland.culvery.display.BRIGHTNESS_RANGE
 import uk.co.siland.culvery.display.CAMERA_NOT_ASKED
 import uk.co.siland.culvery.display.CAMERA_REFUSED
@@ -80,6 +85,7 @@ import uk.co.siland.culvery.display.NO_FRONT_CAMERA
 import uk.co.siland.culvery.display.NO_SUN_TIMES
 import uk.co.siland.culvery.display.OPEN_ANDROIDS_SETTINGS
 import uk.co.siland.culvery.display.SAVE_DATES
+import uk.co.siland.culvery.display.SEASONAL_LOOKS
 import uk.co.siland.culvery.display.SEASONAL_THEMES
 import uk.co.siland.culvery.display.SLEEP
 import uk.co.siland.culvery.display.SLEEP_CHOICES
@@ -99,29 +105,67 @@ import uk.co.siland.culvery.display.nextLine
 import uk.co.siland.culvery.display.nightClockLine
 import uk.co.siland.culvery.display.previewLine
 import uk.co.siland.culvery.display.previewTitle
+import uk.co.siland.culvery.display.shortDatesLine
 import uk.co.siland.culvery.display.putBack
 import uk.co.siland.culvery.display.sleepAfter
 import uk.co.siland.culvery.shell.SunToday
 
 private const val TAG = "DisplaySettings"
 
+/** App settings' Display sub-pages (15b §3): Brightness and night, and Seasonal looks. */
 const val DISPLAY_PAGE_ID = "display"
+const val SEASONAL_PAGE_ID = "seasonal"
 
-/** Settings › Display (8 §4.6), Admin only like the rest of Settings; after Calendars (400), before Music. */
-class DisplayPage @Inject constructor(
+/** App settings › DISPLAY (8 §4.6, 15b §3): its two rows, and the sub-page each opens. */
+class DisplaySections @Inject constructor(
     private val settings: DisplaySettings,
     private val access: CameraAccess,
     private val sunToday: SunToday,
     private val toaster: Toaster,
     private val themes: SeasonalThemes,
-) : SettingsPage {
-    override val id = DISPLAY_PAGE_ID
-    override val title = DISPLAY
-    override val order = 440
+) {
+    /** The DISPLAY section; [onOpen] gets [DISPLAY_PAGE_ID] or [SEASONAL_PAGE_ID]. */
+    @Composable
+    fun Rows(onOpen: (String) -> Unit) {
+        val prefs by settings.read.collectAsStateWithLifecycle()
+        val dates by themes.dates.collectAsStateWithLifecycle()
+        DisplayRows(prefs?.let(::brightnessSummary), seasonalSummary(dates), onOpen)
+    }
 
     @Composable
-    override fun Content() {
-        DisplaySettingsHost(settings, access, sunToday, toaster, LocalShellNavigator.current, themes)
+    fun BrightnessAndNight() {
+        DisplaySettingsHost(settings, access, sunToday, toaster, LocalShellNavigator.current, themes) { ui, actions -> BrightnessAndNightScreen(ui, actions) }
+    }
+
+    @Composable
+    fun SeasonalLooks() {
+        DisplaySettingsHost(settings, access, sunToday, toaster, LocalShellNavigator.current, themes) { ui, actions -> SeasonalLooksScreen(ui, actions) }
+    }
+}
+
+/** "Night clock 22:00–07:00 · Sleep after 5 min" (plan). */
+internal fun brightnessSummary(prefs: DisplayPrefs): String =
+    "$NIGHT_CLOCK ${clockText(prefs.nightFrom)}–${clockText(prefs.nightUntil)} · Sleep after ${prefs.sleepAfterMinutes} min"
+
+/** "Halloween 24–31 Oct", each theme in turn (plan). */
+internal fun seasonalSummary(dates: Map<SeasonalTheme, SeasonDates>): String =
+    SeasonalTheme.entries.joinToString(" · ") { "${it.label} ${shortDatesLine(dates[it] ?: it.defaultDates)}" }
+
+/** The DISPLAY section's two rows; [summary] is null until the saved settings are read. */
+@Composable
+internal fun DisplayRows(summary: String?, seasonal: String, onOpen: (String) -> Unit) {
+    val c = Culvery.colors
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap)) {
+        HhSectionLabel(DISPLAY)
+        listOf(Triple(DISPLAY_PAGE_ID, BRIGHTNESS_AND_NIGHT, summary), Triple(SEASONAL_PAGE_ID, SEASONAL_LOOKS, seasonal)).forEach { (id, title, line) ->
+            HhListRow(
+                title,
+                Modifier.testTag("app_display_$id"),
+                subtitle = line,
+                trailing = { HhIcon(Icons.CHEVRON_RIGHT, size = ListRowTokens.icon, tint = c.mute) },
+                onClick = { onOpen(id) },
+            )
+        }
     }
 }
 
@@ -166,12 +210,13 @@ internal fun shownRange(today: LocalDate, dates: SeasonDates): Pair<LocalDate, L
     return dates.start.atYear(startYear) to dates.end.atYear(endYear)
 }
 
+/** App settings › Brightness and night: the night clock, brightness, sleep and the camera's wake (8 §4.6). */
 @Composable
-fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions) {
+internal fun BrightnessAndNightScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions) {
     val c = Culvery.colors
     val prefs = ui.prefs
-    Column(verticalArrangement = Arrangement.spacedBy(DisplayDimens.settingsGap), modifier = Modifier.testTag("settings_display")) {
-        HhPageTitle(DISPLAY)
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("display_brightness")) {
+        HhPageTitle(BRIGHTNESS_AND_NIGHT)
         HhSectionLabel(NIGHT_CLOCK)
         Text(nightClockLine(prefs.nightFrom, prefs.nightUntil), style = HhType.body, color = c.mute, modifier = Modifier.testTag("display_night_line"))
         HhTimeStepperRow(FROM, NIGHT_START, prefs.nightFrom, "display_from") { actions.onNight(it, prefs.nightUntil) }
@@ -190,6 +235,15 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
             }
         }
         CameraRow(ui, actions)
+    }
+}
+
+/** App settings › Seasonal looks: each theme's dates and its preview (14 §4.5). */
+@Composable
+internal fun SeasonalLooksScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions) {
+    val c = Culvery.colors
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("display_seasonal")) {
+        HhPageTitle(SEASONAL_LOOKS)
         HhSectionLabel(SEASONAL_THEMES)
         val overlay = LocalOverlayHost.current
         SeasonalTheme.entries.forEach { theme ->
@@ -315,7 +369,7 @@ private fun CameraNote(text: String, button: (@Composable () -> Unit)? = null) {
     }
 }
 
-/** Settings › Display with its data; says when a setting didn't save, and waits for the saved settings before it draws. */
+/** A Display sub-page with its data; says when a setting didn't save, and waits for the saved settings before it draws [screen]. */
 @Composable
 internal fun DisplaySettingsHost(
     settings: DisplaySettings,
@@ -324,6 +378,7 @@ internal fun DisplaySettingsHost(
     toaster: Toaster,
     navigator: ShellNavigator,
     themes: SeasonalThemes,
+    screen: @Composable (DisplaySettingsUi, DisplaySettingsActions) -> Unit,
 ) {
     val prefs by settings.read.collectAsStateWithLifecycle()
     val camera by access.state.collectAsStateWithLifecycle()
@@ -336,7 +391,7 @@ internal fun DisplaySettingsHost(
     val scope = rememberCoroutineScope()
     val p = prefs ?: return
     val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a display setting (${it::class.simpleName})") }
-    DisplaySettingsScreen(
+    screen(
         // The device date only places the grid until the household clock is read; it never picks the theme.
         DisplaySettingsUi(p, camera, sunKnown = sun != null, today = today ?: LocalDate.now(), previewing = previewing, dates = dates, next = next),
         DisplaySettingsActions(

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -27,6 +28,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -140,12 +142,15 @@ fun HhListRow(
     }
 }
 
+/** The style [HhSectionLabel] draws in; Settings provides [SettingsTokens.sectionLabel] over its pages (15b Ruling 17). */
+val LocalSectionLabelStyle = staticCompositionLocalOf<TextStyle> { HhType.sectionLabel }
+
 /** A section's label (4d-1 Decision 6): drawn in capitals, spoken as [text] is written ("Who"), and a heading. */
 @Composable
 fun HhSectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text.uppercase(Locale.UK),
-        style = HhType.sectionLabel,
+        style = LocalSectionLabelStyle.current,
         color = Culvery.colors.mute,
         modifier = modifier.semantics {
             heading()

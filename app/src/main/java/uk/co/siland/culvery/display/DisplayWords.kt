@@ -13,6 +13,8 @@ import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.clockText
 
 internal const val DISPLAY = "Display"
+internal const val BRIGHTNESS_AND_NIGHT = "Brightness and night"
+internal const val SEASONAL_LOOKS = "Seasonal looks"
 internal const val NIGHT_CLOCK = "Night clock"
 internal const val BRIGHTNESS = "Brightness"
 internal const val SLEEP = "Sleep"
@@ -68,6 +70,11 @@ internal fun dayMonth(d: LocalDate): String = d.format(DAY_MONTH)
 internal fun dayMonthYear(d: LocalDate): String = d.format(DAY_MONTH_YEAR)
 
 internal fun datesLine(dates: SeasonDates): String = "${dayMonth(dates.start)} – ${dayMonth(dates.end)}"
+
+/** "24–31 Oct" within a month, else "24 Oct–2 Nov" (plan). */
+internal fun shortDatesLine(dates: SeasonDates): String =
+    if (dates.start.month == dates.end.month && dates.start <= dates.end) "${dates.start.dayOfMonth}–${dayMonth(dates.end)}"
+    else "${dayMonth(dates.start)}–${dayMonth(dates.end)}"
 
 internal const val CHANGE_THE_DATES = "Change the dates"
 internal const val TAP_FIRST_THEN_LAST = "Tap the first day, then the last."

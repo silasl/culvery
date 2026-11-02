@@ -52,8 +52,7 @@ internal object MusicDimens {
     val sheetPaddingV = 28.dp
     val favouriteArt = 48.dp
 
-    // Settings › Music: as Settings' other pages; the doorbell's share in 5 % steps, 0–50.
-    val settingsGap = 16.dp
+    // Settings › Music: the doorbell's share in 5 % steps, 0–50.
     val buttonGap = 12.dp
     const val LOWER_STEPS = 9
 }

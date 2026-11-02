@@ -83,6 +83,7 @@ import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.UNTIL
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
@@ -135,7 +136,7 @@ class DoorSettingsActions(
 fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
     val c = Culvery.colors
     Column(
-        verticalArrangement = Arrangement.spacedBy(DoorDimens.settingsGap),
+        verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap),
         modifier = Modifier.testTag("settings_door"),
     ) {
         HhPageTitle(DOOR)

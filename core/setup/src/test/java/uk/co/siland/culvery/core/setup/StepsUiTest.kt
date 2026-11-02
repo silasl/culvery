@@ -218,9 +218,7 @@ class StepsUiTest {
         inFrame(Forward.Skip) { HouseholdStep(editor).Content(onNext = {}) }
         compose.awaitTag("people_add")
         greenButtons().assertCountEquals(0)
-        listOf("people_add", "wizard_skip").forEach {
-            compose.onNodeWithTag(it).assert(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Quiet))
-        }
+        compose.onNodeWithTag("wizard_skip").assert(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Quiet))
         compose.assertClickablesHaveRoleAndLabel()
     }
 

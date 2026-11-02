@@ -15,7 +15,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,13 +32,11 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.Feature
-import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.setup.SettingsScreen
-import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
@@ -161,8 +158,7 @@ class ReviewScreenshotTest {
 
     private fun settings(name: String, dark: Boolean, connected: Boolean = true) {
         val pages = listOf(
-            StillPage("location", "Home location", 0) {},
-            StillPage("people", "People", 100) {},
+            StillPage("app", "App settings", 0) {},
             StillPage("calendars", "Calendars", 400) {
                 if (connected) {
                     Review("Calendars", ConnectionHealth.Ok, weeks = WeeksShown.EIGHT)
@@ -173,7 +169,12 @@ class ReviewScreenshotTest {
                     )
                 }
             },
-            KioskPage(object : HomeApp { override val isDefault = MutableStateFlow(true) }),
+            StillPage("shopping", "Shopping", 420) {},
+            StillPage("music", "Music", 450) {},
+            StillPage("lights", "Lights", 470) {},
+            StillPage("modes", "Modes", 475) {},
+            StillPage("door", "Door", 500) {},
+            StillPage("other_integrations", "Home Assistant", 900) {},
         )
         snap(name, dark, before = { compose.onNodeWithTag("settings_page_calendars").performClick() }) { SettingsScreen(pages, onClose = {}) }
     }

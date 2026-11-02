@@ -26,6 +26,8 @@ import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.Identified
+import uk.co.siland.culvery.core.access.SESSION_TIMEOUT_MS
+import uk.co.siland.culvery.core.access.SETTINGS_TIMEOUT_MS
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
@@ -158,6 +160,26 @@ class ShellViewModelTest {
             assertThat(layout.left?.id).isEqualTo("today")
             assertThat(layout.right.map { it.id }).containsExactly("music")
         }
+    }
+
+    /** 15b Ruling 16: 90 s while Settings is open, two minutes again once it closes, by Close or as its session ends. */
+    @Test
+    fun settingsSetsAndClearsItsTimeout() = runTest {
+        access.result = admin
+        val vm = vm()
+        runCurrent()
+        access.timeouts.clear()
+        vm.openSettings()
+        runCurrent()
+        assertThat(access.timeouts).containsExactly(SETTINGS_TIMEOUT_MS)
+        vm.closeSettings()
+        runCurrent()
+        assertThat(access.timeouts).containsExactly(SETTINGS_TIMEOUT_MS, SESSION_TIMEOUT_MS).inOrder()
+        vm.openSettings()
+        runCurrent()
+        access.lock()
+        runCurrent()
+        assertThat(access.timeouts).containsExactly(SETTINGS_TIMEOUT_MS, SESSION_TIMEOUT_MS, SETTINGS_TIMEOUT_MS, SESSION_TIMEOUT_MS).inOrder()
     }
 
     @Test

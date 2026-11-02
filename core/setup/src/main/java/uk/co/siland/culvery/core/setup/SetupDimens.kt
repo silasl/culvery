@@ -59,14 +59,20 @@ internal object SetupDimens {
     val settingsItemRadius = 16.dp
     val settingsItemPaddingH = 19.dp
     val settingsItemGap = 7.dp
+
+    // Not in the spec: the list's scroll ends 12 above Close.
+    val settingsCloseGap = 12.dp
     val pagePaddingV = 43.dp
     val pagePaddingH = 48.dp
 }
 
 /** Setup and Settings text styles, derived from HhType. */
 internal object SetupType {
-    /** 35 sp / 700, −0.5 tracking: the Settings list's title and the person sheet's heading (handoff 2c, 5b). */
+    /** 35 sp / 700, −0.5 tracking: the person sheet's heading (handoff 5b). */
     val panelTitle = HhType.screenTitle.copy(fontSize = 35.sp, letterSpacing = (-0.5).sp)
+
+    /** 37 sp / 700, −0.5 tracking: the Settings list's title (15b §6 W26: 56 px). */
+    val settingsTitle = panelTitle.copy(fontSize = 37.sp)
 
     /** 16 sp / 400: a title's line, and body text. */
     val line = HhType.body

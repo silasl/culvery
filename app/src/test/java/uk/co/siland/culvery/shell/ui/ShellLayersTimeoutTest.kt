@@ -27,6 +27,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.access.SESSION_TIMEOUT_MS
+import uk.co.siland.culvery.core.access.SETTINGS_TIMEOUT_MS
 import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.OVERLAY_IDLE_MS
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
@@ -101,6 +102,30 @@ class ShellLayersTimeoutTest {
         assertThat(open("settings_warning")).isFalse()
         after(100)
         assertThat(open("settings_warning")).isTrue()
+    }
+
+    /** 15b §3: on Settings' own 90 s the warning comes at 70 s. */
+    @Test
+    fun settingsWarnsAtSeventySeconds() {
+        show()
+        expiresAt = compose.mainClock.currentTime + SETTINGS_TIMEOUT_MS
+        settle()
+        after(70_000 - 100)
+        assertThat(open("settings_warning")).isFalse()
+        after(100)
+        compose.onNodeWithTag("settings_warning").assertTextEquals(SETTINGS_CLOSING)
+    }
+
+    /** Only Settings changed: a sheet over Home still closes after two minutes. */
+    @Test
+    fun aSheetStillClosesAfterTwoMinutes() {
+        assertThat(OVERLAY_IDLE_MS).isEqualTo(120_000L)
+        show()
+        sheet()
+        after(120_000L - 100)
+        assertThat(open("sheet")).isTrue()
+        after(100)
+        assertThat(open("sheet")).isFalse()
     }
 
     /** A sheet and the PIN pad hide what they cover from TalkBack; the warning sits above both, so it is still read. */

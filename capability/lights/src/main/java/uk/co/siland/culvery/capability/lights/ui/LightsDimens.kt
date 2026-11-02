@@ -55,8 +55,7 @@ internal object LightsDimens {
     val percentSize = 15.sp
     val percentWidth = 44.dp
 
-    // Settings › Lights: as Settings' other pages; the sheets as the calendar's.
-    val settingsGap = 16.dp
+    // Settings › Lights: the sheets as the calendar's.
     val settingsButtonGap = 12.dp
     val sheetPaddingH = 30.dp
     val sheetPaddingV = 28.dp

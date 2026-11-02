@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.plugin
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -73,7 +74,7 @@ interface SetupStep {
     fun Content(onNext: () -> Unit)
 }
 
-/** One section of Settings (4a design §3.2, §4.6): Home location 0, People 100, Calendars 400, Display 440, Music 450, Lights 470, Party mode 475, Door 500, Tablet lock 900. */
+/** One section of Settings (4a design §3.2, §4.6; 15b §3): App settings 0, Calendars 400, Shopping 420, Music 450, Lights 470, Modes 475, Door 500, Home Assistant 900. */
 interface SettingsPage {
     val id: String
 
@@ -81,6 +82,12 @@ interface SettingsPage {
     val title: String
     val order: Int
 
+    /** The ids of the sub-pages it holds, so Settings opened on one opens this page (15b Ruling 15). */
+    val opens: Set<String> get() = emptySet()
+
     @Composable
     fun Content()
 }
+
+/** The sub-page Settings was opened on, for the page whose [SettingsPage.opens] holds it; null after its first use (15b Ruling 15). */
+val LocalSettingsStart = staticCompositionLocalOf<String?> { null }

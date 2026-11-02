@@ -10,6 +10,9 @@ data class Authorised(val person: Person, val role: Role, val granted: Set<Strin
 /** Hand-off §7: signed in for 2 minutes after the last authorised action or touch while Settings is open (4a design D5, 4d-2 §6.2). */
 const val SESSION_TIMEOUT_MS = 120_000L
 
+/** 15b §3: while Settings is open its session ends 90 s after the last touch or authorised action. */
+const val SETTINGS_TIMEOUT_MS = 90_000L
+
 /** 4a design D9 (amended): the setup session ends after 10 minutes without a touch in the wizard or an authorised action. */
 const val SETUP_IDLE_MS = 600_000L
 
@@ -94,6 +97,12 @@ interface AccessControl {
      * nothing for a session the wall clock has already ended.
      */
     fun touch(holdForEdits: Boolean = false)
+
+    /**
+     * The signed-in session's length from now on: [SETTINGS_TIMEOUT_MS] while Settings is open, [SESSION_TIMEOUT_MS] once
+     * it closes (15b Ruling 16). Restarts a running session at the new length; the setup session and the edit hold keep theirs.
+     */
+    fun sessionTimeout(millis: Long) {}
 
     /** Ends the session if the wall clock has passed [expiresAt]: its timer stops while the tablet sleeps. On start and resume. */
     fun checkExpiry()

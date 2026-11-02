@@ -48,6 +48,7 @@ import uk.co.siland.culvery.core.ui.HhRadioRow
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 import uk.co.siland.culvery.core.ui.updatedLabel
 
@@ -124,7 +125,7 @@ internal class ShoppingSettingsActions(
 @Composable
 internal fun ShoppingSettings(state: SettingsState, nowMillis: Long, busy: Boolean, actions: ShoppingSettingsActions) {
     val service = state.provider.descriptor.displayName
-    Column(verticalArrangement = Arrangement.spacedBy(ShoppingDimens.settingsGap), modifier = Modifier.testTag("settings_shopping")) {
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("settings_shopping")) {
         HhPageTitle(SHOPPING)
         when (state) {
             is SettingsState.Off -> Off(state, service, busy, actions)
@@ -165,7 +166,7 @@ private fun Choosing(state: SettingsState.ChoosingAccount, service: String, busy
         onChange = { if (it) actions.onUseChosen() }, enabled = state.chosen != null && !busy,
     )
     Text(WHICH_ACCOUNT, style = HhType.body, color = Culvery.colors.ink, modifier = Modifier.testTag("shopping_which"))
-    Column(verticalArrangement = Arrangement.spacedBy(ShoppingDimens.settingsGap), modifier = Modifier.selectableGroup()) {
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.selectableGroup()) {
         state.accounts.forEachIndexed { index, account ->
             HhRadioRow(account, selected = account == state.chosen, tag = "shopping_account_$index", locked = busy) { actions.onChoose(account) }
         }

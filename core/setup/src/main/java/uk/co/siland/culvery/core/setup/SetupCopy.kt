@@ -38,7 +38,7 @@ internal fun noTownsMatch(query: String): String = "No towns match “$query” 
 internal fun townsFound(count: Int): String = if (count == 1) "1 town found" else "$count towns found"
 
 // People (§4.4)
-internal const val ADD_PERSON = "Add person"
+internal const val ADD_PERSON = "Add a person"
 internal const val PIN_SET = "PIN set"
 internal const val NO_PIN = "No PIN"
 internal fun noPinYet(name: String): String = "no PIN yet, so $name can only look"
@@ -124,8 +124,18 @@ internal const val CHANGE_HOME_APP = "Change home app"
 internal const val SETTINGS = "Settings"
 internal const val CLOSE = "Close"
 internal const val HOME_LOCATION = "Home location"
+internal const val HOME_LOCATION_LINE = "Used for the clock’s time zone and the weather. Tap to change."
+
+/** The Home location row before a town is saved (plan). */
+internal const val NO_TOWN_YET = "No town chosen yet"
+
+/** What a tap on the Home location row does, for TalkBack. */
+internal const val CHANGE_HOME_LOCATION = "change the home location"
 internal const val PEOPLE = "People"
 internal const val TABLET_LOCK = "Tablet lock"
+
+/** Tablet lock's status row (15b §6 W29): on while Culvery is the home app. */
+internal fun tabletLockStatus(on: Boolean): String = if (on) "Tablet lock is on" else "Tablet lock is off"
 internal const val USE_OTHER_APPS = "Use other apps"
 internal const val TABLET_LOCK_LINE = "Culvery keeps the tablet on this app. Tap Use other apps to leave it. It locks again when Culvery next opens."
 internal const val HOME_APP_HOW_TO = "If that doesn’t work: tap Use other apps, then choose the home app in Android’s Settings › Apps › Choose default apps › Home app."

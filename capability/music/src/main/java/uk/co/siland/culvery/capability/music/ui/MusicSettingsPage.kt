@@ -64,6 +64,7 @@ import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSliderRow
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.SettingsTokens
 
 private const val TAG = "MusicSettings"
 
@@ -101,7 +102,7 @@ class MusicSettingsActions(
 @Composable
 fun MusicSettingsScreen(ui: MusicSettingsUi, actions: MusicSettingsActions) {
     val c = Culvery.colors
-    Column(verticalArrangement = Arrangement.spacedBy(MusicDimens.settingsGap), modifier = Modifier.testTag("settings_music")) {
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("settings_music")) {
         HhPageTitle(MUSIC)
         HhSectionLabel(SONOS)
         if (ui.status != null) {

@@ -67,6 +67,7 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
@@ -162,6 +163,15 @@ class ReviewCalendarsTest {
         compose.onNodeWithTag("calendars_weeks_12").assertIsNotSelected()
         compose.onNodeWithTag("calendars_weeks_12").performClick()
         assertThat(weeks).isEqualTo(WeeksShown.TWELVE)
+    }
+
+    /** 15b §3: the calendars sit the Settings row gap apart. */
+    @Test
+    fun calendarsAreSevenApart() {
+        show()
+        val first = compose.onNodeWithTag("review_source_family").getBoundsInRoot()
+        val second = compose.onNodeWithTag("review_source_swim").getBoundsInRoot()
+        assertThat((second.top - first.bottom).value).isWithin(0.5f).of(SettingsTokens.rowGap.value)
     }
 
     @Test

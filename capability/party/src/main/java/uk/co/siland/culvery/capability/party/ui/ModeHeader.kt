@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 
 private val ICON_TILE = 64.dp
@@ -36,7 +37,7 @@ fun ModeHeader(icon: String, name: String, onIcon: (() -> Unit)?, onName: (() ->
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(PartyDimens.rowGap),
+        horizontalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap),
         modifier = Modifier.testTag("mode_header"),
     ) {
         Box(

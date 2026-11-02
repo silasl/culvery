@@ -46,7 +46,4 @@ internal object ShoppingDimens {
     val cardColumnGap = 12.dp
     val cardName = 16.sp
     val cardFoot = 13.sp
-
-    // Settings › Shopping: the blocks of the page, as Settings › Calendars spaces its blocks.
-    val settingsGap = 12.dp
 }

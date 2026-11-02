@@ -40,10 +40,11 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.SettingsTokens
 
 private const val TAG = "ModesPage"
 
-/** Settings › Modes (15b §4.1): the list of modes, and the page of the one opened. Between Lights (470) and Other integrations (480). */
+/** Settings › Modes (15b §4.1): the list of modes, and the page of the one opened. Between Lights (470) and Door (500). */
 class ModesPage internal constructor(
     private val store: ModesStore,
     private val controls: ModeControls,
@@ -111,7 +112,7 @@ private fun ModesHost(
         overlay.dismiss()
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(PartyDimens.rowGap), modifier = Modifier.testTag("settings_modes")) {
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("settings_modes")) {
         if (opened == null) {
             val rows = modeRows(p, holiday == true, on, counts)
             ModesList(rows, onOpen = setOpen, onAdd = { overlay.showAddSheet(p, ::add) })

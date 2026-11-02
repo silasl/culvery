@@ -22,8 +22,4 @@ internal object PlugsDimens {
     // The section label's icon.
     val labelIconGap = 8.dp
     val labelIcon = 20.dp
-
-    // Settings › Other integrations › Plugs: a block per plug under the section label, 16 apart as the page's own blocks.
-    val settingsGap = 16.dp
-    val settingsRowGap = 8.dp
 }
