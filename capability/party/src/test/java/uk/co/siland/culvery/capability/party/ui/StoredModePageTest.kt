@@ -154,6 +154,37 @@ class StoredModePageTest {
         assertThat(rig.house.onMode.value).isNull()
     }
 
+    /** 15b M2: fails if Turn on now crashes when the mode's PIN flag is saved between the tap's read and the turn-on. */
+    @Test
+    fun aPinFlagSavedMidTapDoesntCrash() {
+        show(FILM_NIGHT)
+        rig.plugs.onHoldsPin = { rig.settings.update { it.withMode(FILM_ID) { m -> m.copy(needsPin = true) } } }
+
+        tap("mode_turn")
+
+        compose.waitFor { saved().needsPin && rig.house.running.value == null }
+        compose.waitForIdle()
+        assertThat(rig.house.onMode.value).isNull()
+        compose.onNodeWithTag("mode_turn").assertTextEquals("Turn on now")
+    }
+
+    /** 15b M2: fails if a double tap on Turn on now shows a second PIN pad after the first. */
+    @Test
+    fun aDoubleTapAsksForOnePin() {
+        show(PARTY_MODE)
+        val gate = CompletableDeferred<Unit>()
+        rig.access.padGate = gate
+
+        tap("mode_turn")
+        tap("mode_turn")
+        compose.waitForIdle()
+        gate.complete(Unit)
+
+        compose.waitFor { rig.house.onMode.value == "party" }
+        compose.waitForIdle()
+        assertThat(rig.access.asked).hasSize(1)
+    }
+
     // Show on Home
 
     private fun supper() = FILM_NIGHT.copy(id = "modeaaaaaa", name = "Supper")

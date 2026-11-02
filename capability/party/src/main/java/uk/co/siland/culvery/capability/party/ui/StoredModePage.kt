@@ -40,6 +40,7 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.SettingsTokens
+import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "StoredModePage"
 
@@ -81,6 +82,7 @@ internal fun StoredModePage(
         } ?: flowOf(emptyList())
     }.collectAsStateWithLifecycle(emptyList())
     val locked = added.any { it.needsPin }
+    val turn = rememberSingleAction(house) { e -> Log.w(TAG, "A stored mode's page action failed: ${e::class.simpleName}") }
 
     fun save(change: (StoredMode) -> StoredMode) {
         scope.launch {
@@ -89,7 +91,7 @@ internal fun StoredModePage(
     }
 
     HhButton(
-        ModesWords.turnNow(on), { scope.launch { controls.actions.tap(mode.id, sawOn = on) } }, Modifier.testTag("mode_turn"),
+        ModesWords.turnNow(on), { turn.run { controls.actions.tap(mode.id, sawOn = on) } }, Modifier.testTag("mode_turn"),
         tone = ButtonTone.Primary, enabled = running == null && read != null, on = ButtonSurface.Bg,
     )
     refusal?.let { HhStatusLine(it, "mode_turn_line") }

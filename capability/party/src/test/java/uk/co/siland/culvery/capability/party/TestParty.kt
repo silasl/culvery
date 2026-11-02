@@ -183,7 +183,13 @@ internal class FakePlugs(private val trace: Trace = Trace()) : HousePlugs {
         if (forgetThrows) throw IOException("No space left")
     }
 
-    override suspend fun holdsPinPlug(modeId: String) = holdsPin
+    /** Runs as [holdsPinPlug] is read, before it answers. */
+    @Volatile var onHoldsPin: suspend () -> Unit = {}
+
+    override suspend fun holdsPinPlug(modeId: String): Boolean {
+        onHoldsPin()
+        return holdsPin
+    }
 }
 
 internal class FakeMusic(private val trace: Trace = Trace()) : HouseMusic {
