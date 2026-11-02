@@ -106,7 +106,21 @@ On the first start of 15b, with no step for the family to take:
 ## 7. Copy (exact)
 "App settings" · "The home, the people who use the wall, the screen and the lock." · "Modes" · "One tap sets the house up. Each mode can sit on Home and can need a PIN." · "Add a mode" · "Show on Home" · "Needs a PIN" · "Turn on now" / "Turn off now" · "Home has room for 4 modes." · "A plug in this mode needs a PIN." · "Holiday mode always needs a PIN." · "Changes apply the next time {mode} turns on." · "every other light is left alone" · "every other plug is left alone" · "Add a light" · "Add a plug" · "Delete mode" · "Delete {mode}? Its music, lights and plugs choices go too." · "Turn {mode} off first." · "Nothing to do yet. Choose music, lights or plugs in Settings › Modes." · "Home Assistant". Curly apostrophes (’) in copy.
 
-## 8. Left to the builder
+## 8. Taekwondo (throwaway, added by the user 2026-11-02)
+
+A practice aid for ITF patterns, to be removed later. Design matters little; it must be easy to delete whole.
+
+- **Where:** its own module (`:capability:taekwondo`), so removing it means deleting the module and its one registration. No Settings page, no rail tab.
+- **Home:** a "Taekwondo" tray button, half width, after the shown modes. While it exists it takes one of the four half-width spots, so Home has room for 3 modes and the limit copy reads "Home has room for 3 modes." (My call.)
+- **The screen:** tapping the button opens a full-screen overlay titled "Taekwondo", with a Close, and a grid of pattern cards. The first and only card for now is **Choong-Moo**. More cards will follow, each just another pattern's move list.
+- **Detailed mode:** a switch on the Taekwondo screen itself, remembered. (My reading of "no settings".)
+- **A run:** tapping a card starts a 10-second countdown shown large on the screen, then reads the moves in order: the Korean term, then (detailed mode) the one-sentence description, then 3 s of quiet. After the last move, 10 s, then it starts again from the first. It repeats until Cancel or Close. The current move's number, Korean and English show on screen while it's read.
+- **Speech:** Android's text-to-speech. The Korean term is spoken from its Hangul with a Korean voice; if the tablet has no Korean voice, the English voice reads the romanised term. Descriptions use the English voice. Nothing is downloaded by the app.
+- **While running:** the screen stays on and the night clock and sleep don't take over. A doorbell ring stops the run (the door card shows as usual). Settings' timeout doesn't apply; the overlay doesn't close itself while a run is going, and closes after the usual idle time when stopped.
+- **The moves:** a data file in the module, one entry per move: number (or "Start" / "End"), romanised Korean, Hangul, English, description. Choong-Moo's text is the instructor-checked list in `culvery-notes/taekwondo-choong-moo.html` (30 moves plus Start and End). Until the instructor has checked it, the build carries that list as it stands, with step 11's and End's Korean marked to fill in.
+- **No PIN.** Anyone can use it. Nothing is logged but the run starting and stopping.
+
+## 9. Left to the builder
 - How the stored modes are kept (one store of modes replacing `party_settings`, or Party's store widened), so long as §4.4 moves everything and a restart mid-mode still puts back.
 - Where the Modes page and the stored modes' code live (`:capability:party` widened into a modes module is the expectation), and how Holiday's page reaches Holiday lights' choices in `:capability:lights`.
 - The icon grid's exact 12 icons, added to the bundled icon font from the full font in the repo's history (tools/fonts/README.md); no download.
