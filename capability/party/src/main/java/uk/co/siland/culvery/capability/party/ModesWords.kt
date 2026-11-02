@@ -1,5 +1,7 @@
 package uk.co.siland.culvery.capability.party
 
+import uk.co.siland.culvery.core.ui.StateWords
+
 /** The change a mode's tile is making, while neither "on" nor "off" is yet true. */
 enum class ModeRun { TURNING_ON, TURNING_OFF }
 
@@ -37,7 +39,7 @@ object ModesWords {
     fun holidaySummary(on: Boolean, onHome: Boolean): String = pieces(on, builtIn = true, onHome = onHome, pin = true, does = HOLIDAY_DOES)
 
     private fun pieces(on: Boolean, builtIn: Boolean, onHome: Boolean, pin: Boolean, does: String) = listOfNotNull(
-        "On".takeIf { on },
+        StateWords.STATE_ON.takeIf { on },
         "Built in".takeIf { builtIn },
         if (onHome) "On Home" else "Not on Home",
         if (pin) "PIN" else "No PIN",
@@ -84,8 +86,8 @@ object ModesWords {
     const val ADD_LIGHT_TITLE = "Choose a room"
     const val ADD_PLUG_TITLE = "Choose a plug"
     const val SAVE_LIGHT = "Save light"
-    const val LIGHT_ON = "On"
-    const val LIGHT_OFF = "Off"
+    const val LIGHT_ON = StateWords.STATE_ON
+    const val LIGHT_OFF = StateWords.STATE_OFF
     const val SHOW_ON_HOME = "Show on Home"
     const val NEEDS_A_PIN = "Needs a PIN"
     const val HOLIDAY_PIN = "Holiday mode always needs a PIN."

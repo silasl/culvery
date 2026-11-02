@@ -34,6 +34,7 @@ import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.HouseModeDimens
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.StateWords
 
 /** The brightness a room can be set to, in steps of ten (15b §4.2). */
 internal val PERCENTS = (10..100 step 10).toList()
@@ -41,7 +42,7 @@ internal val PERCENTS = (10..100 step 10).toList()
 /** What a chip says of [choice]; a room that can't dim is only ever "On". */
 internal fun lightChip(choice: LightChoice, dimmable: Boolean = true): String = when (choice) {
     is LightChoice.Scene -> "Scene: ${choice.sceneName}"
-    is LightChoice.On -> if (dimmable) "On · ${choice.percent}%" else ModesWords.LIGHT_ON
+    is LightChoice.On -> StateWords.onPercentLabel(choice.percent.takeIf { dimmable })
     LightChoice.Off -> ModesWords.LIGHT_OFF
 }
 

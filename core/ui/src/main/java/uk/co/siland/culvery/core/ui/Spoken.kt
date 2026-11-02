@@ -12,6 +12,15 @@ import androidx.compose.ui.semantics.semantics
  */
 fun Modifier.shownNotSpoken(): Modifier = semantics(mergeDescendants = true) { hideFromAccessibility() }
 
+/** What a light or a mode's light or plug choice says it is. */
+object StateWords {
+    const val STATE_ON = "On"
+    const val STATE_OFF = "Off"
+
+    /** "On · 70%", or "On" with no [percent]. */
+    fun onPercentLabel(percent: Int?) = if (percent == null) STATE_ON else "$STATE_ON · $percent%"
+}
+
 /** "1 minute", "5 minutes". */
 fun plural(count: Long, unit: String): String = if (count == 1L) "1 $unit" else "$count ${unit}s"
 

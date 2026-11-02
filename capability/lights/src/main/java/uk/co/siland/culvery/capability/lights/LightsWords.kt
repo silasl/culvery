@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.lights
 
 import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.plugin.TABLET_OFFLINE
+import uk.co.siland.culvery.core.ui.StateWords
 import uk.co.siland.culvery.core.ui.plural
 
 internal const val LIGHTS = "Lights"
@@ -13,8 +14,8 @@ internal const val HUE_REFUSED = HouseLines.HUE_REFUSED
 internal const val ALL_LIGHTS_OFF = "All lights off"
 internal const val HOLIDAY_LIGHTS = "Holiday lights"
 internal const val ONE_TAP = "One-tap"
-internal const val ON = "On"
-internal const val OFF = "Off"
+internal const val ON = StateWords.STATE_ON
+internal const val OFF = StateWords.STATE_OFF
 internal const val TURNING_ON = "Turning on…"
 internal const val TURNING_OFF = "Turning off…"
 internal const val CANT_REACH_HUE = "Culvery can’t reach the Hue Bridge. Check it’s plugged in and the tablet is on the home Wi-Fi."
@@ -32,11 +33,7 @@ internal const val PRESS_THE_BUTTON = "Press the round button on top of the Hue 
 internal const val NOT_PRESSED_IN_TIME = "The button wasn’t pressed in time. Try again."
 
 /** "On · 70%", "Off", or "On" for a room that can't dim (7 §5.1). */
-internal fun roomState(room: LightRoom): String = when {
-    !room.on -> OFF
-    room.dimmable -> "$ON · ${room.brightness}%"
-    else -> ON
-}
+internal fun roomState(room: LightRoom): String = if (room.on) StateWords.onPercentLabel(room.brightness.takeIf { room.dimmable }) else OFF
 
 /** "2 of 3 rooms on", "1 of 1 room on" (9 §4.4). */
 fun roomsOn(rooms: List<LightRoom>): String = "${rooms.count { it.on }} of ${plural(rooms.size.toLong(), "room")} on"
