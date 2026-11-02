@@ -115,7 +115,10 @@ class IconFontTest {
         /** `icon = "…"`, `icon: String = "…"`, `TOAST_ICON_INFO = "…"`, and the like. */
         val ICON_LITERAL = Regex("""(?i)icon\w*(?:\s*:\s*String\??)?\s*[=:]\s*"([a-z0-9_]+)"""")
 
-        /** Glyphs the full font has no filled alternate for, so FILL fills them through the variation alone. */
+        /**
+         * Glyphs the full font has no filled alternate for. Some fill through the FILL axis alone (pets,
+         * self_improvement); fitness_center and restaurant have no FILL axis deltas either, so they stay outlined.
+         */
         val NO_FILLED_FORM: Set<String> = setOf(
             "add", "arrow_downward", "arrow_forward", "arrow_upward", "check", "chevron_left", "chevron_right",
             "close", "directions_walk", "expand_less", "expand_more", "fitness_center", "keyboard_arrow_down", "music_note", "pets",

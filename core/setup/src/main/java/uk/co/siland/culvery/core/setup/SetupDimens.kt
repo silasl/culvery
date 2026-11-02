@@ -1,10 +1,10 @@
 package uk.co.siland.culvery.core.setup
 
-import uk.co.siland.culvery.core.ui.ListRowTokens
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.ListRowTokens
 
 /** Layout values for the wizard and Settings (4a design §4), named once; those the spec doesn't give say so. */
 internal object SetupDimens {

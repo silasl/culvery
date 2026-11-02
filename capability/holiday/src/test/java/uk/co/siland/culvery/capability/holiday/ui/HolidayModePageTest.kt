@@ -32,6 +32,8 @@ import uk.co.siland.culvery.capability.holiday.HolidayActions
 import uk.co.siland.culvery.capability.holiday.HouseRig
 import uk.co.siland.culvery.capability.holiday.TestAccess
 import uk.co.siland.culvery.capability.holiday.TestSwitch
+import uk.co.siland.culvery.core.access.test.FakeAccess
+import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.household.Role
@@ -62,8 +64,8 @@ class HolidayModePageTest {
     private fun show(
         role: Role? = Role.ADULT,
         lights: Set<HolidayLightsSection> = emptySet(),
-        others: Set<uk.co.siland.culvery.core.house.HouseModeSwitch> = emptySet(),
-    ): uk.co.siland.culvery.core.access.test.FakeAccess {
+        others: Set<HouseModeSwitch> = emptySet(),
+    ): FakeAccess {
         val access = TestAccess(role)
         val page = HolidayModePage(HolidayActions(access, rig.house, null, others, { HouseRig.TODAY }), rig.house, lights)
         compose.setContent {
