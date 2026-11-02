@@ -23,6 +23,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.HouseModeTurnButton
+import uk.co.siland.culvery.core.ui.HouseModeTurnLine
 import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
@@ -40,17 +41,21 @@ class HolidayModePage @Inject constructor(
     @Composable
     override fun TurnButton() {
         val record by house.record.collectAsState()
-        val houseLine by house.line.collectAsState()
-        val refusal by actions.refusal.line.collectAsState(initial = actions.refusal.current())
         val running by house.running.collectAsState()
         val overlay = LocalOverlayHost.current
         val action = rememberSingleAction(house) { e -> Log.w(TAG, "Holiday mode turn button action failed: ${e::class.simpleName}") }
-        val on = record?.on == true
         HouseModeTurnButton(
-            turnNowLabel(on),
+            turnNowLabel(record?.on == true),
             { action.run { actions.toggle { by -> overlay.show { HolidaySheetHost(by, actions, house, overlay::dismiss) } } } },
-            read = record != null, running = running != null, line = refusal ?: houseLine,
+            read = record != null, running = running != null,
         )
+    }
+
+    @Composable
+    override fun TurnLine() {
+        val houseLine by house.line.collectAsState()
+        val refusal by actions.refusal.line.collectAsState(initial = actions.refusal.current())
+        HouseModeTurnLine(refusal ?: houseLine)
     }
 
     @Composable

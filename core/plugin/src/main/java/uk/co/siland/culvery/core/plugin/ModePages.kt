@@ -7,9 +7,13 @@ import androidx.compose.ui.Modifier
 interface BuiltInModePage {
     val modeId: String
 
-    /** "Turn on now" or "Turn off now", running the mode's own flow (Holiday's sheet asks the day you're back). */
+    /** "Turn on now" or "Turn off now" at the end of the page's head, running the mode's own flow (Holiday's sheet asks the day you're back). */
     @Composable
     fun TurnButton()
+
+    /** What the turn button didn't do, under the page's head. */
+    @Composable
+    fun TurnLine()
 
     /** What sits between the switches and Plugs: Holiday's Lights while away and its fixed lines. */
     @Composable

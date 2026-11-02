@@ -56,6 +56,9 @@ private val FAKE_HOLIDAY = object : BuiltInModePage {
     override fun TurnButton() = Text("Turn on now", Modifier.testTag("holiday_fake_turn"))
 
     @Composable
+    override fun TurnLine() = Unit
+
+    @Composable
     override fun Sections() = Text("Lights while away", Modifier.testTag("holiday_fake_sections"))
 }
 

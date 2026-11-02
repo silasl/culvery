@@ -123,12 +123,11 @@ private fun ModesHost(
         } else {
             HhBackLink(ModesWords.BACK_TO_MODES, "modes_back") { setOpen(null) }
             if (opened == null) {
-                ModeHeader(Icons.BEACH_ACCESS, ModesWords.HOLIDAY_NAME, onIcon = null, onName = null)
                 HolidayPage(p, homeRoom, controls, builtIn.firstOrNull { it.modeId == HouseModes.HOLIDAY }, plugs, store, toaster)
             } else {
                 val others = p.modes.filter { it.id != opened.id }.map { it.name }
-                ModeHeader(
-                    ModeIcons.drawn(opened.icon), opened.name,
+                StoredModePage(
+                    opened, p, homeRoom, controls, plugs, store, toaster,
                     onIcon = {
                         overlay.show {
                             ModeIconSheet(ModeIcons.drawn(opened.icon), onSave = { icon -> save(opened.id) { it.copy(icon = icon) } }, onClose = overlay::dismiss)
@@ -140,7 +139,6 @@ private fun ModesHost(
                         }
                     },
                 )
-                StoredModePage(opened, p, homeRoom, controls, plugs, store, toaster)
             }
         }
     }

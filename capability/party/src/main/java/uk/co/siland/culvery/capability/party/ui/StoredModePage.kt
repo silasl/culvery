@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import uk.co.siland.culvery.capability.party.ModeIcons
 import uk.co.siland.culvery.capability.party.ModesPrefs
 import uk.co.siland.culvery.capability.party.ModesStore
 import uk.co.siland.culvery.capability.party.ModesWords
@@ -38,6 +39,7 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HouseModeTurnButton
+import uk.co.siland.culvery.core.ui.HouseModeTurnLine
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "StoredModePage"
@@ -52,7 +54,7 @@ internal class ModeControls(
 )
 
 /**
- * A stored mode's page below its header (15b §4.2): Turn on now, Show on Home and Needs a PIN, then music, lights and
+ * A stored mode's page (15b §4.2): its head with Turn on now, Show on Home and Needs a PIN, then music, lights and
  * plugs, then Delete mode. [room] is how many modes Home has room for, null until it is read. Each change is written at once.
  */
 @Composable
@@ -64,6 +66,8 @@ internal fun StoredModePage(
     plugs: HousePlugs?,
     store: ModesStore,
     toaster: Toaster,
+    onIcon: () -> Unit,
+    onName: () -> Unit,
 ) {
     val change = rememberCoroutineScope().saving(toaster, logSave)
     val house = controls.house
@@ -79,10 +83,10 @@ internal fun StoredModePage(
 
     fun save(transform: (StoredMode) -> StoredMode) = change { store.update { it.withMode(mode.id, transform) } }
 
-    HouseModeTurnButton(
-        turnNowLabel(on), { turn.run { controls.actions.tap(mode.id, sawOn = on) } },
-        read = read != null, running = running != null, line = refusal,
-    )
+    ModeHeader(ModeIcons.drawn(mode.icon), mode.name, onIcon, onName) {
+        HouseModeTurnButton(turnNowLabel(on), { turn.run { controls.actions.tap(mode.id, sawOn = on) } }, read = read != null, running = running != null)
+    }
+    HouseModeTurnLine(refusal)
     if (on) Line(ModesWords.appliesNext(mode.name), "mode_applies_line")
 
     ModeSwitches(

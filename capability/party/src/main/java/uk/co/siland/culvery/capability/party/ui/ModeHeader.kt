@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,16 +30,28 @@ private val ICON_TILE = 64.dp
 private val ICON_SIZE = 32.dp
 
 /**
- * A mode's page head (15b §4.2): its [icon] and [name]. With [onIcon] and [onName] a tap on either changes it; a header
- * given neither, Holiday mode's, has nothing to tap.
+ * A mode's page head (15b §4.2): its [icon] and [name], then [trailing] at the far end. With [onIcon] and [onName] a tap
+ * on either changes it; a header given neither, Holiday mode's, has nothing to tap.
  */
 @Composable
-fun ModeHeader(icon: String, name: String, onIcon: (() -> Unit)?, onName: (() -> Unit)?) {
+fun ModeHeader(icon: String, name: String, onIcon: (() -> Unit)?, onName: (() -> Unit)?, trailing: @Composable () -> Unit = {}) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        ModeTitle(icon, name, onIcon, onName, Modifier.weight(1f))
+        trailing()
+    }
+}
+
+@Composable
+private fun ModeTitle(icon: String, name: String, onIcon: (() -> Unit)?, onName: (() -> Unit)?, modifier: Modifier) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap),
-        modifier = Modifier.testTag("mode_header"),
+        modifier = modifier.testTag("mode_header"),
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -55,6 +68,7 @@ fun ModeHeader(icon: String, name: String, onIcon: (() -> Unit)?, onName: (() ->
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
+                .weight(1f, fill = false)
                 .testTag("mode_header_name")
                 .then(if (onName != null) Modifier.hhClickable(onName, label = ModesWords.renameMode(name)) else Modifier)
                 .heightIn(min = ButtonTokens.regularHeight),

@@ -18,12 +18,13 @@ import uk.co.siland.culvery.core.plugin.BuiltInModePage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.ui.HhSwitchRow
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.SettingsTokens
 
 private const val TAG = "HolidayPage"
 
 /**
- * Holiday mode's page below its header (15b §4.2): its own Turn on now, Show on Home and a Needs a PIN switch that is held
+ * Holiday mode's page (15b §4.2): its head with its own Turn on now, Show on Home and a Needs a PIN switch that is held
  * on, then its own sections, then Plugs. It cannot be renamed, given music or deleted. [page] is null in a build without Holiday.
  */
 @Composable
@@ -39,7 +40,8 @@ internal fun HolidayPage(
     val change = rememberCoroutineScope().saving(toaster, logSave)
     val place by remember { controls.place(HouseModes.HOLIDAY) }.collectAsStateWithLifecycle(null)
 
-    page?.TurnButton()
+    ModeHeader(Icons.BEACH_ACCESS, ModesWords.HOLIDAY_NAME, onIcon = null, onName = null) { page?.TurnButton() }
+    page?.TurnLine()
     ModeSwitches(
         home = {
             ShowOnHomeSwitch(prefs.holidayOnHome, place, room, prefs) { on -> change { store.update { it.copy(holidayOnHome = on) } } }

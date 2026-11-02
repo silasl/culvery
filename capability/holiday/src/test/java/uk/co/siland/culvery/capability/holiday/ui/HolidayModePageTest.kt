@@ -73,6 +73,7 @@ class HolidayModePageTest {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Column {
                         page.TurnButton()
+                        page.TurnLine()
                         page.Sections()
                         overlay.content?.invoke()
                     }

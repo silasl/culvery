@@ -154,6 +154,9 @@ class StoredModeScreenshotTest {
             override fun TurnButton() = HhButton("Turn on now", {}, tone = ButtonTone.Primary, on = ButtonSurface.Bg)
 
             @Composable
+            override fun TurnLine() = Unit
+
+            @Composable
             override fun Sections() = HhSectionLabel("Lights while away")
         }
         val overlay = TestOverlay()

@@ -59,6 +59,7 @@ class HolidayModePageScreenshotTest {
             CompositionLocalProvider(LocalOverlayHost provides TestOverlay()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.widthIn(max = 720.dp)) {
                     page.TurnButton()
+                    page.TurnLine()
                     page.Sections()
                 }
             }
