@@ -20,12 +20,10 @@ import uk.co.siland.culvery.capability.lights.Automation
 import uk.co.siland.culvery.capability.lights.Bridges
 import uk.co.siland.culvery.capability.lights.HOLIDAY_JUST_LIGHTS
 import uk.co.siland.culvery.capability.lights.LightsSettings
-import uk.co.siland.culvery.capability.lights.LightsSystem
 import uk.co.siland.culvery.capability.lights.NO_AUTOMATIONS
 import uk.co.siland.culvery.capability.lights.SET_UP_HUE_FOR_AWAY
 import uk.co.siland.culvery.core.plugin.HolidayLightsSection
 import uk.co.siland.culvery.core.plugin.Toaster
-import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhChoiceChip
@@ -54,7 +52,7 @@ internal fun LightsHolidayHost(settings: LightsSettings, bridges: Bridges, toast
     val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a lights setting (${it::class.simpleName})") }
     LaunchedEffect(system) {
         automations = null
-        automations = system?.let { readBridge(it) }
+        automations = system?.let { s -> readBridge(s, BridgeReader.HOLIDAY_PAGE) { s.automations() } }
     }
     val p = prefs ?: return
     if (system == null) {
@@ -90,13 +88,4 @@ internal fun HolidayChoice(
         }
     }
     if (ticked.isEmpty()) Text(HOLIDAY_JUST_LIGHTS, style = HhType.body, color = c.mute, modifier = modifier.testTag("lights_holiday_note"))
-}
-
-/** No check runs while only Settings shows, and the choices need the automations. */
-private suspend fun readBridge(system: LightsSystem): List<Automation>? = attempt({
-    system.readAll()
-    system.automations()
-}) { e ->
-    Log.w(TAG, "Couldn't read the bridge for Holiday mode's page (${e::class.simpleName})")
-    null
 }

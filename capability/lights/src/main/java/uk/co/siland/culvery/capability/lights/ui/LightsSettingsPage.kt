@@ -203,7 +203,7 @@ internal fun LightsSettingsHost(
         val s = system
         if (s != null) {
             findLine = null
-            readBridge(s)
+            readBridge(s, BridgeReader.SETTINGS) {}
         }
     }
     val p = prefs ?: return
@@ -299,9 +299,19 @@ internal fun LightsSettingsHost(
     )
 }
 
-/** No check runs while only Settings shows, and the choices need the rooms. */
-private suspend fun readBridge(system: LightsSystem) {
-    attempt({ system.readAll() }) { e -> Log.w(TAG, "Couldn't read the bridge for Settings (${e::class.simpleName})") }
+/** Which page reads the bridge, so its log line says so. */
+internal enum class BridgeReader { SETTINGS, HOLIDAY_PAGE }
+
+/** No check runs while only Settings shows, so a page that needs the rooms or automations reads the bridge, then [then]; null when that fails. */
+internal suspend fun <T> readBridge(system: LightsSystem, reader: BridgeReader, then: suspend () -> T): T? = attempt({
+    system.readAll()
+    then()
+}) { e ->
+    when (reader) {
+        BridgeReader.SETTINGS -> Log.w(TAG, "Couldn't read the bridge for Settings (${e::class.simpleName})")
+        BridgeReader.HOLIDAY_PAGE -> Log.w(TAG, "Couldn't read the bridge for Holiday mode's page (${e::class.simpleName})")
+    }
+    null
 }
 
 /** The pairing in progress: its job, and the sheet that is its own (null once closed or replaced). */
