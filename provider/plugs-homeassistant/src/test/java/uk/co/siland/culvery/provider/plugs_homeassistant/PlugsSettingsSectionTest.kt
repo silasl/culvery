@@ -29,7 +29,7 @@ import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 
-/** 12 §4.2: the Plugs block Settings › Other integrations asks the Home Assistant provider for. */
+/** 12 §4.2: the Plugs block Settings › Home Assistant asks the Home Assistant provider for. */
 @RunWith(AndroidJUnit4::class)
 class PlugsSettingsSectionTest {
     @get:Rule val compose = createComposeRule()

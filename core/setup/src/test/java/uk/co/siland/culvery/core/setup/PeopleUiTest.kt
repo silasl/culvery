@@ -91,6 +91,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.setup.pages.LocationPage
+import uk.co.siland.culvery.core.setup.steps.LocationStep
 import uk.co.siland.culvery.core.setup.steps.HouseholdStep
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
@@ -516,6 +517,36 @@ class PeopleUiTest {
         }
         compose.setContent { CulveryTheme(dark = true) { Column { LocationPage(household, noTowns, access.control).Content() } } }
         assertThat(compose.onNode(isHeading() and hasText(HOME_LOCATION)).textLayout().layoutInput.style.fontSize).isEqualTo(37.sp)
+    }
+
+    /** 15b §3: the Home location sub-page lists towns the Settings row gap apart; the wizard keeps its own 12. */
+    @Test
+    fun townsSitTheSettingsGapApartOnlyInSettings() {
+        val towns = object : LocationSearch {
+            override suspend fun search(query: String) = listOf(
+                PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London"),
+                PlaceMatch("Brighton", "Brighton", "New Zealand", -45.95, 170.33, "Pacific/Auckland"),
+            )
+        }
+        var inSettings by mutableStateOf(true)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Column {
+                    if (inSettings) LocationPage(household, towns, access.control).Content() else LocationStep(household, towns, access.control).Content(onNext = {})
+                }
+            }
+        }
+        fun gap(): Float {
+            compose.onNodeWithTag("location_query").performTextInput("Brigh")
+            compose.awaitTag("place_1")
+            val first = compose.onNodeWithTag("place_0").getUnclippedBoundsInRoot()
+            val second = compose.onNodeWithTag("place_1").getUnclippedBoundsInRoot()
+            return (second.top - first.bottom).value
+        }
+        assertThat(gap()).isWithin(0.5f).of(7f)
+        inSettings = false
+        compose.waitForIdle()
+        assertThat(gap()).isWithin(0.5f).of(12f)
     }
 
     @Test

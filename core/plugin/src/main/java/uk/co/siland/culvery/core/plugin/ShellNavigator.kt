@@ -13,13 +13,13 @@ interface ShellNavigator {
     /** Opens Settings, asking for a PIN if needed, on [page] (one of [SettingsPageIds]) or the first page. */
     fun openSettings(page: String? = null)
 
-    /** Settings › Tablet lock (4a design §4.7): Use other apps, after a fresh Admin PIN. */
+    /** Settings › App settings › Tablet lock (4a design §4.7): Use other apps, after a fresh Admin PIN. */
     fun exitKiosk()
 
-    /** The wizard's Done step and Settings › Tablet lock (4c §5.1): asks Android to make Culvery the home app (the open session). */
+    /** The wizard's Done step and Settings › App settings › Tablet lock (4c §5.1): asks Android to make Culvery the home app (the open session). */
     fun chooseHomeApp()
 
-    /** Settings › Tablet lock (4c §5.1): opens the home-app setting to go back to another launcher, after a fresh Admin PIN. */
+    /** Settings › App settings › Tablet lock (4c §5.1): opens the home-app setting to go back to another launcher, after a fresh Admin PIN. */
     fun changeHomeApp()
 
     /**

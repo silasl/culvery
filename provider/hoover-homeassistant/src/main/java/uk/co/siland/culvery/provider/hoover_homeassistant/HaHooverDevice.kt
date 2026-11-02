@@ -10,7 +10,7 @@ import uk.co.siland.culvery.capability.hoover.hooverStatus
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantDevice
 
-/** The Hoover picker in Settings › Other integrations (11 §4.1). */
+/** The Hoover picker in Settings › Home Assistant (11 §4.1). */
 @Singleton
 class HaHooverDevice @Inject constructor(
     ha: HomeAssistant,

@@ -42,7 +42,7 @@ import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
-/** What Settings › Tablet lock or the Done step asked of Android (4c §5.1). */
+/** What Settings › App settings › Tablet lock or the Done step asked of Android (4c §5.1). */
 enum class HomeAppRequest { CHOOSE, CHANGE }
 
 /** One of Android's screens asked for through [ShellNavigator.openSystemScreen], after the PIN. */

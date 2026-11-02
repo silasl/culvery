@@ -124,13 +124,16 @@ internal const val CHANGE_HOME_APP = "Change home app"
 internal const val SETTINGS = "Settings"
 internal const val CLOSE = "Close"
 internal const val HOME_LOCATION = "Home location"
-internal const val HOME_LOCATION_LINE = "Used for the clock’s time zone and the weather. Tap to change."
+/** Under the Home location row: Tap to choose until a town is saved, Tap to change after. */
+internal fun homeLocationLine(chosen: Boolean): String =
+    "Used for the clock’s time zone and the weather. " + if (chosen) "Tap to change." else "Tap to choose."
 
 /** The Home location row before a town is saved (plan). */
 internal const val NO_TOWN_YET = "No town chosen yet"
 
 /** What a tap on the Home location row does, for TalkBack. */
 internal const val CHANGE_HOME_LOCATION = "change the home location"
+internal const val CHOOSE_HOME_LOCATION = "choose the home location"
 internal const val PEOPLE = "People"
 internal const val TABLET_LOCK = "Tablet lock"
 

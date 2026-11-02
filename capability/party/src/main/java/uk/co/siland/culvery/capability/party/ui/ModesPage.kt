@@ -156,20 +156,22 @@ private fun OverlayHost.showAddSheet(prefs: ModesPrefs, onAdd: (String, String) 
     AddModeSheet(prefs.modes.map { it.name }, onAdd, onClose = ::dismiss)
 }
 
-/** The page's title, the rows, then the dashed "Add a mode". */
+/** The page's title, the rows, then the dashed "Add a mode", the Settings row gap apart. */
 @Composable
 fun ModesList(rows: List<ModeRowUi>, onOpen: (String) -> Unit, onAdd: () -> Unit) {
-    HhPageTitle(ModesWords.PAGE_TITLE, ModesWords.PAGE_LINE)
-    rows.forEach { row ->
-        HhListRow(
-            row.name, Modifier.testTag("mode_row_${row.id}"),
-            leading = { HhIcon(row.icon) },
-            subtitle = row.summary,
-            trailing = { HhIcon(Icons.CHEVRON_RIGHT) },
-            onClick = { onOpen(row.id) }, clickLabel = ModesWords.openMode(row.name),
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap)) {
+        HhPageTitle(ModesWords.PAGE_TITLE, ModesWords.PAGE_LINE)
+        rows.forEach { row ->
+            HhListRow(
+                row.name, Modifier.testTag("mode_row_${row.id}"),
+                leading = { HhIcon(row.icon) },
+                subtitle = row.summary,
+                trailing = { HhIcon(Icons.CHEVRON_RIGHT) },
+                onClick = { onOpen(row.id) }, clickLabel = ModesWords.openMode(row.name),
+            )
+        }
+        HhAddRow(ModesWords.ADD_MODE, "modes_add", onAdd)
     }
-    HhAddRow(ModesWords.ADD_MODE, "modes_add", onAdd)
 }
 
 /** How many plugs each of [ids] switches; 0 while unread, with no plug system, or when a read fails. */

@@ -13,12 +13,13 @@ import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.setup.CHANGE_HOME_LOCATION
+import uk.co.siland.culvery.core.setup.CHOOSE_HOME_LOCATION
 import uk.co.siland.culvery.core.setup.HOME_LOCATION
-import uk.co.siland.culvery.core.setup.HOME_LOCATION_LINE
 import uk.co.siland.culvery.core.setup.LocationPane
 import uk.co.siland.culvery.core.setup.LocationSearch
 import uk.co.siland.culvery.core.setup.NO_TOWN_YET
 import uk.co.siland.culvery.core.setup.PlaceMatch
+import uk.co.siland.culvery.core.setup.homeLocationLine
 import uk.co.siland.culvery.core.setup.toHome
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -45,10 +46,10 @@ class LocationPage @Inject constructor(
             HhListRow(
                 current?.name ?: NO_TOWN_YET,
                 Modifier.testTag("app_home_location"),
-                subtitle = HOME_LOCATION_LINE,
+                subtitle = homeLocationLine(chosen = current != null),
                 trailing = { HhIcon(Icons.CHEVRON_RIGHT, size = ListRowTokens.icon, tint = Culvery.colors.mute) },
                 onClick = onOpen,
-                clickLabel = CHANGE_HOME_LOCATION,
+                clickLabel = if (current != null) CHANGE_HOME_LOCATION else CHOOSE_HOME_LOCATION,
             )
         }
     }
@@ -57,7 +58,7 @@ class LocationPage @Inject constructor(
     fun Content() {
         val current by household.location.collectAsState(initial = null)
         HhPageTitle(HOME_LOCATION)
-        LocationPane(search, current, showCurrent = true, save = ::saveHome)
+        LocationPane(search, current, showCurrent = true, rowGap = SettingsTokens.rowGap, save = ::saveHome)
     }
 
     internal suspend fun saveHome(place: PlaceMatch): Boolean {

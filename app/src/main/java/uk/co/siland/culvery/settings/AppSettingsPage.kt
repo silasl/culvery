@@ -10,9 +10,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
 import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.LocalSettingsStart
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -75,7 +77,14 @@ class AppSettingsPage @Inject constructor(
         display.Rows { open = it }
         Box(Modifier.bringIntoViewRequester(sections.getValue(SettingsPageIds.TABLET_LOCK))) { TabletLockSection(homeApp) }
         LaunchedEffect(Unit) {
-            scrollTo?.let { sections.getValue(it).bringIntoView() }
+            scrollTo?.let { target ->
+                // People and Display grow as their data arrives; scroll once that has been laid out.
+                people.members.first()
+                display.awaitRead()
+                withFrameNanos {}
+                withFrameNanos {}
+                sections.getValue(target).bringIntoView()
+            }
             scrollTo = null
         }
     }

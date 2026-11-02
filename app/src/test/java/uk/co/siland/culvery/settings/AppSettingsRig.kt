@@ -59,9 +59,9 @@ internal class AppSettingsRig(dir: File) {
         DisplaySections(display, CameraAccess({ true }, { false }, display, io), SunToday(null, io), RecordingToaster(), SeasonalThemes(MutableStateFlow(null), flowOf(defaultSeasonDates()), io)),
     )
 
-    /** Brighton, and Alex, Sam and Mia. */
-    fun household() = runBlocking {
-        household.setLocation(HomeLocation("Brighton", 50.82838, -0.13947, "Europe/London"))
+    /** Brighton unless [town] is false, and Alex, Sam and Mia. */
+    fun household(town: Boolean = true) = runBlocking {
+        if (town) household.setLocation(HomeLocation("Brighton", 50.82838, -0.13947, "Europe/London"))
         pins.addPerson("Alex", PersonPalette.colors[0], Role.ADMIN, "1234")
         pins.addPerson("Sam", PersonPalette.colors[1], Role.ADULT, "2468")
         pins.addPerson("Mia", PersonPalette.colors[2], Role.CHILD, null)
@@ -74,7 +74,7 @@ internal class AppSettingsRig(dir: File) {
 }
 
 /** Waits for what App settings reads from Room and DataStore, or for a sub-page's own first read. */
-internal fun ComposeContentTestRule.awaitAppSettings() = waitFor {
-    listOf(hasTestTag("person_Mia"), hasText("Night clock", substring = true), hasText("Brighton")).all { onAllNodes(it).fetchSemanticsNodes().isNotEmpty() } ||
+internal fun ComposeContentTestRule.awaitAppSettings(town: String = "Brighton") = waitFor {
+    listOf(hasTestTag("person_Mia"), hasText("Night clock", substring = true), hasText(town)).all { onAllNodes(it).fetchSemanticsNodes().isNotEmpty() } ||
         onAllNodes(hasTestTag("app_back")).fetchSemanticsNodes().isNotEmpty()
 }

@@ -17,7 +17,7 @@ import uk.co.siland.culvery.capability.plugs.PlugPrefs
 import uk.co.siland.culvery.capability.plugs.PlugsWords
 import uk.co.siland.culvery.core.ui.test.snap
 
-/** Settings › Other integrations › Plugs (12 §4.2). */
+/** Settings › Home Assistant › Plugs (12 §4.2). */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlugsSettingsScreenshotTest {

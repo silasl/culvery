@@ -4,10 +4,10 @@ import java.util.Locale
 import uk.co.siland.culvery.capability.heating.HeatingState
 import uk.co.siland.culvery.core.plugin.CHECKING
 
-const val GONE_THERMOSTAT = "Home Assistant has no thermostat called that any more. Choose it again in Settings › Other integrations."
+const val GONE_THERMOSTAT = "Home Assistant has no thermostat called that any more. Choose it again in Settings › Home Assistant."
 const val THERMOSTAT_UNREACHABLE = "Home Assistant can’t reach the thermostat. Check the Nest integration."
 const val NO_THERMOSTAT = "Home Assistant has no thermostat."
-const val NO_THERMOSTAT_CHOSEN = "No thermostat is chosen. Choose one in Settings › Other integrations."
+const val NO_THERMOSTAT_CHOSEN = "No thermostat is chosen. Choose one in Settings › Home Assistant."
 const val THERMOSTAT_REFUSED = "The thermostat didn’t change. Check the Nest integration."
 const val THERMOSTAT = "Thermostat"
 

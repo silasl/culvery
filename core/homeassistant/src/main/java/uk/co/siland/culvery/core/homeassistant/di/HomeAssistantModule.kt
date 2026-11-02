@@ -21,11 +21,11 @@ abstract class HomeAssistantModule {
     @Binds
     abstract fun api(impl: HomeAssistantClient): HomeAssistantApi
 
-    // With no provider bound, Settings › Other integrations shows no pickers.
+    // With no provider bound, Settings › Home Assistant shows no pickers.
     @Multibinds
     abstract fun devices(): Set<HomeAssistantDevice>
 
-    // With no provider bound, Settings › Other integrations shows no extra sections.
+    // With no provider bound, Settings › Home Assistant shows no extra sections.
     @Multibinds
     abstract fun sections(): Set<HomeAssistantSection>
 

@@ -29,7 +29,7 @@ class EntityChoice(val id: String, val name: String) {
 }
 
 /**
- * Check on Settings › Other integrations (11 §4.1): the address by the rule, `GET /api/` with the token, then a fresh
+ * Check on Settings › Home Assistant (11 §4.1): the address by the rule, `GET /api/` with the token, then a fresh
  * Admin PIN before a different link is saved; the first of each kind found alone is chosen.
  */
 @Singleton

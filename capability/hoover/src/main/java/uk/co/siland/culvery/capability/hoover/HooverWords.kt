@@ -9,7 +9,7 @@ const val STARTING = "Starting…"
 const val CLEANING_WORD = "Cleaning"
 const val NOT_STARTED = "The hoover didn’t start. Check the Eufy app."
 const val STUCK = "Stuck. Check the Eufy app."
-const val NO_HOOVER_CHOSEN = "No hoover is chosen. Choose one in Settings › Other integrations."
+const val NO_HOOVER_CHOSEN = "No hoover is chosen. Choose one in Settings › Home Assistant."
 
 private fun HooverActivity.word() = when (this) {
     HooverActivity.DOCKED -> "Docked"

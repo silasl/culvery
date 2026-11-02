@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -183,10 +184,13 @@ fun HhRadioRow(title: String, line: String? = null, selected: Boolean, tag: Stri
     }
 }
 
-/** The [HhRadioRow]s of one question: [RadioRowTokens.gap] apart and read together as a group. */
+/** The gap between a group's [HhRadioRow]s; Settings provides [SettingsTokens.rowGap] (15b §3). */
+val LocalRadioGap = staticCompositionLocalOf { RadioRowTokens.gap }
+
+/** The [HhRadioRow]s of one question: [LocalRadioGap] apart and read together as a group. */
 @Composable
 fun HhRadioGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = modifier.selectableGroup(), content = content)
+    Column(verticalArrangement = Arrangement.spacedBy(LocalRadioGap.current), modifier = modifier.selectableGroup(), content = content)
 }
 
 /** A time with Earlier and Later buttons, half an hour a step; [subject] completes their spoken names. */

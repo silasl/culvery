@@ -115,7 +115,7 @@ internal const val DONE = "done"
 internal const val NOT_DONE_YET = "not done yet"
 internal const val CAPTURE_LINE = "Writes each notification’s details to the tablet’s log for 30 minutes, so Culvery can learn to read them."
 internal const val NOTIFICATION_ACCESS_MISSING =
-    "Culvery can’t open notification access. Choose Settings › Tablet lock › Use other apps, then allow Culvery in the tablet’s Settings › Notifications."
+    "Culvery can’t open notification access. Choose Settings › App settings › Tablet lock › Use other apps, then allow Culvery in the tablet’s Settings › Notifications."
 
 private val DAY_LABEL: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.UK)
 

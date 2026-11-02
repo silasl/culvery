@@ -8,7 +8,7 @@ import uk.co.siland.culvery.capability.plugs.PlugSystem
 import uk.co.siland.culvery.capability.plugs.ui.PlugsSettingsHost
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantSection
 
-/** Plugs under the device pickers in Settings › Other integrations (12 §4.2); nothing without a plug system. */
+/** Plugs under the device pickers in Settings › Home Assistant (12 §4.2); nothing without a plug system. */
 class PlugsSettingsSection @Inject constructor(
     systems: Set<@JvmSuppressWildcards PlugSystem>,
     private val actions: PlugActions,

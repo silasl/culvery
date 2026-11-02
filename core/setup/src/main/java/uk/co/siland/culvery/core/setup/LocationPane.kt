@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.household.HomeLocation
@@ -59,12 +60,18 @@ private fun HomeLocation?.isAt(place: PlaceMatch): Boolean =
 /**
  * 4a design §4.3: the town search and its results, the saved home ticked. A new query cancels the search before it, and
  * with it the request. It says "Searching…" through the pause and the request, and a failed search offers Try again.
- * [showCurrent] (Settings) lists the saved home above the field. [save] stores the chosen town and says whether it did;
+ * [showCurrent] (Settings) lists the saved home above the field; [rowGap] spaces the towns (Settings passes its own). [save] stores the chosen town and says whether it did;
  * if it throws, the pane says it couldn't save and keeps the results to try again. A town that saved fills the field
  * with its name and closes the list (one choice).
  */
 @Composable
-internal fun LocationPane(search: LocationSearch, current: HomeLocation?, showCurrent: Boolean, save: suspend (PlaceMatch) -> Boolean) {
+internal fun LocationPane(
+    search: LocationSearch,
+    current: HomeLocation?,
+    showCurrent: Boolean,
+    rowGap: Dp = SetupDimens.rowGap,
+    save: suspend (PlaceMatch) -> Boolean,
+) {
     var query by rememberSaveable { mutableStateOf("") }
     var chosen by rememberSaveable { mutableStateOf<String?>(null) }
     var retries by rememberSaveable { mutableStateOf(0) }
@@ -98,7 +105,7 @@ internal fun LocationPane(search: LocationSearch, current: HomeLocation?, showCu
         query = q
         saveFailed = false
     }
-    LocationContent(query, onQuery, results, current, showCurrent, action.busy, saveFailed, onRetry = { retries++ }) { place ->
+    LocationContent(query, onQuery, results, current, showCurrent, action.busy, saveFailed, onRetry = { retries++ }, rowGap = rowGap) { place ->
         saveFailed = false
         action.run {
             if (save(place)) {
@@ -119,6 +126,7 @@ internal fun LocationContent(
     busy: Boolean,
     saveFailed: Boolean = false,
     onRetry: () -> Unit = {},
+    rowGap: Dp = SetupDimens.rowGap,
     onChoose: (PlaceMatch) -> Unit,
 ) {
     val c = Culvery.colors
@@ -142,7 +150,7 @@ internal fun LocationContent(
             HhButton(TRY_AGAIN, onRetry, Modifier.testTag("location_retry"), on = ButtonSurface.Bg)
         }
         if (results is TownResults.Found) {
-            Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.rowGap)) {
+            Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
                 results.places.forEachIndexed { i, place ->
                     PlaceRow(place.label, ticked = current.isAt(place), tag = "place_$i", onClick = if (busy) null else ({
                         // Choosing ends the typing, so the keyboard goes too.

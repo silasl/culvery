@@ -45,7 +45,7 @@ import uk.co.siland.culvery.core.ui.test.waitFor
 private val LAMP_CANDIDATE = PlugCandidate(LAMP, "Lamp")
 private val FAN_CANDIDATE = PlugCandidate(FAN, "Fan")
 
-/** 12 §4.2: Settings › Other integrations › Plugs: which plugs show on the tab and which need a PIN to switch. */
+/** 12 §4.2: Settings › Home Assistant › Plugs: which plugs show on the tab and which need a PIN to switch. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlugsSettingsHostTest {

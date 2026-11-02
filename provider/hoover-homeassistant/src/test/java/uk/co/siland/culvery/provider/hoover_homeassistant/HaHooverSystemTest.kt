@@ -270,7 +270,7 @@ class HaHooverSystemTest {
         val system = system()
         assertThat(system.start()).isEqualTo(HooverResult.Failed(GONE_HOOVER))
         assertThat(system.start().let { it as HooverResult.Failed }.line)
-            .isEqualTo("Home Assistant has no hoover called that any more. Choose it again in Settings › Other integrations.")
+            .isEqualTo("Home Assistant has no hoover called that any more. Choose it again in Settings › Home Assistant.")
         api.states["vacuum.hoover"] = vacuum("unavailable")
         assertThat(system.start()).isEqualTo(HooverResult.Failed("Home Assistant can’t reach the hoover. Check the Eufy app."))
         assertThat(api.calls.none { it.startsWith("service") }).isTrue()

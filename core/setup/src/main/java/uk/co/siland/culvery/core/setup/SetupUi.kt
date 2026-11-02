@@ -23,7 +23,7 @@ internal fun OnNewRefusal(owner: Any, count: Int, act: suspend () -> Unit) {
     LaunchedEffect(owner, count) { if (count > seen) act() }
 }
 
-/** 4c design §5.1: shown while Culvery isn't the home app, in the wizard's Done step and Settings › Tablet lock. */
+/** 4c design §5.1: shown while Culvery isn't the home app, in the wizard's Done step and Settings › App settings › Tablet lock. */
 @Composable
 internal fun HomeAppPrompt(onChoose: () -> Unit, tone: ButtonTone) {
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.homeAppPromptGap)) {

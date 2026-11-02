@@ -77,7 +77,7 @@ private val NOTHING_LINKED = OtherIntegrationsUi(
     linked = false, status = null, checking = false, checkLine = null, devices = emptyList(),
 )
 
-/** 11 §4.1, §6: Settings › Other integrations: the address and the token, Check, and the two pickers. */
+/** 11 §4.1, §6: Settings › Home Assistant: the address and the token, Check, and the two pickers. */
 @RunWith(AndroidJUnit4::class)
 class OtherIntegrationsTest {
     @get:Rule val compose = createComposeRule()
@@ -336,7 +336,7 @@ class OtherIntegrationsTest {
     @Test
     fun aLinkWideProblemIsNotRepeatedUnderTheDevices() {
         oneOfEach()
-        val sentence = "Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Other integrations."
+        val sentence = "Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Home Assistant."
         hoover.lineText.value = sentence
         thermostat.lineText.value = sentence
         api.failAll = HaProblem.TOKEN_REFUSED

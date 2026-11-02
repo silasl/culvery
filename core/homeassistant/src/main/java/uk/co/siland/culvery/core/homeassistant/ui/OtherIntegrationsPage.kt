@@ -171,7 +171,7 @@ private fun DevicePicker(device: DeviceUi, showLine: Boolean, onChoose: (String,
 }
 
 /**
- * Settings › Other integrations with its data. The token lives in this composition only (plain `remember`, so it is
+ * Settings › Home Assistant with its data. The token lives in this composition only (plain `remember`, so it is
  * never saved with the screen's state) and is cleared once linked; the pickers read Home Assistant's entities as
  * the page opens and after each Linked Check.
  */

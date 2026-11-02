@@ -2,7 +2,7 @@ package uk.co.siland.culvery.core.homeassistant
 
 import kotlinx.coroutines.flow.Flow
 
-/** A kind of device Settings › Other integrations offers a picker for (11 §4.1), bound by its provider. */
+/** A kind of device Settings › Home Assistant offers a picker for (11 §4.1), bound by its provider. */
 interface HomeAssistantDevice {
     val order: Int
     /** The picker's label: "Hoover", "Thermostat". */

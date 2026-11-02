@@ -49,6 +49,8 @@ import uk.co.siland.culvery.capability.lights.ui.LightsSettingsUi
 import uk.co.siland.culvery.capability.music.ui.MusicSettingsActions
 import uk.co.siland.culvery.capability.music.ui.MusicSettingsScreen
 import uk.co.siland.culvery.capability.music.ui.MusicSettingsUi
+import uk.co.siland.culvery.capability.party.ui.ModeRowUi
+import uk.co.siland.culvery.capability.party.ui.ModesList
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.HomeCard
@@ -109,6 +111,7 @@ private val DOOR_ACTIONS = DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {
 private val LIGHTS_UI = LightsSettingsUi(true, null, null, false, emptyList(), null, emptySet(), 0)
 private val MUSIC_UI = MusicSettingsUi(true, null, null, false, emptyList(), null, 50)
 private val MUSIC_ACTIONS = MusicSettingsActions({}, {}, {}, {})
+private val MODE_ROWS = listOf(ModeRowUi("holiday", "beach_access", "Holiday mode", "Off"), ModeRowUi("party", "celebration", "Party", "Off"))
 
 @RunWith(AndroidJUnit4::class)
 class SetupWiringTest {
@@ -265,7 +268,7 @@ class SetupWiringTest {
         }
     }
 
-    /** 15b §3: inside the real Settings, each page's labels are 12 sp and its rows 7 dp apart. */
+    /** 15b §3: inside the real Settings, each page's labels are 12 sp and its rows, radio rows too, 7 dp apart. */
     @Test
     fun labelsAndGapsOnEveryPage() {
         val rig = AppSettingsRig(folder.root)
@@ -273,8 +276,10 @@ class SetupWiringTest {
         val cases = listOf(
             Gaps(rig.page, "Display", "app_display_display", "app_display_seasonal"),
             Gaps(Wrapped("door") { DoorSettingsScreen(DOOR_UI, DOOR_ACTIONS) }, "Doorbell sound", "door_from", "door_until"),
+            Gaps(Wrapped("door") { DoorSettingsScreen(DOOR_UI, DOOR_ACTIONS) }, "Doorbell sound", "door_doorbell_follow", "door_doorbell_classic"),
             Gaps(Wrapped("lights") { LightsSettingsPage(LIGHTS_UI, {}, {}, {}, {}) }, "Hue Bridge", "lights_connection", "lights_find"),
             Gaps(Wrapped("music") { MusicSettingsScreen(MUSIC_UI, MUSIC_ACTIONS) }, "Sonos", "music_connection", "music_find"),
+            Gaps(Wrapped("modes") { ModesList(MODE_ROWS, onOpen = {}, onAdd = {}) }, null, "mode_row_holiday", "mode_row_party"),
             Gaps(
                 Wrapped("other_integrations") { OtherIntegrations(OtherIntegrationsUi(false, null, false, null, emptyList()), "", {}, "", {}, {}, { _, _ -> }) },
                 "Home Assistant", "ha_address", "ha_token",
@@ -292,7 +297,7 @@ class SetupWiringTest {
             cases.forEachIndexed { i, case ->
                 showing = i
                 compose.waitFor { compose.onAllNodes(hasTestTag(case.below)).fetchSemanticsNodes().isNotEmpty() }
-                assertThat(compose.onNode(isHeading() and hasContentDescription(case.label)).fontSize()).isEqualTo(12.sp)
+                case.label?.let { assertThat(compose.onNode(isHeading() and hasContentDescription(it)).fontSize()).isEqualTo(12.sp) }
                 val above = compose.onNodeWithTag(case.above).getUnclippedBoundsInRoot()
                 val below = compose.onNodeWithTag(case.below).getUnclippedBoundsInRoot()
                 assertThat((below.top - above.bottom).value).isWithin(0.5f).of(SettingsTokens.rowGap.value)
@@ -302,7 +307,8 @@ class SetupWiringTest {
         }
     }
 
-    private class Gaps(val page: SettingsPage, val label: String, val above: String, val below: String)
+    /** [label] is null for a page with no section label (Modes). */
+    private class Gaps(val page: SettingsPage, val label: String?, val above: String, val below: String)
 
     private class Wrapped(override val id: String, private val content: @Composable () -> Unit) : SettingsPage {
         override val title = id

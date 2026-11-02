@@ -46,6 +46,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.LocalRadioGap
 import uk.co.siland.culvery.core.ui.LocalSectionLabelStyle
 import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.readAsOne
@@ -123,7 +124,11 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap),
                     modifier = Modifier.widthIn(max = SetupDimens.settingsPane).testTag("settings_pane"),
                 ) {
-                    CompositionLocalProvider(LocalSectionLabelStyle provides SettingsTokens.sectionLabel, LocalSettingsStart provides start) {
+                    CompositionLocalProvider(
+                        LocalSectionLabelStyle provides SettingsTokens.sectionLabel,
+                        LocalRadioGap provides SettingsTokens.rowGap,
+                        LocalSettingsStart provides start,
+                    ) {
                         page?.Content()
                     }
                 }

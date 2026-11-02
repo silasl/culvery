@@ -28,6 +28,8 @@ import java.time.LocalTime
 import java.time.MonthDay
 import java.time.YearMonth
 import javax.inject.Inject
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.ShellNavigator
@@ -124,6 +126,11 @@ class DisplaySections @Inject constructor(
     private val toaster: Toaster,
     private val themes: SeasonalThemes,
 ) {
+    /** Returns once the saved settings are read, so [Rows] has its summary and full height. */
+    suspend fun awaitRead() {
+        settings.read.filterNotNull().first()
+    }
+
     /** The DISPLAY section; [onOpen] gets [DISPLAY_PAGE_ID] or [SEASONAL_PAGE_ID]. */
     @Composable
     fun Rows(onOpen: (String) -> Unit) {

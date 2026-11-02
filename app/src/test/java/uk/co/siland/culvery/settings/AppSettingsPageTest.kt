@@ -2,6 +2,7 @@ package uk.co.siland.culvery.settings
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
@@ -43,14 +44,14 @@ class AppSettingsPageTest {
     @After
     fun tearDown() = rig.close()
 
-    private fun show(start: String? = null) {
-        rig.household()
+    private fun show(start: String? = null, town: Boolean = true) {
+        rig.household(town)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator, LocalOverlayHost provides TestOverlay(), LocalSettingsStart provides start) {
                 CulveryTheme(dark = true) { Box { InSettingsPane { rig.page.Content() } } }
             }
         }
-        compose.awaitAppSettings()
+        compose.awaitAppSettings(if (town) "Brighton" else "No town chosen yet")
     }
 
     /** Fails if the page's id, name, place in the list or sub-pages change, or it isn't bound into Settings. */
@@ -86,6 +87,15 @@ class AppSettingsPageTest {
         compose.onNodeWithTag("app_back").assertTextEquals("App settings")
         compose.onNode(isHeading() and hasText("Home location")).assertExists()
         compose.onNodeWithTag("location_current").assertExists()
+    }
+
+    /** 15b §3: before a town is saved the row says so, and that a tap chooses one. */
+    @Test
+    fun noTownYetSaysTapToChoose() {
+        show(town = false)
+        compose.onNodeWithTag("app_home_location")
+            .assertTextEquals("No town chosen yet", "Used for the clock’s time zone and the weather. Tap to choose.")
+        compose.onNodeWithText("Tap to change.", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -149,6 +159,16 @@ class AppSettingsPageTest {
     fun aStartOnASectionOpensTheMainPage() {
         show(start = "kiosk")
         compose.onNodeWithTag("app_back").assertDoesNotExist()
-        compose.onNodeWithTag("tablet_lock_status").assertExists()
+        // Scrolled to Tablet lock: the page's title has gone above the top, and the status row is on screen.
+        compose.waitForIdle()
+        assertThat(compose.onNode(isHeading() and hasText("App settings")).getUnclippedBoundsInRoot().top.value).isLessThan(0f)
+        compose.onNodeWithTag("tablet_lock_status").assertIsDisplayed()
+    }
+
+    @Test
+    fun withNoStartThePageOpensAtTheTop() {
+        show()
+        compose.waitForIdle()
+        assertThat(compose.onNode(isHeading() and hasText("App settings")).getUnclippedBoundsInRoot().top.value).isAtLeast(0f)
     }
 }

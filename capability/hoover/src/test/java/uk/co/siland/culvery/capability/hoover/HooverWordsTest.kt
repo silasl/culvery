@@ -75,7 +75,7 @@ class HooverWordsTest {
     fun theWordsAreCopys() {
         assertThat(listOf(HOOVER, START, START_SPOKEN, STARTING, NOT_STARTED, STUCK, NO_HOOVER_CHOSEN)).containsExactly(
             "Hoover", "Start", "Start cleaning", "Starting…", "The hoover didn’t start. Check the Eufy app.",
-            "Stuck. Check the Eufy app.", "No hoover is chosen. Choose one in Settings › Other integrations.",
+            "Stuck. Check the Eufy app.", "No hoover is chosen. Choose one in Settings › Home Assistant.",
         ).inOrder()
     }
 

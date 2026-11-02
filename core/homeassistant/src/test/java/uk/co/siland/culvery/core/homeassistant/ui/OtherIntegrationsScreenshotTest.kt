@@ -22,7 +22,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.homeassistant.EntityChoice
 import uk.co.siland.culvery.core.ui.test.snap
 
-/** Settings › Other integrations as Settings shows it, beside the 320 dp page list. */
+/** Settings › Home Assistant as Settings shows it, beside the 320 dp page list. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w1280dp-h1000dp-land-hdpi")

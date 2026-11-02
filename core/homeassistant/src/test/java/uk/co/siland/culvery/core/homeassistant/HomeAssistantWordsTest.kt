@@ -13,14 +13,14 @@ class HomeAssistantWordsTest {
         assertThat(problemLine(HaProblem.REFUSED)).isEqualTo(unreachable)
         assertThat(problemLine(HaProblem.OFFLINE)).isEqualTo("The tablet is offline. Check the Wi-Fi.")
         assertThat(problemLine(HaProblem.TOKEN_REFUSED))
-            .isEqualTo("Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Other integrations.")
+            .isEqualTo("Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Home Assistant.")
         assertThat(problemLine(HaProblem.BLOCKED))
             .isEqualTo("Home Assistant has blocked the tablet. Unblock its address in Home Assistant.")
     }
 
     @Test
     fun notLinkedSaysWhereToLinkIt() {
-        assertThat(NOT_LINKED).isEqualTo("Home Assistant isn’t linked. Link it in Settings › Other integrations.")
+        assertThat(NOT_LINKED).isEqualTo("Home Assistant isn’t linked. Link it in Settings › Home Assistant.")
     }
 
     /** Fails if the order changes: the link's problem first, then a gone entity, then an unreachable one. */

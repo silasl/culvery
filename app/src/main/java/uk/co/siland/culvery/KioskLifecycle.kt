@@ -38,10 +38,10 @@ internal interface KioskWindow {
  */
 internal fun isHomeTask(intent: Intent?): Boolean = intent?.hasCategory(Intent.CATEGORY_HOME) == true
 
-/** Told when the home-app choice was declined or never shown (4c §5.1); Settings › Tablet lock says how to do it (4d-2 §7.8). */
+/** Told when the home-app choice was declined or never shown (4c §5.1); Settings › App settings › Tablet lock says how to do it (4d-2 §7.8). */
 internal const val HOME_APP_NOT_SET = "Culvery isn’t the home app yet."
 
-/** Told when Change home app finds no screen to open; Settings › Tablet lock says where else to change it. */
+/** Told when Change home app finds no screen to open; Settings › App settings › Tablet lock says where else to change it. */
 internal const val HOME_APP_SCREEN_MISSING = "Culvery can’t open the home app setting."
 
 /**

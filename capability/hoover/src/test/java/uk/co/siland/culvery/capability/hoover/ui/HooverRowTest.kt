@@ -47,7 +47,7 @@ import uk.co.siland.culvery.core.ui.test.OneTapTray
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 
-private const val TOKEN_LINE = "Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Other integrations."
+private const val TOKEN_LINE = "Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Home Assistant."
 private const val NOT_STARTED_LINE = "The hoover didn’t start. Check the Eufy app."
 
 /** 11 §4.4, §4.6: the Hoover row in the One-tap tray, its Start behind a fresh PIN. */
