@@ -15,6 +15,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-02-culvery-15b-settings-and-modes-design.md`. Read it with this plan; it is the binding authority. The source of truth for what was agreed is `culvery-notes/culvery-design-review-2026-10-30/changes.md` ("Settings" 1–3, 5, 6). Handoff: `docs/design/2026-10-redesign/handoff.md`. Earlier specs: 11 (`2026-10-26-…-hoover-heating-holiday`), 12 (`2026-10-27-…-smart-plugs`), 13 (`2026-10-29-…-party-mode`). **Follow-ups:** `docs/superpowers/plans/2026-09-23-plan1-followups.md` (Task 12 updates it).
 
+**Plan review (2026-11-02):** three reviewers (security and state; buildability; tests and simplicity). The user ruled:
+- Switching Needs a PIN off needs only the Settings session (U1).
+- The deprecated `onError(String)` override is approved (U2).
+- 90 s is for Settings alone (U3).
+- W34 applies to every Settings page (U4).
+
+Everything else is folded in below.
+
 **Builds on:** branch `plan-15b-settings-modes` at f2e841cd (the spec), in the one checkout `C:\Users\si\code\siland\culvery`. No worktrees. Never push. File and line references were read at f2e841cd. Subagents use `C:/t9` for scratch, and never point Gradle's temp folder at a long path.
 
 | # | Task | Review |
@@ -64,8 +72,8 @@
   - "Brightness and night", "Seasonal looks", "Scene: {scene}", "On · {n}%", "Off", "‹ Modes", "‹ App settings", "Lower music on a ring to"
   - Use curly apostrophes (’) in copy. The one exception is the Taekwondo move text (Task 10), which is carried exactly as in `culvery-notes/taekwondo-choong-moo.html`.
 - **Copy this plan rules (not in §7), each marked "(plan)" where used:** Task 5's name problems and its summary pieces, Task 7's fixed Holiday lines, Task 8's summaries, Task 9's Shopping line. A reviewer checks them against the copy rules in `~/.claude/CLAUDE.md` (actions keep their name; errors say how to fix).
-- **Logs.** No personal data in logs: only exception class names, as in the existing `Log.w(TAG, "… (${e::class.simpleName})")`. A mode is named in a log only as "Holiday" or "a stored mode" (§5); never a mode's, person's, room's or plug's name, and never a stored mode's id. A new log line or TAG means running `.\gradlew.bat -p build-logic :convention:test` (LogHygieneTest).
-- **No deprecated APIs** without asking the user first. Stop and report any you meet. Task 10 has a known one.
+- **Logs.** No personal data in logs: only exception class names, as in the existing `Log.w(TAG, "… (${e::class.simpleName})")`. A mode is named in a log only as "Holiday" or "a stored mode" (§5); never a mode's, person's, room's or plug's name, and never a stored mode's id. Every task runs `.\gradlew.bat -p build-logic :convention:test` before its commit (LogHygieneTest, ModuleBoundariesTest). `LogHygieneTest.kt:39-56` pins source file names, and `NoBackupTest.kt:66-71` pins Party's file path. A task that renames or deletes a pinned file updates the pin in the same commit. `LogHygiene.ALLOWED` gains `own.logName` and loses `own.modeName` and `this.modeId` (Task 1).
+- **No deprecated APIs** without asking the user first. Stop and report any you meet. One is already approved (U2): Task 10 overrides `UtteranceProgressListener.onError(String)` next to `onError(String, Int)`.
 - **Commits** are plain sentences with no trailers: no Co-Authored-By, no Signed-off-by.
 - **Dependencies.** No new libraries, fonts or sounds. Icons come only from the full font in git history, by `tools/fonts/README.md` (Task 5). Adding an existing library or project to another module's `build.gradle.kts` is allowed. `ModuleBoundariesTest` must keep passing: no capability depends on another.
 - **Devices.** Never switch a real light, plug or speaker. Hue and Sonos are read-only.
@@ -79,7 +87,10 @@
 ## Review Focus
 
 1. **Party mode on while the update installs.** The move runs with the record on and lights saved in the pre-15b six-field form. Party stays on, its tile shows ON, and turning it off still puts the music, plugs and every room back. Tested in Task 3 (the store) and Task 4 (the turn-off).
-2. **A plug locked after a no-PIN mode was tapped.** The plug is set to need a PIN between the tap's check and `begin`, or between `begin` and a retried `enter`. The plug isn't switched by that run, and the line says the plugs didn't all switch. Tested in Task 1.
+2. **A plug locked after a no-PIN mode was tapped.** The plug is set to need a PIN between the tap's check and `begin`, or between `begin` and a retried `enter`:
+   - The plug isn't switched by that run, and the line says the plugs didn't all switch.
+   - A locked plug the run still holds makes turning off ask for a PIN, even after the plug was taken out of the mode (S1).
+   - Tested in Tasks 1 and 4.
 3. **More modes marked Show on Home than Home has room for.** For example, four shown and then Taekwondo's spot is bound, or Holiday is switched back on to Home with four stored modes shown. Home shows only the first that fit, in list order, and the page's switch for any mode not placed reads off and disabled with the room line. Tested in Task 4 (`ModeShelf`) and Task 6.
 4. **Names that are nearly the same.** "  party MODE ", "Holiday Mode", 24 versus 25 characters, a name of spaces only, a name holding the store's field separator or a line break. Each is refused with its line, or trimmed and kept. Tested in Task 5.
 5. **Deleting an off mode whose last turn-off threw on the plugs.** The plug store still holds a run for it. Delete puts those plugs back before the choices go, and a later mode can't inherit the run. Tested in Task 1 (`forget`) and Task 6.
@@ -100,12 +111,12 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
        class Wall(val modeId: String) : ModeGrant
    }
    ```
-   `fun ModeGrant.allows(modeId: String): Boolean`: a person needs `modePermission(modeId)` in `by.granted`, and the wall's `modeId` must be the mode's own. Neither `toString` prints a person or an id.
-4. **The plug store guards the wall.** A `Wall` run's snapshot leaves out every plug in `needsPin`. Its `ModeRun` carries `wall = true` (key `wall.{mode}`), and each `enter` drops any pending plug that has come to need a PIN. `leave` stays grant-free: it only puts back. This holds anti-goal 1 even when a plug is locked mid-run.
-5. **The move is an in-file DataStore migration**, `PartyMove : DataMigration<Preferences>`, on the same `party_settings` file. It runs before the first read, and its write is one atomic file replace. So a restart during the move either finds the old keys (and moves again) or the new ones (§4.4's last point). `shouldMigrate` is "no `modes` key". A fresh install therefore gets Party mode too, with nothing to do. `settingsDataStore` gains `migrations: List<DataMigration<Preferences>> = emptyList()`.
+   `fun ModeGrant.allows(modeId: String): Boolean`: a person needs `modePermission(modeId)` in `by.granted`, and the wall's `modeId` must be the mode's own. The wall never allows `HouseModes.HOLIDAY`: `Wall`'s constructor `require`s it isn't Holiday's (decision 7). Neither `toString` prints a person or an id.
+4. **The plug store guards the wall.** A `Wall` run's snapshot leaves out every plug in `needsPin`. Its `ModeRun` carries `wall = true` (key `wall.{mode}`), and each `enter` drops any pending plug that has come to need a PIN. `leave` itself takes no grant. Instead, the tap's PIN rule counts plugs the run still holds (Ruling 14), so putting back a locked plug always follows a PIN (S1). This holds anti-goal 1 even when a plug is locked mid-run.
+5. **The move is an in-file DataStore migration**, `PartyMove : DataMigration<Preferences>`, on the same `party_settings` file. It runs before the first read, and its write is one atomic file replace. So a restart during the move either finds the old keys (and moves again) or the new ones (§4.4's last point). `shouldMigrate` is "no `modes` key". A fresh install therefore gets Party mode too, with nothing to do. `migrate` never throws: a bad old entry is skipped, so the move can't loop at every start. `ModesStore` always writes the `modes` key, as `""` when no stored mode is left, and drops blank ids on read. `record.mode` is one of `RECORD_KEYS`. `settingsDataStore` gains `migrations: List<DataMigration<Preferences>> = emptyList()`.
 6. **Nothing else moves.** The plug store's `mode.party` and `mode.holiday` entries already are the added plugs with On or Off: Ignore was never stored (`PlugPrefs.with`). Holiday lights' automations stay in `lights_settings` (`holidayAutomations`), and only their page moves (Task 7).
 7. **A stored mode's id** is `"mode"` plus six random letters `a–z`, which fits `isModeId` (`^[a-z]+$`, `PlugSettings.kt:26`). It is drawn again on a clash with any stored id, `holiday`, `party` or `stored`. Party keeps `party`.
-8. **One `HouseModeSwitch` for every stored mode.** It has `modeId = HouseModes.STORED = "stored"` and `isOn` true while any stored mode is on. `modeName` is a getter for the on mode's name, so Holiday's `ModeRefusal` says "Turn Film night off first." The switch interface gains `val logName: String` ("Holiday", "a stored mode"). `ModeRefusal.kt:45` and `ModePlugs`' four lines log `logName`, never `modeName` or the id. Between two stored modes, `StoredModeActions` makes the same refusal itself.
+8. **One `HouseModeSwitch` for every stored mode.** It has `modeId = HouseModes.STORED = "stored"` and `isOn` true while any stored mode is on. `modeName` is a getter for the on mode's name, so Holiday's `ModeRefusal` says "Turn Film night off first." The switch interface gains `val logName: String` ("Holiday", "a stored mode"). `ModeRefusal.kt:45` and `ModePlugs`' four lines log `logName`, never `modeName` or the id. Between two stored modes, `StoredModeActions` makes the same refusal itself. Every turn-on checks one-at-a-time twice: before the PIN, and again after it, through `refusal.turnOnUnlessRefused`, as `PartyActions.kt:36` does today (S2).
 9. **Room choices replace scene choices in `:core:house`.**
    ```kotlin
    sealed interface LightChoice {
@@ -117,7 +128,7 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
    data class RoomChoice(val roomId: String, val roomName: String, val choice: LightChoice)
    ```
    `SceneChoice` goes. `RoomBefore` swaps `sceneId` for `choice: LightChoice`. `HouseLights.partyOptions/partyBefore/partyOn/partyBack` become `lightOptions/modeBefore/modeOn/modeBack`. Each `toString` hides ids and names.
-10. **"Changed by hand" reads the bridge only (§4.3):** Scene: the active scene isn't the mode's (today's rule). On n%: the room is off, or more than 5 points from n. Off: the room is on. `setBrightness` already turns a room on (`HueSystem.kt:151-159`).
+10. **"Changed by hand" reads the bridge only (§4.3):** Scene: the active scene isn't the mode's (today's rule). On n%: the room is off, or more than 5 points from n. Off: the room is on. A room that isn't `dimmable` is offered only "On" (stored as `On(100)`), and for it "still as left" is just `room.on` (S5). `setBrightness` already turns a room on (`HueSystem.kt:151-159`).
 11. **The tray's spots.** `trayRows` returns exactly `TRAY_ROWS` rows. Half-width buttons fill row 1 and then row 3, two to a row, in placement order. Full-width buttons fill row 2, then any row still empty. So with three modes: modes 1–2 / Hoover / mode 3 (decision 3). A row with no cell draws as an empty, outline-less spacer. Mode buttons have orders 10–13 by place, and Taekwondo 90.
 12. **`ModeShelf` (in `:core:house`) places the modes.** It is bound by the party module and read by Holiday:
     ```kotlin
@@ -126,26 +137,43 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
         fun place(modeId: String): Flow<Int?>
     }
     ```
-    The room is `4 − reservations`, where `interface TrayReservation` (`:core:plugin`) is a `@Multibinds` set that Taekwondo adds to. Shown modes past the room get no place. `HouseModule` declares `@BindsOptionalOf ModeShelf`. With none bound, Holiday shows as today.
+    The room is 4 less the tray's half-width buttons that aren't modes. `ModesShelf` counts them from the capabilities' `trayButtons()`, skipping ids starting `mode.` and `holiday.mode`. No new extension point is added for Taekwondo (T5). Shown modes past the room get no place. `HouseModule` declares `@BindsOptionalOf ModeShelf`. With none bound, Holiday shows as today.
 13. **Holiday's page parts are Compose seams in `:core:plugin`.** `BuiltInModePage` is bound by holiday and drawn by Modes. `HolidayLightsSection` is bound by lights and drawn inside Holiday's part. Each consumer declares the `@Multibinds` set, as `LightsTabSection` does (15a Ruling 4).
-14. **Plugs on a mode's page** go through `HousePlugs`. The party module draws them: `options()`, `added(modeId)`, `choose(modeId, plugId, on: Boolean?)` and `forget(modeId)`. `PlugActions.setChoice` and `PlugsPermissions.MANAGE` are deleted (decision 8: Settings' Admin session is the gate). Choosing a plug that needs a PIN also writes the mode's `needsPin = true` (decision 6). The tap's rule is `mode.needsPin || added.any { it.needsPin }`, so a plug locked later on the Home Assistant page counts too.
-15. **A sub-page is a page's own state.** `SettingsPage` gains `val opens: Set<String> get() = emptySet()`, the sub-page ids it holds. `SettingsScreen` opens the page whose `id` is `initialPage` or whose `opens` holds it, and provides `LocalSettingsStart` (`:core:plugin`, `staticCompositionLocalOf<String?> { null }`) so that page opens that sub-page. `openSettings(SettingsPageIds.LOCATION)` from the weather header (`WeatherHeaderItem.kt:48`) therefore lands on App settings › Home location. App settings sits in `:app` (`app/.../settings/`), because Display lives there. `LocationPage`, `PeoplePage`, `KioskPage` and `DisplayPage` stop being bound `@IntoSet SettingsPage`.
-16. **90 s is the session's clock.** Settings closes when the session ends (`ShellViewModel.kt:185`), so `SESSION_TIMEOUT_MS` becomes `90_000L`. `OVERLAY_IDLE_MS` and `EDIT_HOLD_MS` stay. A PIN session started outside Settings ends after 90 s too. Nothing reads it outside Settings but the next authorise, and every mode and plug permission is fresh-PIN anyway.
-17. **W34's section labels.** The handoff's 18 px/700 with 1.5 px letter-spacing is 12 sp with 1 sp. `HhSectionLabel` reads `LocalSectionLabelStyle` (default `HhType.sectionLabel`, unchanged off Settings). `SettingsScreen` provides `SettingsTokens.sectionLabel` over the pane. Rows already clear 84 px (`ListRowTokens.minHeight` 69 dp > 56 dp). The new pages (App settings, Modes, a mode's page) space rows `SettingsTokens.rowGap = 7.dp`. Older pages keep their inner gaps until the walk-through says otherwise.
-18. **Taekwondo's spot and staying awake.** A full-screen overlay already holds the wall awake (`holding(…, sheetShowing = overlay.isShowing, …)`, `SetupWiring.kt:89`). So the night clock and sleep stay away with no new code. `OverlayHost` gains `fun keepOpen(on: Boolean) = Unit`, which `OverlayState` maps to `closesWhenIdle`. A doorbell ring stops the run through an `AlertQuieter` whose `quiet()` stops it and returns false (it turned nothing down).
+14. **Plugs on a mode's page** go through `HousePlugs`. The party module draws them: `options()`, `added(modeId)`, `choose(modeId, plugId, on: Boolean?)` and `forget(modeId)`. `PlugActions.setChoice` and `PlugsPermissions.MANAGE` are deleted (decision 8: Settings' Admin session is the gate). Choosing a plug that needs a PIN also writes the mode's `needsPin = true` (decision 6). The tap's rule is `mode.needsPin || added.any { it.needsPin } || plugs.holdsPinPlug(modeId)`. So a plug locked later on the Home Assistant page counts, and so does a locked plug the run still holds (in its notes or pending) after it was taken out of the mode (S1). A plug store that can't be read answers "needs a PIN". Switching Needs a PIN off needs only the Settings session (U1).
+15. **A sub-page is a page's own state.** `SettingsPage` gains `val opens: Set<String> get() = emptySet()`, the sub-page ids it holds. `SettingsScreen` opens the page whose `id` is `initialPage` or whose `opens` holds it, and provides `LocalSettingsStart` (`:core:plugin`, `staticCompositionLocalOf<String?> { null }`) so that page opens that sub-page. It is cleared after its first use, so leaving for Calendars and coming back lands on App settings' top. `openSettings(SettingsPageIds.LOCATION)` from the weather header (`WeatherHeaderItem.kt:48`) therefore lands on App settings › Home location. App settings sits in `:app` (`app/.../settings/`), because Display lives there. `LocationPage`, `PeoplePage`, `KioskPage` and `DisplayPage` stop being bound `@IntoSet SettingsPage`.
+16. **90 s is Settings' own clock (U3).**
+    - `SESSION_TIMEOUT_MS` stays 120 s for every other PIN session. `SETTINGS_TIMEOUT_MS = 90_000L` is added beside it.
+    - `AccessControl` gains `fun sessionTimeout(millis: Long)`. `ShellViewModel` sets it to `SETTINGS_TIMEOUT_MS` while Settings is open and back to `SESSION_TIMEOUT_MS` when it closes.
+    - `restartExpiry`'s default reads the current value, so a touch in Settings restarts 90 s.
+    - Settings closes as the session ends (`ShellViewModel.kt:185`), and the 20 s warning counts down from `expiresAt` as today.
+    - The edit hold (`EDIT_HOLD_MS`) still wins while a sheet has unsaved changes. `OVERLAY_IDLE_MS` stays.
+17. **W34 on every Settings page (U4).**
+    - **Labels:** the handoff's 18 px/700 with 1.5 px letter-spacing is 12 sp with 1 sp. `HhSectionLabel` reads `LocalSectionLabelStyle` (default `HhType.sectionLabel`, unchanged off Settings). `SettingsScreen` provides `SettingsTokens.sectionLabel` over the pane.
+    - **Rows:** at least 84 px (56 dp). `ListRowTokens.minHeight` is already 69 dp, so no row changes height.
+    - **Gaps:** 10 px (7 dp) between rows. `SettingsTokens.rowGap = 7.dp` replaces each page's own row gap on Calendars, Shopping, Music, Lights, Door, Home Assistant, App settings and its sub-pages, Modes and a mode's page, and the plugs and Party blocks.
+    - **Re-records:** Task 8 re-records every Settings page's screenshots (Ruling 21).
+18. **Taekwondo's spot and staying awake.** A full-screen overlay already holds the wall awake (`holding(…, sheetShowing = overlay.isShowing, …)`, `SetupWiring.kt:89`). So the night clock and sleep stay away with no new code. `OverlayHost` gains a member `fun keepOpen(on: Boolean) {}`, which `OverlayState` maps to `closesWhenIdle`. It is reset to closing when idle each time the overlay is dismissed or replaced. Any door alert stops the run, quiet or loud. `AlertHost` gains `val shown: StateFlow<Boolean>`, which `ShellAlerts.shown` (`ShellOverlays.kt:97`) already is. The Taekwondo screen collects `LocalAlertHost.current.shown` and stops the run when it turns true. No `AlertQuieter` is used, because a quiet alert never calls one.
 19. **The People rows two to a row keep Move up and Move down.** TalkBack reads them left to right, top to bottom, as the list's order. `ADD_PERSON` becomes "Add a person" everywhere, the wizard included, drawn as the dashed add row.
-20. **The Taekwondo text is carried exactly**, straight apostrophes included ("opponent's", "Yi's"), because the user asked for the file's text exactly. Hangul for step 11 and End is `null` until the instructor fills it. A move with no Hangul is spoken from its romanised term in the English voice.
+20. **The Taekwondo text is carried exactly**, straight apostrophes included ("opponent's", "Yi's"), because the user asked for the file's text exactly. Hangul for step 11 and End is `null` until the instructor fills it. A move with no Hangul is spoken from its romanised term in the English voice. Every Hangul entry is unchecked, for the instructor. `Move` gains `spokenHangul: String? = hangul`, so step 6 speaks "구부려 준비 서기" while it shows "구부려 준비 서기 A".
+21. **The Settings re-records (U4)** are Task 8's. It records every `Settings*`, `*SettingsPage*`, `*Settings*Screenshot*` and `Review*` shot under Settings, and looks at each changed PNG.
 
 ---
 
 ### Task 1: Mode grants and the plugs seam
 
 **Files:**
-- Modify: `core/house/.../HouseSeams.kt` (`HouseModeInfo:101-102` goes; `HouseModes`, `HousePermissions:152-155`, `HouseModeSwitch` (`logName`), `HousePlugs:131-143`; new `ModeGrant`, `PlugOption`, `AddedPlug`), `ModePlugs.kt`, `ModeRefusal.kt:45`, `di/HouseModule.kt:36-38`
+- Modify: `core/house/.../HouseSeams.kt` (`HouseModeInfo:101-102` goes; `HouseModes`, `HousePermissions:152-155`, `HouseModeSwitch` (`logName`), `HousePlugs:130-141`; new `ModeGrant`, `PlugOption`, `AddedPlug`), `ModePlugs.kt`, `ModeRefusal.kt:42`, `di/HouseModule.kt:36-38`
 - Modify: `capability/plugs/.../PlugsHouse.kt`, `PlugSettings.kt` (`ModeRun.wall`, key `wall.{mode}`), `PlugActions.kt:86-89` (`setChoice` goes), `PlugsPermissions.kt` (`MANAGE` goes)
 - Modify: `capability/party/.../PartyHouse.kt` (begin with `ModeGrant.Person`; `logName = "a stored mode"`), `PartyPermissions.kt` (label "Turn modes on and off"), `di/PartyModule.kt` (the `@Provides` goes); `capability/holiday/.../HolidayHouse.kt` (`logName = "Holiday"`), `di/HolidayModule.kt`
-- Modify: `app/src/debug/.../di/HouseGraphProbe.kt:35`
-- Test: `core/house/src/test/.../HouseSeamsTest.kt`, `ModePlugsTest.kt`, `ModeRefusalTest.kt`; `capability/plugs/src/test/.../PlugsHouseTest.kt`, `PlugsHouseTwoModesTest.kt`, `PlugSettingsTest.kt`, `PlugActionsTest.kt`, `PlugsPermissionsTest.kt`, `TestPlugsHouse.kt`; `capability/party/src/test/.../PartyHouseTest.kt`, `PartyPermissionsTest.kt`; `capability/holiday/src/test/.../HolidayHouseTest.kt`; `app/src/test/.../HouseGraphTest.kt:55-60`
+- Modify: `app/src/debug/.../di/HouseGraphProbe.kt:35`; `build-logic/convention/src/main/kotlin/LogHygiene.kt` (`ALLOWED`, Global Constraints)
+- Modify, for `PARTY_MODE` → `STORED_MODE` and the new members: `capability/party/.../PartyActions.kt:31`
+- Test:
+  - `core/house/src/test/.../HouseSeamsTest.kt`, `ModePlugsTest.kt`, `ModeRefusalTest.kt`, and `HouseModeSchedulerTest.kt:24` (its fake switch gains `logName`)
+  - `capability/plugs/src/test/.../PlugsHouseTest.kt`, `PlugsHouseTwoModesTest.kt`, `PlugSettingsTest.kt`, `PlugActionsTest.kt`, `PlugsPermissionsTest.kt`, `TestPlugsHouse.kt`, `ui/UiSamples.kt:10,20-21`
+  - `capability/party/src/test/.../PartyHouseTest.kt`, `PartyPermissionsTest.kt`, `PartyActionsTest.kt`, `ui/PartySheetTest.kt`, `TestParty.kt:123,206,232`
+  - `capability/holiday/src/test/.../HolidayHouseTest.kt`, `TestHouse.kt:69,99`, `TestHoliday.kt:68-70`
+  - `app/src/test/.../HouseGraphTest.kt:55-60` and `thePlugsAreInTheHouse`
+  - `build-logic/convention/src/test/kotlin/LogHygieneTest.kt`
 
 **Interfaces:**
 - Produces: `ModeGrant`, `ModeGrant.allows` (Ruling 3), `HousePermissions.STORED_MODE`, `modePermission(modeId)` (Ruling 2), `HouseModes.STORED = "stored"`, `HouseModeSwitch.logName`.
@@ -158,8 +186,10 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   fun added(modeId: String): Flow<List<AddedPlug>>
   /** Adds the plug at [on], or takes it out with null; nothing for a plug not on the Lights tab. */
   suspend fun choose(modeId: String, plugId: String, on: Boolean?)
-  /** Puts back anything [modeId]'s run still holds, then drops its choices and run (15b §4.2 Delete). */
+  /** Puts back anything [modeId]'s run still holds, then drops its choices and run (15b §4.2 Delete). Throws when the put-back can't be saved. */
   suspend fun forget(modeId: String)
+  /** True while [modeId]'s run holds a plug that now needs a PIN, in its notes or pending (S1); true when the store can't be read. */
+  suspend fun holdsPinPlug(modeId: String): Boolean
   ```
   The existing `ready`, `preview`, `enter` and `leave` are unchanged. `data class PlugOption(val id: String, val name: String, val needsPin: Boolean)` and `data class AddedPlug(val id: String, val on: Boolean, val needsPin: Boolean)`; each `toString` leaves out the id and the name.
 - Changes: `class ModePlugs(plugs: HousePlugs, modeId: String, logName: String)`, with `suspend fun begin(grant: ModeGrant)`.
@@ -170,15 +200,18 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `holidayTakesItsOwnPermission`: `modePermission("holiday") == "holiday.mode"`, while `"party"` and `"modeabcdef"` give `"party.mode"`.
   - `aPersonNeedsTheModesPermission`: a person holding only `holiday.mode` doesn't allow `"party"`.
   - `theWallVouchesForOneMode`: `Wall("party").allows("party")` is true, and `.allows("modeabcdef")` is false.
+  - `theWallNeverVouchesForHoliday`: `Wall("holiday")` throws.
 - `PlugsHouseTest`:
   - `aWallRunLeavesOutAPinPlug`: `lamp` On with no PIN, `heater` On with a PIN. `begin("party", Wall("party"))`, then `enter`. Only `lamp` is switched. `TestPlugSystem.switches` is `[lamp=on]`.
   - `aPlugLockedAfterAWallBeginIsNotSwitched` (Review Focus 2): `heater` is unreachable at the first `enter`, then `setNeedsPin(heater, true)`, then `enter` again. `heater` is never switched, and the step is `Failed` with `PlugsWords.enterLine`.
-  - `aPersonRunStillSwitchesAPinPlug`.
+  - `aPersonRunStillSwitchesAPinPlug`: `switches == [lamp=on, heater=on]`.
   - `aWallGrantForAnotherModeIsRefused`: `begin("party", Wall("modeabcdef"))` throws `IllegalArgumentException`.
   - `optionsAreNamedInTabOrder`: the names come from `TestPlugSystem`, the plugs not on the tab are left out, and the result is empty with no system.
   - `chooseAddsSwitchesAndRemoves`: `added` emits `[lamp on]`, then `[lamp off]`, then `[]`.
   - `chooseIgnoresAPlugNotOnTheTab`.
   - `forgetPutsBackFirst` (Review Focus 5): a run left by a `leave` whose last write threw is put back (the plug switched to `before`), then `added("party")` is empty and `runs` has no `party`.
+  - `holdsPinPlugCountsTheRunsPlugs` (S1): a run holds `heater` in its notes, `heater` is then taken out of the mode and set to need a PIN, and `holdsPinPlug("party")` is true. It is false once the run has left.
+  - `existingPartyAndHolidayChoicesReadAsAdded` (T2): write the pre-15b `mode.party` and `mode.holiday` entries raw. `added("party")` and `added("holiday")` list them with their On or Off.
 - `PlugSettingsTest`: `aWallRunIsKept`. The key `wall.party` reads back, and a run without it reads `wall = false`.
 - `ModeRefusalTest` and `ModePlugsTest`: `logsNameNoMode`. A switch with `modeName = "Film night"` and `logName = "a stored mode"` is refused. No `ShadowLog` line contains "Film night" or the id.
 - Delete `PlugActionsTest`'s `setChoice` cases and `PlugsPermissionsTest`'s `MANAGE` case. `HouseGraphTest.partyIsInTheHouse` loses its `modes()` assertions; the switch ids stay `holiday` and `party` until Task 4.
@@ -186,12 +219,14 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 - [ ] **Step 2: Run them to see them fail:** `.\gradlew.bat :core:house:testDebugUnitTest :capability:plugs:testDebugUnitTest`. Expected: compile errors on `ModeGrant`, `options` and `added`.
 
 - [ ] **Step 3: Implement**
+- `LogHygiene.ALLOWED`: add `own.logName`, and drop `own.modeName` and `this.modeId`.
 - `PlugsHouse.begin`: `require(grant.allows(modeId))`. The wall's snapshot is `listed(p, modeId).filterNot { it.first in p.needsPin }`, with `wall = true`. `enter` starts by dropping, under the same `settings.update`, any pending plug of a `wall` run that is now in `needsPin`, logged as `"Plugs: a no-PIN run left out a plug that needs a PIN"`. A dropped plug counts as missed in the step's line.
 - `options()` reads each listed plug's name with `read(id)`, as `preview` does, at once.
 - `forget` runs `leaveLocked(modeId)` under the mutex, then removes `modes[modeId]`.
+- `holdsPinPlug` reads `settings.current()` and checks the notes' holders and the run's pending against `needsPin`. A read that throws answers true.
 - PartyHouse and HolidayHouse pass `ModeGrant.Person(by)` to `ModePlugs.begin`.
 
-- [ ] **Step 4: Run the tests to see them pass**, plus `.\gradlew.bat -p build-logic :convention:test` (the changed log lines) and `.\gradlew.bat :app:testDebugUnitTest --tests "*HouseGraphTest*"`. Then run the gate.
+- [ ] **Step 4: Run the tests to see them pass**, plus `.\gradlew.bat -p build-logic :convention:test` and `.\gradlew.bat :app:testDebugUnitTest --tests "*HouseGraphTest*"`. Then run the gate.
 
 - [ ] **Step 5: Commit:** `git commit -m "Run modes on a person's grant or the wall's, and let the plug store refuse the wall any plug that needs a PIN"`
 
@@ -200,10 +235,10 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 ### Task 2: Light choices
 
 **Files:**
-- Modify: `core/house/.../HouseSeams.kt` (`SceneChoice:226` goes; `LightChoice`, `RoomChoice`; `RoomBefore:231-241`; `HouseLights:62-78`)
+- Modify: `core/house/.../HouseSeams.kt` (`SceneChoice:218` goes; `LightChoice`, `RoomChoice`; `RoomBefore`; `HouseLights:66-82`)
 - Rename: `capability/lights/.../LightsParty.kt` → `LightsModes.kt` (class `LightsModes`); modify `LightsHouseSeam.kt:33-40`
 - Modify: `capability/party/.../PartySettings.kt` (`scenes: List<RoomChoice>`; the `LIGHTS_BEFORE` record form), `PartyHouse.kt:189-203,257-262`, `PartyWords.kt`, `ui/PartySettingsPage.kt:232-260`
-- Test: `capability/lights/src/test/.../LightsPartyTest.kt` → `LightsModesTest.kt`, `LightsHouseSeamTest.kt`, `TestLights.kt`; `capability/party/src/test/.../PartySettingsTest.kt`, `PartyHouseTest.kt`, `TestParty.kt`, `ui/PartySettingsPageTest.kt`
+- Test: `capability/lights/src/test/.../LightsPartyTest.kt` → `LightsModesTest.kt`, `LightsHouseSeamTest.kt`, `TestLights.kt`; `capability/party/src/test/.../PartySettingsTest.kt`, `PartyHouseTest.kt`, `TestParty.kt`, `ui/PartySettingsPageTest.kt`; `build-logic/.../LogHygieneTest.kt` (the pin on `LightsParty.kt` becomes `LightsModes.kt`)
 
 **Interfaces:**
 - Produces: `LightChoice`, `RoomChoice` (Ruling 9), and `RoomBefore(roomId, name, choice: LightChoice, on, brightness, activeSceneId)`.
@@ -219,6 +254,7 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `aGoneSceneIsLeftOut`, and `aGoneRoomIsLeftOutWhateverItsChoice`.
   - `onRoomsGoBackWithinFivePoints`: chosen 60, the room now at 65, goes back. At 66 it stays, and so does an off room.
   - `anOffRoomTurnedOnByHandStays`, and `anOffRoomStillOffGoesBack`.
+  - `aNonDimmableOnRoomGoesBack` (S5): a room with `dimmable = false` chosen On is put back while it is on, whatever its brightness reads.
 - `PartySettingsTest`:
   - `aPreFifteenBRecordReadsAsScenes`: write the six-field `lights.before` entry raw, then `record.first().lights!!.single().choice` is a `Scene` with that scene id.
   - `aRoomChoiceRoundTrips`, for each kind.
@@ -243,7 +279,7 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 - Create: `capability/party/.../ModesStore.kt` (replaces `PartySettings.kt`), `StoredMode.kt`, `PartyMove.kt`, `ModeIds.kt`
 - Modify: `core/plugin/.../SettingsStore.kt:17-26` (`migrations`)
 - Modify: `PartyHouse.kt` (reads Party's mode from `ModesStore`; `PartyRecord` becomes `ModeRecord`), `PartyCapability.kt`, `ui/PartySettingsPage.kt` (writes through `ModesStore.update` on the `party` mode)
-- Test: `capability/party/src/test/.../ModesStoreTest.kt` (replaces `PartySettingsTest.kt`), `ModeIdsTest.kt`, `PartyHouseTest.kt`, `TestParty.kt`; `app/src/test/.../HouseGraphTest.kt:64-66`
+- Test: `capability/party/src/test/.../ModesStoreTest.kt` (replaces `PartySettingsTest.kt`), `ModeIdsTest.kt`, `PartyHouseTest.kt`, `TestParty.kt` (its in-memory stores are seeded with Party mode, since a raw `MemoryStore` skips the migration); `app/src/test/.../HouseGraphTest.kt:64-66`, `NoBackupTest.kt:66-71`; `build-logic/.../LogHygieneTest.kt` (`PartySettings.kt` becomes `ModesStore.kt`)
 
 **Interfaces:**
 - Produces:
@@ -280,7 +316,7 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
       suspend fun clearRecord()
   }
   ```
-  The `@Inject` constructor opens `party_settings` with `migrations = listOf(PartyMove)`.
+  The `@Inject` constructor opens `context.preferencesDataStoreFile(FILE)`, with `private const val FILE = "party_settings"` and `migrations = listOf(PartyMove)`, so `NoBackupTest.kt:66-71`'s pin holds once its path is changed to `ModesStore.kt`. `ModeRecord` and `ModeRunning` override `toString` to leave out every id.
 - Produces: `fun newModeId(taken: Set<String>, random: Random = Random.Default): String` (Ruling 7), and `const val PARTY_ICON = Icons.CELEBRATION`.
 - Keys:
   - `modes`: the ids in the order they were added, comma-joined.
@@ -293,9 +329,11 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `aFreshFileHasPartyModeWithNothingToDo`: the modes are exactly `[party]`, with name "Party mode", icon `celebration`, `showOnHome` and `needsPin` both true, and no music or lights. `holidayOnHome` is true.
   - `theMoveKeepsPartysChoices`: the pick, the pick's name, two speaker rooms and two scenes come through as `RoomChoice(…, Scene(…))`. The old keys `music.pick`, `music.pick_name`, `music.rooms` and `scenes` are gone.
   - `theMoveKeepsAnOnRecord` (Review Focus 1): `on`, `since`, `music.made`, `music.before` and a six-field `lights.before` give `ModeRecord(modeId = "party", on = true, …)` with the lights read as scenes.
+  - `aCorruptScenesEntryDoesntStopTheMove`: Party is on and one old `scenes` entry has three fields. The move lands, the good scenes come through, and the record is still on.
   - `anOffRecordMovesWithNoMode`.
   - `theMoveRunsOnce`: after `update { it.copy(modes = emptyList()) }` (Party deleted), a store reopened over the file still has no modes.
-  - `everyFieldRoundTrips`, including `On(40)` and `Off`.
+  - `everyFieldRoundTrips`, including `On(40)`, `Off`, `speakers` null versus a list, and `ModeRecord(modeId = "modeabcdef")`.
+  - `noModesWritesAnEmptyKey`: after deleting every mode the file holds `modes = ""`, and a blank id in it is dropped on read.
   - `aCorruptModeEntryIsSkipped`: a mode id listed with no name is left out, not thrown.
 - `ModeIdsTest`:
   - `idsFitThePlugStore`: 1,000 draws all match `^[a-z]+$` and start "mode".
@@ -308,13 +346,13 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 
 - [ ] **Step 3: Implement**
 - `PartyMove.migrate`: in one `toMutablePreferences()`:
-  1. Read the old choice keys and build `StoredMode("party", "Party mode", PARTY_ICON, showOnHome = true, needsPin = true, …)`.
+  1. Read the old choice keys and build `StoredMode("party", "Party mode", PARTY_ICON, showOnHome = true, needsPin = true, …)`. An entry that doesn't parse is skipped; `migrate` never throws (Ruling 5).
   2. Remove the old choice keys.
   3. Write `modes = "party"` and its keys.
   4. If `on` is true, write `record.mode = "party"`.
 
   `cleanUp` does nothing.
-- `ModesStore.update` writes the whole mode list over its keys: remove every `mode.*` and `modes` key, then write. The `holiday.home` key and the record's keys stay.
+- `ModesStore.update` writes the whole mode list over its keys: remove every `mode.*` key, then write them and `modes` (always, `""` when empty). The `holiday.home` key and the record's keys stay.
 - `PartyHouse` takes `prefs.mode(HouseModes.PARTY)` in place of `PartyPrefs`, and `ModeRecord` in place of `PartyRecord`. The record always carries `modeId = "party"` while on.
 
 - [ ] **Step 4: Run the tests to see them pass**, then the gate.
@@ -328,8 +366,9 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 **Files:**
 - Rename: `capability/party/.../PartyHouse.kt` → `StoredModesHouse.kt`, `PartyActions.kt` → `StoredModeActions.kt`, `ui/PartyTile.kt` → `ui/StoredModeTile.kt`
 - Delete: `ui/PartySheet.kt`, with `PartySheetTest.kt` and its PNGs. Also delete `PartyPlan`, `willLines` and `backLines` from `PartyWords.kt`, which becomes `ModesWords.kt`.
-- Create: `capability/party/.../ModesShelf.kt`; `core/house/.../HouseSeams.kt` (`ModeShelf`); `core/plugin/.../TrayButton.kt` (`TrayReservation`)
-- Modify: `PartyCapability.kt` → `ModesCapability.kt`, `di/PartyModule.kt` (bind `ModesShelf` as `ModeShelf`, `@Multibinds` `TrayReservation`, `StoredModesHouse` as the switch), `core/house/.../di/HouseModule.kt` (`@BindsOptionalOf ModeShelf`)
+- Create: `capability/party/.../ModesShelf.kt`; `core/house/.../HouseSeams.kt` (`ModeShelf`)
+- Modify: `PartyCapability.kt` → `ModesCapability.kt`, `di/PartyModule.kt` (bind `ModesShelf` as `ModeShelf`, `StoredModesHouse` as the switch), `core/house/.../di/HouseModule.kt` (`@BindsOptionalOf ModeShelf`), `app/src/debug/.../di/HouseGraphProbe.kt:10,29` (it imports `PartyHouse`)
+- Keep: `ui/PartySettingsPage.kt` and the `PartyWords` names it uses, moved into `ModesWords`, until Task 6 deletes the page
 - Modify: `capability/holiday/.../HolidayCapability.kt:33` (placed by `ModeShelf`)
 - Modify: `app/.../shell/ui/HomeTray.kt` (`trayRows`, Ruling 11), `core/ui/.../PageHeader.kt` (`HhTrayGrid`: an empty row)
 - Test:
@@ -337,6 +376,7 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `ui/StoredModeTileTest.kt`, `ui/PartyScreenshotTest.kt` → `ui/StoredModeScreenshotTest.kt`
   - `capability/holiday/src/test/.../HolidayCapabilityTest.kt`, `HolidayActionsTest.kt`
   - `app/src/test/.../shell/ui/TrayRowsTest.kt`, `HomeGridTest.kt`, `ShellScreenshotTest.kt`, `HouseGraphTest.kt:59`
+  - `build-logic/.../LogHygieneTest.kt` (`PartyHouse.kt`, `PartyActions.kt`, `PartyTile.kt` and `PartySheet.kt` become their new names, or go)
 
 **Interfaces:**
 - Consumes: `ModeGrant` and `HousePlugs.added` (Task 1), `RoomChoice` (Task 2), `ModesStore` (Task 3).
@@ -346,13 +386,12 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `val onMode: StateFlow<String?>`, the on mode's id. `isOn` is `onMode != null`, still null until read.
   - `val running: StateFlow<ModeRunning?>`, with `data class ModeRunning(val modeId: String, val change: PartyRun)`.
   - `fun line(modeId: String): Flow<String?>`.
-  - `suspend fun needsPin(modeId: String): Boolean`: the mode's flag, or any added plug that needs a PIN (Ruling 14).
-  - `suspend fun turnOn(modeId: String, grant: ModeGrant)` and `suspend fun turnOff(grant: ModeGrant)`. Each `require`s that the grant allows the mode, and that a `Wall` grant is for a mode that doesn't `needsPin`.
+  - `suspend fun needsPin(modeId: String): Boolean`: Ruling 14's rule, and true when the store can't be read.
+  - `suspend fun turnOn(modeId: String, grant: ModeGrant)` and `suspend fun turnOff(grant: ModeGrant)`. Each `require`s `grant.allows(modeId)`. `turnOff` checks it inside `exclusive`, after `load()`, against `record.modeId` (S3). A `Wall` grant for a mode that now needs a PIN is not thrown on (T4): the turn-on runs, and the plug store leaves out the locked plug (Ruling 4). A `Wall` turn-off of a mode that now needs a PIN does nothing, and the tile's line says "Turn {mode} off with a PIN." (plan).
 - Produces, in `StoredModeActions`:
-  - `suspend fun tap(modeId: String)`, the tile's and the page's one action.
+  - `suspend fun tap(modeId: String, sawOn: Boolean)`, the tile's and the page's one action. `sawOn` is the state the tile or page showed; a tap whose `sawOn` no longer matches is ignored as stale.
   - `fun refusal(modeId: String): Flow<String?>`.
-- Produces: `class ModesShelf @Inject constructor(store: ModesStore, reservations: Set<@JvmSuppressWildcards TrayReservation>) : ModeShelf`, with `val room: Flow<Int>` and `val shown: Flow<List<String>>` (Holiday first, if on Home, then stored, capped at `room`).
-- Produces: `interface TrayReservation { val id: String }` in `:core:plugin`.
+- Produces: `class ModesShelf @Inject constructor(store: ModesStore, capabilities: Provider<Set<@JvmSuppressWildcards Capability>>) : ModeShelf`, with `val room: Flow<Int>` (4 less the other half-width buttons, Ruling 12) and `val shown: Flow<List<String>>` (Holiday first, if on Home, then stored, capped at `room`). The `Provider` breaks the cycle with `ModesCapability`.
 - Produces: `internal fun trayRows(buttons: List<TrayButton>): List<List<TrayCell>>`, which always returns `TRAY_ROWS` rows (Ruling 11).
 - Produces: the tile tags `mode_tile_{id}`, `mode_tile_{id}_on` and `mode_tile_{id}_state`, and the tray ids `mode.{id}`. Party's tags change to `mode_tile_party`.
 - Produces: `ModesWords.NOTHING_TO_DO` (§7), `fun turnLabel(name: String, on: Boolean) = if (on) "Turn $name on" else "Turn $name off"`, and `fun tileSpoken(name: String, on: Boolean)`.
@@ -366,11 +405,18 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `anEditWhileOnChangesOnlyTheNextRun`: on with Lounge, add Kitchen, off. Only Lounge is put back, and Kitchen is never touched.
   - `aRenameWhileOnShowsInTheRefusal`.
   - `logsNeverNameAMode`: a mode named "Film night" through every step and failure. No `ShadowLog` line holds the name or the id, and a no-PIN turn-on logs "A stored mode turned on with no PIN".
+  - `aRestartWithFilmNightOnPutsFilmNightBack` (T1): a record with `modeId = "modeabcdef"` loads on, and turn-off puts back Film night's rooms and plugs.
+  - `aWallCantTurnOffAnotherMode` (S3): `turnOff(Wall("modeother"))` throws while Film night is on, and Film night stays on.
+  - `aPlugLockedBetweenTapAndTurnOnDoesntCrash` (T4): `turnOn("party", Wall("party"))` after an added plug was locked turns Party on with that plug left out and its line shown.
 - `StoredModeActionsTest`, with `TestAccess`:
   - `aNoPinModeTurnsOnForAChild`: `TestAccess` is never asked.
   - `aPinModeAsksAFreshPinNamingTheMode`: asked for `party.mode` with label "Turn Film night on". An Adult turns it on, and a Child (refused) leaves it off.
   - `aLockedPlugMakesTheTapAskForAPin`: the mode's flag is off, and one added plug needs a PIN.
   - `aPlugLockedMidRunMakesTurnOffAsk`.
+  - `aRemovedLockedPlugStillAsksOnTurnOff` (S1): Film night (no PIN) is on holding `heater`. `heater` is taken out of the mode, then set to need a PIN. The turn-off asks for a PIN.
+  - `holidayGoingOnWhileThePinIsUpRefuses` (S2): Holiday turns on while the pad is up. After an Adult's PIN, Party stays off and the line says "Turn Holiday mode off first.".
+  - `aStaleTapIsIgnored`: `tap("party", sawOn = false)` while Party is already on does nothing.
+  - `anUnreadablePlugStoreAsksForAPin`.
   - `holidayOnRefusesBeforeThePin`: no PIN is asked, and `refusal("party")` emits "Turn Holiday mode off first.".
   - `anotherStoredModeRefusesBeforeThePin`: "Turn Party mode off first." on the tapped mode's tile only.
   - `turningOffNeverRefuses`, and `aTapWhileRunningDoesNothing`.
@@ -378,9 +424,10 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 - `ModesShelfTest`:
   - `holidayFirstThenStoredInOrder`, and `hiddenModesTakeNoPlace`.
   - `fourAtMost`: five shown give places 0–3, and the fifth is null.
-  - `aReservationLeavesThree` (Review Focus 3): four stored shown plus one `TrayReservation` place the first three only.
+  - `anotherHalfButtonLeavesThree` (Review Focus 3): four stored shown plus a capability with one non-mode half button place the first three only.
   - `holidayBackOnHomePushesTheLastOff` (Review Focus 3).
 - `HolidayCapabilityTest`: `offHomeNoButton`, and `placedFirstWhenShown` (order 10).
+- `HolidayActionsTest`: `holidayRefusesWhileFilmNightIsOn` (T3). No PIN is asked, and the line is "Turn Film night off first.".
 - `TrayRowsTest` (replacing the 15a cases):
   - `threeRowsAlways`.
   - `halvesFillRowOneThenRowThree`: three halves and the Hoover give `[[h1, h2], [hoover], [h3]]`.
@@ -399,10 +446,10 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - The log lines say "A stored mode's {STEP} step …".
   - A mode with nothing to do: nothing runs, and its line is `NOTHING_TO_DO`.
 - **`StoredModeActions.tap`:**
-  1. Return if `running.value != null`.
+  1. Return if `running.value != null`, if the record is unread, or if `sawOn` isn't the state now.
   2. If turning on, refuse when Holiday is on (`ModeRefusal`) or another stored mode is on.
   3. If `needsPin(modeId)`, run `access.authorise(STORED_MODE, label = turnLabel(name, !on)) ?: return` and wrap it as `Person`. Otherwise use `Wall(modeId)`.
-  4. Run `withContext(NonCancellable) { house.turnOn/turnOff }`.
+  4. Turning on runs `withContext(NonCancellable) { refusal.turnOnUnlessRefused { house.turnOn(…) } }`, so a mode that went on during the PIN still refuses (S2). Turning off runs `house.turnOff` under `NonCancellable`.
 
   The tile shows `TURNING_ON` from the moment `running` is set.
 - **`ModesCapability.trayButtons()`:** `combine(store.prefs, shelf.shown)` gives one `TrayButton("mode.$id", 10 + place, TrayWidth.HALF) { StoredModeTileHost(id, …) }` per stored mode with a place.
@@ -419,8 +466,9 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 ### Task 5: Settings › Modes
 
 **Files:**
-- Modify: `core/ui/.../Icons.kt`, `tools/fonts/icons.txt`, `core/ui/src/main/res/font/material_symbols_rounded.ttf` (re-subset). Add `MOVIE`, `SPORTS_ESPORTS`, `RESTAURANT`, `MENU_BOOK`, `SELF_IMPROVEMENT`, `FITNESS_CENTER`, `CAKE`, `PETS`, `PARK` (the grid) and `SPORTS_MARTIAL_ARTS` (Task 10's). All ten are in 608ce00's full font.
-- Create: `core/ui/.../Rows.kt` (`HhAddRow`), `core/ui/.../Components.kt` (`HhBackLink`); `capability/party/.../ui/ModesPage.kt`, `ui/AddModeSheet.kt`, `ui/ModeHeader.kt`, `ModeIcons.kt`
+- Modify: `core/ui/.../Icons.kt`, `tools/fonts/icons.txt`, `core/ui/src/main/res/font/material_symbols_rounded.ttf` (re-subset). Add `MOVIE`, `SPORTS_ESPORTS`, `RESTAURANT`, `MENU_BOOK`, `SELF_IMPROVEMENT`, `FITNESS_CENTER`, `CAKE`, `PETS` and `PARK`, all in 608ce00's full font. Taekwondo's icon is Task 10's own font step.
+- Modify: `core/ui/.../Rows.kt` (`HhAddRow`), `core/ui/.../Components.kt` (`HhBackLink`), `core/ui/.../Fades.kt` or a new `Dashes.kt` (`Modifier.dashedOutline`, shared with `WeekView.kt:360-366`'s dashed ghost)
+- Create: `capability/party/.../ui/ModesPage.kt`, `ui/AddModeSheet.kt`, `ui/ModeHeader.kt`, `ModeIcons.kt`
 - Modify: `ModesWords.kt`, `ModesCapability.kt` (`settingsPages()` adds `ModesPage`; Party's old page stays until Task 6)
 - Test: `core/ui/src/test/.../IconFontTest.kt` (unchanged, must pass), `RowsTest.kt`; `capability/party/src/test/.../ModesWordsTest.kt`, `ui/ModesPageTest.kt`, `ui/AddModeSheetTest.kt`, `ui/ModesScreenshotTest.kt`
 
@@ -428,7 +476,8 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 - Consumes: `ModesStore`, `newModeId` (Task 3), and `StoredModesHouse.onMode`, `ModesShelf.room` (Task 4).
 - Produces:
   - `data class ModeIcon(val name: String, val spoken: String)` and `object ModeIcons { val GRID: List<ModeIcon> }`: celebration "Party", movie "Film", sports_esports "Games", restaurant "Dinner", menu_book "Reading", bedtime "Bedtime", self_improvement "Calm", fitness_center "Exercise", cake "Birthday", pets "Pets", park "Outdoors", music_note "Music" (spoken names are plan copy), in that order.
-  - `@Composable fun HhAddRow(label: String, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier)`: a dashed 2 dp `border` outline, the add icon, at least `ListRowTokens.minHeight`.
+  - `fun Modifier.dashedOutline(color: Color, width: Dp, radius: Dp, dashes: FloatArray): Modifier`: `drawBehind` with `PathEffect.dashPathEffect`, as `WeekView.kt:360-366` draws its ghost, which moves onto it.
+  - `@Composable fun HhAddRow(label: String, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier)`: a 2 dp `dashedOutline`, the add icon, at least `ListRowTokens.minHeight`.
   - `@Composable fun HhBackLink(label: String, tag: String, onBack: () -> Unit)`: "‹ {label}" with `CHEVRON_LEFT`, 48 dp tall.
 - Produces: `class ModesPage(…) : SettingsPage`, with `id = "modes"`, `title = "Modes"` and `order = 475`. It holds `var open: String?` (`rememberSaveable`), the mode whose page shows; null shows the list.
 - Produces, in `ModesWords` (the summary pieces are §7 copy; the joins and "Nothing chosen yet" are this plan's):
@@ -453,6 +502,8 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `addAModeAsksANameThenAnIcon`: type "Film night", then Next, then pick `movie`, then "Add a mode". The store gains one mode with that name, icon `movie`, and both switches on. The page shows `mode_header` with "Film night".
   - `aNewModeStartsOffHomeWhenHomeIsFull`.
   - `aRefusedNameKeepsTheSheet`: the problem line shows, and Next is disabled.
+  - `theNameStopsAt24`: typing 30 characters leaves 24 in the field, and the keyboard's Done acts as Next.
+  - `anUnknownIconDrawsTheDefault`: a stored icon not in `ModeIcons.GRID` draws `celebration`.
   - `renameAndIconSave`.
   - `holidaysHeaderDoesntOpenAnything`.
   - `backReturnsToTheList`.
@@ -464,7 +515,7 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 
 - [ ] **Step 3: Run the new tests to see them fail:** `.\gradlew.bat :capability:party:testDebugUnitTest :core:ui:testDebugUnitTest`
 
-- [ ] **Step 4: Implement.** The Add sheet is an `HhSheet` with two steps. The name step uses `HhTextField` with `maxLength` 24 and the keyboard's Next action. The icon step is a 4 × 3 grid of 72 dp tiles in a `selectableGroup`. Saving runs through the page's `saving(toaster)` writer, which shows `COULD_NOT_SAVE` when a write fails. The rename sheet ("Save name") and the icon sheet ("Save icon") reuse the two steps. Holiday's header has no tap.
+- [ ] **Step 4: Implement.** The Add sheet is an `HhSheet` with two steps. The name step uses `HhTextField` (`Controls.kt:306-320`) as it is. `onValueChange` caps the text at 24 characters, and its existing `onDone` runs Next. The icon step is a 4 × 3 grid of 72 dp tiles in a `selectableGroup`. Saving runs through the page's `saving(toaster)` writer, which shows `COULD_NOT_SAVE` when a write fails. The rename sheet ("Save name") and the icon sheet ("Save icon") reuse the two steps. Holiday's header has no tap.
 
 - [ ] **Step 5: Run the tests to see them pass.** Then record the Modes shots, look at them, and run the gate.
 
@@ -492,11 +543,14 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `oneAtATimeFromThePage`: with Holiday on, the refusal line "Turn Holiday mode off first." shows under the button.
   - `changesApplyLineWhileOn`: "Changes apply the next time Party mode turns on."
 - **Show on Home:**
-  - `showOnHomeWhenFull` (Review Focus 3): with four placed and this one not, `mode_home` is off and disabled, with "Home has room for 4 modes.". With a reservation it says "Home has room for 3 modes.".
+  - `showOnHomeWhenFull` (Review Focus 3): with four placed and this one not, `mode_home` is off and disabled, with "Home has room for 4 modes.". With a room of 3 it says "Home has room for 3 modes.".
+  - `aHiddenModeTurnsOnFromItsPage`: with Show on Home off, Turn on now calls `tap`.
   - `aShownModePastTheRoomReadsOff` (Review Focus 3).
 - **Needs a PIN:**
   - `aLockedPlugHoldsThePin`: adding `heater` (needs a PIN) saves `needsPin = true`. `mode_pin` is on and disabled, with "A plug in this mode needs a PIN.".
   - `removingTheLastLockedPlugFreesTheSwitch`: it is still on and now enabled.
+  - `aPlugLockedLaterHoldsThePinToo`: a plug added unlocked is later set to need a PIN on the Home Assistant page (the fake's `needsPin` changes). The switch shows on and disabled with the line, and the tap asks for a PIN.
+  - `pinOffNeedsOnlyTheSession` (U1): switching it off saves with no `TestAccess` call.
 - **Lights:**
   - `lightsLabelSaysTheRestAreLeftAlone`.
   - `addALightListsOnlyRoomsNotAdded`.
@@ -509,10 +563,12 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 - **Music:** `noMusicLeavesTheSpeakersAlone` (the music cases, moved).
 - **Delete:**
   - `deleteConfirmsThenGoes` (Review Focus 5): `mode_delete`, then `mode_delete_confirm` with "Delete Film night? Its music, lights and plugs choices go too.", then confirm. `plugs.forget("modeabcdef")` runs before the mode leaves the store, and the page returns to the list.
-  - `deleteIsRefusedWhileOn`: "Turn Film night off first.", and nothing is deleted.
+  - `deleteIsRefusedWhileOn`: "Turn Film night off first.", and nothing is deleted. It is refused too while `running` is set or the record is unread.
+  - `aFailedForgetKeepsTheMode`: `forget` throws, the mode stays, and `COULD_NOT_SAVE` shows.
   - `keepChangesNothing`.
 - `LightChoiceSheetTest`:
   - `percentStepsByTen`: − at 10 is disabled, + at 100 is disabled.
+  - `aNonDimmableRoomOffersOnWithoutAPercent` (S5): the chip reads "On".
   - `scenesAreRadios`, and `offIsARadio`.
 - `StoredModeScreenshotTest`: `partyPageDark`, `partyPageLight`, `lightChoiceSheetDark` and `deleteConfirmDark`.
 
@@ -526,7 +582,7 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   4. MUSIC, LIGHTS and PLUGS.
   5. Delete mode (`ButtonTone.Danger`, quiet), with an inline `HhConfirmCard` as `ShoppingSettingsPage.kt:195-212` draws one.
 - Section labels: "Lights · every other light is left alone" and "Plugs · every other plug is left alone".
-- Each change saves through `store.update` at once. Choosing a plug that needs a PIN updates the mode's `needsPin` in the same save step.
+- Each change saves through `store.update` at once. Choosing a plug that needs a PIN saves the plug, then saves the mode's `needsPin = true`. Delete runs `plugs.forget`, then the store's removal; a throw from `forget` stops it there.
 
 - [ ] **Step 4: Run the tests to see them pass.** Then record the page shots, look at them, and run the gate.
 
@@ -571,6 +627,8 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `aChildIsRefused`.
   - `fixedLinesShow`.
   - `noLightsSectionWithNoHue`.
+  - `refusesWhileFilmNightIsOn` (T3), with the real `HolidayActions` and a stored switch on: no PIN is asked, and the page shows "Turn Film night off first.".
+- `LightsTabTest`'s existing `lights_tray_holiday` case still passes: decision 5 keeps Holiday lights on the Lights tab.
 - `LightsHolidaySectionTest`: the `lights_automation_*` and `lights_holiday_note` cases, moved from `LightsSettingsPageTest`. `LightsSettingsPageTest`: `noHolidaySection`.
 - `HolidayPageTest` (Modes, with a fake `BuiltInModePage`):
   - `pinHeldOn`: `mode_pin` is on and disabled, with "Holiday mode always needs a PIN.".
@@ -607,7 +665,8 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `di/SetupModule.kt:51-61` (the three bindings go), `pages/LocationPage.kt`, `pages/PeoplePage.kt` (an App settings section), `pages/KioskPage.kt` (a status row), `PeopleUi.kt` (two to a row), `SetupCopy.kt`
   - `app/.../display/ui/DisplaySettingsPage.kt` (split into `BrightnessAndNight` and `SeasonalLooks`), `display/di/DisplayModule.kt:42` (the binding goes), `display/DisplayWords.kt`
   - `core/homeassistant/.../ui/OtherIntegrationsPage.kt:81-83` and `HomeAssistantWords.kt:31` ("Home Assistant", order 900)
-  - `core/access/.../AccessControl.kt` (`SESSION_TIMEOUT_MS = 90_000L` and its KDoc)
+  - `core/access/.../AccessControl.kt` (`SETTINGS_TIMEOUT_MS`, `sessionTimeout`), `DefaultAccessControl.kt` (`restartExpiry`'s base), `app/.../shell/ShellViewModel.kt:199-206` (sets it as Settings opens and closes) (Ruling 16)
+  - Every Settings page's row gaps to `SettingsTokens.rowGap` (Ruling 17): `capability/calendar/.../ui/ReviewCalendars.kt`, `capability/shopping/.../ui/ShoppingSettingsPage.kt`, `capability/music/.../ui/MusicSettingsPage.kt`, `capability/lights/.../ui/LightsSettingsPage.kt`, `capability/door/.../ui/DoorSettingsPage.kt`, `core/homeassistant/.../ui/OtherIntegrationsPage.kt`, `capability/plugs/.../ui/PlugsSettings.kt`, and the party pages
   - `core/plugin/.../Setup.kt:89` (the order KDoc)
 - Test:
   - `app/src/test/.../SetupWiringTest.kt`, `settings/AppSettingsPageTest.kt`, `display/...DisplaySettings*Test.kt`, `shell/ui/ShellLayersTimeoutTest.kt`
@@ -617,6 +676,7 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
 **Interfaces:**
 - Consumes: `HhBackLink`, `HhAddRow` (Task 5).
 - Produces: `val SettingsPage.opens: Set<String>` and `val LocalSettingsStart` (Ruling 15). Also `class AppSettingsPage : SettingsPage`, with `id = "app"`, `title = "App settings"`, `order = 0`, and `opens = {LOCATION, PEOPLE, TABLET_LOCK, DISPLAY_PAGE_ID, "seasonal"}`.
+- Produces: `const val SETTINGS_TIMEOUT_MS = 90_000L` and `fun AccessControl.sessionTimeout(millis: Long)` (a member, default a no-op for fakes) (Ruling 16).
 - Produces, in `:core:setup`:
   - `@Composable fun HomeLocationRow(onOpen: () -> Unit)`, and `LocationPage.Content()` kept as the sub-page.
   - `@Composable fun PeopleSection(editor: PeopleEditor)`.
@@ -629,7 +689,8 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `theListIsEightInOrder`: the titles are exactly App settings, Calendars, Shopping, Music, Lights, Modes, Door, Home Assistant.
   - `noPartyOrOtherIntegrations`.
 - `SettingsScreenTest`:
-  - `aSubPageIdOpensItsParent`: `initialPage = "location"` selects `settings_page_app`, and the Home location sub-page shows.
+  - `aSubPageIdOpensItsParent`: `initialPage = "location"` selects `settings_page_app`, and the Home location sub-page shows. So do `"display"` (Brightness and night) and `"seasonal"` (Seasonal looks).
+  - `theStartIsUsedOnce`: from the deep link, go to Calendars, then back to App settings, which shows its top.
   - `theBackLinkReturns`: `‹ App settings` goes back to App settings.
   - `closeNeverCoversTheLastRow`: at 1280 × 800 dp with font scale 1.3, `settings_close`'s top is at or below the last item's bottom.
   - `theTitleIs37sp`.
@@ -642,10 +703,16 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - `displayRowsOpenTheirSubPages`, with each summary's text.
   - `tabletLockSaysOnOrOff`: `homeApp.isDefault` true gives "Tablet lock is on", with the change and Use other apps buttons. False gives "Tablet lock is off" with Choose.
 - Display tests: the existing night, brightness, sleep, camera and seasonal cases pass on the two sub-screens.
-- `DefaultAccessControlTest`: `theSessionEndsAfterNinetySeconds`. It is still signed in at 89 s, and null at 90 s.
-- `ShellLayersTimeoutTest`: passes with the constant. `aSheetStillClosesAfterTwoMinutes` (`OVERLAY_IDLE_MS` unchanged).
+- `DefaultAccessControlTest`:
+  - `settingsSessionEndsAfterNinetySeconds`: with `sessionTimeout(SETTINGS_TIMEOUT_MS)`, still signed in at 89 s, and null at 90 s.
+  - `otherSessionsKeepTwoMinutes`: without it, still signed in at 119 s.
+  - `theEditHoldStillWins`.
+- `ShellViewModelTest`: `settingsSetsAndClearsItsTimeout`.
+- `ShellLayersTimeoutTest`: the Settings warning at 70 s; `aSheetStillClosesAfterTwoMinutes` (`OVERLAY_IDLE_MS` unchanged).
+- `labelsAndGapsOnEveryPage` (Ruling 17): for each of the eight pages, a section label measures 12 sp and two adjacent rows are 7 dp apart.
 - `OtherIntegrationsPageTest`: the title is "Home Assistant".
 - `SettingsScreenshotTest`: `allPagesDark` and `allPagesLight`, `appSettingsDark` and `appSettingsLight`, `homeLocationSubPageDark`, `brightnessSubPageDark`, `seasonalSubPageDark`. Delete the PNGs of the removed pages' shots.
+- **Re-record every Settings page's shots** (Ruling 21): Calendars, Shopping, Music, Lights, Door, Home Assistant, the plugs block, Modes and a mode's page, in dark and light where they exist.
 
 - [ ] **Step 2: Run them to see them fail:** `.\gradlew.bat :core:setup:testDebugUnitTest :core:access:testDebugUnitTest :app:testDebugUnitTest`
 
@@ -656,9 +723,9 @@ Where the spec doesn't fit the code at f2e841cd, or §9 leaves the builder a cho
   - Provide `LocalSectionLabelStyle provides SettingsTokens.sectionLabel` and `LocalSettingsStart provides initialPage` around `page?.Content()`.
 - **The bindings:** `SettingsModule` binds `AppSettingsPage @IntoSet SettingsPage`.
 
-- [ ] **Step 4: Run the tests to see them pass.** Then record the Settings shots, look at them (the list at font 1.3 included), and run the gate.
+- [ ] **Step 4: Run the tests to see them pass**, plus `.\gradlew.bat -p build-logic :convention:test`. Then record every Settings shot, look at each changed PNG (the list at font 1.3 included), and run the gate.
 
-- [ ] **Step 5: Commit:** `git commit -m "Gather Home location, People, Display and Tablet lock into App settings, list Settings' eight pages and close it after 90 seconds"`
+- [ ] **Step 5: Commit:** `git commit -m "Gather Home location, People, Display and Tablet lock into App settings, list Settings' eight pages with the handoff's spacing, and close Settings after 90 seconds"`
 
 ---
 
@@ -701,16 +768,24 @@ A throwaway module (§8): deleting it means deleting `capability/taekwondo/`, th
 **Files:**
 - Create: `capability/taekwondo/build.gradle.kts` (the plugins and dependencies as `capability/party/build.gradle.kts`: `api(:core:plugin)`, `:core:ui`, `libs.androidx.datastore.preferences`, test fixtures, roborazzi)
 - Create: `src/main/AndroidManifest.xml`, with `<queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>`. This is Android 11's package visibility; the SM-T510 runs API 30.
-- Create in `src/main/java/uk/co/siland/culvery/capability/taekwondo/`: `Moves.kt`, `TaekwondoRun.kt`, `Speaker.kt` (interface and `TtsSpeaker`), `TaekwondoSettings.kt`, `TaekwondoCapability.kt`, `TaekwondoQuieter.kt`, `ui/TaekwondoScreen.kt`, `di/TaekwondoModule.kt`
-- Modify: `settings.gradle.kts`, `app/build.gradle.kts`; `core/plugin/.../Overlays.kt` (`keepOpen`), `app/.../shell/ShellOverlays.kt` (`OverlayState.keepOpen`)
-- Test: `capability/taekwondo/src/test/.../MovesTest.kt`, `TaekwondoRunTest.kt`, `TaekwondoCapabilityTest.kt`, `TaekwondoQuieterTest.kt`, `ui/TaekwondoScreenTest.kt`, `ui/TaekwondoScreenshotTest.kt`; `app/src/test/.../shell/ui/OverlayLayersTest.kt`; `build-logic` `ModuleBoundariesTest` (passes unchanged)
+- Create in `src/main/java/uk/co/siland/culvery/capability/taekwondo/`: `Moves.kt`, `TaekwondoRun.kt`, `Speaker.kt` (interface and `TtsSpeaker`), `TaekwondoSettings.kt`, `TaekwondoCapability.kt`, `ui/TaekwondoScreen.kt`, `di/TaekwondoModule.kt`
+- Modify: `settings.gradle.kts`, `app/build.gradle.kts`; `core/plugin/.../Overlays.kt` (`keepOpen`), `core/plugin/.../Alerts.kt` (`AlertHost.shown`), `app/.../shell/ShellOverlays.kt` (`OverlayState.keepOpen`, reset on dismiss and show); `core/ui/.../Icons.kt`, `tools/fonts/icons.txt` and the font (`SPORTS_MARTIAL_ARTS`, by `tools/fonts/README.md` from 608ce00, as Task 5)
+- Test: `capability/taekwondo/src/test/.../MovesTest.kt`, `TaekwondoRunTest.kt`, `TaekwondoCapabilityTest.kt`, `ui/TaekwondoScreenTest.kt`, `ui/TaekwondoScreenshotTest.kt`; `app/src/test/.../shell/ui/OverlayLayersTest.kt`; `build-logic` `ModuleBoundariesTest` (passes unchanged)
 
 **Interfaces:**
-- Consumes: `TrayReservation` (Task 4), `Icons.SPORTS_MARTIAL_ARTS` (Task 5).
+- Consumes: the shelf's count of non-mode half buttons (Task 4, Ruling 12).
 - Produces:
   ```kotlin
   /** [hangul] null until the instructor fills it in; the English voice reads [romanised] then (15b §8). */
-  data class Move(val number: String, val romanised: String, val hangul: String?, val english: String, val description: String)
+  data class Move(
+      val number: String,
+      val romanised: String,
+      val hangul: String?,
+      val english: String,
+      val description: String,
+      /** What the Korean voice says, when it differs from what's shown (step 6 drops its "A"). */
+      val spokenHangul: String? = hangul,
+  )
   data class Pattern(val name: String, val moves: List<Move>)
   val PATTERNS: List<Pattern> = listOf(CHOONG_MOO)
 
@@ -736,12 +811,12 @@ A throwaway module (§8): deleting it means deleting `capability/taekwondo/`, th
   }
   ```
 - Produces: `TaekwondoCapability`: `id = "taekwondo"`, `label = "Taekwondo"`, `icon = Icons.SPORTS_MARTIAL_ARTS`, `order = 95`, `hasTab = flowOf(false)`. Its tray button is `TrayButton("taekwondo", 90, TrayWidth.HALF)`, a `HouseModeTile` with no ON state, which opens the screen with `showFullScreen`.
-- Produces: `TaekwondoModule`, which binds the capability, a `TrayReservation` (id `taekwondo`), and `TaekwondoQuieter : AlertQuieter` (Ruling 18), all `@IntoSet`.
-- Produces: `fun OverlayHost.keepOpen(on: Boolean)`.
+- Produces: `TaekwondoModule`, which binds the capability `@IntoSet`.
+- Produces: the member `fun OverlayHost.keepOpen(on: Boolean) {}` and `val AlertHost.shown: StateFlow<Boolean>` (Ruling 18).
 - Produces: `TaekwondoSettings`, a DataStore `taekwondo_settings` holding `val detailed: Flow<Boolean>` (default false) and `suspend fun setDetailed(on: Boolean)`.
 - Copy: "Taekwondo", "Detailed mode", "Cancel", "Close", and "Again in {n}" (plan). The card's title is the pattern's name.
 
-**The moves.** `CHOONG_MOO = Pattern("Choong-Moo", …)` holds these 32 entries in order. The romanised, English and description text is exactly `culvery-notes/taekwondo-choong-moo.html`'s, straight apostrophes included. The Hangul is this plan's transliteration of the romanised ITF term, for the reviewer to check.
+**The moves.** `CHOONG_MOO = Pattern("Choong-Moo", …)` holds these 32 entries in order. The romanised, English and description text is exactly `culvery-notes/taekwondo-choong-moo.html`'s, straight apostrophes included. The Hangul is this plan's transliteration of the romanised ITF term. Every entry is unchecked, for the instructor; the reviewer checks it against the romanised term. Step 6's `spokenHangul` is "구부려 준비 서기".
 
 | # | Romanised | Hangul | English | Description |
 |---|---|---|---|---|
@@ -785,17 +860,17 @@ A throwaway module (§8): deleting it means deleting `capability/taekwondo/`, th
   - `onlyElevenAndEndWaitForHangul`.
 - `TaekwondoRunTest`, with a `FakeSpeaker` that records `(text, korean)` and returns after a virtual second, under `runTest`:
   - `countsDownTenThenSaysTheFirstMove`: `Counting(10)` … `Counting(1)`, then `Moving(0)` with `say("나란히 준비 서기", korean = true)` at 10 s.
-  - `detailedAddsTheDescriptionInEnglish`.
+  - `detailedAddsTheDescriptionInEnglish`: the speaker's calls for the first two moves are exactly `[("나란히 준비 서기", true), ("Feet parallel, shoulder width apart; calm and ready to begin.", false), ("니은자 서 쌍 손칼 막기", true), …]`.
   - `threeSecondsOfQuietBetweenMoves`.
-  - `afterTheLastTenSecondsThenTheFirstAgain`: `Again(10)` … then `Moving(0)`.
+  - `stepSixSpeaksWithoutTheA`.
+  - `afterTheLastTenSecondsThenTheFirstAgain`: after End's speech, `Again(10)` … `Again(1)`, then `Moving(0)` 10 s later in all, with no 3 s gap added.
   - `noKoreanVoiceReadsTheRomanisedInEnglish`.
   - `noHangulReadsTheRomanisedInEnglish`: step 11.
   - `stopEndsAtOnceAndStopsTheSpeaker`.
   - `onlyStartAndStopAreLogged`: `ShadowLog` holds exactly "A run started" and "A run stopped", with no move text.
-- `TaekwondoQuieterTest`: `aRingStopsTheRun` (`quiet()` returns false, and the state is `Idle`).
 - `TaekwondoCapabilityTest`:
   - `aHalfButtonAfterTheModes`: order 90, `TrayWidth.HALF`.
-  - `holdsOneTraySpot`: the module's `TrayReservation` binding.
+  - `holdsOneTraySpot`: with it bound, `ModesShelf.room` is 3.
 - `TaekwondoScreenTest`:
   - `theGridShowsChoongMoo`.
   - `aTapCountsDown`: "10" shows large.
@@ -804,22 +879,33 @@ A throwaway module (§8): deleting it means deleting `capability/taekwondo/`, th
   - `closeStopsAndCloses`.
   - `detailedIsRemembered`: the switch writes `TaekwondoSettings`, and a new screen reads it on.
   - `keptOpenWhileRunning`: `keepOpen(true)` on start, `false` on stop.
-- `OverlayLayersTest`: `aKeptOpenOverlayWaitsThenClosesOnceLetGo`. Nothing closes at `OVERLAY_IDLE_MS + 1 s` while it is kept open. After `keepOpen(false)`, it closes `OVERLAY_IDLE_MS` later.
+  - `anyDoorAlertStops`: `shown` turning true, from a quiet alert as from a loud one, stops the run.
+  - `noPinIsAsked`: a start with `TestAccess` never asks.
+- `OverlayLayersTest`: `aKeptOpenOverlayWaitsThenClosesOnceLetGo`. Nothing closes at `OVERLAY_IDLE_MS + 1 s` while it is kept open. After `keepOpen(false)`, it closes `OVERLAY_IDLE_MS` later. Also `theNextOverlayClosesWhenIdle`: after a kept-open overlay is dismissed, the next `show` closes after `OVERLAY_IDLE_MS`.
 - `TaekwondoScreenshotTest`: `gridDark`, `countingDark`, `movingDark`.
 
 - [ ] **Step 2: Run them to see them fail:** `.\gradlew.bat :capability:taekwondo:testDebugUnitTest :app:testDebugUnitTest`
 
-- [ ] **Step 3: Write `TtsSpeaker`, and STOP before its progress listener.** `TextToSpeech(context, listener)`, `speak(CharSequence, Int, Bundle?, String)` and `setLanguage` are current. Waiting for an utterance to end needs `UtteranceProgressListener`, whose abstract `onError(String)` is deprecated (API 21) but must be overridden. Report this to the controller, who asks the user (the global constraint on deprecated APIs). The proposal: override `onError(String)` only to call the current `onError(String, Int)`, with a one-line comment saying why. Don't write the listener until the user has answered.
+- [ ] **Step 3: Add the icon.** `SPORTS_MARTIAL_ARTS` by `tools/fonts/README.md` steps 2–5 from 608ce00, then `IconFontTest`.
+
+- [ ] **Step 3b: Write `TtsSpeaker`.** `TextToSpeech(context, listener)`, `speak(CharSequence, Int, Bundle?, String)` and `setLanguage` are current. Its `UtteranceProgressListener` overrides the deprecated abstract `onError(String)` next to `onError(String, Int)`, the first calling the second, with a one-line comment saying it is abstract (approved, U2). Stop and report any other deprecated API.
 
 - [ ] **Step 4: Implement**
 - `TtsSpeaker.hasKorean` is `isLanguageAvailable(Locale.KOREAN) >= LANG_AVAILABLE`, read once the engine starts.
 - `say` sets the language (Korean or `Locale.UK`), then speaks with `QUEUE_FLUSH`. It suspends on `suspendCancellableCoroutine` until `onDone` or `onError` for that utterance id. Cancellation calls `stop()`.
 - Nothing installs voice data: no `ACTION_INSTALL_TTS_DATA`.
-- `TaekwondoRun` is one coroutine on `scope`: the countdown in one-second `delay`s, then per move `say` the term (and the description when `detailed`), then `delay(3_000)`, then `Again` and repeat. `stop()` cancels the coroutine and calls `speaker.stop()`.
+- `TaekwondoRun` is one coroutine on `scope`: the countdown in one-second `delay`s, then per move `say` the term (and the description when `detailed`). Each move but the last is followed by `delay(3_000)`. After the last, `Again` counts 10 s, then the run repeats. `stop()` cancels the coroutine and calls `speaker.stop()`.
 
 - [ ] **Step 5: Run the tests to see them pass**, plus `.\gradlew.bat -p build-logic :convention:test` (a new TAG; ModuleBoundaries). Record the Taekwondo shots and `home_tray_*` with Taekwondo, look at them, and run the gate.
 
 - [ ] **Step 6: Commit:** `git commit -m "Add a throwaway Taekwondo practice screen that reads Choong-Moo's moves aloud from a tray button"`
+
+**Deleting it later:** delete `capability/taekwondo/`, the `include`, and the app's `implementation` line. Then the leftovers can go too, or stay harmless:
+- `OverlayHost.keepOpen` and its `OverlayLayersTest` cases.
+- `AlertHost.shown` (Ruling 18).
+- `Icons.SPORTS_MARTIAL_ARTS` and its glyph.
+- The shelf's room-for-3 branch is only exercised by `ModesShelfTest.anotherHalfButtonLeavesThree`, which stays valid.
+- The `taekwondo_settings` DataStore file on the tablet, which nothing reads once the module is gone.
 
 ---
 
