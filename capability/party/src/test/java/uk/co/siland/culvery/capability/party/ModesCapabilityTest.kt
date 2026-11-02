@@ -19,7 +19,7 @@ class ModesCapabilityTest {
     private fun TestScope.capability(rig: HouseRig = HouseRig(backgroundScope)) = ModesCapability(
         StoredModeActions(TestAccess(Role.ADULT), rig.house, rig.settings, emptySet()), rig.house, rig.settings,
         ModesShelf(rig.settings, Provider { emptySet() }),
-        Optional.of(rig.music), Optional.of(rig.lights), Optional.of(rig.plugs), emptySet(), RecordingToaster(),
+        Optional.of(rig.music), Optional.of(rig.lights), Optional.of(rig.plugs), emptySet(), emptySet(), RecordingToaster(),
     )
 
     /** 13 §2.7: the modes sit in the tray, not on a tab. Fails if there is a tab, a card, or another id, label, icon or order. */

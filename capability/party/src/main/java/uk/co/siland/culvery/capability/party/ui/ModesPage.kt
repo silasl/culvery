@@ -28,6 +28,7 @@ import uk.co.siland.culvery.capability.party.StoredMode
 import uk.co.siland.culvery.capability.party.newModeId
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePlugs
+import uk.co.siland.culvery.core.plugin.BuiltInModePage
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -50,6 +51,7 @@ class ModesPage internal constructor(
     private val room: Flow<Int>,
     private val plugs: HousePlugs?,
     private val toaster: Toaster,
+    private val builtIn: Set<BuiltInModePage> = emptySet(),
 ) : SettingsPage {
     override val id = "modes"
     override val title = ModesWords.PAGE_TITLE
@@ -59,7 +61,7 @@ class ModesPage internal constructor(
     override fun Content() {
         // The mode whose page shows; null shows the list.
         var open by rememberSaveable { mutableStateOf<String?>(null) }
-        ModesHost(store, controls, holidayOn, room, plugs, toaster, open) { open = it }
+        ModesHost(store, controls, holidayOn, room, plugs, toaster, builtIn, open) { open = it }
     }
 }
 
@@ -76,6 +78,7 @@ private fun ModesHost(
     room: Flow<Int>,
     plugs: HousePlugs?,
     toaster: Toaster,
+    builtIn: Set<BuiltInModePage>,
     open: String?,
     setOpen: (String?) -> Unit,
 ) {
@@ -116,6 +119,7 @@ private fun ModesHost(
             HhBackLink(ModesWords.BACK_TO_MODES, "modes_back") { setOpen(null) }
             if (opened === HOLIDAY_ENTRY) {
                 ModeHeader(Icons.BEACH_ACCESS, ModesWords.HOLIDAY_NAME, onIcon = null, onName = null)
+                HolidayPage(p, homeRoom, controls, builtIn.firstOrNull { it.modeId == HouseModes.HOLIDAY }, plugs, store, toaster)
             } else {
                 val others = p.modes.filter { it.id != opened.id }.map { it.name }
                 ModeHeader(

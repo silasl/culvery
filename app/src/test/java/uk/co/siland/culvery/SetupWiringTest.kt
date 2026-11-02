@@ -199,8 +199,8 @@ class SetupWiringTest {
             },
             "lights" to {
                 LightsSettingsPage(
-                    LightsSettingsUi(true, null, null, false, emptyList(), null, emptySet(), 0, null, emptySet()),
-                    {}, {}, {}, {}, {},
+                    LightsSettingsUi(true, null, null, false, emptyList(), null, emptySet(), 0),
+                    {}, {}, {}, {},
                 )
             },
             "music" to {

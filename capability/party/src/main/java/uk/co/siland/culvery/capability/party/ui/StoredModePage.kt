@@ -94,15 +94,9 @@ internal fun StoredModePage(
     refusal?.let { HhStatusLine(it, "mode_turn_line") }
     if (on) Line(ModesWords.appliesNext(mode.name), "mode_applies_line")
 
-    val shown = mode.showOnHome && place != null
-    val canShow = room != null && !mode.showOnHome && prefs.onHome() < room
     Row(horizontalArrangement = Arrangement.spacedBy(PartyDimens.rowGap), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.weight(1f)) {
-            HhSwitchRow(
-                ModesWords.SHOW_ON_HOME, line = room?.takeIf { !shown && !canShow }?.let(ModesWords::homeHasRoom),
-                checked = shown, tag = "mode_home", enabled = shown || canShow,
-                onChange = { save { m -> m.copy(showOnHome = it) } },
-            )
+            ShowOnHomeSwitch(mode.showOnHome, place, room, prefs) { save { m -> m.copy(showOnHome = it) } }
         }
         Row(Modifier.weight(1f)) {
             HhSwitchRow(

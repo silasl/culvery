@@ -13,8 +13,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.capability.lights.AWAY
-import uk.co.siland.culvery.capability.lights.MIMIC
 import uk.co.siland.culvery.capability.lights.room
 import uk.co.siland.culvery.core.ui.test.snap
 
@@ -27,12 +25,12 @@ class LightsSettingsScreenshotTest {
     private val paired = LightsSettingsUi(
         paired = true, status = null, findLine = null, finding = false,
         rooms = listOf(room("Lounge"), room("Kitchen"), room("Hall"), room("Garden")), mainRoomId = "Kitchen-id",
-        leftOut = setOf("Garden-id", "Gone-id"), goneLeftOut = 1, automations = listOf(MIMIC, AWAY), holidayAutomations = setOf("mimic-id"),
+        leftOut = setOf("Garden-id", "Gone-id"), goneLeftOut = 1,
     )
 
     private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) = compose.snap(name, dark, Modifier.size(960.dp, 800.dp), content = content)
 
-    private fun page(ui: LightsSettingsUi): @Composable () -> Unit = { InSettingsPane { LightsSettingsPage(ui, {}, {}, {}, {}, {}) } }
+    private fun page(ui: LightsSettingsUi): @Composable () -> Unit = { InSettingsPane { LightsSettingsPage(ui, {}, {}, {}, {}) } }
 
     @Test fun lightsDark() = snap("settings_lights_dark", true, page(paired))
 
@@ -43,7 +41,7 @@ class LightsSettingsScreenshotTest {
         "settings_lights_unpaired_dark", true,
         page(
             paired.copy(
-                paired = false, rooms = emptyList(), automations = null, leftOut = emptySet(), goneLeftOut = 0,
+                paired = false, rooms = emptyList(), leftOut = emptySet(), goneLeftOut = 0,
                 findLine = "No Hue Bridge answered. Check it’s plugged in, or enter the bridge’s address.",
             ),
         ),

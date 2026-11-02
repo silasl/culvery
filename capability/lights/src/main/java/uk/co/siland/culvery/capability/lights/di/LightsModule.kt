@@ -11,9 +11,11 @@ import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.LightsHouseSeam
 import uk.co.siland.culvery.capability.lights.LightsPermissionSource
 import uk.co.siland.culvery.capability.lights.LightsProvider
+import uk.co.siland.culvery.capability.lights.ui.LightsHolidaySection
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.HolidayLightsSection
 import uk.co.siland.culvery.core.plugin.LightsTabSection
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -42,4 +44,9 @@ abstract class LightsModule {
 
     @Binds
     abstract fun house(impl: LightsHouseSeam): HouseLights
+
+    // Holiday mode's page draws it (15b decision 5).
+    @Binds
+    @IntoSet
+    abstract fun holidaySection(impl: LightsHolidaySection): HolidayLightsSection
 }

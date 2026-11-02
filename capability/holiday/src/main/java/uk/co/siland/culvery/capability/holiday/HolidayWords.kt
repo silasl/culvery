@@ -10,6 +10,7 @@ import uk.co.siland.culvery.core.house.PlugChange
 /** Holiday mode's words (11 §5.2, §5.8). */
 object HolidayWords {
     const val LABEL = "Holiday mode"
+    const val LIGHTS_WHILE_AWAY = "Lights while away"
     const val WHEN_BACK = "When are you back?"
     const val CHANGE_DATE = "Change date"
     const val WILL = "Holiday mode will:"
@@ -19,6 +20,8 @@ object HolidayWords {
     const val NO_PICK = "Pick the day you’re back."
     const val STILL_ON_ECO = "The heating is still on Eco. Turn it off in the Nest app."
     const val LIGHTS_STILL_ON = "Holiday lights are still on. Turn them off in the Lights tab."
+    private const val ECO_LINE = "Put the heating on Eco, and take it off Eco when you’re back."
+    private const val HOOVER_LINE = "Run the hoover the day before you’re back."
     private const val LIGHTS_MISSED = "Holiday lights didn’t switch on. Turn them on in the Lights tab."
 
     private const val WEEKDAY_ALONE_DAYS = 6L
@@ -63,6 +66,11 @@ object HolidayWords {
         HolidayStep.HOOVER -> HouseLines.HOOVER_DIDNT_RUN
         HolidayStep.ECO_OFF -> HouseLines.ECO_OFF_FAILED
     }
+
+    /** What Holiday mode always does besides its lights and plugs, as its page in Settings › Modes lists it (plan copy). */
+    val FIXED_LINES = listOf(ECO_LINE, HOOVER_LINE, DOOR)
+
+    fun turnNow(on: Boolean) = if (on) "Turn off now" else "Turn on now"
 
     fun backShort(date: LocalDate) = "Back ${SHORT.format(date)}"
 

@@ -16,6 +16,7 @@ import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
+import uk.co.siland.culvery.core.plugin.BuiltInModePage
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -35,6 +36,7 @@ class ModesCapability @Inject constructor(
     private val lights: Optional<HouseLights>,
     private val plugs: Optional<HousePlugs>,
     private val switches: Set<@JvmSuppressWildcards HouseModeSwitch>,
+    private val builtIn: Set<@JvmSuppressWildcards BuiltInModePage>,
     private val toaster: Toaster,
 ) : Capability {
     override val id = "party"
@@ -61,7 +63,7 @@ class ModesCapability @Inject constructor(
         ModesPage(
             settings, ModeControls(actions, house, shelf::place, music.orElse(null), lights.orElse(null)),
             switches.firstOrNull { it.modeId == HouseModes.HOLIDAY }?.isOn ?: MutableStateFlow(false),
-            shelf.room, plugs.orElse(null), toaster,
+            shelf.room, plugs.orElse(null), toaster, builtIn,
         ),
     )
 }

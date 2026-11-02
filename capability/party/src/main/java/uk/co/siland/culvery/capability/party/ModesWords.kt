@@ -87,6 +87,7 @@ object ModesWords {
     const val LIGHT_OFF = "Off"
     const val SHOW_ON_HOME = "Show on Home"
     const val NEEDS_A_PIN = "Needs a PIN"
+    const val HOLIDAY_PIN = "Holiday mode always needs a PIN."
     const val PLUG_NEEDS_PIN = "A plug in this mode needs a PIN."
     const val DELETE_MODE = "Delete mode"
     const val MISSING_PLUG = "A plug that is no longer on the Lights tab"

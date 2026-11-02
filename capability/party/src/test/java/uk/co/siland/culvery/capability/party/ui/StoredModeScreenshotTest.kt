@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,14 +34,20 @@ import uk.co.siland.culvery.capability.party.PARTY_MODE
 import uk.co.siland.culvery.capability.party.PARTY_ICON
 import uk.co.siland.culvery.capability.party.PartyRun
 import uk.co.siland.culvery.core.house.AddedPlug
+import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.LightChoice
 import uk.co.siland.culvery.core.house.PlugOption
 import uk.co.siland.culvery.core.house.RoomChoice
+import uk.co.siland.culvery.core.plugin.BuiltInModePage
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.test.OneTapTray
 import uk.co.siland.culvery.core.ui.test.snap
 import uk.co.siland.culvery.core.ui.test.waitFor
@@ -132,6 +139,45 @@ class StoredModeScreenshotTest {
         compose.onNodeWithTag("mode_delete").performScrollTo().performClick()
         compose.waitFor { compose.onAllNodesWithTag("mode_delete_confirm").fetchSemanticsNodes().isNotEmpty() }
     }
+
+    /** Holiday mode's page with stand-ins for its own parts, plus the plugs section; the real parts are in the holiday module's shots. */
+    private fun holidayPage(name: String, dark: Boolean) {
+        val rig = PageRig(scope)
+        rig.plugs.offered = listOf(PlugOption("lamp", "Lamp", false))
+        rig.plugs.addedNow.value = listOf(AddedPlug("lamp", on = true, needsPin = false))
+        runBlocking { rig.settings.update { ModesPrefs(true, listOf(PARTY_MODE)) } }
+        rig.loaded()
+        val parts = object : BuiltInModePage {
+            override val modeId = HouseModes.HOLIDAY
+
+            @Composable
+            override fun TurnButton() = HhButton("Turn on now", {}, tone = ButtonTone.Primary, on = ButtonSurface.Bg)
+
+            @Composable
+            override fun Sections() = HhSectionLabel("Lights while away")
+        }
+        val overlay = TestOverlay()
+        val page = rig.page(toaster, setOf(parts))
+        compose.setContent {
+            CulveryTheme(dark = dark) {
+                CompositionLocalProvider(LocalOverlayHost provides overlay) {
+                    Box(Modifier.background(Culvery.colors.bg).size(960.dp, 900.dp)) { InSettingsPane { page.Content() } }
+                }
+            }
+        }
+        compose.waitFor { compose.onAllNodesWithTag("modes_add").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("mode_row_holiday").performClick()
+        compose.waitFor { compose.onAllNodesWithTag("plug_row_0").fetchSemanticsNodes().isNotEmpty() }
+        compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w1000dp-h950dp-port-hdpi")
+    fun holidayPageDark() = holidayPage("holiday_mode_page_dark", true)
+
+    @Test
+    @Config(qualifiers = "w1000dp-h950dp-port-hdpi")
+    fun holidayPageLight() = holidayPage("holiday_mode_page_light", false)
 
     @Test
     fun lightChoiceSheetDark() {

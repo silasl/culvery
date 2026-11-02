@@ -41,6 +41,7 @@ import uk.co.siland.culvery.core.house.MusicOptions
 import uk.co.siland.culvery.core.house.MusicPick
 import uk.co.siland.culvery.core.house.RoomChoice
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.plugin.BuiltInModePage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -64,9 +65,9 @@ internal class PageRig(scope: CoroutineScope, role: Role? = Role.ADULT) {
         (listOfNotNull(HouseModes.HOLIDAY.takeIf { prefs.holidayOnHome }) + prefs.modes.filter { it.showOnHome }.map { it.id }).take(room)
     }.distinctUntilChanged()
 
-    private val controls = ModeControls(actions, house, { id -> shown.map { ids -> ids.indexOf(id).takeIf { it >= 0 } } }, music, lights)
+    val controls = ModeControls(actions, house, { id -> shown.map { ids -> ids.indexOf(id).takeIf { it >= 0 } } }, music, lights)
 
-    fun page(toaster: Toaster) = ModesPage(settings, controls, holidayOn, room, plugs, toaster)
+    fun page(toaster: Toaster, builtIn: Set<BuiltInModePage> = emptySet()) = ModesPage(settings, controls, holidayOn, room, plugs, toaster, builtIn)
 
     /** Reads the record, as the scheduler's first tick does; until then the page takes the mode for unread. */
     fun loaded() = runBlocking { house.tick() }

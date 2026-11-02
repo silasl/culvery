@@ -36,7 +36,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.capability.lights.AWAY
 import uk.co.siland.culvery.capability.lights.BridgeFound
 import uk.co.siland.culvery.capability.lights.Bridges
 import uk.co.siland.culvery.capability.lights.LightsConnect
@@ -47,7 +46,6 @@ import uk.co.siland.culvery.capability.lights.LightsProvider
 import uk.co.siland.culvery.capability.lights.LightsSettings
 import uk.co.siland.culvery.capability.lights.LightsUnreachableException
 import uk.co.siland.culvery.capability.lights.LightsView
-import uk.co.siland.culvery.capability.lights.MIMIC
 import uk.co.siland.culvery.capability.lights.TestLightsProvider
 import uk.co.siland.culvery.capability.lights.link
 import uk.co.siland.culvery.capability.lights.problemLine
@@ -64,7 +62,7 @@ import uk.co.siland.culvery.core.ui.test.waitFor
 private val SEEN = listOf(room("Lounge"), room("Kitchen"), room("Garden"))
 private val FOUND = BridgeFound("001788fffe00a1b2", "192.168.1.30")
 
-/** 7 §4.1, §5.3: Hue Bridge, the main room, the rooms All lights off leaves out and Holiday lights' automations. */
+/** 7 §4.1, §5.3: Hue Bridge, the main room and the rooms All lights off leaves out; Holiday lights' automations are on Holiday mode's page (15b decision 5). */
 @RunWith(AndroidJUnit4::class)
 class LightsSettingsPageTest {
     @get:Rule val compose = createComposeRule()
@@ -72,7 +70,7 @@ class LightsSettingsPageTest {
     private val calls = mutableListOf<String>()
     private val paired = LightsSettingsUi(
         paired = true, status = null, findLine = null, finding = false, rooms = SEEN, mainRoomId = null,
-        leftOut = emptySet(), goneLeftOut = 0, automations = listOf(MIMIC, AWAY), holidayAutomations = emptySet(),
+        leftOut = emptySet(), goneLeftOut = 0,
     )
 
     private fun show(ui: LightsSettingsUi) = compose.setContent {
@@ -84,10 +82,19 @@ class LightsSettingsPageTest {
                     onEnterAddress = { calls += "address" },
                     onMainRoom = { calls += "main $it" },
                     onLeftOut = { calls += "left out ${it.sorted()}" },
-                    onHolidayAutomations = { calls += "holiday ${it.sorted()}" },
                 )
             }
         }
+    }
+
+    /** Fails if Settings › Lights still draws Holiday lights' automations, which moved to Holiday mode's page. */
+    @Test
+    fun noHolidaySection() {
+        show(paired)
+        compose.onAllNodesWithTag("lights_holiday_note").assertCountEquals(0)
+        compose.onAllNodesWithTag("lights_no_automations").assertCountEquals(0)
+        compose.onAllNodesWithTag("lights_automation_mimic-id").assertCountEquals(0)
+        compose.onAllNodesWithText("Holiday lights switch on", ignoreCase = true).assertCountEquals(0)
     }
 
     private fun checkbox() = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox)
@@ -95,7 +102,7 @@ class LightsSettingsPageTest {
     /** Fails if an unpaired page doesn't say so, or Find Hue Bridge and the address button don't call out. */
     @Test
     fun unpairedOffersFindAndAddress() {
-        show(paired.copy(paired = false, rooms = emptyList(), automations = null))
+        show(paired.copy(paired = false, rooms = emptyList()))
         compose.onNodeWithTag("lights_connection").assertTextEquals("Not paired yet. Find Hue Bridge, or enter the bridge’s address.")
         compose.onAllNodesWithTag("lights_main_Lounge-id").assertCountEquals(0)
         compose.onNodeWithTag("lights_find").performClick()
@@ -232,42 +239,6 @@ class LightsSettingsPageTest {
         compose.onNodeWithTag("lights_gone_line").assertTextEquals("2 rooms left out are no longer on the bridge.")
     }
 
-    /** Fails if the note about Holiday lights is missing under an empty tick, or ticking doesn't save. */
-    @Test
-    fun holidayAutomationsTicks() {
-        show(paired)
-        compose.onNodeWithTag("lights_holiday_note").assertTextEquals("Holiday lights turns all lights off and shows On.")
-        compose.onNodeWithTag("lights_automation_mimic-id").assert(checkbox()).performClick()
-        assertThat(calls).containsExactly("holiday [mimic-id]")
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    /** Fails if the note stays once an automation is ticked. */
-    @Test
-    fun theNoteGoesOnceOneIsTicked() {
-        show(paired.copy(holidayAutomations = setOf("mimic-id")))
-        compose.onNodeWithTag("lights_automation_mimic-id").assertIsSelected()
-        compose.onAllNodesWithTag("lights_holiday_note").assertCountEquals(0)
-    }
-
-    /** Fails if a bridge with no automations doesn't say how to get one. */
-    @Test
-    fun noAutomationsYet() {
-        show(paired.copy(automations = emptyList()))
-        compose.onNodeWithTag("lights_no_automations").assertTextEquals("No Hue automations yet. Set one up in the Hue app, such as Mimic presence.")
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    /** Fails if a ticked automation the bridge dropped shows, or the next save keeps its id. */
-    @Test
-    fun aGoneAutomationIsNotListed() {
-        show(paired.copy(holidayAutomations = setOf("mimic-id", "gone-id")))
-        compose.onAllNodesWithTag("lights_automation_gone-id").assertCountEquals(0)
-        compose.onNodeWithTag("lights_automation_away-id").performClick()
-        assertThat(calls).containsExactly("holiday [away-id, mimic-id]")
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
     /** Fails if a problem doesn't take the connection line's place with the same words as the card. */
     @Test
     fun theStatusIsTheProblemLine() {
@@ -387,14 +358,14 @@ class LightsSettingsPageTest {
         compose.waitFor { runCatching { compose.onNodeWithTag("lights_find_line").assertTextEquals(problemLine(LightsProblem.UNREACHABLE)) }.isSuccess }
     }
 
-    /** Fails if the host doesn't read the rooms and the automations once as the page opens, or doesn't list them. */
+    /** Fails if the host doesn't read the rooms once as the page opens, reads the automations, or doesn't list the rooms. */
     @Test
     fun theHostReadsOnceAndListsWhatTheBridgeHas() {
         val h = Host()
         showHost(h)
         h.open()
-        compose.waitFor { appeared("lights_main_Lounge-id") && appeared("lights_automation_mimic-id") }
-        assertThat(h.hue.systems.single().calls.filter { it == "readAll" || it == "automations" }).containsExactly("readAll", "automations").inOrder()
+        compose.waitFor { appeared("lights_main_Lounge-id") }
+        assertThat(h.hue.systems.single().calls.filter { it == "readAll" || it == "automations" }).containsExactly("readAll")
     }
 
     /** Fails if a tick doesn't save at once, or a gone room's id survives the next save. */
@@ -410,9 +381,6 @@ class LightsSettingsPageTest {
         compose.waitFor { h.saved.value.leftOut == setOf("Garden-id", "Kitchen-id") }
         compose.onNodeWithTag("lights_main_Garden-id").performClick()
         compose.waitFor { h.saved.value.mainRoomId == "Garden-id" }
-        compose.waitFor { appeared("lights_automation_away-id") }
-        compose.onNodeWithTag("lights_automation_away-id").performClick()
-        compose.waitFor { h.saved.value.holidayAutomations == setOf("away-id") }
     }
 
     /** Fails if a choice that couldn't be saved says nothing, or says anything but the standard line. */

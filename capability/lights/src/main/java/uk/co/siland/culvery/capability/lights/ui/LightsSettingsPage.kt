@@ -21,7 +21,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import uk.co.siland.culvery.capability.lights.Automation
 import uk.co.siland.culvery.capability.lights.BRIDGE_ADDRESS
 import uk.co.siland.culvery.capability.lights.BRIDGE_ADDRESS_EXAMPLE
 import uk.co.siland.culvery.capability.lights.BRIDGE_ADDRESS_HINT
@@ -31,8 +30,6 @@ import uk.co.siland.culvery.capability.lights.ConnectFailed
 import uk.co.siland.culvery.capability.lights.ENTER_BRIDGE_ADDRESS
 import uk.co.siland.culvery.capability.lights.FIND_HUE_BRIDGE
 import uk.co.siland.culvery.capability.lights.FindOutcome
-import uk.co.siland.culvery.capability.lights.HOLIDAY_JUST_LIGHTS
-import uk.co.siland.culvery.capability.lights.HOLIDAY_SWITCHES_ON
 import uk.co.siland.culvery.capability.lights.HUE_BRIDGE
 import uk.co.siland.culvery.capability.lights.LEFT_OUT_LABEL
 import uk.co.siland.culvery.capability.lights.LIGHTS
@@ -44,7 +41,6 @@ import uk.co.siland.culvery.capability.lights.LightsSystem
 import uk.co.siland.culvery.capability.lights.LightsView
 import uk.co.siland.culvery.capability.lights.MAIN_ROOM
 import uk.co.siland.culvery.capability.lights.NOT_PAIRED
-import uk.co.siland.culvery.capability.lights.NO_AUTOMATIONS
 import uk.co.siland.culvery.capability.lights.PAIRED
 import uk.co.siland.culvery.capability.lights.PAIRED_WITH_BRIDGE
 import uk.co.siland.culvery.capability.lights.PAIR_WITH_BRIDGE
@@ -98,9 +94,6 @@ data class LightsSettingsUi(
     val leftOut: Set<String>,
     /** How many of [leftOut] the bridge no longer lists. */
     val goneLeftOut: Int,
-    /** Null until the bridge has answered. */
-    val automations: List<Automation>?,
-    val holidayAutomations: Set<String>,
 )
 
 @Composable
@@ -110,7 +103,6 @@ fun LightsSettingsPage(
     onEnterAddress: () -> Unit,
     onMainRoom: (String) -> Unit,
     onLeftOut: (Set<String>) -> Unit,
-    onHolidayAutomations: (Set<String>) -> Unit,
 ) {
     val c = Culvery.colors
     Column(verticalArrangement = Arrangement.spacedBy(LightsDimens.settingsGap), modifier = Modifier.testTag("settings_lights")) {
@@ -131,7 +123,6 @@ fun LightsSettingsPage(
         HhMessageLine(ui.findLine, HhType.body, c.danger, "lights_find_line")
         MainRoomChoice(ui, onMainRoom)
         LeftOutChoice(ui, onLeftOut)
-        HolidayChoice(ui, onHolidayAutomations)
     }
 }
 
@@ -172,28 +163,6 @@ private fun LeftOutChoice(ui: LightsSettingsUi, onLeftOut: (Set<String>) -> Unit
 }
 
 @Composable
-private fun HolidayChoice(ui: LightsSettingsUi, onHolidayAutomations: (Set<String>) -> Unit) {
-    val c = Culvery.colors
-    val automations = ui.automations ?: return
-    HhSectionLabel(HOLIDAY_SWITCHES_ON)
-    when {
-        automations.isEmpty() -> Text(NO_AUTOMATIONS, style = HhType.body, color = c.mute, modifier = Modifier.testTag("lights_no_automations"))
-        else -> {
-            val ticked = ui.holidayAutomations intersect automations.map { it.id }.toSet()
-            ChipFlow {
-                automations.forEach { automation ->
-                    HhChoiceChip(
-                        automation.name, selected = automation.id in ticked, tag = "lights_automation_${automation.id}", role = Role.Checkbox,
-                        onClick = { onHolidayAutomations(if (automation.id in ticked) ticked - automation.id else ticked + automation.id) },
-                    )
-                }
-            }
-            if (ticked.isEmpty()) Text(HOLIDAY_JUST_LIGHTS, style = HhType.body, color = c.mute, modifier = Modifier.testTag("lights_holiday_note"))
-        }
-    }
-}
-
-@Composable
 private fun RoomsAfterPairing() = Text(ROOMS_AFTER_PAIRING, style = HhType.body, color = Culvery.colors.mute)
 
 @Composable
@@ -224,7 +193,6 @@ internal fun LightsSettingsHost(
     val rooms by view.rooms.collectAsStateWithLifecycle(emptyList())
     val problem by view.problem.collectAsStateWithLifecycle(null)
     val system by bridges.system.collectAsStateWithLifecycle()
-    var automations by remember { mutableStateOf<List<Automation>?>(null) }
     var finding by remember { mutableStateOf(false) }
     var findLine by remember { mutableStateOf<String?>(null) }
     val pairing = remember { PairingRun() }
@@ -232,10 +200,9 @@ internal fun LightsSettingsHost(
     val scope = rememberCoroutineScope()
     LaunchedEffect(system) {
         val s = system
-        automations = null
         if (s != null) {
             findLine = null
-            automations = readBridge(s)
+            readBridge(s)
         }
     }
     val p = prefs ?: return
@@ -295,8 +262,6 @@ internal fun LightsSettingsHost(
             mainRoomId = p.mainRoomId,
             leftOut = p.leftOut,
             goneLeftOut = if (rooms.isEmpty()) 0 else (p.leftOut - listed).size,
-            automations = automations,
-            holidayAutomations = p.holidayAutomations,
         ),
         onFind = {
             scope.launch {
@@ -330,17 +295,12 @@ internal fun LightsSettingsHost(
         },
         onMainRoom = { id -> change { settings.setMainRoom(id) } },
         onLeftOut = { ids -> change { settings.setLeftOut(ids) } },
-        onHolidayAutomations = { ids -> change { settings.setHolidayAutomations(ids) } },
     )
 }
 
-/** No check runs while only Settings shows, and the choices need the rooms and the automations. */
-private suspend fun readBridge(system: LightsSystem): List<Automation>? = attempt({
-    system.readAll()
-    system.automations()
-}) { e ->
-    Log.w(TAG, "Couldn't read the bridge for Settings (${e::class.simpleName})")
-    null
+/** No check runs while only Settings shows, and the choices need the rooms. */
+private suspend fun readBridge(system: LightsSystem) {
+    attempt({ system.readAll() }) { e -> Log.w(TAG, "Couldn't read the bridge for Settings (${e::class.simpleName})") }
 }
 
 /** The pairing in progress: its job, and the sheet that is its own (null once closed or replaced). */
