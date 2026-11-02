@@ -92,8 +92,6 @@ object ModesWords {
     const val DELETE_MODE = "Delete mode"
     const val MISSING_PLUG = "A plug that is no longer on the Lights tab"
 
-    fun turnNow(on: Boolean) = if (on) "Turn off now" else "Turn on now"
-
     fun appliesNext(name: String) = "Changes apply the next time $name turns on."
 
     fun homeHasRoom(room: Int) = "Home has room for $room ${if (room == 1) "mode" else "modes"}."

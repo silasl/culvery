@@ -1,9 +1,6 @@
 package uk.co.siland.culvery.capability.party.ui
 
 import android.util.Log
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,7 +13,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,13 +29,15 @@ import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.save
+import uk.co.siland.culvery.core.plugin.saving
+import uk.co.siland.culvery.core.plugin.turnNowLabel
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhSwitchRow
-import uk.co.siland.culvery.core.ui.SettingsTokens
+import uk.co.siland.culvery.core.ui.HouseModeTurnButton
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "StoredModePage"
@@ -67,7 +65,7 @@ internal fun StoredModePage(
     store: ModesStore,
     toaster: Toaster,
 ) {
-    val scope = rememberCoroutineScope()
+    val change = rememberCoroutineScope().saving(toaster, logSave)
     val house = controls.house
     val onId by house.onMode.collectAsStateWithLifecycle()
     val running by house.running.collectAsStateWithLifecycle()
@@ -75,44 +73,32 @@ internal fun StoredModePage(
     val on = onId == mode.id
     val place by remember(mode.id) { controls.place(mode.id) }.collectAsStateWithLifecycle(null)
     val refusal by remember(mode.id) { controls.actions.refusal(mode.id) }.collectAsStateWithLifecycle(null)
-    val added by remember(plugs, mode.id) {
-        plugs?.added(mode.id)?.catch { e ->
-            Log.w(TAG, "Couldn't read a mode's plugs (${e::class.simpleName})")
-            emit(emptyList())
-        } ?: flowOf(emptyList())
-    }.collectAsStateWithLifecycle(emptyList())
+    val added by remember(plugs, mode.id) { plugs?.addedOrNone(mode.id, TAG) ?: flowOf(emptyList()) }.collectAsStateWithLifecycle(emptyList())
     val locked = added.any { it.needsPin }
     val turn = rememberSingleAction(house) { e -> Log.w(TAG, "A stored mode's page action failed: ${e::class.simpleName}") }
 
-    fun save(change: (StoredMode) -> StoredMode) {
-        scope.launch {
-            toaster.save({ store.update { it.withMode(mode.id, change) } }) { Log.w(TAG, "Couldn't save a mode (${it::class.simpleName})") }
-        }
-    }
+    fun save(transform: (StoredMode) -> StoredMode) = change { store.update { it.withMode(mode.id, transform) } }
 
-    HhButton(
-        ModesWords.turnNow(on), { turn.run { controls.actions.tap(mode.id, sawOn = on) } }, Modifier.testTag("mode_turn"),
-        tone = ButtonTone.Primary, enabled = running == null && read != null, on = ButtonSurface.Bg,
+    HouseModeTurnButton(
+        turnNowLabel(on), { turn.run { controls.actions.tap(mode.id, sawOn = on) } },
+        read = read != null, running = running != null, line = refusal,
     )
-    refusal?.let { HhStatusLine(it, "mode_turn_line") }
     if (on) Line(ModesWords.appliesNext(mode.name), "mode_applies_line")
 
-    Row(horizontalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.weight(1f)) {
-            ShowOnHomeSwitch(mode.showOnHome, place, room, prefs) { save { m -> m.copy(showOnHome = it) } }
-        }
-        Row(Modifier.weight(1f)) {
+    ModeSwitches(
+        home = { ShowOnHomeSwitch(mode.showOnHome, place, room, prefs) { save { m -> m.copy(showOnHome = it) } } },
+        pin = {
             HhSwitchRow(
                 ModesWords.NEEDS_A_PIN, line = ModesWords.PLUG_NEEDS_PIN.takeIf { locked },
                 checked = mode.needsPin || locked, tag = "mode_pin", enabled = !locked,
                 onChange = { save { m -> m.copy(needsPin = it) } },
             )
-        }
-    }
+        },
+    )
 
     ModeMusicSection(mode, controls.music, ::save)
     ModeLightsSection(mode, controls.lights, ::save)
-    if (plugs != null) ModePlugsSection(mode.id, plugs, onLockedAdded = { save { it.copy(needsPin = true) } }, toaster = toaster)
+    if (plugs != null) ModePlugsSection(mode.id, plugs, added, onLockedAdded = { save { it.copy(needsPin = true) } }, toaster = toaster)
 
     DeleteMode(mode, blocked = on || running != null || read == null) {
         toaster.save({

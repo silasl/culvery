@@ -175,6 +175,16 @@ fun HouseModeSheet(
     }
 }
 
+/**
+ * A mode page's turn button, [label] tagged `mode_turn`, then [line] under it tagged `mode_turn_line`. It works once the
+ * mode's state is [read] and while no change is [running].
+ */
+@Composable
+fun HouseModeTurnButton(label: String, onClick: () -> Unit, read: Boolean, running: Boolean, line: String?) {
+    HhButton(label, onClick, Modifier.testTag("mode_turn"), tone = ButtonTone.Primary, enabled = !running && read, on = ButtonSurface.Bg)
+    line?.let { HhStatusLine(it, "mode_turn_line") }
+}
+
 /** The sheet's list: [title], then each of [lines], tagged [tag]. */
 @Composable
 fun HouseModeLines(title: String, lines: List<String>, tag: String) {

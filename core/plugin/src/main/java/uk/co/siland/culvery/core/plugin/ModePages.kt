@@ -16,6 +16,9 @@ interface BuiltInModePage {
     fun Sections()
 }
 
+/** A mode page's turn button's label while the mode is [on] or off. */
+fun turnNowLabel(on: Boolean) = if (on) "Turn off now" else "Turn on now"
+
 /** Holiday lights' choice of presence automations, drawn on Holiday mode's page (15b decision 5). */
 interface HolidayLightsSection {
     @Composable

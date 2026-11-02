@@ -1,6 +1,5 @@
 package uk.co.siland.culvery.capability.party.ui
 
-import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,7 +9,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.party.ModesPrefs
 import uk.co.siland.culvery.capability.party.ModesStore
 import uk.co.siland.culvery.capability.party.ModesWords
@@ -18,7 +16,7 @@ import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.plugin.BuiltInModePage
 import uk.co.siland.culvery.core.plugin.Toaster
-import uk.co.siland.culvery.core.plugin.save
+import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.SettingsTokens
 
@@ -38,24 +36,30 @@ internal fun HolidayPage(
     store: ModesStore,
     toaster: Toaster,
 ) {
-    val scope = rememberCoroutineScope()
+    val change = rememberCoroutineScope().saving(toaster, logSave)
     val place by remember { controls.place(HouseModes.HOLIDAY) }.collectAsStateWithLifecycle(null)
 
     page?.TurnButton()
-    Row(horizontalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.weight(1f)) {
-            ShowOnHomeSwitch(prefs.holidayOnHome, place, room, prefs) { on ->
-                scope.launch {
-                    toaster.save({ store.update { it.copy(holidayOnHome = on) } }) { Log.w(TAG, "Couldn't save a mode (${it::class.simpleName})") }
-                }
-            }
-        }
-        Row(Modifier.weight(1f)) {
-            HhSwitchRow(ModesWords.NEEDS_A_PIN, line = ModesWords.HOLIDAY_PIN, checked = true, tag = "mode_pin", enabled = false, onChange = {})
-        }
-    }
+    ModeSwitches(
+        home = {
+            ShowOnHomeSwitch(prefs.holidayOnHome, place, room, prefs) { on -> change { store.update { it.copy(holidayOnHome = on) } } }
+        },
+        pin = { HhSwitchRow(ModesWords.NEEDS_A_PIN, line = ModesWords.HOLIDAY_PIN, checked = true, tag = "mode_pin", enabled = false, onChange = {}) },
+    )
     page?.Sections()
-    if (plugs != null) ModePlugsSection(HouseModes.HOLIDAY, plugs, onLockedAdded = {}, toaster = toaster)
+    if (plugs != null) {
+        val added by remember(plugs) { plugs.addedOrNone(HouseModes.HOLIDAY, TAG) }.collectAsStateWithLifecycle(emptyList())
+        ModePlugsSection(HouseModes.HOLIDAY, plugs, added, onLockedAdded = {}, toaster = toaster)
+    }
+}
+
+/** A mode page's Show on Home and Needs a PIN, side by side and the same width. */
+@Composable
+internal fun ModeSwitches(home: @Composable () -> Unit, pin: @Composable () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.weight(1f)) { home() }
+        Row(Modifier.weight(1f)) { pin() }
+    }
 }
 
 /** Show on Home: on while the mode is on Home with a place there; off with no room left, it says so and can't be turned on. */

@@ -14,9 +14,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -43,6 +43,9 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.SettingsTokens
 
 private const val TAG = "ModesPage"
+
+/** How every Modes page logs a change that didn't save. */
+internal val logSave: (IOException) -> Unit = { Log.w(TAG, "Couldn't save a mode (${it::class.simpleName})") }
 
 /** Settings › Modes (15b §4.1): the list of modes, and the page of the one opened. Between Lights (470) and Door (500). */
 class ModesPage internal constructor(
@@ -89,12 +92,13 @@ private fun ModesHost(
     val holiday by holidayOn.collectAsStateWithLifecycle()
     val overlay = LocalOverlayHost.current
     val scope = rememberCoroutineScope()
-    val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a mode (${it::class.simpleName})") }
+    val change = scope.saving(toaster, logSave)
     val p = prefs ?: return
-    val counts = plugCounts(plugs, p.modes.map { it.id })
-    val opened = open?.let { id -> if (id == HouseModes.HOLIDAY) HOLIDAY_ENTRY else p.mode(id) }
+    val holidayOpen = open == HouseModes.HOLIDAY
+    val opened = if (holidayOpen) null else open?.let(p::mode)
     // A mode deleted while its page is open leaves the list.
-    LaunchedEffect(open, opened == null) { if (open != null && opened == null) setOpen(null) }
+    val gone = open != null && !holidayOpen && opened == null
+    LaunchedEffect(open, gone) { if (gone) setOpen(null) }
 
     fun add(name: String, icon: String) = change {
         val spots = room.first()
@@ -113,12 +117,12 @@ private fun ModesHost(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("settings_modes")) {
-        if (opened == null) {
-            val rows = modeRows(p, holiday == true, on, counts)
+        if (!holidayOpen && opened == null) {
+            val rows = modeRows(p, holiday == true, on, plugCounts(plugs, p.modes.map { it.id }))
             ModesList(rows, onOpen = setOpen, onAdd = { overlay.showAddSheet(p, ::add) })
         } else {
             HhBackLink(ModesWords.BACK_TO_MODES, "modes_back") { setOpen(null) }
-            if (opened === HOLIDAY_ENTRY) {
+            if (opened == null) {
                 ModeHeader(Icons.BEACH_ACCESS, ModesWords.HOLIDAY_NAME, onIcon = null, onName = null)
                 HolidayPage(p, homeRoom, controls, builtIn.firstOrNull { it.modeId == HouseModes.HOLIDAY }, plugs, store, toaster)
             } else {
@@ -146,9 +150,6 @@ private fun ModesHost(
 internal fun modeRows(prefs: ModesPrefs, holidayOn: Boolean, on: String?, plugCounts: Map<String, Int>): List<ModeRowUi> =
     listOf(ModeRowUi(HouseModes.HOLIDAY, Icons.BEACH_ACCESS, ModesWords.HOLIDAY_NAME, ModesWords.holidaySummary(holidayOn, prefs.holidayOnHome))) +
         prefs.modes.map { ModeRowUi(it.id, ModeIcons.drawn(it.icon), it.name, ModesWords.summary(it, on == it.id, plugCounts[it.id] ?: 0)) }
-
-/** Stands for Holiday mode while its page is open; it is not a stored mode. */
-private val HOLIDAY_ENTRY = StoredMode(HouseModes.HOLIDAY, ModesWords.HOLIDAY_NAME, Icons.BEACH_ACCESS, showOnHome = true, needsPin = true)
 
 internal fun ModesPrefs.onHome() = (if (holidayOnHome) 1 else 0) + modes.count { it.showOnHome }
 
@@ -183,10 +184,7 @@ private fun plugCounts(plugs: HousePlugs?, ids: List<String>): Map<String, Int> 
         } else {
             combine(
                 ids.map { id ->
-                    plugs.added(id).map { it.size }.catch { e ->
-                        Log.w(TAG, "Couldn't read a mode's plugs (${e::class.simpleName})")
-                        emit(0)
-                    }
+                    plugs.addedOrNone(id, TAG).map { it.size }
                 },
             ) { counts -> ids.zip(counts.toList()).toMap() }.collect { value = it }
         }

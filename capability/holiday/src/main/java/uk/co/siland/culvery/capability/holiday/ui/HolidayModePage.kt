@@ -18,13 +18,11 @@ import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.plugin.BuiltInModePage
 import uk.co.siland.culvery.core.plugin.HolidayLightsSection
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
-import uk.co.siland.culvery.core.ui.ButtonSurface
-import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.plugin.turnNowLabel
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhSectionLabel
-import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.HouseModeTurnButton
 import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
@@ -48,13 +46,11 @@ class HolidayModePage @Inject constructor(
         val overlay = LocalOverlayHost.current
         val action = rememberSingleAction(house) { e -> Log.w(TAG, "Holiday mode turn button action failed: ${e::class.simpleName}") }
         val on = record?.on == true
-        HhButton(
-            HolidayWords.turnNow(on),
+        HouseModeTurnButton(
+            turnNowLabel(on),
             { action.run { actions.toggle { by -> overlay.show { HolidaySheetHost(by, actions, house, overlay::dismiss) } } } },
-            Modifier.testTag("mode_turn"),
-            tone = ButtonTone.Primary, enabled = running == null && record != null, on = ButtonSurface.Bg,
+            read = record != null, running = running != null, line = refusal ?: houseLine,
         )
-        (refusal ?: houseLine)?.let { HhStatusLine(it, "mode_turn_line") }
     }
 
     @Composable

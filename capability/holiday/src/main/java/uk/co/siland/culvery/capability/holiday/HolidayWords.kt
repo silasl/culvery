@@ -70,8 +70,6 @@ object HolidayWords {
     /** What Holiday mode always does besides its lights and plugs, as its page in Settings › Modes lists it (plan copy). */
     val FIXED_LINES = listOf(ECO_LINE, HOOVER_LINE, DOOR)
 
-    fun turnNow(on: Boolean) = if (on) "Turn off now" else "Turn on now"
-
     fun backShort(date: LocalDate) = "Back ${SHORT.format(date)}"
 
     fun backSpoken(date: LocalDate): String = FULL.format(date)
