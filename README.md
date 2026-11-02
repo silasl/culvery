@@ -62,7 +62,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:capability:calendar-testkit` | `CalendarProviderContractTest`, the tests every calendar provider must pass |
 | `:capability:weather` | Weather contract (`WeatherProvider`), `weather.db` (the last forecast, for the place it was fetched for), the 30-minute fetch, the header item, the Forecast card, today's sun times (`Daylight`) |
 | `:capability:music` | Music contract (`MusicSystem`, with grouping and regrouping speakers), the saved household (`music_settings`), the Music tab, lowering for the doorbell, `MusicHouseSeam` (`HouseMusic`: Party's group and putting it back) |
-| `:capability:lights` | Lights contract (`LightsSystem`), the saved bridge (`lights_settings`), the Lights tab, Holiday lights, `LightsParty` (Party's scenes, put back only where the bridge still shows them) |
+| `:capability:lights` | Lights contract (`LightsSystem`), the saved bridge (`lights_settings`), the Lights tab, Holiday lights, `LightsModes` (a mode’s scene, on-at-a-percent or off choices, put back only where the bridge still shows them as left) |
 | `:capability:shopping` | Shopping contract (`ShoppingProvider`), `shopping.db` (the connection, the last read, the queue of unsent changes, what is learned), `ShoppingLock` |
 | `:capability:hoover` | Hoover contract (`HooverSystem`), the chosen hoover (`hoover_settings`), the words for its states, the `hoover.start` permission, the Hoover capability (no tab) |
 | `:capability:heating` | Heating contract (`HeatingSystem`), the chosen thermostat (`heating_settings`) |

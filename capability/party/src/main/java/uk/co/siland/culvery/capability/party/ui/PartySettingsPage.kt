@@ -32,11 +32,12 @@ import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HouseRoom
 import uk.co.siland.culvery.core.house.HouseScene
+import uk.co.siland.culvery.core.house.LightChoice
 import uk.co.siland.culvery.core.house.LightOptions
 import uk.co.siland.culvery.core.house.LightRoomOption
 import uk.co.siland.culvery.core.house.MusicOptions
 import uk.co.siland.culvery.core.house.MusicPick
-import uk.co.siland.culvery.core.house.SceneChoice
+import uk.co.siland.culvery.core.house.RoomChoice
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.attempt
@@ -139,7 +140,7 @@ private fun LightsSection(ui: PartySettingsUi, onScene: (LightRoomOption, HouseS
     lights.line?.let { Line(it, "party_lights_line", problem = true) }
     val overlay = LocalOverlayHost.current
     lights.rooms.forEachIndexed { i, room ->
-        val chosen = ui.prefs.scenes.firstOrNull { it.roomId == room.id }
+        val chosen = ui.prefs.scenes.firstOrNull { it.roomId == room.id }?.choice as? LightChoice.Scene
         ChoiceRow(room.name, chosen?.sceneName ?: PartyWords.LEAVE_ALONE, PartyWords.chooseScene(room.name), "party_light_$i") {
             overlay.show {
                 PartySceneSheet(
@@ -233,7 +234,7 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
         value = if (lights == null || lightsReady != true) {
             null
         } else {
-            attempt({ lights.partyOptions() }) { e ->
+            attempt({ lights.lightOptions() }) { e ->
                 Log.w(TAG, "Couldn't read what the lights offer (${e::class.simpleName})")
                 LightOptions(emptyList(), HouseLines.HUE_REFUSED)
             }
@@ -255,7 +256,7 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
         onMusic = { pick -> save { it.copy(music = pick?.let { chosen -> MusicChoice(chosen.id, chosen.name) }) } },
         onSpeaker = { room, on -> save { it.withSpeaker(musicOptions?.rooms.orEmpty(), room, on) } },
         onScene = { room, scene ->
-            save { if (scene == null) it.withoutScene(room.id) else it.withScene(SceneChoice(room.id, room.name, scene.id, scene.name)) }
+            save { if (scene == null) it.withoutScene(room.id) else it.withScene(RoomChoice(room.id, room.name, LightChoice.Scene(scene.id, scene.name))) }
         },
     )
 }

@@ -54,11 +54,12 @@ import uk.co.siland.culvery.capability.party.PartyPrefs
 import uk.co.siland.culvery.capability.party.PartySettings
 import uk.co.siland.culvery.core.house.HouseRoom
 import uk.co.siland.culvery.core.house.HouseScene
+import uk.co.siland.culvery.core.house.LightChoice
 import uk.co.siland.culvery.core.house.LightOptions
 import uk.co.siland.culvery.core.house.LightRoomOption
 import uk.co.siland.culvery.core.house.MusicOptions
 import uk.co.siland.culvery.core.house.MusicPick
-import uk.co.siland.culvery.core.house.SceneChoice
+import uk.co.siland.culvery.core.house.RoomChoice
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -75,7 +76,7 @@ internal val LIGHT_OPTIONS = LightOptions(
     ),
     null,
 )
-internal val BRIGHT_IN_KITCHEN = SceneChoice("r1", "Kitchen", "s1", "Bright")
+internal val BRIGHT_IN_KITCHEN = RoomChoice("r1", "Kitchen", LightChoice.Scene("s1", "Bright"))
 
 /** Hosts a page as Settings does: in a vertical scroll, in a column 720 dp wide. */
 @Composable
@@ -255,7 +256,7 @@ class PartySettingsPageTest {
     fun aSavedChoiceNoLongerOfferedStillShows() {
         screen(
             ui.copy(
-                prefs = PartyPrefs(music = MusicChoice("FV:9/9", "Old mix"), scenes = listOf(SceneChoice("r1", "Kitchen", "gone", "Candlelight"))),
+                prefs = PartyPrefs(music = MusicChoice("FV:9/9", "Old mix"), scenes = listOf(RoomChoice("r1", "Kitchen", LightChoice.Scene("gone", "Candlelight")))),
             ),
         )
         compose.onNodeWithTag("party_music").assertTextEquals("Music", "Old mix")

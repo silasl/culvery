@@ -10,13 +10,13 @@ import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseStep
 import uk.co.siland.culvery.core.house.LightOptions
 import uk.co.siland.culvery.core.house.RoomBefore
-import uk.co.siland.culvery.core.house.SceneChoice
+import uk.co.siland.culvery.core.house.RoomChoice
 
 /** Holiday mode's way to Holiday lights (11 §5.1). */
 class LightsHouseSeam @Inject constructor(
     private val house: LightsHouse,
     private val settings: LightsSettings,
-    private val party: LightsParty,
+    private val modes: LightsModes,
 ) : HouseLights {
     override val ready: Flow<Boolean> = settings.prefs.map { it.link != null }.distinctUntilChanged()
 
@@ -30,11 +30,11 @@ class LightsHouseSeam @Inject constructor(
         }
     }
 
-    override suspend fun partyOptions(): LightOptions = party.options()
+    override suspend fun lightOptions(): LightOptions = modes.options()
 
-    override suspend fun partyBefore(choices: List<SceneChoice>): List<RoomBefore> = party.before(choices)
+    override suspend fun modeBefore(choices: List<RoomChoice>): List<RoomBefore> = modes.before(choices)
 
-    override suspend fun partyOn(rooms: List<RoomBefore>): List<String> = party.on(rooms)
+    override suspend fun modeOn(rooms: List<RoomBefore>): List<String> = modes.on(rooms)
 
-    override suspend fun partyBack(rooms: List<RoomBefore>): List<String> = party.back(rooms)
+    override suspend fun modeBack(rooms: List<RoomBefore>): List<String> = modes.back(rooms)
 }

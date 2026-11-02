@@ -69,16 +69,16 @@ interface HouseLights {
     suspend fun setHoliday(on: Boolean, by: Authorised): HouseStep
 
     /** Every room and its scenes, read afresh; [LightOptions.line] says why they couldn't be. */
-    suspend fun partyOptions(): LightOptions
+    suspend fun lightOptions(): LightOptions
 
-    /** The chosen rooms read afresh; a room or scene the bridge no longer has is left out (13 §2.13). Throws when the bridge can't be read. */
-    suspend fun partyBefore(choices: List<SceneChoice>): List<RoomBefore>
+    /** The chosen rooms read afresh; a scene the bridge no longer has, or a room it no longer has, is left out (13 §2.13). Throws when the bridge can't be read. */
+    suspend fun modeBefore(choices: List<RoomChoice>): List<RoomBefore>
 
-    /** Recalls each room's scene; the names of the rooms that didn't change. Never throws. */
-    suspend fun partyOn(rooms: List<RoomBefore>): List<String>
+    /** Sets each room as chosen; the names of the rooms that didn't change. Never throws. */
+    suspend fun modeOn(rooms: List<RoomBefore>): List<String>
 
-    /** Puts back each room whose active scene, read afresh, is still Party's (13 §2.12); the names not put back. Never throws. */
-    suspend fun partyBack(rooms: List<RoomBefore>): List<String>
+    /** Puts back each room that is still as the mode left it, read afresh (13 §2.12, 15b §4.3); the names not put back. Never throws. */
+    suspend fun modeBack(rooms: List<RoomBefore>): List<String>
 }
 
 interface HouseHeating {
@@ -270,16 +270,29 @@ data class LightRoomOption(val id: String, val name: String, val scenes: List<Ho
 /** What Settings offers for the lights: [line] says why [rooms] couldn't be read. */
 data class LightOptions(val rooms: List<LightRoomOption>, val line: String?)
 
-/** The scene chosen for a room, with the names the sheet shows. [toString] leaves out the ids and names. */
-data class SceneChoice(val roomId: String, val roomName: String, val sceneId: String, val sceneName: String) {
-    override fun toString() = "SceneChoice"
+/** What a mode does to a room (15b §4.2). */
+sealed interface LightChoice {
+    /** [toString] leaves out the ids and names. */
+    data class Scene(val sceneId: String, val sceneName: String) : LightChoice {
+        override fun toString() = "Scene"
+    }
+
+    /** [percent] is 10–100 in steps of 10 (15b §4.2). */
+    data class On(val percent: Int) : LightChoice
+
+    data object Off : LightChoice
 }
 
-/** A room as it was before Party; [sceneId] is Party's. [toString] leaves out the ids and name. */
+/** The choice made for a room, with the names the sheet shows. [toString] leaves out the ids and names. */
+data class RoomChoice(val roomId: String, val roomName: String, val choice: LightChoice) {
+    override fun toString() = "RoomChoice"
+}
+
+/** A room as it was before the mode; [choice] is the mode's. [toString] leaves out the ids and name. */
 data class RoomBefore(
     val roomId: String,
     val name: String,
-    val sceneId: String,
+    val choice: LightChoice,
     val on: Boolean,
     val brightness: Int,
     val activeSceneId: String?,

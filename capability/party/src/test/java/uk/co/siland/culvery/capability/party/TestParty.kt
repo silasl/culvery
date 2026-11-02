@@ -25,15 +25,16 @@ import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseRoom
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.LightChoice
 import uk.co.siland.culvery.core.house.LightOptions
 import uk.co.siland.culvery.core.house.MusicOptions
 import uk.co.siland.culvery.core.house.MusicStart
 import uk.co.siland.culvery.core.house.ModeGrant
+import uk.co.siland.culvery.core.house.PartyGroup
 import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.house.PlugOption
-import uk.co.siland.culvery.core.house.PartyGroup
 import uk.co.siland.culvery.core.house.RoomBefore
-import uk.co.siland.culvery.core.house.SceneChoice
+import uk.co.siland.culvery.core.house.RoomChoice
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
@@ -68,8 +69,8 @@ internal val LOUNGE = HouseRoom("Lounge-id", "Lounge")
 internal val DINING = HouseRoom("Dining-id", "Dining")
 
 internal val PARTY_MIX = MusicChoice("FV:2/3", "Party mix")
-internal val KITCHEN_BRIGHT = SceneChoice("r1", "Kitchen", "s1", "Bright")
-internal val LOUNGE_RELAX = SceneChoice("r2", "Lounge", "s3", "Relax")
+internal val KITCHEN_BRIGHT = RoomChoice("r1", "Kitchen", LightChoice.Scene("s1", "Bright"))
+internal val LOUNGE_RELAX = RoomChoice("r2", "Lounge", LightChoice.Scene("s3", "Relax"))
 
 internal val GROUPS_BEFORE = listOf(
     GroupBefore("Kitchen-id", listOf("Kitchen-id")),
@@ -77,8 +78,8 @@ internal val GROUPS_BEFORE = listOf(
 )
 internal val MADE = PartyGroup("Lounge-id", setOf("Kitchen-id", "Lounge-id", "Dining-id"))
 internal val LIGHTS_BEFORE = listOf(
-    RoomBefore("r1", "Kitchen", "s1", true, 40, "s2"),
-    RoomBefore("r2", "Lounge", "s3", false, 0, null),
+    RoomBefore("r1", "Kitchen", LightChoice.Scene("s1", ""), true, 40, "s2"),
+    RoomBefore("r2", "Lounge", LightChoice.Scene("s3", ""), false, 0, null),
 )
 
 internal val FULL_PREFS = PartyPrefs(music = PARTY_MIX, rooms = listOf(KITCHEN, LOUNGE), scenes = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX))
@@ -217,24 +218,24 @@ internal class FakeLights(private val trace: Trace = Trace()) : HouseLights {
     @Volatile var optionsGate: CompletableDeferred<Unit>? = null
     @Volatile var optionsThrow = false
 
-    override suspend fun partyOptions(): LightOptions {
+    override suspend fun lightOptions(): LightOptions {
         optionsGate?.await()
-        check(!optionsThrow) { "partyOptions threw" }
+        check(!optionsThrow) { "lightOptions threw" }
         return offered
     }
 
-    override suspend fun partyBefore(choices: List<SceneChoice>): List<RoomBefore> {
-        trace.hit("lights.partyBefore")
+    override suspend fun modeBefore(choices: List<RoomChoice>): List<RoomBefore> {
+        trace.hit("lights.modeBefore")
         return snapshot
     }
 
-    override suspend fun partyOn(rooms: List<RoomBefore>): List<String> {
-        trace.hit("lights.partyOn")
+    override suspend fun modeOn(rooms: List<RoomBefore>): List<String> {
+        trace.hit("lights.modeOn")
         return notChanged
     }
 
-    override suspend fun partyBack(rooms: List<RoomBefore>): List<String> {
-        trace.hit("lights.partyBack")
+    override suspend fun modeBack(rooms: List<RoomBefore>): List<String> {
+        trace.hit("lights.modeBack")
         backs += rooms
         return notBack
     }

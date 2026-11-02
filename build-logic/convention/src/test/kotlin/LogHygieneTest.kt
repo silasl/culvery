@@ -39,7 +39,7 @@ class LogHygieneTest {
         assertThat(sources.map { it.name }).contains("PartySettings.kt")
         assertThat(sources.map { it.name }).contains("PartyHouse.kt")
         assertThat(sources.map { it.name }).contains("MusicHouseSeam.kt")
-        assertThat(sources.map { it.name }).contains("LightsParty.kt")
+        assertThat(sources.map { it.name }).contains("LightsModes.kt")
         assertThat(sources.map { it.name }).contains("HolidayActions.kt")
         assertThat(sources.map { it.name }).contains("HolidayTile.kt")
         assertThat(sources.map { it.name }).contains("HolidaySheet.kt")

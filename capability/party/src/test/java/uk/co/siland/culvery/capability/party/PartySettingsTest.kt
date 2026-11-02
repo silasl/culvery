@@ -24,7 +24,9 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.house.HouseRoom
-import uk.co.siland.culvery.core.house.SceneChoice
+import uk.co.siland.culvery.core.house.LightChoice
+import uk.co.siland.culvery.core.house.RoomBefore
+import uk.co.siland.culvery.core.house.RoomChoice
 import uk.co.siland.culvery.core.plugin.settingsDataStore
 import uk.co.siland.culvery.core.plugin.test.soon
 
@@ -89,7 +91,7 @@ class PartySettingsTest {
         val prefs = PartyPrefs(
             music = MusicChoice("FV:2/3", odd),
             rooms = listOf(HouseRoom("Kitchen-id", odd)),
-            scenes = listOf(SceneChoice("r1", odd, "s1", odd)),
+            scenes = listOf(RoomChoice("r1", odd, LightChoice.Scene("s1", odd))),
         )
         val record = FULL_RECORD.copy(lights = listOf(LIGHTS_BEFORE[0].copy(name = odd)))
 
@@ -158,7 +160,7 @@ class PartySettingsTest {
 
     @Test
     fun withSceneReplacesThatRoomsChoice() {
-        val relax = KITCHEN_BRIGHT.copy(sceneId = "s2", sceneName = "Relax")
+        val relax = KITCHEN_BRIGHT.copy(choice = LightChoice.Scene("s2", "Relax"))
 
         val prefs = FULL_PREFS.withScene(relax)
 
@@ -202,5 +204,39 @@ class PartySettingsTest {
                 assertThat(text).doesNotContain(secret)
             }
         }
+    }
+
+    /** 15b §4.2: fails if a six-field entry written before 15b is dropped, or reads as anything but a scene. */
+    @Test
+    fun aPreFifteenBRecordReadsAsScenes() = runTest {
+        val sep = "\u001F"
+        val store = MemoryStore(
+            mutablePreferencesOf(stringSetPreferencesKey("lights.before") to setOf("r1${sep}Kitchen${sep}s1${sep}true${sep}40${sep}s2")),
+        )
+        val settings = PartySettings(store, backgroundScope)
+
+        runCurrent()
+        val room = settings.record.value!!.lights!!.single()
+        assertThat(room.choice).isInstanceOf(LightChoice.Scene::class.java)
+        assertThat((room.choice as LightChoice.Scene).sceneId).isEqualTo("s1")
+        assertThat(room.on).isTrue()
+        assertThat(room.activeSceneId).isEqualTo("s2")
+    }
+
+    /** 15b §4.2: fails if On's percent or Off is lost, in the choices or in the record. */
+    @Test
+    fun aRoomChoiceRoundTrips() = runTest {
+        val settings = PartySettings(MemoryStore(), backgroundScope)
+        val choices = listOf(LightChoice.Scene("s1", "Bright"), LightChoice.On(60), LightChoice.Off)
+        val prefs = PartyPrefs(scenes = choices.mapIndexed { i, c -> RoomChoice("r$i", "Room $i", c) })
+        val record = PartyRecord(on = true, lights = choices.mapIndexed { i, c -> RoomBefore("r$i", "Room $i", c, true, 40, "s2") })
+
+        settings.update { prefs }
+        settings.save(record)
+
+        assertThat(settings.prefs.first()).isEqualTo(prefs)
+        val back = settings.record.filterNotNull().first { it.lights != null }.lights!!
+        assertThat(back.map { it.choice }).containsExactly(LightChoice.Scene("s1", ""), LightChoice.On(60), LightChoice.Off).inOrder()
+        assertThat(back.map { it.activeSceneId }.distinct()).containsExactly("s2")
     }
 }

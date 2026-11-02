@@ -43,8 +43,8 @@ class HouseSeamsTest {
             PartyGroup("Kitchen-id", setOf("Kitchen-id")),
             scene,
             LightRoomOption("r1", "Kitchen", listOf(scene)),
-            SceneChoice("r1", "Kitchen", "s1", "Bright"),
-            RoomBefore("r1", "Kitchen", "s1", true, 40, "s2"),
+            RoomChoice("r1", "Kitchen", LightChoice.Scene("s1", "Bright")),
+            RoomBefore("r1", "Kitchen", LightChoice.Scene("s1", "Bright"), true, 40, "s2"),
         ).map { it.toString() }
         for (text in texts) {
             for (secret in listOf("Kitchen", "Kitchen-id", "Party mix", "FV:2/3", "r1", "s1", "Bright")) {

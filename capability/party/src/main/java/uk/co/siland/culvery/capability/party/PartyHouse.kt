@@ -236,14 +236,14 @@ class PartyHouse internal constructor(
     private suspend fun startLights(prefs: PartyPrefs) {
         val choices = prefs.scenes
         if (choices.isEmpty() || lights == null || !lights.ready.isReady()) return
-        val rooms = answer(PartyStep.LIGHTS) { lights.partyBefore(choices) }
+        val rooms = answer(PartyStep.LIGHTS) { lights.modeBefore(choices) }
         if (rooms == null) {
             lines.lights = HouseLines.lightsDidntChange(choices.map { it.roomName })
             return
         }
         if (rooms.isEmpty()) return
         set(current.value!!.copy(lights = rooms))
-        val left = answer(PartyStep.LIGHTS) { lights.partyOn(rooms) } ?: rooms.map { it.name }
+        val left = answer(PartyStep.LIGHTS) { lights.modeOn(rooms) } ?: rooms.map { it.name }
         lines.lights = left.takeIf { it.isNotEmpty() }?.let(HouseLines::lightsDidntChange)
         if (lines.lights != null) Log.w(TAG, "Party mode's LIGHTS step didn't change every room")
     }
@@ -278,7 +278,7 @@ class PartyHouse internal constructor(
     }
 
     private suspend fun putLightsBack(rooms: List<RoomBefore>): String? {
-        val left = lights?.let { answer(PartyStep.LIGHTS) { it.partyBack(rooms) } } ?: rooms.map { it.name }
+        val left = lights?.let { answer(PartyStep.LIGHTS) { it.modeBack(rooms) } } ?: rooms.map { it.name }
         if (left.isEmpty()) return null
         Log.w(TAG, "Party mode's LIGHTS step didn't put every room back")
         return HouseLines.lightsDidntGoBack(left)

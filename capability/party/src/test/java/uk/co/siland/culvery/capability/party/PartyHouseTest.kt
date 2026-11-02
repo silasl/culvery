@@ -93,7 +93,7 @@ class PartyHouseTest {
         house.turnOn(by)
 
         assertThat(rig.calls).containsExactly(
-            "plugs.begin party", "plugs.enter party", "music.before", "music.start FV:2/3 null", "lights.partyBefore", "lights.partyOn",
+            "plugs.begin party", "plugs.enter party", "music.before", "music.start FV:2/3 null", "lights.modeBefore", "lights.modeOn",
         ).inOrder()
         assertThat(rig.plugs.begins).containsExactly(by)
         val expected = PartyRecord(on = true, since = rig.wall, musicBefore = GROUPS_BEFORE, made = MADE, lights = LIGHTS_BEFORE)
@@ -140,12 +140,12 @@ class PartyHouseTest {
         val lights = rig()
         lights.choose()
         val lightsGate = CompletableDeferred<Unit>()
-        lights.trace.gates["lights.partyOn"] = lightsGate
+        lights.trace.gates["lights.modeOn"] = lightsGate
         val lightsHouse = lights.house()
         val lightsTurnOn = launch { lightsHouse.turnOn(by()) }
         runCurrent()
 
-        assertThat(lights.calls.last()).isEqualTo("lights.partyOn")
+        assertThat(lights.calls.last()).isEqualTo("lights.modeOn")
         assertThat(lights.saved().lights).isEqualTo(LIGHTS_BEFORE)
         assertThat(lights.saved().made).isEqualTo(MADE)
         lightsGate.complete(Unit)
@@ -188,13 +188,13 @@ class PartyHouseTest {
         val rig = rig()
         rig.choose()
         rig.music.started = MusicStart(null, HouseStep.Failed(MUSIC_START_LINE))
-        rig.trace.throws += "lights.partyBefore"
+        rig.trace.throws += "lights.modeBefore"
         val house = rig.house()
 
         house.turnOn(by())
 
         assertThat(rig.calls).containsExactly(
-            "plugs.begin party", "plugs.enter party", "music.before", "music.start FV:2/3 null", "lights.partyBefore",
+            "plugs.begin party", "plugs.enter party", "music.before", "music.start FV:2/3 null", "lights.modeBefore",
         ).inOrder()
         assertThat(house.isOn.value).isTrue()
         assertThat(house.line.value).isEqualTo("$MUSIC_START_LINE\nSome lights didn’t change: Kitchen and Lounge.")
@@ -235,7 +235,7 @@ class PartyHouseTest {
         assertThat(rig.enters()).isEqualTo(2)
         assertThat(house.line.value).isNull()
         assertThat(rig.calls.count { it.startsWith("music.start") }).isEqualTo(1)
-        assertThat(rig.calls.count { it == "lights.partyOn" }).isEqualTo(1)
+        assertThat(rig.calls.count { it == "lights.modeOn" }).isEqualTo(1)
         rig.wall = turnedOn + 3 * HouseTimings.RETRY_MS
         house.tick()
         assertThat(rig.enters()).isEqualTo(2)
@@ -292,7 +292,7 @@ class PartyHouseTest {
 
         house.turnOff(by())
 
-        assertThat(rig.calls.drop(before)).containsExactly("music.stop", "lights.partyBack", "plugs.leave party").inOrder()
+        assertThat(rig.calls.drop(before)).containsExactly("music.stop", "lights.modeBack", "plugs.leave party").inOrder()
         assertThat(rig.music.stops).containsExactly(MADE to GROUPS_BEFORE)
         assertThat(rig.lights.backs).containsExactly(LIGHTS_BEFORE)
         assertThat(rig.saved()).isEqualTo(PartyRecord())
@@ -338,7 +338,7 @@ class PartyHouseTest {
         rig.choose()
         val house = rig.house()
         house.turnOn(by())
-        rig.trace.throws += setOf("music.stop", "lights.partyBack", "plugs.leave")
+        rig.trace.throws += setOf("music.stop", "lights.modeBack", "plugs.leave")
 
         house.turnOff(by())
 
@@ -698,7 +698,7 @@ class PartyHouseTest {
         ShadowLog.clear()
         val rig = rig()
         rig.choose()
-        rig.trace.throws += setOf("plugs.enter", "lights.partyBefore", "music.stop", "plugs.leave", "lights.partyBack")
+        rig.trace.throws += setOf("plugs.enter", "lights.modeBefore", "music.stop", "plugs.leave", "lights.modeBack")
         rig.music.started = MusicStart(null, HouseStep.Failed(MUSIC_START_LINE))
         val house = rig.house()
         house.turnOn(by())

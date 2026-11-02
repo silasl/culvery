@@ -11,7 +11,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.house.HouseStep
-import uk.co.siland.culvery.core.house.SceneChoice
+import uk.co.siland.culvery.core.house.LightChoice
+import uk.co.siland.culvery.core.house.RoomChoice
 import uk.co.siland.culvery.core.plugin.test.soon
 
 /** 11 §5.1: Holiday mode's way to Holiday lights. */
@@ -21,7 +22,7 @@ class LightsHouseSeamTest {
     private val settings get() = lights.settings
     private val system = TestLightsSystem(listOf(room("Lounge", on = true)))
     private val house by lazy { LightsHouse({ system }, settings) }
-    private val seam by lazy { LightsHouseSeam(house, settings, LightsParty({ system })) }
+    private val seam by lazy { LightsHouseSeam(house, settings, LightsModes({ system })) }
 
     /** Fails if turning on with the record already on runs the lights again. */
     @Test
@@ -83,19 +84,19 @@ class LightsHouseSeamTest {
         assertThat(seam.ready.first()).isTrue()
     }
 
-    /** Fails if the seam's Party calls don't reach LightsParty over the same system. */
+    /** Fails if the seam's mode calls don't reach LightsModes over the same system. */
     @Test
-    fun thePartyCallsReachLightsParty() = runTest {
+    fun theModeCallsReachLightsModes() = runTest {
         system.rooms.value = listOf(room("Lounge", on = true, brightness = 40, scenes = listOf(RELAX), active = RELAX.id))
-        val choice = SceneChoice("Lounge-id", "Lounge", RELAX.id, "Relax")
-        val direct = LightsParty({ system })
-        assertThat(seam.partyOptions()).isEqualTo(direct.options())
-        val before = seam.partyBefore(listOf(choice))
+        val choice = RoomChoice("Lounge-id", "Lounge", LightChoice.Scene(RELAX.id, "Relax"))
+        val direct = LightsModes({ system })
+        assertThat(seam.lightOptions()).isEqualTo(direct.options())
+        val before = seam.modeBefore(listOf(choice))
         assertThat(before).isEqualTo(direct.before(listOf(choice)))
         assertThat(before).hasSize(1)
-        assertThat(seam.partyOn(before)).isEqualTo(direct.on(before))
-        assertThat(seam.partyBack(before)).isEqualTo(direct.back(before))
+        assertThat(seam.modeOn(before)).isEqualTo(direct.on(before))
+        assertThat(seam.modeBack(before)).isEqualTo(direct.back(before))
         system.failures["recallScene Lounge-id relax-id"] = LightsRefusedException()
-        assertThat(seam.partyOn(before)).containsExactly("Lounge")
+        assertThat(seam.modeOn(before)).containsExactly("Lounge")
     }
 }

@@ -221,6 +221,6 @@ class PartyActionsTest {
         runCurrent()
 
         assertThat(rig.house.isOn.value).isFalse()
-        assertThat(rig.trace.calls).contains("lights.partyBack")
+        assertThat(rig.trace.calls).contains("lights.modeBack")
     }
 }

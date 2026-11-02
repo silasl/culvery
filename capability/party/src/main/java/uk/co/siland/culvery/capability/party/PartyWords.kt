@@ -2,14 +2,15 @@ package uk.co.siland.culvery.capability.party
 
 import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.house.HouseRoom
+import uk.co.siland.culvery.core.house.LightChoice
 import uk.co.siland.culvery.core.house.PlugChange
-import uk.co.siland.culvery.core.house.SceneChoice
+import uk.co.siland.culvery.core.house.RoomChoice
 
 /** What Party will do, as the sheet lists it. [toString] leaves out the choices. */
 data class PartyPlan(
     val plugs: List<PlugChange>,
     val music: MusicChoice?,
-    val scenes: List<SceneChoice>,
+    val scenes: List<RoomChoice>,
     val rooms: List<HouseRoom>? = null,
 ) {
     val nothing: Boolean get() = plugs.isEmpty() && music == null && scenes.isEmpty()
@@ -62,7 +63,7 @@ object PartyWords {
                 add(HouseLines.PLUGS_BACK)
             }
             plan.music?.let { add(musicLine(it, plan.rooms)) }
-            plan.scenes.forEach { add("${it.sceneName} in ${it.roomName}.") }
+            plan.scenes.forEach { room -> (room.choice as? LightChoice.Scene)?.let { add("${it.sceneName} in ${room.roomName}.") } }
         }
     }
 

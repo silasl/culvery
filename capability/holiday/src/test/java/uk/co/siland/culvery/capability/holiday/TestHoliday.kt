@@ -20,7 +20,7 @@ import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseStep
 import uk.co.siland.culvery.core.house.LightOptions
 import uk.co.siland.culvery.core.house.RoomBefore
-import uk.co.siland.culvery.core.house.SceneChoice
+import uk.co.siland.culvery.core.house.RoomChoice
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
@@ -65,13 +65,13 @@ internal class FakeLights : Script(), HouseLights {
         return answer()
     }
 
-    override suspend fun partyOptions() = LightOptions(emptyList(), null)
+    override suspend fun lightOptions() = LightOptions(emptyList(), null)
 
-    override suspend fun partyBefore(choices: List<SceneChoice>) = emptyList<RoomBefore>()
+    override suspend fun modeBefore(choices: List<RoomChoice>) = emptyList<RoomBefore>()
 
-    override suspend fun partyOn(rooms: List<RoomBefore>) = emptyList<String>()
+    override suspend fun modeOn(rooms: List<RoomBefore>) = emptyList<String>()
 
-    override suspend fun partyBack(rooms: List<RoomBefore>) = emptyList<String>()
+    override suspend fun modeBack(rooms: List<RoomBefore>) = emptyList<String>()
 }
 
 internal class FakeHeating : Script(), HouseHeating {
