@@ -86,12 +86,12 @@ class ModesStore(private val store: DataStore<Preferences>, scope: CoroutineScop
             it[ModeKeys.ON] = record.on
             record.since?.let { since -> it[ModeKeys.SINCE] = since }
             record.musicBefore?.let { before ->
-                it[ModeKeys.MUSIC_BEFORE] = before.map { g -> ModeKeys.join(g.coordinatorId, g.roomIds.joinToString(",")) }.toSet()
+                it[ModeKeys.MUSIC_BEFORE] = before.map { g -> joinGroup(g.coordinatorId, g.roomIds) }.toSet()
             }
-            record.made?.let { made -> it[ModeKeys.MUSIC_MADE] = ModeKeys.join(made.coordinatorId, made.roomIds.joinToString(",")) }
+            record.made?.let { made -> it[ModeKeys.MUSIC_MADE] = joinGroup(made.coordinatorId, made.roomIds) }
             record.lights?.let { lights ->
                 it[ModeKeys.LIGHTS_BEFORE] = lights.map { r ->
-                    ModeKeys.join(r.roomId, r.name, *r.choice.recordFields(), r.on.toString(), r.brightness.toString(), r.activeSceneId.orEmpty())
+                    ModeKeys.join(r.roomId, r.name, *ModeKeys.encoded(r.choice).recordFields(), r.on.toString(), r.brightness.toString(), r.activeSceneId.orEmpty())
                 }.toSet()
             }
         }
@@ -134,6 +134,8 @@ class ModesStore(private val store: DataStore<Preferences>, scope: CoroutineScop
         lights = this[ModeKeys.LIGHTS_BEFORE]?.mapNotNull(::parseRoomBefore),
     )
 
+    private fun joinGroup(id: String, rooms: Collection<String>) = ModeKeys.join(id, rooms.joinToString(","))
+
     private fun parseGroup(text: String): Pair<String, List<String>>? {
         val f = ModeKeys.fields(text, 2) ?: return null
         return f[0] to f[1].split(',').filter { it.isNotEmpty() }
@@ -157,9 +159,6 @@ class ModesStore(private val store: DataStore<Preferences>, scope: CoroutineScop
             activeSceneId = active.ifEmpty { null },
         )
     }
-
-    /** `kind, sceneId, percent`: the record keeps no scene name. */
-    private fun LightChoice.recordFields(): Array<String> = ModeKeys.encoded(this).let { arrayOf(it[0], it[1], it[3]) }
 }
 
 /** The file's keys and value forms, shared by [ModesStore] and [PartyMove]. */
@@ -219,11 +218,19 @@ internal object ModeKeys {
         else -> null
     }
 
-    /** `kind, sceneId, sceneName, percent`. */
-    fun encoded(choice: LightChoice): Array<String> = when (choice) {
-        is LightChoice.Scene -> arrayOf(KIND_SCENE, choice.sceneId, choice.sceneName, "")
-        is LightChoice.On -> arrayOf(KIND_ON, "", "", choice.percent.toString())
-        LightChoice.Off -> arrayOf(KIND_OFF, "", "", "")
+    /** A [LightChoice]'s stored fields; empty where the kind has none. */
+    class Encoded(val kind: String, val sceneId: String = "", val sceneName: String = "", val percent: String = "") {
+        /** `kind, sceneId, sceneName, percent`. */
+        fun fields() = arrayOf(kind, sceneId, sceneName, percent)
+
+        /** `kind, sceneId, percent`: the record keeps no scene name. */
+        fun recordFields() = arrayOf(kind, sceneId, percent)
+    }
+
+    fun encoded(choice: LightChoice): Encoded = when (choice) {
+        is LightChoice.Scene -> Encoded(KIND_SCENE, sceneId = choice.sceneId, sceneName = choice.sceneName)
+        is LightChoice.On -> Encoded(KIND_ON, percent = choice.percent.toString())
+        LightChoice.Off -> Encoded(KIND_OFF)
     }
 }
 
@@ -242,6 +249,6 @@ internal fun MutablePreferences.writeModes(modes: List<StoredMode>) {
             this[keys.pickName] = music.pickName
         }
         mode.speakers?.let { rooms -> this[keys.rooms] = rooms.map { ModeKeys.join(it.id, it.name) }.toSet() }
-        if (mode.lights.isNotEmpty()) this[keys.lights] = mode.lights.map { ModeKeys.join(it.roomId, it.roomName, *ModeKeys.encoded(it.choice)) }.toSet()
+        if (mode.lights.isNotEmpty()) this[keys.lights] = mode.lights.map { ModeKeys.join(it.roomId, it.roomName, *ModeKeys.encoded(it.choice).fields()) }.toSet()
     }
 }
