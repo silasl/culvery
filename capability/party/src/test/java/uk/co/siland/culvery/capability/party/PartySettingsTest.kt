@@ -239,4 +239,15 @@ class PartySettingsTest {
         assertThat(back.map { it.choice }).containsExactly(LightChoice.Scene("s1", ""), LightChoice.On(60), LightChoice.Off).inOrder()
         assertThat(back.map { it.activeSceneId }.distinct()).containsExactly("s2")
     }
+
+    /** 15b §4.2: fails if a four-field scenes entry saved before 15b is dropped, or loses its scene name. */
+    @Test
+    fun aPreFifteenBSceneChoiceReadsBack() = runTest {
+        val sep = "\u001F"
+        val store = MemoryStore(mutablePreferencesOf(stringSetPreferencesKey("scenes") to setOf("r1${sep}Kitchen${sep}s1${sep}Bright")))
+
+        val settings = PartySettings(store, backgroundScope)
+
+        assertThat(settings.prefs.first().scenes).containsExactly(RoomChoice("r1", "Kitchen", LightChoice.Scene("s1", "Bright")))
+    }
 }

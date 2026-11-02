@@ -23,8 +23,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.house.GroupBefore
 import uk.co.siland.culvery.core.house.HouseRoom
-import uk.co.siland.culvery.core.house.PartyGroup
 import uk.co.siland.culvery.core.house.LightChoice
+import uk.co.siland.culvery.core.house.PartyGroup
 import uk.co.siland.culvery.core.house.RoomBefore
 import uk.co.siland.culvery.core.house.RoomChoice
 import uk.co.siland.culvery.core.plugin.ApplicationScope
@@ -192,11 +192,11 @@ class PartySettings(private val store: DataStore<Preferences>, scope: CoroutineS
 
     private companion object {
         /** No name holds it, so a value with several fields can be split again. */
+        const val SEPARATOR = '\u001F'
+
         const val KIND_SCENE = "scene"
         const val KIND_ON = "on"
         const val KIND_OFF = "off"
-
-        const val SEPARATOR = '\u001F'
 
         fun join(vararg fields: String) = fields.joinToString(SEPARATOR.toString())
 
