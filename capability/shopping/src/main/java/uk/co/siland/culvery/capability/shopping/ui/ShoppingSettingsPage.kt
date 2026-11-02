@@ -28,6 +28,7 @@ import uk.co.siland.culvery.capability.shopping.StoredShopping
 import uk.co.siland.culvery.capability.shopping.WHICH_ACCOUNT
 import uk.co.siland.culvery.capability.shopping.allow
 import uk.co.siland.culvery.capability.shopping.listGoneOnSettings
+import uk.co.siland.culvery.capability.shopping.permissionOnSettings
 import uk.co.siland.culvery.capability.shopping.problemLine
 import uk.co.siland.culvery.capability.shopping.stayedAllowed
 import uk.co.siland.culvery.capability.shopping.stopQuestion
@@ -216,18 +217,19 @@ private fun On(state: SettingsState.On, service: String, busy: Boolean, nowMilli
     }
 }
 
-/** "Updated 2 minutes ago" when it is fine; else what is wrong, as the tab and card say it. */
+/** "Updated 2 minutes ago" once the list has been read and is fine; else what is wrong, as the tab and card say it. */
 @Composable
 private fun Health(state: SettingsState.On, service: String, nowMillis: Long) {
     val problem = when (state.health) {
         ShoppingHealth.OK -> null
+        ShoppingHealth.NEEDS_PERMISSION -> permissionOnSettings(service)
         ShoppingHealth.LIST_GONE -> listGoneOnSettings(service)
         else -> problemLine(state.health, state.provider)
     }
-    if (problem != null) {
-        HhStatusLine(problem, "shopping_health")
-    } else {
-        Text(updatedLabel(state.lastReadMillis, nowMillis), style = HhType.body, color = Culvery.colors.mute, modifier = Modifier.testTag("shopping_health"))
+    when {
+        problem != null -> HhStatusLine(problem, "shopping_health")
+        state.lastReadMillis != null ->
+            Text(updatedLabel(state.lastReadMillis, nowMillis), style = HhType.body, color = Culvery.colors.mute, modifier = Modifier.testTag("shopping_health"))
     }
 }
 

@@ -23,6 +23,8 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.Dp
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
@@ -186,6 +188,30 @@ class PeopleUiTest {
         compose.onNodeWithTag("person_up_Sam").assertExists()
         compose.onNodeWithTag("person_down_Sam").assertExists()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15b §6: names are the handoff's 19 sp. */
+    @Test
+    fun namesAre19sp() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        assertThat(compose.onNodeWithText("Sam", useUnmergedTree = true).textLayout().layoutInput.style.fontSize).isEqualTo(19.sp)
+    }
+
+    /** Two to a row, half width: a long subtitle ("can only look") wraps over the lines it needs and is not cut. The text beside two Move buttons and a chevron is about 130 dp, so the sample needs three. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aNarrowRowsSubtitleWrapsInsteadOfCutting() {
+        runBlocking { access.pins.addPerson("Mia", PersonPalette.colors[2], Role.CHILD, null) }
+        show { Box(Modifier.width(720.dp)) { PeoplePane(editor, reorder = true) } }
+        compose.awaitTag("person_Mia")
+        val line = "Child · no PIN yet, so Mia can only look"
+        val layout = compose.onNodeWithText(line, useUnmergedTree = true).textLayout()
+        assertThat(layout.lineCount).isAtLeast(2)
+        assertThat(layout.hasVisualOverflow).isFalse()
+        val row = compose.onNodeWithTag("person_Mia").getUnclippedBoundsInRoot()
+        assertThat(compose.onNodeWithText(line, useUnmergedTree = true).getUnclippedBoundsInRoot().bottom.value).isAtMost(row.bottom.value)
     }
 
     @Test
@@ -791,6 +817,18 @@ class PeopleUiTest {
         val button = compose.onNodeWithTag("person_set_pin").getUnclippedBoundsInRoot()
         assertThat(hint.left.value).isAtLeast(button.right.value)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 15b §6: on an 800 dp screen the Set PIN pill scrolls wholly into the sheet's scroll area, not under its edge. */
+    @Test
+    fun setPinIsWhollyOnScreenAt800dp() {
+        showSheet(PersonForm(existing = null, taken = emptyMap()).apply { name = "Sam" }, scale = 1.3f)
+        compose.onNodeWithTag("person_scroll").performTouchInput { repeat(3) { swipeUp() } }
+        compose.waitForIdle()
+        val pill = compose.onNodeWithTag("person_set_pin").getUnclippedBoundsInRoot()
+        val viewport = compose.onNodeWithTag("person_scroll").getUnclippedBoundsInRoot()
+        assertThat(pill.top.value).isAtLeast(viewport.top.value)
+        assertThat(pill.bottom.value).isAtMost(viewport.bottom.value - SetupDimens.scrollEndPadding.value)
     }
 
     @Test

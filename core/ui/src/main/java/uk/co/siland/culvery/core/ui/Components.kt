@@ -104,6 +104,8 @@ fun HhListRow(
     clickLabel: String? = null,
     below: (@Composable ColumnScope.() -> Unit)? = null,
     minHeight: Dp = ListRowTokens.minHeight,
+    titleStyle: TextStyle = ListRowTokens.titleStyle,
+    subtitleMaxLines: Int = 1,
 ) {
     val c = Culvery.colors
     Column(
@@ -121,11 +123,11 @@ fun HhListRow(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ListRowTokens.lineGap)) {
                 Text(
-                    title, style = ListRowTokens.titleStyle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    title, style = titleStyle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 if (subtitle != null) {
                     Text(
-                        subtitle, style = HhType.secondary, color = subtitleColor, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        subtitle, style = HhType.secondary, color = subtitleColor, maxLines = subtitleMaxLines, overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

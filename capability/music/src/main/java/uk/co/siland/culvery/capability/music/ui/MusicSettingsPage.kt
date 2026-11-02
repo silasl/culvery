@@ -138,6 +138,7 @@ fun MusicSettingsScreen(ui: MusicSettingsUi, actions: MusicSettingsActions) {
 private fun LowerToRow(lowerTo: Int, onLowerTo: (Int) -> Unit) = HhSliderRow(
     LOWER_MUSIC_TO, lowerTo, "music_lower_to", onLowerTo,
     range = 0..MAX_LOWER_TO, steps = MusicDimens.LOWER_STEPS, spokenState = ::lowerToWords, valueLabel = ::lowerToWords,
+    titleWeight = MusicDimens.LOWER_TITLE_WEIGHT,
 )
 
 /** Enter a speaker's address (6 §4.1): [onConnect] answers null when connected, else the line to show. */

@@ -93,6 +93,8 @@ internal fun PersonRow(
         leading = { Box(Modifier.size(SetupDimens.rowDot).clip(CircleShape).background(Color(member.person.color))) },
         subtitle = "${member.role.label} · ${pinState(member)}",
         minHeight = SetupDimens.personRowHeight,
+        titleStyle = SetupType.personName,
+        subtitleMaxLines = 3,
         trailing = {
             if (reorderable) {
                 MoveButton(Icons.ARROW_UPWARD, moveUpLabel(name), "person_up_$name", onUp, atEnd = ALREADY_FIRST)

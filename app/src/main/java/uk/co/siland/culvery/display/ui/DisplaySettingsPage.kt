@@ -272,6 +272,9 @@ internal fun SeasonalLooksScreen(ui: DisplaySettingsUi, actions: DisplaySettings
                         )
                     }
                 },
+                trailing = {
+                    HhIcon(Icons.CHEVRON_RIGHT, size = ListRowTokens.icon, tint = c.mute, modifier = Modifier.testTag("display_dates_${theme.name.lowercase()}_chevron"))
+                },
                 clickLabel = CHANGE_THE_DATES,
                 modifier = Modifier.testTag("display_dates_${theme.name.lowercase()}"),
             )

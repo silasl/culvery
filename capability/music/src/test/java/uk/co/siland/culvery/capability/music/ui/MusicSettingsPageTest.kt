@@ -1,6 +1,10 @@
 package uk.co.siland.culvery.capability.music.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -67,12 +71,25 @@ class MusicSettingsPageTest {
         compose.onNodeWithTag("music_usual_RINCON_A").assertIsSelected()
         compose.onNodeWithTag("music_usual_RINCON_B").performClick()
         compose.onNodeWithTag("music_lower_to")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("When the doorbell rings, lower music to")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lower music on a ring to")))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "20 % of its volume"))
             .performSemanticsAction(SemanticsActions.SetProgress) { it(0f) }
         compose.onNodeWithText("0 % (muted)").assertExists()
         assertThat(calls).containsExactly("usual RINCON_B", "lower 0").inOrder()
         compose.assertAccessible()
+    }
+
+    /** 15b §6: the ring line fits on one line in Settings' pane at the tablet's size. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun theRingLineIsOneLine() {
+        compose.setContent {
+            CulveryTheme(dark = true) { Box(Modifier.size(1280.dp, 800.dp)) { InSettingsPane { MusicSettingsScreen(connected, actions) } } }
+        }
+        val layout = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("Lower music on a ring to").fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layout)
+        assertThat(layout.single().lineCount).isEqualTo(1)
+        assertThat(layout.single().layoutInput.text.text).isEqualTo("Lower music on a ring to")
     }
 
     /** Fails if the lower-to control is not the shared 69 dp slider row, or loses its 5 % steps or its words. */

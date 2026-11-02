@@ -481,6 +481,14 @@ class DisplaySettingsPageTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** 15b §6: each theme's dates row carries the chevron that says it opens something. */
+    @Test
+    fun datesRowsHaveAChevron() {
+        show()
+        compose.onNodeWithTag("display_dates_halloween").performScrollTo()
+        compose.onNodeWithTag("display_dates_halloween_chevron", useUnmergedTree = true).assertExists()
+    }
+
     /** Fails if two taps don't hand on the two days, or the sheet stays open. */
     @Test
     fun pickingTwoDaysSavesThem() {

@@ -476,6 +476,15 @@ class ReviewCalendarsTest {
         assertThat(chosen).isEqualTo("swim" to "Family")
     }
 
+    /** 15b §6: the household's calendars are "Family" (9c-2), never "Everyone". */
+    @Test
+    fun familyIsTheHouseholdsName() {
+        show(picking = sourceKey(swim))
+        compose.onNodeWithTag("review_pick_Family").assertExists()
+        compose.onAllNodesWithText("Everyone", useUnmergedTree = true).assertCountEquals(0)
+        compose.onNodeWithTag("review_person_family").assertExists()
+    }
+
     @Test
     fun disconnectAsksFirstAndCountsWhatWaits() {
         var confirming by mutableStateOf<Confirming?>(null)

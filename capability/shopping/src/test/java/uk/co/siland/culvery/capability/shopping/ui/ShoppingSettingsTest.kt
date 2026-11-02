@@ -11,7 +11,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -245,6 +247,21 @@ class ShoppingSettingsTest {
         compose.onNodeWithTag("shopping_kept_line")
             .assertTextEquals("Google Tasks stays allowed for $FAMILY until someone removes it in their Google account settings.")
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun nothingBeforeTheFirstRead() {
+        stateless(on(rig(), ShoppingHealth.OK, lastRead = null))
+        compose.onNodeWithTag("shopping_clear").assertExists()
+        compose.onAllNodes(hasTestTag("shopping_health")).assertCountEquals(0)
+    }
+
+    @Test
+    fun permissionLineDoesntSendYouHere() {
+        stateless(on(rig(), ShoppingHealth.NEEDS_PERMISSION))
+        compose.onNodeWithTag("shopping_health").assertTextEquals("Google Tasks needs permission again.")
+        compose.onNodeWithTag("shopping_allow").assertTextEquals("Allow Google Tasks")
+        compose.onAllNodes(hasText("Settings › Shopping", substring = true)).assertCountEquals(0)
     }
 
     @Test

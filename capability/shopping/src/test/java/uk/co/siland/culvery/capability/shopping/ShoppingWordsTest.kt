@@ -36,6 +36,11 @@ class ShoppingWordsTest {
     }
 
     @Test
+    fun settingsSaysPermissionNeededWithoutPointingAtItself() {
+        assertThat(permissionOnSettings("Google Tasks")).isEqualTo("Google Tasks needs permission again.")
+    }
+
+    @Test
     fun theOtherWords() {
         assertThat(QUEUE_FULL).isEqualTo("Shopping can’t hold more until it’s fixed in Settings › Shopping.")
         assertThat(ticked("Milk")).isEqualTo("Ticked Milk")

@@ -110,7 +110,7 @@ internal const val CONNECT_TO_SPEAKER = "Connect to this speaker"
 internal const val USUAL_ROOM_LABEL = "Usual room"
 internal const val ROOMS_AFTER_FIND = "The rooms appear here once Sonos is found."
 internal const val DOORBELL = "Doorbell"
-internal const val LOWER_MUSIC_TO = "When the doorbell rings, lower music to"
+internal const val LOWER_MUSIC_TO = "Lower music on a ring to"
 
 /** The doorbell's share, said as what it does: 0 % mutes (6 §5.4). */
 fun lowerToWords(percent: Int): String = if (percent == 0) "0 % (muted)" else "$percent % of its volume"

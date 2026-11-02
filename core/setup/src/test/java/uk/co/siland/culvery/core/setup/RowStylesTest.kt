@@ -35,7 +35,8 @@ class RowStylesTest {
     @Test
     fun aPersonsRowUsesTheSharedRowStyles() {
         compose.setContent { CulveryTheme(dark = true) { PeopleList(listOf(alex), onEdit = {}, onAdd = null, onMove = null) } }
-        assertRowTitle("Alex")
+        assertWithMessage("name size").that(style("Alex").fontSize).isEqualTo(19.sp)
+        assertWithMessage("name weight").that(style("Alex").fontWeight).isEqualTo(FontWeight.W600)
         assertWithMessage("subtitle size").that(style("Admin · PIN set").fontSize).isEqualTo(14.sp)
     }
 

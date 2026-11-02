@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.setup
 
+import uk.co.siland.culvery.core.ui.ListRowTokens
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +49,9 @@ internal object SetupDimens {
     val pinHintGap = 13.dp
     val footerGap = 10.dp
 
+    // Not in the spec (15b §6): room under the last control, so Set PIN's pill clears the scroll edge on an 800 dp screen.
+    val scrollEndPadding = 8.dp
+
     // Settings (9 §4.12, handoff 2c's panel): 320 wide on `surf`, padded 35 top and 28 at the sides and foot; the title 25
     // above the list; items 52 dp, radius 16, padding 0 19, 7 apart. The page is padded 43 × 48, at most [settingsPane] wide.
     val settingsList = 320.dp
@@ -76,6 +80,9 @@ internal object SetupType {
 
     /** 16 sp / 400: a title's line, and body text. */
     val line = HhType.body
+
+    /** 19 sp: a person's name in the people list (handoff; 15b §6). */
+    val personName = ListRowTokens.titleStyle.copy(fontSize = 19.sp)
 
     /** 17 sp / 600: a Settings item. */
     val rowTitle = HhType.rowTitle

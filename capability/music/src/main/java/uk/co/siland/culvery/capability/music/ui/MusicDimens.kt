@@ -55,4 +55,7 @@ internal object MusicDimens {
     // Settings › Music: the doorbell's share in 5 % steps, 0–50.
     val buttonGap = 12.dp
     const val LOWER_STEPS = 9
+
+    // 15b §6: a wider title, so "Lower music on a ring to" stays on one line beside its slider (the shared row gives it 1).
+    const val LOWER_TITLE_WEIGHT = 1.3f
 }

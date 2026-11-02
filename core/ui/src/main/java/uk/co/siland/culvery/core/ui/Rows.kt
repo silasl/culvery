@@ -105,6 +105,7 @@ fun HhSliderRow(
     spokenName: String = title,
     spokenState: (Int) -> String = { "$it percent" },
     valueLabel: (Int) -> String = { "$it %" },
+    titleWeight: Float = SliderRowTokens.TITLE_WEIGHT,
 ) {
     val c = Culvery.colors
     Row(
@@ -116,7 +117,7 @@ fun HhSliderRow(
             .testTag("${tag}_row")
             .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd),
     ) {
-        Text(title, style = ListRowTokens.titleStyle, color = c.ink, modifier = Modifier.weight(SliderRowTokens.TITLE_WEIGHT))
+        Text(title, style = ListRowTokens.titleStyle, color = c.ink, modifier = Modifier.weight(titleWeight))
         HhPercentSlider(
             title, percent, tag, Modifier.weight(SliderRowTokens.TRACK_WEIGHT),
             range = range, steps = steps, spokenName = spokenName, spokenState = spokenState, enabled = enabled, holdCeilingMs = SETTINGS_HOLD_MS,

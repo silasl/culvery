@@ -46,6 +46,9 @@ fun stayedAllowed(service: String, account: String): String =
 
 fun listGoneOnSettings(service: String): String = "The Shopping list isn’t in $service any more."
 
+/** Settings › Shopping's own line for a lost permission; its Allow button sits under it (15b §6, plan). */
+fun permissionOnSettings(service: String): String = "$service needs permission again."
+
 /** One change reads in the singular; "will be lost", as the calendar's disconnect says. */
 fun stopQuestion(service: String, queued: Int): String =
     "${stopUsing(service)}? The list stays in $service, and suggestions stay here." + when (queued) {

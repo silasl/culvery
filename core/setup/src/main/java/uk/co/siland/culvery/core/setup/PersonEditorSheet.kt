@@ -274,7 +274,7 @@ internal fun PersonEditorSheet(
             }
             Column(
                 verticalArrangement = Arrangement.spacedBy(SetupDimens.sectionGap),
-                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                modifier = Modifier.weight(1f).fillMaxWidth().testTag("person_scroll").verticalScroll(rememberScrollState()).padding(bottom = SetupDimens.scrollEndPadding),
             ) {
                 Section(NAME, null, form, views, focus) {
                     HhTextField(
