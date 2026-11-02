@@ -1,8 +1,7 @@
 package uk.co.siland.culvery.capability.lights.ui
 
 import android.util.Log
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +22,7 @@ import uk.co.siland.culvery.capability.lights.HOLIDAY_JUST_LIGHTS
 import uk.co.siland.culvery.capability.lights.LightsSettings
 import uk.co.siland.culvery.capability.lights.LightsSystem
 import uk.co.siland.culvery.capability.lights.NO_AUTOMATIONS
+import uk.co.siland.culvery.capability.lights.SET_UP_HUE_FOR_AWAY
 import uk.co.siland.culvery.core.plugin.HolidayLightsSection
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.attempt
@@ -57,6 +57,10 @@ internal fun LightsHolidayHost(settings: LightsSettings, bridges: Bridges, toast
         automations = system?.let { readBridge(it) }
     }
     val p = prefs ?: return
+    if (system == null) {
+        Text(SET_UP_HUE_FOR_AWAY, style = HhType.body, color = Culvery.colors.mute, modifier = modifier.testTag("lights_holiday_set_up"))
+        return
+    }
     HolidayChoice(automations, p.holidayAutomations, modifier) { ids -> change { settings.setHolidayAutomations(ids) } }
 }
 
@@ -75,16 +79,14 @@ internal fun HolidayChoice(
         return
     }
     val ticked = holidayAutomations intersect listed.map { it.id }.toSet()
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(LightsDimens.settingsButtonGap),
-        verticalArrangement = Arrangement.spacedBy(LightsDimens.settingsButtonGap),
-        modifier = modifier,
-    ) {
-        listed.forEach { automation ->
-            HhChoiceChip(
-                automation.name, selected = automation.id in ticked, tag = "lights_automation_${automation.id}", role = Role.Checkbox,
-                onClick = { onHolidayAutomations(if (automation.id in ticked) ticked - automation.id else ticked + automation.id) },
-            )
+    Box(modifier) {
+        ChipFlow {
+            listed.forEach { automation ->
+                HhChoiceChip(
+                    automation.name, selected = automation.id in ticked, tag = "lights_automation_${automation.id}", role = Role.Checkbox,
+                    onClick = { onHolidayAutomations(if (automation.id in ticked) ticked - automation.id else ticked + automation.id) },
+                )
+            }
         }
     }
     if (ticked.isEmpty()) Text(HOLIDAY_JUST_LIGHTS, style = HhType.body, color = c.mute, modifier = modifier.testTag("lights_holiday_note"))

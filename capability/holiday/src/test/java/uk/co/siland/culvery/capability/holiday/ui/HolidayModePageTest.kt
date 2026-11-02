@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -130,6 +131,8 @@ class HolidayModePageTest {
         compose.onNodeWithTag("holiday_fixed_0").assertTextEquals("Put the heating on Eco, and take it off Eco when you’re back.")
         compose.onNodeWithTag("holiday_fixed_1").assertTextEquals("Run the hoover the day before you’re back.")
         compose.onNodeWithTag("holiday_fixed_2").assertTextEquals("Keep the doorbell quiet. Rings and motion still show in the Door tab.")
+        val tops = listOf("fake_lights", "holiday_fixed_0", "holiday_fixed_1", "holiday_fixed_2").map { compose.onNodeWithTag(it).getUnclippedBoundsInRoot().top.value }
+        assertThat(tops).isInOrder()
     }
 
     /** Fails if Lights while away shows with no Hue to fill it, or the fixed lines go with it. */

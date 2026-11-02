@@ -166,7 +166,7 @@ private fun LeftOutChoice(ui: LightsSettingsUi, onLeftOut: (Set<String>) -> Unit
 private fun RoomsAfterPairing() = Text(ROOMS_AFTER_PAIRING, style = HhType.body, color = Culvery.colors.mute)
 
 @Composable
-private fun ChipFlow(content: @Composable () -> Unit) = FlowRow(
+internal fun ChipFlow(content: @Composable () -> Unit) = FlowRow(
     horizontalArrangement = Arrangement.spacedBy(LightsDimens.settingsButtonGap),
     verticalArrangement = Arrangement.spacedBy(LightsDimens.settingsButtonGap),
 ) { content() }

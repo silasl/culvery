@@ -161,6 +161,7 @@ internal const val NOT_PAIRED = "Not paired yet. Find Hue Bridge, or enter the b
 internal const val MAIN_ROOM = "Main room"
 internal const val LEFT_OUT_LABEL = "All lights off leaves out"
 internal const val ROOMS_AFTER_PAIRING = "The rooms appear here once the bridge is paired."
+internal const val SET_UP_HUE_FOR_AWAY = "Set up Hue in Settings › Lights to choose what the lights do while you’re away."
 internal const val NO_AUTOMATIONS = "No Hue automations yet. Set one up in the Hue app, such as Mimic presence."
 internal const val HOLIDAY_JUST_LIGHTS = "Holiday lights turns all lights off and shows On."
 
