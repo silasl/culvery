@@ -133,14 +133,14 @@ class DisplaySections @Inject constructor(
     }
 
     @Composable
-    fun BrightnessAndNight() {
-        DisplaySettingsHost(settings, access, sunToday, toaster, LocalShellNavigator.current, themes) { ui, actions -> BrightnessAndNightScreen(ui, actions) }
-    }
+    fun BrightnessAndNight() = Host { ui, actions -> BrightnessAndNightScreen(ui, actions) }
 
     @Composable
-    fun SeasonalLooks() {
-        DisplaySettingsHost(settings, access, sunToday, toaster, LocalShellNavigator.current, themes) { ui, actions -> SeasonalLooksScreen(ui, actions) }
-    }
+    fun SeasonalLooks() = Host { ui, actions -> SeasonalLooksScreen(ui, actions) }
+
+    @Composable
+    private fun Host(screen: @Composable (DisplaySettingsUi, DisplaySettingsActions) -> Unit) =
+        DisplaySettingsHost(settings, access, sunToday, toaster, LocalShellNavigator.current, themes, screen)
 }
 
 /** "Night clock 22:00–07:00 · Sleep after 5 min" (plan). */

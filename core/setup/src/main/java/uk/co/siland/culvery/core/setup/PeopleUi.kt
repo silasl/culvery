@@ -58,7 +58,7 @@ internal fun PeopleList(members: List<Member>, onEdit: (Member) -> Unit, onAdd: 
                         Box(Modifier.weight(1f)) {
                             PersonRow(
                                 member,
-                                reorderable = onMove != null,
+                                reorderable = inSettings,
                                 onUp = if (onMove != null && i > 0) ({ onMove(member, true) }) else null,
                                 onDown = if (onMove != null && i < members.lastIndex) ({ onMove(member, false) }) else null,
                                 onClick = { onEdit(member) },
