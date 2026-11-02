@@ -155,7 +155,7 @@ class StoredModeTileTest {
         val actions = StoredModeActions(TestAccess(Role.CHILD), rig.house, rig.settings, setOf(rig.house))
         compose.setContent {
             CulveryTheme(dark = true) {
-                OneTapTray(FILM_ID) { StoredModeTileHost(FILM_NIGHT, actions, rig.house) }
+                OneTapTray(FILM_ID) { StoredModeTileHost(FILM_NIGHT.id, FILM_NIGHT.name, FILM_NIGHT.icon, actions, rig.house) }
             }
         }
 

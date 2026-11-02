@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import uk.co.siland.culvery.capability.party.ModeRun
 import uk.co.siland.culvery.capability.party.ModesWords
-import uk.co.siland.culvery.capability.party.StoredMode
 import uk.co.siland.culvery.capability.party.StoredModeActions
 import uk.co.siland.culvery.capability.party.StoredModesHouse
 import uk.co.siland.culvery.core.ui.HouseModeOnPill
@@ -46,18 +45,18 @@ internal fun StoredModeTile(id: String, name: String, icon: String, on: Boolean,
 }
 
 /**
- * [mode]'s tile on Home (15b §4.3): a tap asks for a PIN only where the mode needs one, then turns it on or off with no
+ * The tile on Home of the stored mode [id], drawn with [name] and [icon] (15b §4.3): a tap asks for a PIN only where the mode needs one, then turns it on or off with no
  * sheet. While another mode is on it asks nothing and says to turn that off first.
  */
 @Composable
-fun StoredModeTileHost(mode: StoredMode, actions: StoredModeActions, house: StoredModesHouse) {
+fun StoredModeTileHost(id: String, name: String, icon: String, actions: StoredModeActions, house: StoredModesHouse) {
     val onMode by house.onMode.collectAsState()
     val running by house.running.collectAsState()
-    val houseLine by remember(house, mode.id) { house.line(mode.id) }.collectAsState(initial = null)
-    val refusal by remember(actions, mode.id) { actions.refusal(mode.id) }.collectAsState(initial = null)
-    val on = onMode == mode.id
+    val houseLine by remember(house, id) { house.line(id) }.collectAsState(initial = null)
+    val refusal by remember(actions, id) { actions.refusal(id) }.collectAsState(initial = null)
+    val on = onMode == id
     val action = rememberSingleAction(house) { e -> Log.w(TAG, "A stored mode's tile action failed: ${e::class.simpleName}") }
-    StoredModeTile(mode.id, mode.name, mode.icon, on, refusal ?: houseLine, running?.takeIf { it.modeId == mode.id }?.change) {
-        action.run { actions.tap(mode.id, sawOn = on) }
+    StoredModeTile(id, name, icon, on, refusal ?: houseLine, running?.takeIf { it.modeId == id }?.change) {
+        action.run { actions.tap(id, sawOn = on) }
     }
 }

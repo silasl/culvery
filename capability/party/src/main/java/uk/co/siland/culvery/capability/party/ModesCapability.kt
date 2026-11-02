@@ -7,9 +7,11 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
-import uk.co.siland.culvery.capability.party.ui.ModesPage
+import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.capability.party.ui.ModeControls
+import uk.co.siland.culvery.capability.party.ui.ModesPage
 import uk.co.siland.culvery.capability.party.ui.StoredModeTileHost
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseModeSwitch
@@ -50,12 +52,14 @@ class ModesCapability @Inject constructor(
     @Composable
     override fun TabContent() = Unit
 
-    // Mode buttons take orders 10–13 by place (15b Ruling 11).
+    // Mode buttons take orders 10–13 by place (15b Ruling 11). A change to what a mode does leaves the buttons as they are.
     override fun trayButtons(): Flow<List<TrayButton>> = combine(settings.prefs, shelf.shown) { prefs, shown ->
         prefs.modes.mapNotNull { mode ->
-            shown.indexOf(mode.id).takeIf { it >= 0 }?.let { place ->
-                TrayButton("mode.${mode.id}", 10 + place, TrayWidth.HALF) { StoredModeTileHost(mode, actions, house) }
-            }
+            shown.indexOf(mode.id).takeIf { it >= 0 }?.let { place -> TrayMode(mode.id, mode.name, mode.icon, place) }
+        }
+    }.distinctUntilChanged().map { modes ->
+        modes.map { m ->
+            TrayButton(HouseModes.trayId(m.id), 10 + m.place, TrayWidth.HALF) { StoredModeTileHost(m.id, m.name, m.icon, actions, house) }
         }
     }
 
@@ -66,4 +70,9 @@ class ModesCapability @Inject constructor(
             shelf.room, plugs.orElse(null), toaster, builtIn,
         ),
     )
+}
+
+/** What a stored mode's tray button shows. [toString] leaves out the id and name. */
+private data class TrayMode(val id: String, val name: String, val icon: String, val place: Int) {
+    override fun toString() = "TrayMode(place=$place)"
 }

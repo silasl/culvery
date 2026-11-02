@@ -104,6 +104,17 @@ object HouseModes {
 
     /** The one switch every stored mode shares (15b Ruling 8). */
     const val STORED = "stored"
+
+    /** Holiday mode's button in Home's tray. */
+    const val HOLIDAY_TRAY_ID = "holiday.mode"
+
+    private const val TRAY_PREFIX = "mode."
+
+    /** A stored mode's button in Home's tray. */
+    fun trayId(modeId: String) = "$TRAY_PREFIX$modeId"
+
+    /** Whether a tray button is a mode's, Holiday's or a stored mode's. */
+    fun isModeTrayId(id: String) = id.startsWith(TRAY_PREFIX) || id == HOLIDAY_TRAY_ID
 }
 
 /** What lets a mode's run change the house (15b Ruling 3). Neither [toString] prints a person or an id. */

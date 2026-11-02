@@ -39,6 +39,6 @@ class HolidayCapability internal constructor(
 
     // What it can do depends on which seams are set up, which the sheet reads when it opens. With no shelf it is first.
     override fun trayButtons(): Flow<List<TrayButton>> = (shelf?.place(HouseModes.HOLIDAY) ?: flowOf(0)).map { place ->
-        listOfNotNull(place?.let { TrayButton("holiday.mode", 10 + it, TrayWidth.HALF) { HolidayTileHost(actions, house) } })
+        listOfNotNull(place?.let { TrayButton(HouseModes.HOLIDAY_TRAY_ID, 10 + it, TrayWidth.HALF) { HolidayTileHost(actions, house) } })
     }
 }

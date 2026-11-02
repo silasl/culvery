@@ -71,7 +71,7 @@ class ModesShelf @Inject constructor(
             }
             combine(answers, waited) { lists, waited -> lists.takeIf { waited || it.none { list -> list == null } } }
                 .filterNotNull()
-                .map { lists -> lists.sumOf { list -> list.orEmpty().count { it.width == TrayWidth.HALF && !it.id.isModeButton() } } }
+                .map { lists -> lists.sumOf { list -> list.orEmpty().count { it.width == TrayWidth.HALF && !HouseModes.isModeTrayId(it.id) } } }
         }
         emitAll(halves.map { (HALF_SPOTS - it).coerceAtLeast(0) })
     }.stateIn(scope, SharingStarted.Lazily, null).filterNotNull()
@@ -84,5 +84,3 @@ class ModesShelf @Inject constructor(
 
     override fun place(modeId: String): Flow<Int?> = shown.map { ids -> ids.indexOf(modeId).takeIf { it >= 0 } }.distinctUntilChanged()
 }
-
-private fun String.isModeButton() = startsWith("mode.") || this == "holiday.mode"
