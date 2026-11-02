@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.ui.Icons
 
@@ -18,7 +19,7 @@ class ModesCapabilityTest {
     private fun TestScope.capability(rig: HouseRig = HouseRig(backgroundScope)) = ModesCapability(
         StoredModeActions(TestAccess(Role.ADULT), rig.house, rig.settings, emptySet()), rig.house, rig.settings,
         ModesShelf(rig.settings, Provider { emptySet() }),
-        Optional.of(rig.music), Optional.of(rig.lights),
+        Optional.of(rig.music), Optional.of(rig.lights), Optional.of(rig.plugs), emptySet(), RecordingToaster(),
     )
 
     /** 13 §2.7: the modes sit in the tray, not on a tab. Fails if there is a tab, a card, or another id, label, icon or order. */
@@ -45,11 +46,12 @@ class ModesCapabilityTest {
             .containsExactly(Triple("mode.party", 11, TrayWidth.HALF), Triple("mode.$FILM_ID", 12, TrayWidth.HALF)).inOrder()
     }
 
-    /** 13 §3: Settings › Party mode sits between Lights (470) and Other integrations (480) until Task 6 replaces it. */
+    /** 15b §4.1: Settings › Modes sits beside Party mode's old page, between Lights (470) and Other integrations (480), until Task 6 removes that page. */
     @Test
-    fun theSettingsPageSitsAfterLights() = runTest {
+    fun theSettingsPagesSitAfterLights() = runTest {
         val pages = capability().settingsPages()
 
-        assertThat(pages.map { Triple(it.id, it.title, it.order) }).containsExactly(Triple("party", "Party mode", 475))
+        assertThat(pages.map { Triple(it.id, it.title, it.order) })
+            .containsExactly(Triple("party", "Party mode", 475), Triple("modes", "Modes", 475)).inOrder()
     }
 }

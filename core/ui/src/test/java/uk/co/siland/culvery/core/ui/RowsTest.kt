@@ -50,4 +50,15 @@ class RowsTest {
         assertThat(times).containsExactly(LocalTime.of(21, 30), LocalTime.of(22, 30)).inOrder()
         compose.assertClickablesHaveRoleAndLabel()
     }
+
+    /** Fails if: the add row isn't a button named by its label, or a tap on it does nothing. */
+    @Test
+    fun addRowIsAButtonWithItsLabel() {
+        var taps = 0
+        compose.setContent { CulveryTheme(dark = true) { HhAddRow("Add a mode", "add", onClick = { taps++ }) } }
+        compose.onNodeWithTag("add").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)).performClick()
+        compose.onNodeWithText("Add a mode").assertExists()
+        assertThat(taps).isEqualTo(1)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
 }

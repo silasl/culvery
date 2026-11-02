@@ -38,19 +38,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -87,6 +86,7 @@ import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.dashedOutline
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
@@ -349,22 +349,13 @@ private fun EmptySpace(date: LocalDate, chips: LazyListState, pressed: Boolean, 
 @Composable
 private fun PressedGhost(date: LocalDate, hasChipsAbove: Boolean) {
     val accent = Culvery.colors.accent
+    val dashes = with(LocalDensity.current) { floatArrayOf(CalendarDimens.ghostDash.toPx(), CalendarDimens.ghostGap.toPx()) }
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxSize()
             .padding(top = if (hasChipsAbove) CalendarDimens.columnGap else 0.dp)
-            .drawBehind {
-                val stroke = CalendarDimens.ghostStroke.toPx()
-                val dashes = floatArrayOf(CalendarDimens.ghostDash.toPx(), CalendarDimens.ghostGap.toPx())
-                drawRoundRect(
-                    accent,
-                    topLeft = Offset(stroke / 2, stroke / 2),
-                    size = Size(size.width - stroke, size.height - stroke),
-                    cornerRadius = CornerRadius(CalendarDimens.ghostRadius.toPx()),
-                    style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(dashes)),
-                )
-            },
+            .dashedOutline(accent, CalendarDimens.ghostStroke, CalendarDimens.ghostRadius, dashes),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.ghostIconGap)) {
             HhIcon(Icons.ADD, size = CalendarDimens.ghostIcon, tint = accent)

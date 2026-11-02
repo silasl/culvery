@@ -17,9 +17,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -199,4 +201,36 @@ fun HhTimeStepperRow(label: String, subject: String, time: LocalTime, tag: Strin
             HhButton(LATER, { onTime(time.plusMinutes(TIME_STEP_MINUTES)) }, Modifier.testTag("${tag}_later"), on = ButtonSurface.Surf, spokenName = "$LATER, $subject")
         },
     )
+}
+
+/** The dashed add row's outline and dashes (4c §3.5, 15b §4.1). */
+object AddRowTokens {
+    val stroke = 2.dp
+    val dash = 8.dp
+    val gap = 6.dp
+    val iconGap = 8.dp
+    val icon = 24.dp
+}
+
+/** The last row of a list: a dashed outline with the add icon and [label], at least [ListRowTokens.minHeight] tall, a button named by its label. */
+@Composable
+fun HhAddRow(label: String, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Culvery.colors
+    val density = LocalDensity.current
+    val dashes = remember(density) { with(density) { floatArrayOf(AddRowTokens.dash.toPx(), AddRowTokens.gap.toPx()) } }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AddRowTokens.iconGap, Alignment.CenterHorizontally),
+        modifier = modifier
+            .testTag(tag)
+            .fillMaxWidth()
+            .heightIn(min = ListRowTokens.minHeight)
+            .clip(ListRowTokens.shape)
+            .hhClickable(onClick)
+            .dashedOutline(c.accent, AddRowTokens.stroke, ListRowTokens.radius, dashes)
+            .padding(horizontal = ListRowTokens.paddingStart, vertical = ListRowTokens.paddingV),
+    ) {
+        HhIcon(Icons.ADD, size = AddRowTokens.icon, tint = c.accent)
+        Text(label, style = ListRowTokens.titleStyle, color = c.accent)
+    }
 }

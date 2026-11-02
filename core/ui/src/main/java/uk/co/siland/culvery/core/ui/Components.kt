@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -22,9 +23,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -153,3 +156,19 @@ fun HhSectionLabel(text: String, modifier: Modifier = Modifier) {
 
 /** 1–4 cards two to a row, more three (Lights' rooms). */
 fun gridColumns(count: Int): Int = if (count <= 4) 2 else 3
+
+/** A sub-page's way back to its parent, "‹ {label}": 48 dp tall, spoken "Back to {label}". */
+@Composable
+fun HhBackLink(label: String, tag: String, onBack: () -> Unit) {
+    val c = Culvery.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .testTag(tag)
+            .height(ButtonTokens.regularHeight)
+            .hhClickable(onBack, spoken = "Back to $label"),
+    ) {
+        HhIcon(Icons.CHEVRON_LEFT, tint = c.accent)
+        Text(label, style = HhType.body.copy(fontWeight = FontWeight.W600), color = c.accent)
+    }
+}
