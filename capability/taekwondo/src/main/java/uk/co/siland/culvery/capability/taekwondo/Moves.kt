@@ -1,6 +1,6 @@
 package uk.co.siland.culvery.capability.taekwondo
 
-/** [hangul] null until the instructor fills it in; the English voice reads [romanised] then (15b §8). */
+/** [hangul] null until the instructor fills it in; the English voice reads [romanised] then (15b §8). [toString] leaves out the text. */
 data class Move(
     val number: String,
     val romanised: String,
@@ -9,9 +9,14 @@ data class Move(
     val description: String,
     /** What the Korean voice says, when it differs from what's shown (step 6 drops its "A"). */
     val spokenHangul: String? = hangul,
-)
+) {
+    override fun toString() = "Move"
+}
 
-data class Pattern(val name: String, val moves: List<Move>)
+/** [toString] leaves out the name and the moves. */
+data class Pattern(val name: String, val moves: List<Move>) {
+    override fun toString() = "Pattern"
+}
 
 /**
  * The text of `culvery-notes/taekwondo-choong-moo.html`, straight apostrophes included. Every Hangul entry is the plan's

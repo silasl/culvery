@@ -49,4 +49,13 @@ class MovesTest {
         assertThat(six.hangul).isEqualTo("구부려 준비 서기 A")
         assertThat(six.spokenHangul).isEqualTo("구부려 준비 서기")
     }
+
+    /** 15b M6: fails if a move, the pattern or a run's state prints move text in its toString. */
+    @Test
+    fun toStringLeavesOutTheMoves() {
+        val move = CHOONG_MOO.moves.first { it.number == "1" }
+        val printed = listOf(move.toString(), CHOONG_MOO.toString(), RunState.Moving(1, move).toString())
+
+        assertThat(printed).containsExactly("Move", "Pattern", "Moving(1)").inOrder()
+    }
 }

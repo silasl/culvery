@@ -20,7 +20,10 @@ sealed interface RunState {
 
     data class Counting(val seconds: Int) : RunState
 
-    data class Moving(val index: Int, val move: Move) : RunState
+    /** [toString] leaves out the move. */
+    data class Moving(val index: Int, val move: Move) : RunState {
+        override fun toString() = "Moving($index)"
+    }
 
     data class Again(val seconds: Int) : RunState
 }
