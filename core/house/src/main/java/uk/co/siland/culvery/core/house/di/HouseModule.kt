@@ -14,6 +14,7 @@ import uk.co.siland.culvery.core.house.HouseModeScheduler
 import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
+import uk.co.siland.culvery.core.house.ModeShelf
 import uk.co.siland.culvery.core.house.MultiDayEvents
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -37,6 +38,10 @@ abstract class HouseModule {
 
     @BindsOptionalOf
     abstract fun music(): HouseMusic
+
+    // With none bound, Holiday mode's tile shows first in the tray as before 15b.
+    @BindsOptionalOf
+    abstract fun modeShelf(): ModeShelf
 
     // With no mode bound nothing blocks a mode (13 §2.6).
     @Multibinds

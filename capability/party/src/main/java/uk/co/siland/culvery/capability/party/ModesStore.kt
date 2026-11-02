@@ -63,6 +63,9 @@ class ModesStore(private val store: DataStore<Preferences>, scope: CoroutineScop
 
     val prefs: Flow<ModesPrefs> = data.map { it.toModesPrefs() }.distinctUntilChanged()
 
+    /** [prefs] as last read, for what can't wait for a read (a mode's name in another mode's refusal); null until then. */
+    val prefsNow: StateFlow<ModesPrefs?> = prefs.stateIn(scope, SharingStarted.Eagerly, null)
+
     /** Null until the file is first read, so nothing takes "off" for the saved answer. */
     val record: StateFlow<ModeRecord?> = data.map { it.toRecord() }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, null)
 

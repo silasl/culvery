@@ -147,7 +147,7 @@ const val TRAY_ROWS = 3
 
 /**
  * [HhTray]'s Home form: the [label] on top, not spoken, then [TRAY_ROWS] rows of equal height. A row holds one cell at
- * full width or two side by side; rows past `rows.size` are empty. Each cell is tagged `tray_row_{key}`.
+ * full width or two side by side; a row with no cell, or past `rows.size`, is an empty spacer. Each cell is tagged `tray_row_{key}`.
  */
 @Composable
 fun HhTrayGrid(label: String, rows: List<List<TrayCell>>, modifier: Modifier = Modifier) {
@@ -174,7 +174,7 @@ private fun TrayRows(rows: List<List<TrayCell>>, modifier: Modifier) {
         content = {
             repeat(slots) { i ->
                 val cells = rows.getOrNull(i)
-                if (cells == null) {
+                if (cells.isNullOrEmpty()) {
                     Spacer(Modifier)
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(TrayTokens.gap)) {
@@ -189,9 +189,10 @@ private fun TrayRows(rows: List<List<TrayCell>>, modifier: Modifier) {
     ) { measurables, constraints ->
         val width = constraints.maxWidth
         val gap = TrayTokens.gap.roundToPx()
-        val natural = measurables.mapIndexed { i, m -> if (i < rows.size) m.minIntrinsicHeight(width) else 0 }
+        val filled = List(slots) { i -> !rows.getOrNull(i).isNullOrEmpty() }
+        val natural = measurables.mapIndexed { i, m -> if (filled[i]) m.minIntrinsicHeight(width) else 0 }
         val heights = if (constraints.hasBoundedHeight) {
-            trayRowHeights(natural, rows.size, constraints.maxHeight, gap)
+            trayRowHeights(natural, filled, constraints.maxHeight, gap)
         } else {
             natural
         }
@@ -204,11 +205,11 @@ private fun TrayRows(rows: List<List<TrayCell>>, modifier: Modifier) {
     }
 }
 
-/** Each row's height: a third of [total] less the gaps, grown to its [natural] height where that is more and the others can give. */
-private fun trayRowHeights(natural: List<Int>, filled: Int, total: Int, gap: Int): List<Int> {
+/** Each row's height: a third of [total] less the gaps, grown to its [natural] height where that is more and the others can give, empty rows first. */
+private fun trayRowHeights(natural: List<Int>, filled: List<Boolean>, total: Int, gap: Int): List<Int> {
     val third = (total - gap * (natural.size - 1)) / natural.size
     val heights = MutableList(natural.size) { third }
-    val demand = natural.mapIndexed { i, n -> if (i < filled) maxOf(0, n - third) else 0 }
+    val demand = natural.mapIndexed { i, n -> if (filled[i]) maxOf(0, n - third) else 0 }
     var need = demand.sum()
     var donated = 0
     fun give(i: Int, room: Int) {
@@ -217,9 +218,9 @@ private fun trayRowHeights(natural: List<Int>, filled: Int, total: Int, gap: Int
         need -= g
         donated += g
     }
-    for (i in natural.indices) if (i >= filled) give(i, third)
-    for (i in 0 until filled) give(i, maxOf(0, third - natural[i]))
-    for (i in 0 until filled) {
+    for (i in natural.indices) if (!filled[i]) give(i, third)
+    for (i in natural.indices) if (filled[i]) give(i, maxOf(0, third - natural[i]))
+    for (i in natural.indices) {
         val g = minOf(demand[i], donated)
         heights[i] += g
         donated -= g

@@ -4,22 +4,27 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.TrayWidth
+import uk.co.siland.culvery.core.ui.TRAY_ROWS
 
-/** How the tray's buttons fall into rows (15a §2.1). */
+/** The tray's spots (15b Ruling 11): halves fill the first row and then the third, the full-width buttons the middle one. */
 class TrayRowsTest {
     private fun half(id: String, order: Int) = TrayButton(id, order, TrayWidth.HALF) {}
     private fun full(id: String, order: Int) = TrayButton(id, order) {}
     private fun ids(rows: List<List<Pair<String, *>>>) = rows.map { row -> row.map { it.first } }
 
-    /** Fails if two half-width buttons next to each other don't share a row. */
-    @Test fun twoHalvesShareARow() = assertThat(ids(trayRows(listOf(half("holiday.mode", 10), half("party.mode", 15), full("hoover.start", 20)))))
-        .containsExactly(listOf("holiday.mode", "party.mode"), listOf("hoover.start")).inOrder()
+    @Test fun threeRowsAlways() {
+        assertThat(trayRows(emptyList())).hasSize(TRAY_ROWS)
+        assertThat(trayRows(listOf(full("hoover.start", 20)))).hasSize(TRAY_ROWS)
+        assertThat(trayRows(listOf(half("a", 10), half("b", 11), full("hoover.start", 20), half("c", 12), half("d", 13)))).hasSize(TRAY_ROWS)
+    }
 
-    /** Fails if a half with no half after it is paired with the full-width button instead of having its own row. */
-    @Test fun aLoneHalfTakesItsOwnRow() = assertThat(ids(trayRows(listOf(half("party.mode", 15), full("hoover.start", 20)))))
-        .containsExactly(listOf("party.mode"), listOf("hoover.start")).inOrder()
+    /** Decision 3: fails if the third mode doesn't go to the row under the hoover's. */
+    @Test fun halvesFillRowOneThenRowThree() = assertThat(ids(trayRows(listOf(half("h1", 10), half("h2", 11), half("h3", 12), full("hoover", 20)))))
+        .containsExactly(listOf("h1", "h2"), listOf("hoover"), listOf("h3")).inOrder()
 
-    /** Fails if halves either side of a full button are paired across it. */
-    @Test fun aFullBetweenHalvesBreaksThePair() = assertThat(ids(trayRows(listOf(half("a", 10), full("b", 20), half("c", 30)))))
-        .containsExactly(listOf("a"), listOf("b"), listOf("c")).inOrder()
+    @Test fun withNoHooverTheMiddleRowIsEmpty() = assertThat(ids(trayRows(listOf(half("h1", 10), half("h2", 11), half("h3", 12)))))
+        .containsExactly(listOf("h1", "h2"), emptyList<String>(), listOf("h3")).inOrder()
+
+    @Test fun aLoneHalfStaysInRowOne() = assertThat(ids(trayRows(listOf(half("h1", 10), full("hoover", 20)))))
+        .containsExactly(listOf("h1"), listOf("hoover"), emptyList<String>()).inOrder()
 }

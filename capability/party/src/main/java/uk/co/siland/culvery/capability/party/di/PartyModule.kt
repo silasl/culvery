@@ -5,11 +5,13 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
-import uk.co.siland.culvery.capability.party.PartyCapability
-import uk.co.siland.culvery.capability.party.PartyHouse
+import uk.co.siland.culvery.capability.party.ModesCapability
+import uk.co.siland.culvery.capability.party.ModesShelf
 import uk.co.siland.culvery.capability.party.PartyPermissionSource
+import uk.co.siland.culvery.capability.party.StoredModesHouse
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.house.HouseModeSwitch
+import uk.co.siland.culvery.core.house.ModeShelf
 import uk.co.siland.culvery.core.plugin.Capability
 
 @Module
@@ -21,9 +23,12 @@ abstract class PartyModule {
 
     @Binds
     @IntoSet
-    abstract fun capability(impl: PartyCapability): Capability
+    abstract fun capability(impl: ModesCapability): Capability
 
     @Binds
     @IntoSet
-    abstract fun switch(impl: PartyHouse): HouseModeSwitch
+    abstract fun switch(impl: StoredModesHouse): HouseModeSwitch
+
+    @Binds
+    abstract fun shelf(impl: ModesShelf): ModeShelf
 }

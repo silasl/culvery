@@ -260,4 +260,26 @@ class PageHeaderTest {
         assertThat(c.bottom.value).isAtMost(tray.bottom.value - padding + 0.5f)
         assertThat(c.height.value).isGreaterThan(0f)
     }
+
+    /** 15b Ruling 11. Fails if an empty row between two filled ones draws anything, or doesn't give its height first. */
+    @Test
+    fun anEmptyMiddleRowIsASpacerThatGivesFirst() {
+        show {
+            HhTrayGrid(
+                "One-tap",
+                listOf(
+                    listOf("a" to { Box(Modifier.fillMaxWidth().height(150.dp)) }),
+                    emptyList(),
+                    listOf("c" to { Box(Modifier.fillMaxSize()) }),
+                ),
+                Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
+            )
+        }
+        val a = compose.onNodeWithTag("tray_row_a").getUnclippedBoundsInRoot()
+        val c = compose.onNodeWithTag("tray_row_c").getUnclippedBoundsInRoot()
+        assertThat(a.height.value).isWithin(0.5f).of(150f)
+        // c keeps its third, and the empty middle row is what is left of its own: a third less a's extra.
+        val middle = c.top.value - a.bottom.value - 2 * gap
+        assertThat(middle).isWithin(1f).of(2 * c.height.value - 150f)
+    }
 }

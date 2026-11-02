@@ -51,14 +51,14 @@ class HouseGraphTest {
 
     @Test
     fun partyIsInTheHouse() {
-        assertThat(probe.switches().map { it.modeId }).containsExactly("holiday", "party")
+        assertThat(probe.switches().map { it.modeId }).containsExactly("holiday", "stored")
         assertThat(probe.music().isPresent).isTrue()
     }
 
     @Test
     fun theAppStartsPartysSchedulerAndItLoadsTheRecord() = runBlocking {
         // Nothing else reads the record: only the scheduler's own start, from CulveryApp.onCreate, makes it known (13 §4.3).
-        assertThat(withTimeout(10_000) { probe.partyHouse().isOn.first { it != null } }).isFalse()
+        assertThat(withTimeout(10_000) { probe.storedModesHouse().isOn.first { it != null } }).isFalse()
     }
 
     /** 13 §8: the debug samples are bound, yet Find and a typed address ask the real providers. */

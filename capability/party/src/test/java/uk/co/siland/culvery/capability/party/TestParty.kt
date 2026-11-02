@@ -11,8 +11,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -41,6 +41,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.Icons
 
 /** What a fresh file holds once [PartyMove] has run: Party mode with nothing to do. */
 internal val MOVED: Preferences = runBlocking { PartyMove.migrate(emptyPreferences()) }
@@ -123,7 +124,13 @@ internal class FakePlugs(private val trace: Trace = Trace()) : HousePlugs {
     val readyNow = MutableStateFlow(true)
     @Volatile var changes: List<PlugChange> = listOf(PlugChange("Lamp", false))
     val begun: MutableSet<String> = ConcurrentHashMap.newKeySet()
-    val begins = CopyOnWriteArrayList<Authorised>()
+    val grants = CopyOnWriteArrayList<ModeGrant>()
+    val addedNow = MutableStateFlow<List<AddedPlug>>(emptyList())
+    @Volatile var addedThrows = false
+    @Volatile var holdsPin = false
+
+    /** The people whose grants began a run; a wall's begin adds none. */
+    val begins: List<Authorised> get() = grants.filterIsInstance<ModeGrant.Person>().map { it.by }
     val enters = ConcurrentLinkedQueue<HouseStep?>()
     val leaves = ConcurrentLinkedQueue<HouseStep>()
     @Volatile var enterOtherwise: HouseStep? = HouseStep.Done
@@ -136,7 +143,7 @@ internal class FakePlugs(private val trace: Trace = Trace()) : HousePlugs {
     override suspend fun begin(modeId: String, grant: ModeGrant) {
         trace.hit("plugs.begin", modeId)
         begun += modeId
-        begins += (grant as ModeGrant.Person).by
+        grants += grant
     }
 
     override suspend fun enter(modeId: String): HouseStep? {
@@ -153,13 +160,13 @@ internal class FakePlugs(private val trace: Trace = Trace()) : HousePlugs {
 
     override suspend fun options() = emptyList<PlugOption>()
 
-    override fun added(modeId: String): Flow<List<AddedPlug>> = flowOf(emptyList())
+    override fun added(modeId: String): Flow<List<AddedPlug>> = addedNow.onEach { check(!addedThrows) { "added threw" } }
 
     override suspend fun choose(modeId: String, plugId: String, on: Boolean?) = Unit
 
     override suspend fun forget(modeId: String) = Unit
 
-    override suspend fun holdsPinPlug(modeId: String) = false
+    override suspend fun holdsPinPlug(modeId: String) = holdsPin
 }
 
 internal class FakeMusic(private val trace: Trace = Trace()) : HouseMusic {
@@ -216,6 +223,7 @@ internal class FakeLights(private val trace: Trace = Trace()) : HouseLights {
     @Volatile var notChanged: List<String> = emptyList()
     @Volatile var notBack: List<String> = emptyList()
     val backs = CopyOnWriteArrayList<List<RoomBefore>>()
+    val asked = CopyOnWriteArrayList<List<RoomChoice>>()
 
     override val ready: Flow<Boolean> = readyNow
 
@@ -234,6 +242,7 @@ internal class FakeLights(private val trace: Trace = Trace()) : HouseLights {
 
     override suspend fun modeBefore(choices: List<RoomChoice>): List<RoomBefore> {
         trace.hit("lights.modeBefore")
+        asked += choices
         return snapshot
     }
 
@@ -259,22 +268,29 @@ internal class TestSwitch(
     override suspend fun tick() = Unit
 }
 
-/** A real [PartyHouse] over an in-memory store and the fake seams. */
+/** Film night, a mode the family added: no PIN, Party mix on every speaker and Bright in Kitchen. */
+internal const val FILM_ID = "modeabcdef"
+internal val FILM_NIGHT = StoredMode(FILM_ID, "Film night", Icons.BEDTIME, showOnHome = true, needsPin = false, music = PARTY_MIX, lights = listOf(KITCHEN_BRIGHT))
+
+/** A plug a mode added, On, that needs a PIN. */
+internal val LOCKED_HEATER = AddedPlug("heater", on = true, needsPin = true)
+
+/** A real [StoredModesHouse] over an in-memory store and the fake seams. */
 internal class HouseRig(scope: CoroutineScope) {
     val trace = Trace()
     val plugs = FakePlugs(trace)
     val music = FakeMusic(trace)
     val lights = FakeLights(trace)
     val settings = ModesStore(MemoryStore(), scope)
-    val house = PartyHouse(settings, plugs, music, lights, WallClock { 1_000_000L })
+    val house = StoredModesHouse(settings, plugs, music, lights, WallClock { 1_000_000L })
 
     /** Reads the stored record, as the scheduler's first tick does; the plugs put back on that first read are not counted. */
-    suspend fun loaded(): PartyHouse = house.also {
+    suspend fun loaded(): StoredModesHouse = house.also {
         it.tick()
         trace.calls.clear()
     }
 
     /** Party mix on every speaker, Bright in Kitchen and Relax in Lounge. */
-    suspend fun choose(mode: StoredMode = PARTY_MODE.copy(music = PARTY_MIX, lights = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX))) =
-        settings.update { ModesPrefs(modes = listOf(mode)) }
+    suspend fun choose(vararg modes: StoredMode = arrayOf(PARTY_MODE.copy(music = PARTY_MIX, lights = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX)))) =
+        settings.update { ModesPrefs(modes = modes.toList()) }
 }

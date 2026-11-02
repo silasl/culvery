@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.party.MusicChoice
 import uk.co.siland.culvery.capability.party.ModesStore
-import uk.co.siland.culvery.capability.party.PartyWords
+import uk.co.siland.culvery.capability.party.ModesWords
 import uk.co.siland.culvery.capability.party.StoredMode
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseLines
@@ -58,7 +58,7 @@ private const val TAG = "PartySettingsPage"
 /** Settings › Party mode (13 §3), between Lights (470) and Other integrations (480); always listed. */
 class PartyPage internal constructor(private val content: @Composable () -> Unit) : SettingsPage {
     override val id = "party"
-    override val title = PartyWords.SETTINGS_TITLE
+    override val title = ModesWords.SETTINGS_TITLE
     override val order = 475
 
     @Composable
@@ -87,26 +87,26 @@ fun PartySettingsScreen(
     onScene: (LightRoomOption, HouseScene?) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(PartyDimens.settingsGap), modifier = Modifier.testTag("settings_party")) {
-        HhPageTitle(PartyWords.SETTINGS_TITLE)
+        HhPageTitle(ModesWords.SETTINGS_TITLE)
         MusicSection(ui, onMusic, onSpeaker)
         LightsSection(ui, onScene)
-        HhSectionLabel(PartyWords.PLUGS_SECTION)
-        Line(PartyWords.PLUGS_LINE, "party_plugs_line")
+        HhSectionLabel(ModesWords.PLUGS_SECTION)
+        Line(ModesWords.PLUGS_LINE, "party_plugs_line")
     }
 }
 
 @Composable
 private fun MusicSection(ui: PartySettingsUi, onMusic: (MusicPick?) -> Unit, onSpeaker: (HouseRoom, Boolean) -> Unit) {
-    HhSectionLabel(PartyWords.MUSIC_SECTION)
+    HhSectionLabel(ModesWords.MUSIC_SECTION)
     val music = ui.music
     if (music == null) {
-        if (!ui.musicReading) Line(PartyWords.SET_UP_SONOS, "party_music_line")
+        if (!ui.musicReading) Line(ModesWords.SET_UP_SONOS, "party_music_line")
         return
     }
     music.line?.let { Line(it, "party_music_line", problem = true) }
     val overlay = LocalOverlayHost.current
     val chosen = ui.mode.music
-    ChoiceRow(PartyWords.MUSIC_SECTION, chosen?.pickName ?: PartyWords.NONE, PartyWords.CHOOSE_MUSIC, "party_music") {
+    ChoiceRow(ModesWords.MUSIC_SECTION, chosen?.pickName ?: ModesWords.NONE, ModesWords.CHOOSE_MUSIC, "party_music") {
         overlay.show {
             PartyMusicSheet(
                 music.picks, chosen?.pickId,
@@ -120,7 +120,7 @@ private fun MusicSection(ui: PartySettingsUi, onMusic: (MusicPick?) -> Unit, onS
     }
     if (music.rooms.isEmpty()) return
     val on = music.rooms.map { ui.mode.speakers == null || ui.mode.speakers.any { saved -> saved.id == it.id } }
-    Text(PartyWords.SPEAKERS, style = HhType.label, color = Culvery.colors.mute, modifier = Modifier.semantics { heading() })
+    Text(ModesWords.SPEAKERS, style = HhType.label, color = Culvery.colors.mute, modifier = Modifier.semantics { heading() })
     music.rooms.forEachIndexed { i, room ->
         HhSwitchRow(
             room.name, line = null, checked = on[i], tag = "party_speaker_$i",
@@ -132,17 +132,17 @@ private fun MusicSection(ui: PartySettingsUi, onMusic: (MusicPick?) -> Unit, onS
 
 @Composable
 private fun LightsSection(ui: PartySettingsUi, onScene: (LightRoomOption, HouseScene?) -> Unit) {
-    HhSectionLabel(PartyWords.LIGHTS_SECTION)
+    HhSectionLabel(ModesWords.LIGHTS_SECTION)
     val lights = ui.lights
     if (lights == null) {
-        if (!ui.lightsReading) Line(PartyWords.SET_UP_HUE, "party_lights_line")
+        if (!ui.lightsReading) Line(ModesWords.SET_UP_HUE, "party_lights_line")
         return
     }
     lights.line?.let { Line(it, "party_lights_line", problem = true) }
     val overlay = LocalOverlayHost.current
     lights.rooms.forEachIndexed { i, room ->
         val chosen = ui.mode.lights.firstOrNull { it.roomId == room.id }?.choice as? LightChoice.Scene
-        ChoiceRow(room.name, chosen?.sceneName ?: PartyWords.LEAVE_ALONE, PartyWords.chooseScene(room.name), "party_light_$i") {
+        ChoiceRow(room.name, chosen?.sceneName ?: ModesWords.LEAVE_ALONE, ModesWords.chooseScene(room.name), "party_light_$i") {
             overlay.show {
                 PartySceneSheet(
                     room, chosen?.sceneId,
@@ -172,14 +172,14 @@ private fun Line(text: String, tag: String, problem: Boolean = false) = Text(
 /** The music to play, "None" first; [chosenId] is the pick shown as chosen, null for "None". */
 @Composable
 internal fun PartyMusicSheet(picks: List<MusicPick>, chosenId: String?, onPick: (MusicPick?) -> Unit, onClose: () -> Unit) = NoneFirstSheet(
-    PartyWords.MUSIC_SHEET_TITLE, "party_music_sheet", "party_music", PartyWords.NONE,
+    ModesWords.MUSIC_SHEET_TITLE, "party_music_sheet", "party_music", ModesWords.NONE,
     picks, picks.map { it.id }, picks.map { it.name }, chosenId, onPick, onClose,
 )
 
 /** A light room's scenes, "Leave alone" first; [chosenId] is the scene shown as chosen, null for "Leave alone". */
 @Composable
 internal fun PartySceneSheet(room: LightRoomOption, chosenId: String?, onPick: (HouseScene?) -> Unit, onClose: () -> Unit) = NoneFirstSheet(
-    room.name, "party_scene_sheet", "party_scene", PartyWords.LEAVE_ALONE,
+    room.name, "party_scene_sheet", "party_scene", ModesWords.LEAVE_ALONE,
     room.scenes, room.scenes.map { it.id }, room.scenes.map { it.name }, chosenId, onPick, onClose,
 )
 
@@ -246,7 +246,7 @@ fun PartySettingsHost(settings: ModesStore, music: HouseMusic?, lights: HouseLig
     fun save(change: (StoredMode) -> StoredMode) {
         scope.launch {
             attempt({ settings.update { it.withMode(HouseModes.PARTY, change) } }) { e ->
-                Log.w(TAG, "Couldn't save a Party mode setting (${e::class.simpleName})")
+                Log.w(TAG, "Couldn't save a stored mode's setting (${e::class.simpleName})")
             }
         }
     }

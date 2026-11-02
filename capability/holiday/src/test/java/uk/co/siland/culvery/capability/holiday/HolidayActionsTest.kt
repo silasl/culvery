@@ -203,6 +203,22 @@ class HolidayActionsTest {
         assertThat(actions.refusal.current()).isNull()
     }
 
+    /** T3: fails if an added mode being on asks for a PIN, or the line doesn't name it. */
+    @Test
+    fun holidayRefusesWhileFilmNightIsOn() = runTest {
+        val rig = rig()
+        val access = TestAccess(Role.ADULT)
+        rig.loaded()
+        val stored = TestSwitch(HouseModes.STORED, "Film night", MutableStateFlow(true), logName = "a stored mode")
+        val actions = HolidayActions(access, rig.house, null, setOf(stored), { HouseRig.TODAY })
+
+        actions.toggle { opened += it }
+
+        assertThat(access.asked).isEmpty()
+        assertThat(opened).isEmpty()
+        assertThat(actions.refusal.current()).isEqualTo("Turn Film night off first.")
+    }
+
     /** The line is a state, not an event: it is on while Party mode is and off once it isn't, without another tap. */
     @Test
     fun theRefusalFollowsPartyModeBothWays() = runTest {

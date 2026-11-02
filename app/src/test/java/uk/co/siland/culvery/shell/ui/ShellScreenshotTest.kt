@@ -273,7 +273,7 @@ class ShellScreenshotTest {
         HhCard(Modifier.fillMaxWidth().height(68.dp)) { Text("Tray row", style = HhType.cardTitle, color = Culvery.colors.ink) }
     }
 
-    /** The Holiday and Party tiles' places, side by side first in the tray (15a §2.1). */
+    /** The modes' tiles' places, two to a row round the hoover's (15b Ruling 11). */
     private fun trayMode(id: String, order: Int, label: String) = TrayButton(id, order, TrayWidth.HALF) {
         Box(
             Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(17.dp)).background(Culvery.colors.surf2).padding(horizontal = 12.dp),
@@ -281,10 +281,14 @@ class ShellScreenshotTest {
         ) { Text(label, style = HhType.cardTitle, color = Culvery.colors.ink, maxLines = 1) }
     }
 
-    private val trayHoliday = trayMode("holiday.mode", 10, "Holiday")
-    private val trayParty = trayMode("party.mode", 15, "Party")
+    private val trayModes = listOf(
+        trayMode("holiday.mode", 10, "Holiday"),
+        trayMode("mode.party", 11, "Party"),
+        trayMode("mode.modea", 12, "Film night"),
+        trayMode("mode.modeb", 13, "Bedtime"),
+    )
 
-    private fun trayHome(dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true) = calendarHome(dark).copy(
+    private fun trayHome(dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true, modes: Int = 2) = calendarHome(dark).copy(
         tabs = allTabs,
         homeCards = HomeCardPlacer.place(
             homeCardList(lights, music) +
@@ -293,7 +297,7 @@ class ShellScreenshotTest {
                         HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
                     }.takeIf { shopping },
                 ),
-            listOf(trayRow, trayHoliday, trayParty),
+            listOf(trayRow) + trayModes.take(modes),
         ),
     )
 
@@ -582,6 +586,19 @@ class ShellScreenshotTest {
 
     @Test
     fun homeTrayAloneLight() = snap("home_tray_alone_light", dark = false, state = trayHome(dark = false, shopping = false, lights = false, music = false))
+
+    /** One mode, and four round the hoover's row (15b decision 3). */
+    @Test
+    fun homeTrayOneModeDark() = snap("home_tray_one_mode_dark", dark = true, state = trayHome(dark = true, shopping = true, modes = 1))
+
+    @Test
+    fun homeTrayOneModeLight() = snap("home_tray_one_mode_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 1))
+
+    @Test
+    fun homeTrayFourModesDark() = snap("home_tray_four_modes_dark", dark = true, state = trayHome(dark = true, shopping = true, modes = 4))
+
+    @Test
+    fun homeTrayFourModesLight() = snap("home_tray_four_modes_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 4))
 
     /** The capability's own card: Milk, Bread and Eggs over the sample provider (10 §4.9). */
     @Test

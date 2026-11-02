@@ -143,6 +143,12 @@ interface HouseModeSwitch {
     suspend fun tick()
 }
 
+/** Where the modes sit in Home's tray (15b Ruling 12): bound by the stored modes, read by Holiday mode. */
+interface ModeShelf {
+    /** Where [modeId] sits among the modes on Home, 0 first; null while it isn't on Home (15b decision 3). */
+    fun place(modeId: String): Flow<Int?>
+}
+
 /** The first mode other than [modeId] that is on. */
 fun Set<HouseModeSwitch>.blockedBy(modeId: String): HouseModeSwitch? = firstOrNull { it.modeId != modeId && it.isOn.value == true }
 
