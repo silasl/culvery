@@ -8,9 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -18,8 +15,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.flowOf
 import uk.co.siland.culvery.capability.party.ModesWords
 import uk.co.siland.culvery.capability.party.StoredMode
 import uk.co.siland.culvery.core.house.HouseLights
@@ -52,21 +47,16 @@ private const val TAG = "ModeLightsSection"
  */
 @Composable
 internal fun ModeLightsSection(mode: StoredMode, lights: HouseLights?, save: ((StoredMode) -> StoredMode) -> Unit) {
-    val ready by remember(lights) { lights?.ready ?: flowOf(false) }.collectAsStateWithLifecycle<Boolean?>(null)
-    val options by produceState<LightOptions?>(null, lights, ready) {
-        value = if (lights == null || ready != true) {
-            null
-        } else {
-            attempt({ lights.lightOptions() }) { e ->
-                Log.w(TAG, "Couldn't read what the lights offer (${e::class.simpleName})")
-                LightOptions(emptyList(), HouseLines.HUE_REFUSED)
-            }
+    val options = rememberHouseOptions(lights, { it.ready }) { l ->
+        attempt({ l.lightOptions() }) { e ->
+            Log.w(TAG, "Couldn't read what the lights offer (${e::class.simpleName})")
+            LightOptions(emptyList(), HouseLines.HUE_REFUSED)
         }
     }
     HhSectionLabel(ModesWords.LIGHTS_SECTION)
-    val offered = options
+    val offered = options.offered
     if (offered == null) {
-        if (lights == null || ready == false) Line(ModesWords.SET_UP_HUE, "mode_lights_line")
+        if (options.notSetUp) Line(ModesWords.SET_UP_HUE, "mode_lights_line")
         return
     }
     offered.line?.let { Line(it, "mode_lights_line", problem = true) }

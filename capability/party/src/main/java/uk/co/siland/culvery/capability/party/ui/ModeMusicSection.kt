@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import uk.co.siland.culvery.capability.party.ModesWords
 import uk.co.siland.culvery.capability.party.MusicChoice
@@ -49,21 +50,16 @@ private const val TAG = "ModeMusicSection"
  */
 @Composable
 internal fun ModeMusicSection(mode: StoredMode, music: HouseMusic?, save: ((StoredMode) -> StoredMode) -> Unit) {
-    val ready by remember(music) { music?.ready ?: flowOf(false) }.collectAsStateWithLifecycle<Boolean?>(null)
-    val options by produceState<MusicOptions?>(null, music, ready) {
-        value = if (music == null || ready != true) {
-            null
-        } else {
-            attempt({ music.options() }) { e ->
-                Log.w(TAG, "Couldn't read what the speakers offer (${e::class.simpleName})")
-                MusicOptions(emptyList(), emptyList(), HouseLines.CANT_REACH_SONOS)
-            }
+    val options = rememberHouseOptions(music, { it.ready }) { m ->
+        attempt({ m.options() }) { e ->
+            Log.w(TAG, "Couldn't read what the speakers offer (${e::class.simpleName})")
+            MusicOptions(emptyList(), emptyList(), HouseLines.CANT_REACH_SONOS)
         }
     }
     HhSectionLabel(ModesWords.MUSIC_SECTION)
-    val offered = options
+    val offered = options.offered
     if (offered == null) {
-        if (music == null || ready == false) Line(ModesWords.SET_UP_SONOS, "mode_music_line")
+        if (options.notSetUp) Line(ModesWords.SET_UP_SONOS, "mode_music_line")
         return
     }
     offered.line?.let { Line(it, "mode_music_line", problem = true) }
@@ -92,6 +88,19 @@ internal fun ModeMusicSection(mode: StoredMode, music: HouseMusic?, save: ((Stor
             onChange = { save { m -> m.withSpeaker(offered.rooms, room, it) } },
         )
     }
+}
+
+/** What a house system offers a mode's section, [offered] once read; [notSetUp] with no system or one that isn't set up. */
+internal class HouseOptions<T>(val offered: T?, val notSetUp: Boolean)
+
+/** Reads what [seam] offers with [load] once [ready] says it is set up; nothing while that read runs. */
+@Composable
+internal fun <S : Any, T : Any> rememberHouseOptions(seam: S?, ready: (S) -> Flow<Boolean>, load: suspend (S) -> T): HouseOptions<T> {
+    val isReady by remember(seam) { seam?.let(ready) ?: flowOf(false) }.collectAsStateWithLifecycle<Boolean?>(null)
+    val offered by produceState<T?>(null, seam, isReady) {
+        value = if (seam == null || isReady != true) null else load(seam)
+    }
+    return HouseOptions(offered, notSetUp = seam == null || isReady == false)
 }
 
 /** A row that says what it holds and opens a sheet to change it; spoken "[title], [value]". */
