@@ -619,7 +619,7 @@ class StoredModesHouseTest {
         val house = rig.house()
         val turnOn = launch { house.turnOn(PARTY, by()) }
         runCurrent()
-        assertThat(house.running.value).isEqualTo(ModeRunning(PARTY, PartyRun.TURNING_ON))
+        assertThat(house.running.value).isEqualTo(ModeRunning(PARTY, ModeRun.TURNING_ON))
 
         house.turnOff(by())
         gate.complete(Unit)
@@ -943,7 +943,7 @@ class StoredModesHouseTest {
     /** Fails if the running change can be read out of a log line. */
     @Test
     fun theRunHidesItsMode() {
-        assertThat(ModeRunning(FILM_ID, PartyRun.TURNING_ON).toString()).doesNotContain(FILM_ID)
+        assertThat(ModeRunning(FILM_ID, ModeRun.TURNING_ON).toString()).doesNotContain(FILM_ID)
     }
 
     private companion object {

@@ -24,8 +24,8 @@ class ModesWordsTest {
     fun spoken() {
         assertThat(ModesWords.tileSpoken("Film night", false)).isEqualTo("Film night, off.")
         assertThat(ModesWords.tileSpoken("Film night", true)).isEqualTo("Film night, on.")
-        assertThat(ModesWords.runningSpoken("Film night", PartyRun.TURNING_ON)).isEqualTo("Film night, turning on.")
-        assertThat(ModesWords.runningSpoken("Film night", PartyRun.TURNING_OFF)).isEqualTo("Film night, turning off.")
+        assertThat(ModesWords.runningSpoken("Film night", ModeRun.TURNING_ON)).isEqualTo("Film night, turning on.")
+        assertThat(ModesWords.runningSpoken("Film night", ModeRun.TURNING_OFF)).isEqualTo("Film night, turning off.")
     }
 
     private val film = StoredMode("modeaaaaaa", "Film night", "movie", showOnHome = true, needsPin = true)

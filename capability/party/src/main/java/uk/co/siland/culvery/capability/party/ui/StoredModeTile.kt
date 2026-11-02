@@ -5,8 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import uk.co.siland.culvery.capability.party.ModeRun
 import uk.co.siland.culvery.capability.party.ModesWords
-import uk.co.siland.culvery.capability.party.PartyRun
 import uk.co.siland.culvery.capability.party.StoredMode
 import uk.co.siland.culvery.capability.party.StoredModeActions
 import uk.co.siland.culvery.capability.party.StoredModesHouse
@@ -23,10 +23,10 @@ private const val TAG = "StoredModeTile"
  * under it. A tap does nothing while [running] says a change is out.
  */
 @Composable
-internal fun StoredModeTile(id: String, name: String, icon: String, on: Boolean, line: String?, running: PartyRun?, onTap: () -> Unit) {
+internal fun StoredModeTile(id: String, name: String, icon: String, on: Boolean, line: String?, running: ModeRun?, onTap: () -> Unit) {
     val state = when (running) {
-        PartyRun.TURNING_ON -> HouseModeWords.TURNING_ON
-        PartyRun.TURNING_OFF -> HouseModeWords.TURNING_OFF
+        ModeRun.TURNING_ON -> HouseModeWords.TURNING_ON
+        ModeRun.TURNING_OFF -> HouseModeWords.TURNING_OFF
         null -> null
     }
     HouseModeTile(

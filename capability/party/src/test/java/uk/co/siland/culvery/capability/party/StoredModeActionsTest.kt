@@ -286,7 +286,7 @@ class StoredModeActionsTest {
         rig.trace.gates["plugs.begin"] = gate
         val turning = launch { turnOnParty(rig) }
         runCurrent()
-        assertThat(rig.house.running.value).isEqualTo(ModeRunning(PARTY, PartyRun.TURNING_ON))
+        assertThat(rig.house.running.value).isEqualTo(ModeRunning(PARTY, ModeRun.TURNING_ON))
         val access = TestAccess(Role.ADULT)
 
         actions(access, rig).tap(FILM_ID, sawOn = false)
@@ -317,7 +317,7 @@ class StoredModeActionsTest {
         rig.trace.gates["music.start"] = gate
         val tap = launch { actions(TestAccess(Role.ADULT), rig).tap(FILM_ID, sawOn = false) }
         runCurrent()
-        assertThat(rig.house.running.value).isEqualTo(ModeRunning(FILM_ID, PartyRun.TURNING_ON))
+        assertThat(rig.house.running.value).isEqualTo(ModeRunning(FILM_ID, ModeRun.TURNING_ON))
 
         tap.cancel()
         gate.complete(Unit)

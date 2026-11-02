@@ -27,12 +27,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.capability.party.ModeRun
 import uk.co.siland.culvery.capability.party.ModesPrefs
 import uk.co.siland.culvery.capability.party.ModesWords
 import uk.co.siland.culvery.capability.party.MusicChoice
-import uk.co.siland.culvery.capability.party.PARTY_MODE
 import uk.co.siland.culvery.capability.party.PARTY_ICON
-import uk.co.siland.culvery.capability.party.PartyRun
+import uk.co.siland.culvery.capability.party.PARTY_MODE
 import uk.co.siland.culvery.core.house.AddedPlug
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.LightChoice
@@ -62,7 +62,7 @@ import uk.co.siland.culvery.core.ui.test.waitFor
 class StoredModeScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private fun tile(name: String, dark: Boolean, on: Boolean, line: String? = null, running: PartyRun? = null) =
+    private fun tile(name: String, dark: Boolean, on: Boolean, line: String? = null, running: ModeRun? = null) =
         compose.snap(name, dark, Modifier.padding(16.dp)) {
             OneTapTray("party") { StoredModeTile("party", "Party mode", PARTY_ICON, on, line, running) {} }
         }
@@ -75,9 +75,9 @@ class StoredModeScreenshotTest {
 
     @Test fun tileOnLinesLight() = tile("party_tile_on_lines_light", false, on = true, line = LINES)
 
-    @Test fun tileTurningOnDark() = tile("party_tile_turning_on_dark", true, on = false, running = PartyRun.TURNING_ON)
+    @Test fun tileTurningOnDark() = tile("party_tile_turning_on_dark", true, on = false, running = ModeRun.TURNING_ON)
 
-    @Test fun tileTurningOnLight() = tile("party_tile_turning_on_light", false, on = false, running = PartyRun.TURNING_ON)
+    @Test fun tileTurningOnLight() = tile("party_tile_turning_on_light", false, on = false, running = ModeRun.TURNING_ON)
 
     @Test fun tileNothingDark() = tile("party_tile_nothing_dark", true, on = true, line = ModesWords.NOTHING_TO_DO)
 

@@ -32,7 +32,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.party.FILM_ID
 import uk.co.siland.culvery.capability.party.FILM_NIGHT
 import uk.co.siland.culvery.capability.party.HouseRig
-import uk.co.siland.culvery.capability.party.PartyRun
+import uk.co.siland.culvery.capability.party.ModeRun
 import uk.co.siland.culvery.capability.party.StoredModeActions
 import uk.co.siland.culvery.capability.party.TestAccess
 import uk.co.siland.culvery.core.household.Role
@@ -53,7 +53,7 @@ class StoredModeTileTest {
     private var taps = 0
     private var on by mutableStateOf(false)
     private var line by mutableStateOf<String?>(null)
-    private var running by mutableStateOf<PartyRun?>(null)
+    private var running by mutableStateOf<ModeRun?>(null)
 
     @After fun stop() = scope.cancel()
 
@@ -109,7 +109,7 @@ class StoredModeTileTest {
     /** Fails if a tap while a change runs reaches the action, or the words don't say what is happening. */
     @Test
     fun runningShowsTurningOn() {
-        running = PartyRun.TURNING_ON
+        running = ModeRun.TURNING_ON
         show()
         compose.onNodeWithTag("${TILE}_state", useUnmergedTree = true).assertTextEquals("Turning on…")
         compose.onNode(hasContentDescription("Film night, turning on.")).assertExists()
@@ -117,7 +117,7 @@ class StoredModeTileTest {
         assertThat(taps).isEqualTo(0)
 
         on = true
-        running = PartyRun.TURNING_OFF
+        running = ModeRun.TURNING_OFF
         compose.waitForIdle()
         compose.onNodeWithTag("${TILE}_state", useUnmergedTree = true).assertTextEquals("Turning off…")
         compose.onNode(hasContentDescription("Film night, turning off.")).assertExists()

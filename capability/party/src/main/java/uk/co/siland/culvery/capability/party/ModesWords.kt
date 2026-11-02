@@ -1,7 +1,7 @@
 package uk.co.siland.culvery.capability.party
 
 /** The change a mode's tile is making, while neither "on" nor "off" is yet true. */
-enum class PartyRun { TURNING_ON, TURNING_OFF }
+enum class ModeRun { TURNING_ON, TURNING_OFF }
 
 /** The stored modes' words (13 §5, 15b §7). */
 object ModesWords {
@@ -68,6 +68,7 @@ object ModesWords {
         }
     }
 
+    /** The capability's label, kept from when it was Party mode alone (13); the mode pages' words follow. */
     const val LABEL = "Party mode"
     const val NOTHING_TO_DO = "Nothing to do yet. Choose music, lights or plugs in Settings › Modes."
 
@@ -124,8 +125,8 @@ object ModesWords {
 
     fun tileSpoken(name: String, on: Boolean) = if (on) "$name, on." else "$name, off."
 
-    fun runningSpoken(name: String, run: PartyRun): String = when (run) {
-        PartyRun.TURNING_ON -> "$name, turning on."
-        PartyRun.TURNING_OFF -> "$name, turning off."
+    fun runningSpoken(name: String, run: ModeRun): String = when (run) {
+        ModeRun.TURNING_ON -> "$name, turning on."
+        ModeRun.TURNING_OFF -> "$name, turning off."
     }
 }

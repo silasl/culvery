@@ -39,7 +39,7 @@ private const val TAG = "StoredModesHouse"
 private enum class ModeStep { MUSIC, LIGHTS }
 
 /** The stored mode a change is turning on or off. [toString] leaves out the id. */
-data class ModeRunning(val modeId: String, val change: PartyRun) {
+data class ModeRunning(val modeId: String, val change: ModeRun) {
     override fun toString() = "ModeRunning($change)"
 }
 
@@ -124,7 +124,7 @@ class StoredModesHouse internal constructor(
     /** Turns [modeId] on unless a stored mode is on already. The wall may turn on only a mode whose own flag needs no PIN. */
     suspend fun turnOn(modeId: String, grant: ModeGrant) {
         require(grant.allows(modeId)) { "Turning a stored mode on needs its own grant" }
-        exclusive(ModeRunning(modeId, PartyRun.TURNING_ON)) {
+        exclusive(ModeRunning(modeId, ModeRun.TURNING_ON)) {
             if (load().on) return@exclusive
             val mode = settings.prefs.first().mode(modeId) ?: return@exclusive
             // A plug locked since the tap is left out by the plug store instead (15b Ruling 4).
@@ -155,7 +155,7 @@ class StoredModesHouse internal constructor(
     suspend fun turnOff(grant: ModeGrant) {
         val seen = current.value ?: settings.record.filterNotNull().first()
         if (!seen.on) return
-        exclusive(ModeRunning(seen.onId(), PartyRun.TURNING_OFF)) {
+        exclusive(ModeRunning(seen.onId(), ModeRun.TURNING_OFF)) {
             val record = load()
             if (!record.on) return@exclusive
             val id = record.onId()
@@ -203,7 +203,7 @@ class StoredModesHouse internal constructor(
 
     private suspend fun exclusive(change: ModeRunning, block: suspend () -> Unit) {
         if (!run.compareAndSet(null, change)) return
-        claiming.value = change.change == PartyRun.TURNING_ON
+        claiming.value = change.change == ModeRun.TURNING_ON
         try {
             mutex.withLock { block() }
         } finally {
