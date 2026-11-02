@@ -9,3 +9,5 @@ provider/music-sonos/SonosDiscovery.kt | M-SEARCH * HTTP/1.1\r\nHOST: 239.255.25
 provider/music-sonos/SonosSystem.kt | <DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r= | the playlist metadata's DIDL, sent to the speakers, never shown
 provider/music-sonos/SonosSystem.kt | "urn:schemas-rinconnetworks-com:metadata-1-0/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"> | the playlist metadata's DIDL, sent to the speakers, never shown
 provider/music-sonos/SonosSystem.kt | <item id="" parentID="$PLAYLISTS" restricted="true"><dc:title></dc:title> | the playlist metadata's DIDL, sent to the speakers, never shown
+capability/taekwondo/Moves.kt | Walking stance, grab the opponent's head | the instructor's text, carried exactly as in culvery-notes/taekwondo-choong-moo.html (15b Ruling 20)
+capability/taekwondo/Moves.kt | The pattern ends with a left-hand punch, marking Admiral Yi's death in battle. | the instructor's text, carried exactly as in culvery-notes/taekwondo-choong-moo.html (15b Ruling 20)

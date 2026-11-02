@@ -345,6 +345,42 @@ class OverlayLayersTest {
         assertThat(open("editor")).isFalse()
     }
 
+    /** Fails if a kept-open overlay closes while it is kept, or doesn't start its idle wait once let go. */
+    @Test
+    fun aKeptOpenOverlayWaitsThenClosesOnceLetGo() {
+        showShell()
+        val shownAt = showEditor(edited = false)
+        compose.runOnIdle { overlay.keepOpen(true) }
+        settle()
+        until(shownAt, OVERLAY_IDLE_MS + 1_000)
+        assertThat(open("editor")).isTrue()
+
+        val letGoAt = compose.mainClock.currentTime
+        compose.runOnIdle { overlay.keepOpen(false) }
+        settle()
+        until(letGoAt, OVERLAY_IDLE_MS - FRAME_MS)
+        assertThat(open("editor")).isTrue()
+        until(letGoAt, OVERLAY_IDLE_MS + FRAME_MS)
+        assertThat(open("editor")).isFalse()
+    }
+
+    /** Fails if the keep-open mark outlives the overlay it was set for. */
+    @Test
+    fun theNextOverlayClosesWhenIdle() {
+        showShell()
+        showEditor(edited = false)
+        compose.runOnIdle {
+            overlay.keepOpen(true)
+            overlay.dismiss()
+        }
+        settle()
+        val shownAt = showEditor(edited = false)
+        until(shownAt, OVERLAY_IDLE_MS - FRAME_MS)
+        assertThat(open("editor")).isTrue()
+        until(shownAt, OVERLAY_IDLE_MS + FRAME_MS)
+        assertThat(open("editor")).isFalse()
+    }
+
     /** pin: the edited hold and its warning are the sheet's, unchanged. */
     @Test
     fun anEditedFullScreenOverlayWarnsAt580SecondsAndClosesAt600() {

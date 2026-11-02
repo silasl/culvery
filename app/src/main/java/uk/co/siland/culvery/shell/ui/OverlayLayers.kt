@@ -187,8 +187,8 @@ private fun rememberSheetClosingSoon(overlay: OverlayState, activity: UserActivi
     val content = overlay.content
     val edited = overlay.edited
     var endsAt by remember(content, edited, closes) { mutableStateOf<Long?>(null) }
-    LaunchedEffect(content, edited, overlay.closesWhenIdle, closes) {
-        if (content == null || !overlay.closesWhenIdle || !closes) return@LaunchedEffect
+    LaunchedEffect(content, edited, overlay.closesNow, closes) {
+        if (content == null || !overlay.closesNow || !closes) return@LaunchedEffect
         // Collected here rather than as state, so a touch restarts the wait without recomposing the shell.
         activity.touches.collectLatest {
             endsAt = null

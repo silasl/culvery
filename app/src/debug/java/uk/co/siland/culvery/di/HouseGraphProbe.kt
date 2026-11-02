@@ -7,6 +7,7 @@ import java.util.Optional
 import uk.co.siland.culvery.capability.holiday.HolidayHouse
 import uk.co.siland.culvery.capability.lights.Bridges
 import uk.co.siland.culvery.capability.music.Speakers
+import uk.co.siland.culvery.capability.party.ModesShelf
 import uk.co.siland.culvery.capability.party.StoredModesHouse
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
@@ -28,6 +29,7 @@ import uk.co.siland.culvery.display.SeasonalThemes
 interface HouseGraphProbe {
     fun holidayHouse(): HolidayHouse
     fun storedModesHouse(): StoredModesHouse
+    fun modesShelf(): ModesShelf
     fun houseMode(): HouseMode
     fun lights(): Optional<HouseLights>
     fun heating(): Optional<HouseHeating>

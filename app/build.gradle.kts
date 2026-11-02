@@ -82,6 +82,8 @@ dependencies {
     implementation(project(":capability:party"))
     // Wired by Hilt alone, as Holiday mode (13 §6a).
     implementation(project(":capability:plugs"))
+    // A throwaway practice screen (15b §8), wired by Hilt alone.
+    implementation(project(":capability:taekwondo"))
     implementation(project(":provider:plugs-homeassistant"))
     implementation(project(":provider:hoover-homeassistant"))
     implementation(project(":provider:heating-homeassistant"))

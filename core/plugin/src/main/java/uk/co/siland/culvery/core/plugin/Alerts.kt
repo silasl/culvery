@@ -27,6 +27,9 @@ interface AlertHost {
     /** True while Culvery's screen is resumed in front: an alert raised otherwise would never be seen (5 §2.7). */
     val inFront: StateFlow<Boolean>
 
+    /** True while any alert, quiet or loud, is on the alert layer. */
+    val showing: StateFlow<Boolean>
+
     /**
      * True once a quieter of the loud alert showing has turned something down (9 §6.3): false as each quiet pass starts,
      * and when the loud alert goes.

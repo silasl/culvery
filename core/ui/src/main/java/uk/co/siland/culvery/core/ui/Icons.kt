@@ -89,6 +89,7 @@ object Icons {
     const val SKIP_NEXT = "skip_next"
     const val SPEAKER = "speaker"
     const val SPORTS_ESPORTS = "sports_esports"
+    const val SPORTS_MARTIAL_ARTS = "sports_martial_arts"
     const val STAR = "star"
     const val SUNNY = "sunny"
     const val SYNC_PROBLEM = "sync_problem"

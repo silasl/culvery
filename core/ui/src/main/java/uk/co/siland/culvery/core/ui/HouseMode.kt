@@ -75,7 +75,8 @@ fun HouseModeOnPill(tag: String) {
 /**
  * A mode's tray tile, narrow enough for half the tray: [icon] with [trailing] on its right, then [label] and [second]
  * under them, all spoken as [spoken], then what didn't happen as [line] under the tile. A tap does nothing unless
- * [enabled]. Its tags start with [tag]; [second]'s is [secondTag].
+ * [enabled]. Its tags start with [tag]; [second]'s is [secondTag]. [clickLabel] is what TalkBack offers for a tap, where
+ * "Turn on" and "Turn off" would be wrong.
  */
 @Composable
 fun HouseModeTile(
@@ -89,6 +90,7 @@ fun HouseModeTile(
     spoken: String,
     enabled: Boolean,
     onTap: () -> Unit,
+    clickLabel: String? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val colors = Culvery.colors
@@ -102,7 +104,7 @@ fun HouseModeTile(
                 .testTag(tag)
                 .clip(RoundedCornerShape(HouseModeDimens.radius))
                 .background(if (on) colors.accent else colors.surf2)
-                .hhClickable(onTap, label = if (on) HouseModeWords.CLICK_OFF else HouseModeWords.CLICK_ON, enabled = enabled, spoken = spoken)
+                .hhClickable(onTap, label = clickLabel ?: if (on) HouseModeWords.CLICK_OFF else HouseModeWords.CLICK_ON, enabled = enabled, spoken = spoken)
                 .padding(horizontal = HouseModeDimens.paddingH, vertical = HouseModeDimens.paddingV),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

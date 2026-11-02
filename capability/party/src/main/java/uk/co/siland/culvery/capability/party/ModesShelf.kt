@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.ModeShelf
 import uk.co.siland.culvery.core.plugin.Capability
@@ -33,7 +32,10 @@ class ModesShelf @Inject constructor(
     private val store: ModesStore,
     private val capabilities: Provider<Set<@JvmSuppressWildcards Capability>>,
 ) : ModeShelf {
-    /** The spots left for modes: four less the half-width buttons that aren't modes. */
+    /**
+     * The spots left for modes: four less the half-width buttons that aren't modes. It says nothing until every other
+     * capability has given its buttons, so Home never places a mode in a spot that a button then takes.
+     */
     val room: Flow<Int> = flow {
         // The modes' own capabilities place their buttons by this shelf, so asking them would go round in a circle.
         val others = capabilities.get().filter { it.id != HouseModes.HOLIDAY && it.id != HouseModes.PARTY }
@@ -44,7 +46,6 @@ class ModesShelf @Inject constructor(
                 others.map { cap ->
                     cap.trayButtons()
                         .retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its tray buttons (${it::class.simpleName}); retrying") }
-                        .onStart { emit(emptyList()) }
                 },
             ) { lists -> lists.sumOf { list -> list.count { it.width == TrayWidth.HALF && !it.id.isModeButton() } } }
         }

@@ -5,9 +5,14 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,6 +83,29 @@ class ModesShelfTest {
         // The room is four until the board's buttons are read.
         assertThat(shelf.room.first { it != 4 }).isEqualTo(3)
         assertThat(shelf.shown.first { it.size != 4 }).containsExactly("party", "modeb", "modec").inOrder()
+    }
+
+    /** Fails if the room is announced as four while a half-width button is still on its way, which flashes a fourth mode on Home. */
+    @Test
+    fun theRoomNeverSaysFourBeforeTheButtonsAreKnown() = runTest {
+        val late = object : Capability by Buttons("late", emptyList()) {
+            override fun trayButtons(): Flow<List<TrayButton>> = flow {
+                delay(50)
+                emit(listOf(TrayButton("late.start", 90, TrayWidth.HALF) {}))
+            }
+        }
+        val shelf = shelf(backgroundScope, ModesPrefs(holidayOnHome = false, modes = listOf(mode("party"))), late)
+        val rooms = mutableListOf<Int>()
+        val shown = mutableListOf<List<String>>()
+        backgroundScope.launch { shelf.room.toList(rooms) }
+        backgroundScope.launch { shelf.shown.toList(shown) }
+
+        advanceTimeBy(10)
+        assertThat(rooms).isEmpty()
+        assertThat(shown).isEmpty()
+        advanceTimeBy(100)
+        assertThat(rooms).containsExactly(3)
+        assertThat(shown.flatten()).containsExactly("party")
     }
 
     /** Review Focus 3: fails if Holiday mode back on Home doesn't take the first place and push the last mode off. */

@@ -84,6 +84,7 @@ shuffle
 skip_next
 speaker
 sports_esports
+sports_martial_arts
 star
 sunny
 sync_problem

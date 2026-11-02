@@ -37,11 +37,19 @@ class TestOverlay : OverlayHost {
     /** As the shell's: reset by each show and dismiss. */
     var edited = false
 
+    /** As the shell's: reset by each show and dismiss. */
+    var keptOpen = false
+
     override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
         shown++
         this.closesWhenIdle = closesWhenIdle
         edited = false
+        keptOpen = false
         this.content = content
+    }
+
+    override fun keepOpen(on: Boolean) {
+        keptOpen = on
     }
 
     override fun markEdited(edited: Boolean) {
@@ -51,6 +59,7 @@ class TestOverlay : OverlayHost {
     override fun dismiss() {
         content = null
         edited = false
+        keptOpen = false
     }
 
     /** The shell closing the sheet by itself (a scrim tap, the idle timer), without a dismiss from the sheet's owner. */

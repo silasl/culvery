@@ -46,6 +46,11 @@ class OverlayState : OverlayHost {
     var fullScreen by mutableStateOf(false)
         private set
 
+    private var keptOpen by mutableStateOf(false)
+
+    /** The idle close applies: the overlay asked for it and isn't being kept open. */
+    val closesNow: Boolean get() = closesWhenIdle && !keptOpen
+
     val isShowing: Boolean get() = content != null
 
     override var generation = 0
@@ -57,6 +62,7 @@ class OverlayState : OverlayHost {
 
     private fun open(closesWhenIdle: Boolean, fullScreen: Boolean, content: @Composable () -> Unit) {
         this.closesWhenIdle = closesWhenIdle
+        keptOpen = false
         edited = false
         this.fullScreen = fullScreen
         this.content = content
@@ -67,9 +73,14 @@ class OverlayState : OverlayHost {
         this.edited = edited
     }
 
+    override fun keepOpen(on: Boolean) {
+        keptOpen = on
+    }
+
     override fun dismiss() {
         content = null
         edited = false
+        keptOpen = false
         fullScreen = false
     }
 }
@@ -87,6 +98,9 @@ class ShellAlerts @Inject constructor(
 ) : AlertHost, DefaultLifecycleObserver {
     private val _content = MutableStateFlow<(@Composable () -> Unit)?>(null)
     val content: StateFlow<(@Composable () -> Unit)?> = _content.asStateFlow()
+
+    private val _showing = MutableStateFlow(false)
+    override val showing: StateFlow<Boolean> = _showing.asStateFlow()
 
     private val _inFront = MutableStateFlow(false)
     override val inFront: StateFlow<Boolean> = _inFront.asStateFlow()
@@ -108,6 +122,7 @@ class ShellAlerts @Inject constructor(
     override fun show(loud: Boolean, content: @Composable () -> Unit) {
         synchronized(lock) {
             _content.value = content
+            _showing.value = true
             if (loud && !this.loud) startQuiet() else if (!loud && this.loud) startRestore()
             this.loud = loud
         }
@@ -120,6 +135,7 @@ class ShellAlerts @Inject constructor(
     override fun dismiss() {
         synchronized(lock) {
             _content.value = null
+            _showing.value = false
             if (loud) startRestore()
             loud = false
         }

@@ -27,6 +27,9 @@ interface OverlayHost {
 
     fun dismiss()
 
+    /** While [on], the overlay stays open however long it is left alone; each show and dismiss puts it back to closing when idle. */
+    fun keepOpen(on: Boolean) {}
+
     /** Counts the overlays shown so far, so a caller can tell whether another was shown since it last looked. */
     val generation: Int get() = 0
 }

@@ -65,6 +65,7 @@ internal fun File.names(): List<String> = listFiles()?.map { it.name }?.sorted()
 internal class FakeAlertHost(inFront: Boolean = true) : AlertHost {
     override val inFront = MutableStateFlow(inFront)
     override val lowered = MutableStateFlow(false)
+    override val showing = MutableStateFlow(false)
     @Volatile var shown = 0
     @Volatile var dismissed = 0
     var content: (@Composable () -> Unit)? = null

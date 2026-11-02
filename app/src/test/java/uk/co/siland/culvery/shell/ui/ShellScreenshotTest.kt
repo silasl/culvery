@@ -288,7 +288,12 @@ class ShellScreenshotTest {
         trayMode("mode.modeb", 13, "Bedtime"),
     )
 
-    private fun trayHome(dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true, modes: Int = 2) = calendarHome(dark).copy(
+    /** Taekwondo's half-width button after the modes (15b §8), which leaves room for three of them. */
+    private val trayTaekwondo = trayMode("taekwondo", 90, "Taekwondo")
+
+    private fun trayHome(
+        dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true, modes: Int = 2, taekwondo: Boolean = false,
+    ) = calendarHome(dark).copy(
         tabs = allTabs,
         homeCards = HomeCardPlacer.place(
             homeCardList(lights, music) +
@@ -297,7 +302,7 @@ class ShellScreenshotTest {
                         HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
                     }.takeIf { shopping },
                 ),
-            listOf(trayRow) + trayModes.take(modes),
+            listOf(trayRow) + trayModes.take(modes) + listOfNotNull(trayTaekwondo.takeIf { taekwondo }),
         ),
     )
 
@@ -323,6 +328,7 @@ class ShellScreenshotTest {
         val host = object : AlertHost {
             override val inFront = MutableStateFlow(false)
             override val lowered = MutableStateFlow(false)
+            override val showing = MutableStateFlow(false)
 
             override fun show(loud: Boolean, content: @Composable () -> Unit) = Unit
 
@@ -599,6 +605,13 @@ class ShellScreenshotTest {
 
     @Test
     fun homeTrayFourModesLight() = snap("home_tray_four_modes_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 4))
+
+    /** Three modes and Taekwondo's button round the hoover's row (15b §8). */
+    @Test
+    fun homeTrayTaekwondoDark() = snap("home_tray_taekwondo_dark", dark = true, state = trayHome(dark = true, shopping = true, modes = 3, taekwondo = true))
+
+    @Test
+    fun homeTrayTaekwondoLight() = snap("home_tray_taekwondo_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 3, taekwondo = true))
 
     /** The capability's own card: Milk, Bread and Eggs over the sample provider (10 §4.9). */
     @Test

@@ -76,6 +76,19 @@ class ShellAlertsTest {
         assertThat(alerts.content.value).isNull()
     }
 
+    /** Taekwondo stops by this (15b Ruling 18). Fails if a quiet alert doesn't count, or the flag outlives the alert. */
+    @Test
+    fun showingIsTrueWhileAnyAlertIsUp() {
+        val alerts = alerts()
+        assertThat(alerts.showing.value).isFalse()
+        alerts.show(loud = false, content = nothing)
+        assertThat(alerts.showing.value).isTrue()
+        alerts.show(loud = true, content = nothing)
+        assertThat(alerts.showing.value).isTrue()
+        alerts.dismiss()
+        assertThat(alerts.showing.value).isFalse()
+    }
+
     /** 6 §3.3 "at once". Fails if a quieter is skipped, waits for the one before it, or quieted() returns before the slowest finished. */
     @Test
     fun aLoudAlertRunsEveryQuieterAtOnceAndQuietedWaitsForThem() = runTest {
