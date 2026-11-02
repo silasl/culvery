@@ -626,7 +626,7 @@ class PlugsHouseTest {
 
         val again = house.enter(PARTY)
 
-        assertThat(again).isEqualTo(HouseStep.Failed(PlugsWords.enterLine(listOf(PlugChange("Heater", true)))))
+        assertThat(again).isEqualTo(HouseStep.Failed("Heater needs a PIN, so it wasn’t switched."))
         assertThat(rig.system.switches).containsExactly(LAMP to true)
         assertThat(rig.prefs().runs.getValue(PARTY).pending).isEmpty()
         assertThat(house.enter(PARTY)).isEqualTo(HouseStep.Done)
@@ -769,5 +769,25 @@ class PlugsHouseTest {
 
         assertThat(house.added(PARTY).first()).containsExactly(AddedPlug(LAMP, true, false), AddedPlug(FAN, false, false)).inOrder()
         assertThat(house.added(HOLIDAY).first()).containsExactly(AddedPlug(FAN, true, false))
+    }
+
+    /** Fix round 1: fails if a no-PIN begin over a leftover run puts back a plug that needs a PIN, or a later enter switches it. */
+    @Test
+    fun aWallBeginDoesNotPutBackAPinPlug() = runTest {
+        val rig = pinRig()
+        val house = rig.house()
+        house.start(PARTY)
+        rig.forgetCalls()
+        // A leftover run, as a leave whose last write threw leaves it: Heater still noted and pending.
+        rig.configure { p -> p.copy(runs = p.runs + (PARTY to p.runs.getValue(PARTY).copy(pending = mapOf(HEATER to true)))) }
+
+        assertThat(runCatching { house.begin(PARTY, ModeGrant.Wall(PARTY)) }.exceptionOrNull()).isInstanceOf(IllegalStateException::class.java)
+        assertThat(house.enter(PARTY)).isEqualTo(HouseStep.Failed("Heater needs a PIN, so it wasn’t switched."))
+
+        assertThat(rig.system.switches).isEmpty()
+        assertThat(house.holdsPinPlug(PARTY)).isTrue()
+        house.begin(PARTY)
+        assertThat(rig.system.switches).containsExactly(LAMP to false, HEATER to false)
+        assertThat(rig.prefs().runs.getValue(PARTY).wall).isFalse()
     }
 }

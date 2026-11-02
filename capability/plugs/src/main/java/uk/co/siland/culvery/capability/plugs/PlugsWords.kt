@@ -63,6 +63,9 @@ object PlugsWords {
 
     fun didntSwitch(name: String) = "$name didn’t switch. Try again, or use the Tapo app."
 
+    /** The tile line for the plugs a no-PIN run left out because they need a PIN (15b Ruling 4); nothing retries them. */
+    fun leftOut(names: List<String>): String = names.joinToString(" ") { "$it needs a PIN, so it wasn’t switched." }
+
     /** The tile line for plugs a mode didn't switch; the mode keeps trying (12 §5.3). */
     fun enterLine(missed: List<PlugChange>): String =
         missed.singleOrNull()?.let { "${it.name} didn’t switch ${if (it.on) "on" else "off"}. It’ll keep trying." }

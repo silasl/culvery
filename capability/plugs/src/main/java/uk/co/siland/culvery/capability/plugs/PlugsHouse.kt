@@ -58,7 +58,11 @@ class PlugsHouse internal constructor(
         val wall = grant is ModeGrant.Wall
         mutex.withLock {
             // A run still here is a leave whose last write threw: put it back before the new snapshot (12 §5.2).
-            if (modeId in settings.current().runs) leaveLocked(modeId)
+            val prefs = settings.current()
+            if (modeId in prefs.runs) {
+                if (wall && holdsPin(prefs, modeId)) refuseWall(modeId)
+                leaveLocked(modeId)
+            }
             settings.update { p ->
                 val notes = p.notes.mapValues { (_, note) -> note.copy(holders = note.holders.filter { it.mode != modeId }) }
                     .filterValues { it.holders.isNotEmpty() }
@@ -75,9 +79,11 @@ class PlugsHouse internal constructor(
         val prefs = settings.current()
         val run = prefs.runs[modeId] ?: return@withLock null
         val locked = if (run.wall) dropLocked(modeId, prefs) else emptySet()
-        fanOut(run.pending.entries.sortedBy { prefs.plugs.indexOf(it.key) }, PlugsWords::enterLine) { (id, wanted) ->
-            if (id in locked) missed(id, wanted) else reach(modeId, id, wanted)
-        }
+        val pending = run.pending.entries.sortedBy { prefs.plugs.indexOf(it.key) }
+        val step = fanOut(pending.filter { it.key !in locked }, PlugsWords::enterLine) { (id, wanted) -> reach(modeId, id, wanted) }
+        if (locked.isEmpty()) return@withLock step
+        val names = coroutineScope { pending.filter { it.key in locked }.map { async { nameOf(it.key) } }.awaitAll() }
+        HouseStep.Failed(listOfNotNull(PlugsWords.leftOut(names), (step as? HouseStep.Failed)?.line).joinToString(" "))
     }
 
     override suspend fun leave(modeId: String): HouseStep = mutex.withLock { leaveLocked(modeId) }
@@ -108,11 +114,7 @@ class PlugsHouse internal constructor(
         settings.update { it.copy(modes = it.modes - modeId) }
     }
 
-    override suspend fun holdsPinPlug(modeId: String): Boolean = attempt({
-        val p = settings.current()
-        val noted = p.notes.filterValues { note -> note.holders.any { it.mode == modeId } }.keys
-        (noted + p.runs[modeId]?.pending?.keys.orEmpty()).any { it in p.needsPin }
-    }) { e ->
+    override suspend fun holdsPinPlug(modeId: String): Boolean = attempt({ holdsPin(settings.current(), modeId) }) { e ->
         Log.w(TAG, "Plugs: couldn't read the runs (${e::class.simpleName}); counting a plug that needs a PIN")
         true
     }
@@ -134,11 +136,24 @@ class PlugsHouse internal constructor(
         return dropped
     }
 
-    /** The change for a plug a wall's run left out, named by a read. */
-    private suspend fun missed(id: String, wanted: Boolean): PlugChange? = guarded(wanted) { touched ->
-        touched.name = read(id).name
-        false
+    /** True while [modeId]'s run holds a plug in [PlugPrefs.needsPin], in its notes or pending (S1). */
+    private fun holdsPin(p: PlugPrefs, modeId: String): Boolean {
+        val noted = p.notes.filterValues { note -> note.holders.any { it.mode == modeId } }.keys
+        return (noted + p.runs[modeId]?.pending?.keys.orEmpty()).any { it in p.needsPin }
     }
+
+    /**
+     * A wall never puts back a plug that needs a PIN (15b Ruling 4): the leftover run is marked a wall's, so an `enter`
+     * on it drops those plugs too, and the put-back waits for a PIN-backed leave. Throws, as `begin`'s other refusals do.
+     */
+    private suspend fun refuseWall(modeId: String): Nothing {
+        settings.update { p -> p.runs[modeId]?.let { p.copy(runs = p.runs + (modeId to it.copy(wall = true))) } ?: p }
+        Log.w(TAG, "Plugs: a no-PIN run didn't begin over a run that holds a plug that needs a PIN")
+        throw IllegalStateException("A no-PIN run can't put back a plug that needs a PIN")
+    }
+
+    /** A plug's name from a read; "A plug" when the read throws. */
+    private suspend fun nameOf(id: String): String = attempt({ read(id).name }) { PlugsWords.A_PLUG }
 
     private suspend fun leaveLocked(modeId: String): HouseStep {
         val prefs = settings.current()

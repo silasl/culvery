@@ -91,4 +91,12 @@ class PlugsWordsTest {
     fun aPlugWithoutANameIsCalledAPlug() {
         assertThat(PlugsWords.A_PLUG).isEqualTo("A plug")
     }
+
+    /** Fix round 1: fails if a plug a no-PIN run left out says it will keep trying, or loses its name. */
+    @Test
+    fun aPlugLeftOutSaysItNeedsAPin() {
+        assertThat(PlugsWords.leftOut(listOf("Heater"))).isEqualTo("Heater needs a PIN, so it wasn’t switched.")
+        assertThat(PlugsWords.leftOut(listOf("Heater", "Fan")))
+            .isEqualTo("Heater needs a PIN, so it wasn’t switched. Fan needs a PIN, so it wasn’t switched.")
+    }
 }
