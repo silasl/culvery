@@ -283,6 +283,12 @@ class ModesPageTest {
         compose.waitFor { exists("modes_add") }
         compose.onAllNodesWithTag("mode_header").assertCountEquals(0)
         compose.onAllNodesWithTag("mode_row_$FILM_ID").assertCountEquals(0)
+
+        // A mode written back under the same id must not reopen the page: the open id was reset.
+        runBlocking { settings.update { it.copy(modes = it.modes + FILM_NIGHT) } }
+
+        compose.waitFor { exists("mode_row_$FILM_ID") }
+        compose.onAllNodesWithTag("mode_header").assertCountEquals(0)
     }
 
     @Test

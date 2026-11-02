@@ -40,7 +40,7 @@ private const val TAG = "ModePlugsSection"
  * was added, so the mode can hold the PIN too.
  */
 @Composable
-internal fun ModePlugsSection(modeId: String, plugs: HousePlugs, onLockedAdded: () -> Unit, toaster: Toaster? = null) {
+internal fun ModePlugsSection(modeId: String, plugs: HousePlugs, onLockedAdded: () -> Unit, toaster: Toaster) {
     val overlay = LocalOverlayHost.current
     val scope = rememberCoroutineScope()
     val added by remember(plugs, modeId) {
@@ -63,7 +63,7 @@ internal fun ModePlugsSection(modeId: String, plugs: HousePlugs, onLockedAdded: 
                 afterwards()
             } catch (e: IOException) {
                 Log.w(TAG, "Couldn't save a plug choice (${e::class.simpleName})")
-                toaster?.show(COULD_NOT_SAVE, urgent = true)
+                toaster.show(COULD_NOT_SAVE, urgent = true)
             }
         }
     }

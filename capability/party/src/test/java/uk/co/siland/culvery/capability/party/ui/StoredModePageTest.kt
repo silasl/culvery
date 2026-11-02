@@ -44,6 +44,7 @@ import uk.co.siland.culvery.capability.party.KITCHEN_BRIGHT
 import uk.co.siland.culvery.capability.party.LOCKED_HEATER
 import uk.co.siland.culvery.capability.party.LOUNGE
 import uk.co.siland.culvery.capability.party.ModesPrefs
+import uk.co.siland.culvery.capability.party.MusicChoice
 import uk.co.siland.culvery.capability.party.PARTY_MODE
 import uk.co.siland.culvery.capability.party.StoredMode
 import uk.co.siland.culvery.capability.party.grant
@@ -424,6 +425,19 @@ class StoredModePageTest {
         compose.waitFor { saved().music == null }
         assertThat(saved().speakers?.map { it.name }).containsExactly("Kitchen", "Lounge").inOrder()
         compose.onNodeWithTag("mode_music").assertTextEquals("Music", "None")
+    }
+
+    /** Fails if a pick in the music sheet never reaches the store (the old theHostSavesThePick). */
+    @Test
+    fun pickingMusicReachesTheStore() {
+        show(FILM_NIGHT.copy(music = null))
+        compose.waitFor { exists("mode_music") }
+
+        tap("mode_music")
+        tap("mode_music_1")
+
+        compose.waitFor { saved().music != null }
+        assertThat(saved().music).isEqualTo(MusicChoice(SUNDAY.id, SUNDAY.name))
     }
 
     // Delete
