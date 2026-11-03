@@ -543,7 +543,6 @@ For the end-of-v1 design review:
 - At the wall, 2026-10-23 (the user): the Step 3 checks all passed, done lightly rather than thoroughly; household use is the main testing from here, so faults may still show up there. Fault A didn't recur.
 
 Fault found:
-- Fault A, while adding an event (title typed), a tap on a start date closed the editor and an existing event's details opened. Not reproduced; no crash and no warning in the log. Nothing in the editor opens an event, so the editor closed first and a tap reached the week or Home behind it; the idle close (10 min once edited, warned at 9:40) and a session ending don't fit. Next time: note the minute, the entry point and where the opened event sat, and read logcat at once.
 - Fault B (Plan 6, Sonos), Favourites lists "Discover Sonos Radio" and "Trending now", which do nothing when tapped. **Fixed 2026-10-23:** they are Sonos Radio shortcuts with no link to play, now left out.
 
 ## From Plans 9c-1b and 9c-1c
@@ -765,7 +764,7 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - **From main (2026-10-29):** merged with `--ff-only` at cbad52aa, the gate green on main; the release installed with `-r` (mapping `culvery-notes/mappings/mapping-cbad52a.txt`). Culvery is running and in front, but the tablet's screen went off after the install and sits on Android's lock screen; it wasn't unlocked. No crash or ANR; the Party tags wrote nothing.
 
 ## Plan 13 (Party mode): left for later (final review, 2026-10-29)
-- **For the end-of-v1 design review:** the tile's look copied from Holiday's, and its `celebration` icon; the sheet's full stops and the off sheet's wording; "Play {playlist} on {rooms}." when not every speaker is chosen; switch rows (not checkboxes) for the speakers, and the pickers as sheets; the speakers-not-regrouped line; the Settings "Speakers" sub-label.
+- **End-of-v1 design review:** signed off by the user (2026-11-03).
 - **For the first real party:** how long the speakers take to show a regroup; how a speaker that already leads others behaves when it joins; whether the stricter settle in grouping costs time.
 - **Known, small:**
   - a speaker group that held a party room and a room left out of the party goes back whole, undoing a hand change made during the party to the left-out room;
@@ -789,7 +788,7 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 
 ## Plan 14 (seasonal themes): not in this build, on purpose (2026-10-30)
 - **For the Christmas plan:** the doorbell sound as part of a theme's look (today it's the Haunted organ's own choice in Settings › Door); the big clock's colour in the look (Home picks the accent); the sky choosing its own part of the header; other cards taking a theme's corner art (only Today does).
-- **For the end-of-v1 design review:** night bats faint across a room and the night moon muddy; the day cobweb faint; "Chime volume" and "Play chime" now cover the organ too; the dates row has no tap cue; the dates sheet's look.
+- **End-of-v1 design review:** Halloween signed off by the user (2026-11-03).
 - **By design (spec):** themes change the tablet only, never lights, plugs or speakers; the night clock stays as it is; no "never show" switch; a preview is the only manual way in, and it ends at midnight.
 
 ## Plan 14 (seasonal themes): emulator walk-through (2026-10-30)
@@ -811,7 +810,7 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
   - Android's screen dump hangs while the bats drift (it waits for a still screen), so the walk-through used screenshots only.
 
 ## Plan 14 (seasonal themes): left for later (final review, 2026-10-30)
-- **For the end-of-v1 design review:** from 24 to 30 October the Preview row's words don't fit. Turned on, it says "It ends at midnight" though Halloween carries on by its dates; turned off, it offers to show what's already on the wall.
+- **End-of-v1 design review:** Halloween signed off by the user (2026-11-03).
 - **For the Christmas plan:** a range starting 29 February starts on 1 March in common years, but "Next:" and the dates sheet say 28 February, and saving unchanged rewrites the start to 28 Feb. Only reachable by picking 29 Feb.
 - **Known, small:** on a cold start the default dates apply for a few milliseconds before the settings are read. A household that moved Halloween could see a flash, and a ring in that moment would play the organ. Leave it unless it shows on the tablet.
 - **The plan against the code:** the bats cross in 45 s in 2 lanes (the plan said 90 s and 4 lanes), from the Task 9 ruling that moved the sky into the header band.
@@ -861,10 +860,6 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
   - Logcat: Culvery was in front; no record or alert warnings. The user says it wasn't night and Holiday was off.
   - 25654dfc logs a warning naming why a ring got no card (not in front, night or not known yet, Holiday on, or a repeat of a ring already recorded). Its release is on the tablet (mapping `mapping-25654df.txt`).
   - **Still to do:** ring during a run and read the tablet's log at that time.
-- **Hoover missing from Holiday:**
-  - It showed on Holiday's page once Home Assistant was connected.
-  - The sheet leaves the hoover out after 10:00 on the day before the back date, and says nothing about it (by design so far). **Open:** should the sheet say why?
-  - **Open:** the user's "includeable in modes" may mean a hoover choice for custom modes. Ask before adding it to Feature ideas.
 
 ## Plan 15b (Settings and Modes): from main (2026-11-03)
 - Merged with `--ff-only` at 25654dfc and pushed, with 15a. The tablet runs this release.
@@ -919,7 +914,6 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 
 ## Bugs (2026-10-23)
 The open faults after the redesign phase. Details are in the plan sections above.
-- **Fault A:** a start-date tap once closed the Add event editor and opened an existing event. Not reproduced.
 - **M2:** an Undo racing a drain create leaves the event on the week until the next sync; `UndoneKeys` is lost on restart.
 - **M3:** a phone's counted series is expanded in full on every detail update (`Repeats.kt:28`).
 - **Home slow to fill:** 2.2–2.9 s from a cold start, with the Hue bridge the slowest. One option is for Lights to show its last known rooms while it connects.
