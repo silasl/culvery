@@ -835,8 +835,85 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - **Home and Lights:** `HhTrayGrid` has no guard for more than three rows, and `TrayRows` can go negative under two gaps; `LightsCard` takes all of `HouseActions` but uses only All off; `plugsSummary` joins every section's summary, not only shown ones; a section's watch starts even when none is shown; no host-level plugs-only test.
 - **Tests:** Door and Lights UI tests with 5 s waits time out now and then under the full gate's load (DoorTabTest, DoorSettingsPageTest, DoorRecorderTest, LightsCapabilityTest); they pass on re-runs.
 
+## Plan 15b (Settings and Modes): emulator walk-through (2026-11-03)
+- **Rulings, built and re-checked on the emulator:**
+  - Turn on now sits at the right end of a mode page's title row.
+  - Holiday's sheet matches its page: no lights line without chosen Hue automations, and the same heating, hoover and doorbell lines.
+  - A tray tile's refusal line runs full width under its row.
+  - Inline confirm cards (Delete mode, Disconnect) scroll themselves into view.
+  - PLUGS gets an empty-state line and the usual section gap. When Home Assistant offers no plug, the line says where to show one first.
+  - A saved light row opens the light choice with its current choice picked.
+  - Holiday's page: LIGHTS WHILE AWAY keeps only the Hue part, and heating, hoover and doorbell go under ALSO WHILE AWAY.
+  - The tray's row gap equals its column gap, and empty rows close up at the top.
+  - Music says "20% of its volume".
+- **Kept as they were:** the Speakers sub-label; tap-then-explain on Turn on now and Delete mode.
+- **Dropped:** F1 and F2 (the page scroll was the user's own touch); the "Party mode" label flash (not real, since Modes has no tab).
+
+## Plan 15b (Settings and Modes): on the tablet (2026-11-03)
+- **Installed:** the release from 005005f8 with `-r` (mapping `culvery-notes/mappings/mapping-005005f.txt`), no DebugClock.
+- **Approved:** Taekwondo (the screen stays awake); Party mode's plugs after the move; the tray.
+- **Taekwondo, changed after the check (20312986):**
+  - The description always shows as text.
+  - Detailed mode reads the Korean name, then the English name and the description in English. Its switch says "Also reads the English name and description aloud."
+  - With no Korean voice, the screen says how to install one. The tablet has none yet, so it reads the romanised names in an English voice.
+- **Doorbell ring during a Taekwondo run, fault:**
+  - The ring was recorded in the Door tab at 11:39, but no door card showed, so nothing stopped the run.
+  - Logcat: Culvery was in front; no record or alert warnings. The user says it wasn't night and Holiday was off.
+  - 25654dfc logs a warning naming why a ring got no card (not in front, night or not known yet, Holiday on, or a repeat of a ring already recorded). Its release is on the tablet (mapping `mapping-25654df.txt`).
+  - **Still to do:** ring during a run and read the tablet's log at that time.
+- **Hoover missing from Holiday:**
+  - It showed on Holiday's page once Home Assistant was connected.
+  - The sheet leaves the hoover out after 10:00 on the day before the back date, and says nothing about it (by design so far). **Open:** should the sheet say why?
+  - **Open:** the user's "includeable in modes" may mean a hoover choice for custom modes. Ask before adding it to Feature ideas.
+
+## Plan 15b (Settings and Modes): from main (2026-11-03)
+- Merged with `--ff-only` at 25654dfc and pushed, with 15a. The tablet runs this release.
+
+## Plan 15b (Settings and Modes): left for later (final review, 2026-11-03)
+- **For the end-of-v1 design review:**
+  - The nothing-to-do line uses the danger colour.
+  - A light chip's fill matches its row's.
+  - Section labels sit 7 dp under the row above.
+  - "HOME ASSISTANT" repeats the page title.
+  - The Modes and module screenshot rigs draw different gaps and label sizes from Settings.
+  - Mia's "can only look" line takes 3 lines at half width.
+  - The "no Korean voice" line is red-tinted.
+- **Modes, known, small:**
+  - A plug locked between a no-PIN tap and `begin` is left out with no line, and the house test pins a fake line (M1).
+  - A stored mode's turn-off isn't bound to the mode tapped (M3).
+  - The wall's turn-off checks the PIN before `leave`, with no lock between (M4).
+  - A mode page's "Needs a PIN" doesn't show a held locked plug (M5).
+  - After the move, an off Party record with speakers still waiting has no tile for its line (M7).
+  - With no Holiday module, the shelf still keeps a place for Holiday (M8).
+  - "Turn {mode} off first." shows while the record is unread.
+  - "Show on Home" flickers off while its place loads.
+  - A plug locked later never saves needsPin.
+  - Plugs are read twice, so a failure is logged twice.
+  - A wall `begin` refusal is swallowed by `ModePlugs.attempt`.
+  - A turn-on before the first tick skips other modes' leftover plug runs.
+  - The shelf's upstream throwing past `retryWithBackoff` leaves the room null for good.
+- **Settings:**
+  - Close gives the Admin session a fresh 120 s, up to 90 s longer than before (M9).
+  - A narrow race can leave Settings on 120 s until the next touch.
+  - A stale deep-link id's fallback is untested.
+  - KioskPage, PeoplePage and OtherIntegrations file names no longer match their pages.
+  - Not re-checked at font 1.3: Close against the last row (15a's fault 3).
+- **Taekwondo:**
+  - Detailed may start off if tapped before its setting is read.
+  - The Hangul line-break setting applies to every Hangul line, and move 21's "와" should attach to the word before it (the instructor's note). Check word wrapping on the tablet.
+  - MovesTest checks 5 of 32 moves.
+- **Simplify, not done:**
+  - needsPin as one snapshot;
+  - parallel Hue room commands and mode steps;
+  - `options()` calling Home Assistant per plug;
+  - one spacing local for Settings;
+  - the Dimens consolidation;
+  - a shared mode sheet scaffold;
+  - App settings composing every section at once (only if the tablet janks).
+- **From 15a, still open:** in a plugs-only house, some copy still says "Lights tab" (Holiday's lights lines; Add a plug's list).
+
 ## To check when the tablet is next plugged in
-- **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close is now known to overlap Tablet lock (Plan 15a's fault 3, for 15b). The emulator was slow; check whether it happens on the tablet before treating it as a fault.
+- **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
 - **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing. The same walk-through saw it on the Calendar tab after a restart, Settings › Calendars, Home location and People (fault 1); time those too.
 
@@ -846,7 +923,7 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **M2:** an Undo racing a drain create leaves the event on the week until the next sync; `UndoneKeys` is lost on restart.
 - **M3:** a phone's counted series is expanded in full on every detail update (`Repeats.kt:28`).
 - **Home slow to fill:** 2.2–2.9 s from a cold start, with the Hue bridge the slowest. One option is for Lights to show its last known rooms while it connects.
-- **Doorbell missed (21 Oct; again 23 Oct at 16:02), cause found:** Android holds at most 25 notifications per app. Nothing on the wall clears Ring's, and Culvery's listener doesn't cancel them, so Ring's motion and ring notifications pile up. Once 25 are held, Android drops every new one ("Package has already posted or enqueued 25 notifications. Not showing more. package=com.ringapp"), and Culvery never sees the ring. On 23 Oct the tablet held 25 Ring notifications, most of them motion; posts were dropped at 15:12, 15:23 and 16:02. **Fixed 2026-10-23 (34b60d4a):** `RingNotificationListener` clears each Ring notification once read, and clears leftovers when it connects. The release from 34b60d4a is on the tablet (mapping `culvery-notes/mappings/mapping-34b60d4.txt`); the tablet held 0 Ring notifications after the install, down from 25. A real ring on the new build is still to check.
+- **Doorbell missed (21 Oct; again 23 Oct at 16:02), cause found:** Android holds at most 25 notifications per app. Nothing on the wall clears Ring's, and Culvery's listener doesn't cancel them, so Ring's motion and ring notifications pile up. Once 25 are held, Android drops every new one ("Package has already posted or enqueued 25 notifications. Not showing more. package=com.ringapp"), and Culvery never sees the ring. On 23 Oct the tablet held 25 Ring notifications, most of them motion; posts were dropped at 15:12, 15:23 and 16:02. **Fixed 2026-10-23 (34b60d4a):** `RingNotificationListener` clears each Ring notification once read, and clears leftovers when it connects. The release from 34b60d4a is on the tablet (mapping `culvery-notes/mappings/mapping-34b60d4.txt`); the tablet held 0 Ring notifications after the install, down from 25. Rings now reach the tablet: one was recorded at 11:39 on 3 Nov. That ring showed no card; see Plan 15b on the tablet.
 - **Not tried yet:** "Use for new events" with real calendars, and a new Sonos playlist appearing on the next open.
 - **TalkBack checks from 9c-2:** dropped; the user will raise them if they show in use.
 - **Accented letters broken on the Music card (seen 2026-10-30):** on the tablet, Home's Lounge card showed a Polish track title with Ż and ą as stray marks (the Ż's dot above the line, ą as an apostrophe). Either Sonos sends the text mangled, or the card's font or line height clips marks above and below the letters. Compare the raw title from Sonos with what's drawn before fixing.
@@ -884,4 +961,4 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **Plugs in Holiday lights (the user, 2026-10-27, from the Plan 12 brainstorm):** maybe let Holiday lights (mimic presence) switch chosen plugs too, such as a lamp on a plug.
 - **Recipes into the shopping list (the user, 2026-10-27):** extend Shopping with a curated list of recipes; tapping one has Culvery read the recipe page for its ingredients and add them to the shopping list.
 - **A status tab (the user, 2026-10-28, from the Plan 12 walk-through):** "maybe we need some sort of status tab that's where extended detail like this lives": one place for the fuller story behind the short lines on tiles and rows, such as every Holiday step that failed or was missed, which plugs did not go back, and the Home Assistant link's state. Tiles keep one short line and point there. Its own spec; no detail yet. Would also give the rail redesign a case to weigh.
-- **A Modes settings tab with custom modes (the user, 2026-10-29, from the Plan 13 walk-through):** one Settings page for Holiday and Party mode, where the family can also add their own modes (each with its own plug, music and lights choices and a tile in the One-tap tray). Its own spec; no detail yet. Would fold the Party mode settings page and the Plugs tab's per-mode columns into one place.
+- **A Modes settings tab with custom modes (the user, 2026-10-29, from the Plan 13 walk-through):** **Done in Plan 15b (2026-11-03).** one Settings page for Holiday and Party mode, where the family can also add their own modes (each with its own plug, music and lights choices and a tile in the One-tap tray). Its own spec; no detail yet. Would fold the Party mode settings page and the Plugs tab's per-mode columns into one place.
