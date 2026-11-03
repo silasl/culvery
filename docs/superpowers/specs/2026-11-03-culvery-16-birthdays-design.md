@@ -1,6 +1,6 @@
 # Culvery Plan 16: Birthdays
 
-Brainstormed with the user on 2026-11-03. The next family birthday is about two weeks away (the date is in culvery-notes, not here). The look must be on the tablet, finished, by the evening before it. Visual choices stay provisional for the end-of-v1 design review.
+Brainstormed with the user on 2026-11-03. The look must be on the tablet, finished, by the evening before the next family birthday; that date is in culvery-notes, not here. Visual choices stay provisional for the end-of-v1 design review.
 
 ## 1. Intent
 
@@ -48,12 +48,14 @@ Success on the day: the tablet greets the right person by name from midnight to 
 
 ### 3.1 What counts as a birthday
 - An event counts when all hold:
-  - it is all-day and covers today;
+  - it is all-day, one day long, and on today;
+  - it repeats every year (the user, plan review: a child can't make a repeating event, so a child can't give themselves a birthday look; real birthdays are yearly);
   - its title contains the word "birthday" (case-insensitive, whole word, so "Birthday", "birthday!" and "Sam's birthday" count, "birthdays" too; "bday" does not);
   - its "for" tag names one or more household members (the user: no tag, no theme).
 - Only the tag counts. An untagged event never falls back to the calendar it came from, as other events do (`resolveIds`), so "Grandma's birthday" in a parent's own calendar greets nobody. Tag ids that aren't in People, and Family, are ignored; if nothing is left, it gets nothing.
 - An event tagged for two people ("Sam and Alex's birthday") is a birthday for each of them.
 - Timed events don't count, so "Sam's birthday party, 14:00" at a friend's house doesn't make it Sam's birthday.
+- Accepted risk (the user, plan review): a yearly all-day "Leo's birthday" tagged for Sam would greet Sam. Titles aren't matched against names, because "Mum's birthday" tagged for a person listed by first name must still count.
 
 ### 3.2 Which look wins
 - A birthday's look beats a seasonal theme on the same day (a birthday on 31 October shows the birthday, not Halloween).
@@ -62,8 +64,8 @@ Success on the day: the tablet greets the right person by name from midnight to 
 - The look starts and ends at local midnight with the same 400 ms colour fade as a seasonal theme. The night clock is showing then, so the change is unseen until morning. The night clock is unchanged.
 
 ### 3.3 Confetti
-- "Wakes" means the screen goes from asleep (the dark screen) or the night clock to awake (Plan 8's `Screen` changing to `AWAKE`). Starting the app does not count.
-- Confetti doesn't fall when animations are off (`AnimatorsOn`), or while the door card, a PIN pad or any alert is showing. It falls over whatever screen is showing, never takes a touch, and is skipped by TalkBack.
+- "Wakes" means the screen goes from asleep (the dark screen) or the night clock to awake (Plan 8's `Screen` changing to `AWAKE`). Starting the app does not count, and neither does Culvery leaving and coming back to the front.
+- Confetti doesn't fall during the night hours (the user, plan review: a tap on the night clock in a dark room gets no confetti), when animations are off (`AnimatorsOn`), or while the door card, a PIN pad or any alert is showing. It falls over whatever screen is showing, never takes a touch, and is skipped by TalkBack.
 - Confetti colours: the six person colours and the accent. About 60 pieces, gone by 3 seconds.
 
 ### 3.4 Balloons
@@ -80,9 +82,10 @@ Success on the day: the tablet greets the right person by name from midnight to 
 ## 4. How it works
 
 ### 4.1 Finding today's birthdays
-- The calendar capability works out today's birthday people from the events it already holds (`Held`, `HeldEvent.people`), by the rule in 3.1, deduplicated by person and ordered by People. It re-reads when the held events or the household's date change.
+- The calendar capability works out today's birthday people from today's stored events only (the user, plan review: not the 12-week held events), by the rule in 3.1, deduplicated by person and ordered by People. It re-reads when the household's date changes and when today's stored events change. A birthday added on the tablet shows after its next sync.
 - It publishes the list through a seam in `core` so the app and `core/ui` can read it without depending on the calendar module, as `ShowingTheme` does for the seasonal theme. The builder picks the seam.
-- If the calendar hasn't synced since the household's date changed, the held events from the last sync still count. A yearly event is held well ahead, so a birthday shows even if the morning sync fails.
+- If the calendar hasn't synced since the household's date changed, the stored events from the last sync still count, however old that sync is. A yearly event is stored well ahead, so a birthday shows even if the morning sync fails.
+- Before the day (the user, plan review): check on the tablet that the real birthday event is yearly, all-day and tagged for the person, logging nothing, and tag the series if it isn't.
 
 ### 4.2 The birthday look
 - Plan 14's `SeasonalLook` holds a fixed look per enum entry. A birthday look is built from a person's colour, so it can't be an enum entry as it stands. The builder decides the shape. One option: generalise "what's showing" to a look (seasonal or birthday) with `SeasonalTheme` and a birthday-for-a-colour both producing a `SeasonalLook`. Whatever the shape:
