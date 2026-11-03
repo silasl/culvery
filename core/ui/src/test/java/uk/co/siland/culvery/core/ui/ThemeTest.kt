@@ -101,16 +101,15 @@ class ThemeTest {
 
     @Test
     fun halloweenProvidesItsSets() {
-        var night: Triple<HhColors, SeasonalTheme?, SeasonalLook?>? = null
+        var night: Pair<HhColors, SeasonalLook?>? = null
         var day: HhColors? = null
         compose.setContent {
-            if (nightOn) CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN) { night = Triple(Culvery.colors, LocalSeasonalTheme.current, Culvery.look) }
+            if (nightOn) CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN) { night = Culvery.colors to Culvery.look }
             else CulveryTheme(dark = false, seasonal = SeasonalTheme.HALLOWEEN) { day = Culvery.colors }
         }
         compose.waitForIdle()
         assertThat(night!!.first).isEqualTo(HalloweenNight)
-        assertThat(night!!.second).isEqualTo(SeasonalTheme.HALLOWEEN)
-        assertThat(night!!.third).isSameInstanceAs(HalloweenLook)
+        assertThat(night!!.second).isSameInstanceAs(HalloweenLook)
         nightOn = false
         compose.waitForIdle()
         assertThat(day).isEqualTo(HalloweenDay)
@@ -119,8 +118,8 @@ class ThemeTest {
     /** **pin**: no theme is the look the family has today. */
     @Test
     fun noThemeIsTheNormalLook() {
-        var seen: Triple<HhColors, SeasonalTheme?, SeasonalLook?>? = null
-        compose.setContent { CulveryTheme(dark = true) { seen = Triple(Culvery.colors, LocalSeasonalTheme.current, Culvery.look) } }
+        var seen: Triple<HhColors, SeasonalLook?, Birthday?>? = null
+        compose.setContent { CulveryTheme(dark = true) { seen = Triple(Culvery.colors, Culvery.look, Culvery.birthday) } }
         compose.waitForIdle()
         assertThat(seen!!.first).isEqualTo(DarkColors)
         assertThat(seen!!.second).isNull()
@@ -151,5 +150,55 @@ class ThemeTest {
         assertThat(HalloweenNight.rain).isEqualTo(DarkColors.rain)
         assertThat(HalloweenDay.weather).isEqualTo(LightColors.weather)
         assertThat(HalloweenDay.rain).isEqualTo(LightColors.rain)
+    }
+
+    private val pink = PersonPalette.colors[2]
+
+    @Test
+    fun aBirthdayProvidesItsColourSets() {
+        var night: Triple<HhColors, SeasonalLook?, List<String>?>? = null
+        var day: HhColors? = null
+        compose.setContent {
+            if (nightOn) CulveryTheme(dark = true, birthday = Birthday(pink, listOf("Sam"))) { night = Triple(Culvery.colors, Culvery.look, Culvery.birthday?.names) }
+            else CulveryTheme(dark = false, birthday = Birthday(pink, listOf("Sam"))) { day = Culvery.colors }
+        }
+        compose.waitForIdle()
+        assertThat(night!!.first).isEqualTo(birthdayLook(pink)!!.night)
+        assertThat(night!!.second).isSameInstanceAs(birthdayLook(pink))
+        assertThat(night!!.third).containsExactly("Sam")
+        nightOn = false
+        compose.waitForIdle()
+        assertThat(day).isEqualTo(birthdayLook(pink)!!.day)
+    }
+
+    @Test
+    fun aBirthdayWinsOverATheme() {
+        var seen: Pair<HhColors, SeasonalLook?>? = null
+        compose.setContent {
+            CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN, birthday = Birthday(pink, listOf("Sam"))) { seen = Culvery.colors to Culvery.look }
+        }
+        compose.waitForIdle()
+        assertThat(seen!!.first).isEqualTo(birthdayLook(pink)!!.night)
+        assertThat(seen!!.second).isSameInstanceAs(birthdayLook(pink))
+    }
+
+    @Test
+    fun aColourOutsideTheSixKeepsTheNormalLook() {
+        var seen: Triple<HhColors, SeasonalLook?, Birthday?>? = null
+        compose.setContent { CulveryTheme(dark = true, birthday = Birthday(0xFF123456, listOf("Sam"))) { seen = Triple(Culvery.colors, Culvery.look, Culvery.birthday) } }
+        compose.waitForIdle()
+        assertThat(seen!!.first).isEqualTo(DarkColors)
+        assertThat(seen!!.second).isNull()
+        assertThat(seen!!.third).isNotNull()
+    }
+
+    /** **pin**: no birthday is as before. */
+    @Test
+    fun noBirthdayIsAsBefore() {
+        var seen: Pair<SeasonalLook?, Birthday?>? = null
+        compose.setContent { CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN) { seen = Culvery.look to Culvery.birthday } }
+        compose.waitForIdle()
+        assertThat(seen!!.first).isSameInstanceAs(HalloweenLook)
+        assertThat(seen!!.second).isNull()
     }
 }

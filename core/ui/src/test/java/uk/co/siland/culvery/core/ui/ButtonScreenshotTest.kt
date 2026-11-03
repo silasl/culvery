@@ -2,6 +2,9 @@ package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -53,6 +56,34 @@ class ButtonScreenshotTest {
         }
         compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
     }
+
+    @Composable
+    private fun BirthdayStrip(colour: Long, dark: Boolean) {
+        CulveryTheme(dark = dark, birthday = Birthday(colour, listOf("Sam"))) {
+            val c = Culvery.colors
+            Row(Modifier.background(c.bg).padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                HhButton("Next", {}, tone = ButtonTone.Primary, on = ButtonSurface.Bg)
+                HhButton("Back", {}, tone = ButtonTone.Quiet, on = ButtonSurface.Bg)
+                Column(Modifier.background(c.surf).padding(12.dp)) {
+                    Text("Ink on surf", color = c.ink)
+                    Text("Mute on surf", color = c.mute)
+                }
+                Box(Modifier.background(c.accentSoft, RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 6.dp)) {
+                    Text("Happy birthday Sam", color = c.ink)
+                }
+            }
+        }
+    }
+
+    private fun birthdays(name: String, dark: Boolean) {
+        compose.setContent {
+            Column(Modifier.testTag("shot")) { PersonPalette.colors.forEach { BirthdayStrip(it, dark) } }
+        }
+        compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
+    }
+
+    @Test fun birthdayColoursDark() = birthdays("birthday_colours_dark", true)
+    @Test fun birthdayColoursLight() = birthdays("birthday_colours_light", false)
 
     @Test fun matrixDark() = snap("button_matrix_dark", true)
     @Test fun matrixLight() = snap("button_matrix_light", false)

@@ -23,8 +23,17 @@ private const val NON_TEXT = 3.0
  * sits near its line is pinned at its value today, so a token change that lowers it fails here first.
  */
 class ContrastTest {
-    private val themes = (listOf(null) + SeasonalTheme.entries).flatMap { seasonal ->
-        listOf(true, false).map { dark -> "${seasonal?.label ?: "normal"} ${if (dark) "night" else "day"}" to colorsFor(seasonal, dark) }
+    private val looks: List<Pair<String, SeasonalLook?>> =
+        listOf<Pair<String, SeasonalLook?>>("normal" to null) +
+            SeasonalTheme.entries.map { it.label to it.look } +
+            PersonPalette.colors.map { "${PersonPalette.nameOf(it)} birthday" to birthdayLook(it) }
+
+    private val themes = looks.flatMap { (name, look) ->
+        listOf(true, false).map { dark -> "$name ${if (dark) "night" else "day"}" to colorsOf(look, dark) }
+    }
+
+    private val birthdays = PersonPalette.colors.flatMap { c ->
+        listOf(true, false).map { dark -> "${PersonPalette.nameOf(c)} birthday ${if (dark) "night" else "day"}" to (c to colorsOf(birthdayLook(c), dark)) }
     }
 
     private val halloween = SeasonalTheme.entries.flatMap { listOf("${it.label} night" to colorsFor(it, true), "${it.label} day" to colorsFor(it, false)) }
@@ -209,6 +218,30 @@ class ContrastTest {
             val web = HalloweenInks.web(t)
             check("$name ink on the web", t.ink, web, TEXT)
             check("$name mute on the web", t.mute, web, TEXT)
+        }
+    }
+
+    /** The greeting pill is a soft fill on the background. */
+    @Test
+    fun theGreetingPillStandsOffTheBackground() {
+        birthdays.forEach { (name, set) -> check("$name pill on bg", set.second.accentSoft, set.second.bg, QUIET_FILL_MIN) }
+    }
+
+    @Test
+    fun eachBirthdayAccentKeepsThePersonsHue() {
+        birthdays.forEach { (name, set) ->
+            assertWithMessage("$name: the hue gap between accent and the person's colour")
+                .that(hueGap(set.second.accent, Color(set.first))).isAtMost(12f)
+        }
+    }
+
+    @Test
+    fun balloonsAndFlagsStandOffTheBackground() {
+        birthdays.forEach { (name, set) ->
+            PersonPalette.colors.forEach { colour ->
+                check("$name balloon ${colour.toString(16)} on bg", BirthdayInks.balloon(colour, set.second), set.second.bg, SKY_MIN)
+                check("$name flag ${colour.toString(16)} on bg", BirthdayInks.flag(colour), set.second.bg, SKY_MIN)
+            }
         }
     }
 }

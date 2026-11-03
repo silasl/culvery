@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
+import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
@@ -17,10 +18,11 @@ fun ComposeContentTestRule.snap(
     dark: Boolean,
     modifier: Modifier = Modifier,
     seasonal: SeasonalTheme? = null,
+    birthday: Birthday? = null,
     content: @Composable () -> Unit,
 ) {
     setContent {
-        CulveryTheme(dark = dark, seasonal = seasonal) {
+        CulveryTheme(dark = dark, seasonal = seasonal, birthday = birthday) {
             Box(Modifier.background(Culvery.colors.bg).then(modifier)) { content() }
         }
     }

@@ -56,13 +56,13 @@ interface ShowingTheme {
     val showing: StateFlow<SeasonalTheme?>
 }
 
-val LocalSeasonalTheme = staticCompositionLocalOf<SeasonalTheme?> { null }
-
-fun colorsFor(seasonal: SeasonalTheme?, dark: Boolean): HhColors = when {
-    seasonal == null -> if (dark) DarkColors else LightColors
-    dark -> seasonal.look.night
-    else -> seasonal.look.day
+fun colorsOf(look: SeasonalLook?, dark: Boolean): HhColors = when {
+    look == null -> if (dark) DarkColors else LightColors
+    dark -> look.night
+    else -> look.day
 }
+
+fun colorsFor(seasonal: SeasonalTheme?, dark: Boolean): HhColors = colorsOf(seasonal?.look, dark)
 
 /** What Home's header measures, in pixels; Home sets it and the sky reads it when it draws, so a change redraws only the sky. */
 class HomeSkyBand {
