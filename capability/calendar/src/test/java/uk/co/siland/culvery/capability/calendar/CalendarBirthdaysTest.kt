@@ -75,8 +75,12 @@ class CalendarBirthdaysTest {
     private fun load(vararg events: RemoteEvent, visible: Boolean = true) = runBlocking {
         val mapping = mapOf("s1" to SourceMapping(PersonId.FAMILY, visible = visible))
         store.addConnection(conn, listOf(CalendarSource("s1", "S1", writable = false)), mapping)
+        sync("s1", events.toList())
+    }
+
+    private suspend fun sync(source: String, events: List<RemoteEvent>) {
         val range = DateRange(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 4, 1), zone)
-        store.applySync("c1", "s1", range, SyncResult(events.toList(), emptyList(), SyncCursor("k"), fullReplace = true), LocalDate.of(2026, 3, 12))
+        store.applySync("c1", source, range, SyncResult(events, emptyList(), SyncCursor("k"), fullReplace = true), LocalDate.of(2026, 3, 12))
     }
 
     private suspend fun Flow<List<Person>>.untilIs(expected: List<Person>) = withTimeout(10_000) { first { it == expected } }
@@ -102,10 +106,14 @@ class CalendarBirthdaysTest {
     @Test
     fun nobodyBeforeTheClockIsRead() = runBlocking<Unit> {
         load(yearly("Sam’s birthday", "sam"))
-        val birthdays = birthdays(clock = MutableStateFlow(null))
-        household.value = listOf(sam, alex)
+        val clock = MutableStateFlow<LocalDateTime?>(null)
+        val birthdays = birthdays(clock = clock)
+        delay(300)
         assertThat(birthdays.today.value).isEmpty()
         assertThat(queries).isEqualTo(0)
+        clock.value = march(12, 9, 0)
+        birthdays.today.untilIs(listOf(sam))
+        assertThat(queries).isEqualTo(1)
     }
 
     @Test
@@ -124,15 +132,17 @@ class CalendarBirthdaysTest {
 
     @Test
     fun aHiddenCalendarGreetsNobody() = runBlocking<Unit> {
-        load(yearly("Sam’s birthday", "sam"), visible = false)
-        val birthdays = birthdays()
-        assertThat(store.eventsBetween(0, Long.MAX_VALUE).first()).isEmpty()
-        assertThat(birthdays.today.value).isEmpty()
+        val mapping = mapOf("s1" to SourceMapping(PersonId.FAMILY, visible = false), "s2" to SourceMapping(PersonId.FAMILY, visible = true))
+        store.addConnection(conn, listOf(CalendarSource("s1", "S1", writable = false), CalendarSource("s2", "S2", writable = false)), mapping)
+        sync("s1", listOf(yearly("Sam’s birthday", "sam")))
+        sync("s2", listOf(yearly("Alex’s birthday", "alex").copy(remoteId = "b2")))
+        // Alex's, on the visible calendar, shows that the query has run; Sam's, on the hidden one, must not.
+        birthdays().today.untilIs(listOf(alex))
     }
 
     @Test
     fun aQueuedCreateWaitsForItsSync() = runBlocking<Unit> {
-        load()
+        load(yearly("Alex’s birthday", "alex"))
         val draft = EventDraft(
             "Sam’s birthday", EventTime.AllDay(LocalDate.of(2026, 3, 12)), EventTime.AllDay(LocalDate.of(2026, 3, 13)),
             forPerson = "sam", createdBy = "sam",
@@ -140,9 +150,8 @@ class CalendarBirthdaysTest {
         store.enqueue(
             PendingChange(0, "c1", "s1", null, ChangeKind.CREATE, draft, attempts = 1, nextAttemptMillis = 0, createdMillis = 0, clientKey = "0123456789abcdef0123456789abcdef"),
         )
-        val birthdays = birthdays()
-        assertThat(store.eventsBetween(0, Long.MAX_VALUE).first()).isEmpty()
-        assertThat(birthdays.today.value).isEmpty()
+        // Alex's synced one shows that the query has run; Sam's, only queued, must not.
+        birthdays().today.untilIs(listOf(alex))
     }
 
     @Test
