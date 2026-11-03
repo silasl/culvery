@@ -931,12 +931,12 @@ The open faults after the redesign phase. Details are in the plan sections above
 - Philips Hue (the user, 2026-10-14): Plan 7, spec `docs/superpowers/specs/2026-10-16-culvery-7-hue-design.md`. Holiday mode drives it.
 - Shopping list (the user, 2026-10-14): its own spec; no detail yet.
 - Doorbell ring tones (the user, 2026-10-15): a list of chimes to choose from in Settings › Door, perhaps switching itself for Christmas and Halloween.
-- Sound buttons (the user, 2026-10-15): buttons that play a short sound on the wall, such as the Imperial March or a sad trombone ("wah wah wahhh").
+- Sound buttons (the user, 2026-10-15): buttons that play a short sound on the wall, such as the Imperial March or a sad trombone ("wah wah wahhh"). On a birthday, one button switches to "Happy Birthday" (the user, 2026-11-03; the tune is out of copyright in the UK, so generate it).
 - Holiday mode (the user, 2026-10-14): Plan 11b, spec `docs/superpowers/specs/2026-10-26-culvery-11-hoover-heating-holiday-design.md` (asks when you're back; heating off Eco at 00:01 that day, a clean the day before; Arlo left for later). Originally: saves power (puts the tablet to sleep) and drives other services while the family is away: Hue lights to their holiday setting, Arlo's settings, the thermostat to eco. Needs the Hue, Arlo and thermostat links first, and Sleep and wake for the tablet's part.
 - Thermostat, Nest (the user, 2026-10-19): Plan 11a, through Home Assistant, spec `docs/superpowers/specs/2026-10-26-culvery-11-hoover-heating-holiday-design.md`. Originally its own spec; so far: if the last day of a holiday is in the calendar, override Nest's away mode (so the house is warm for the return). Holiday mode sets it to eco/away.
 - Reminders (the user, 2026-10-16): its own spec; no detail yet.
 - Family slideshow (the user, 2026-10-16): its own spec; no detail yet.
-- Event celebrations (the user, 2026-10-16): family birthdays and other occasions marked on the wall, with a sound or something like it. Its own spec; no detail yet.
+- Event celebrations (the user, 2026-10-16): Plan 16 does birthdays only, spec `docs/superpowers/specs/2026-11-03-culvery-16-birthdays-design.md`. Other occasions are for later.
 - Voice control (the user, 2026-10-16, a question): its own spec; no detail yet.
 - Party mode (the user, 2026-10-15): one switch that sets the house up for a party: music on (Sonos), chosen smart plugs on, and so on. Like Holiday mode, it drives other services, so it needs their links first (Sonos from Plan 6; smart plugs have no link yet). Its own spec; no detail yet.
 - Eufy robot vacuum (the user, 2026-10-16): start the Eufy robovac from the wall. Plan 11a, through Home Assistant, spec `docs/superpowers/specs/2026-10-26-culvery-11-hoover-heating-holiday-design.md`.
