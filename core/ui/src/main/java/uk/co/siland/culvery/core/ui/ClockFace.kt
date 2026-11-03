@@ -33,6 +33,16 @@ val CreepsterClock: TextStyle = HhType.clock.copy(
     letterSpacing = 0.sp,
 )
 
+val CherryBombOne = FontFamily(Font(R.font.cherry_bomb_one))
+
+/** The birthday clock: the normal clock's size and line height in Cherry Bomb One (16 §4.2). */
+val CherryBombClock: TextStyle = HhType.clock.copy(
+    fontFamily = CherryBombOne,
+    fontWeight = FontWeight.Normal,
+    fontFeatureSettings = null,
+    letterSpacing = 0.sp,
+)
+
 /** Each character in a box as wide as the widest digit, so the time never changes width (14 §4.4). */
 @Composable
 fun SlotClock(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {

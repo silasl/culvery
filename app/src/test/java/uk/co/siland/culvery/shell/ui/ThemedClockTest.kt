@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
@@ -23,31 +24,61 @@ import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDateTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.ParameterizedRobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.plugin.HeaderItem
+import uk.co.siland.culvery.core.ui.Birthday
+import uk.co.siland.culvery.core.ui.CherryBombOne
 import uk.co.siland.culvery.core.ui.Creepster
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DmSans
 import uk.co.siland.culvery.core.ui.HalloweenNight
+import uk.co.siland.culvery.core.ui.HhColors
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.birthdayLook
 
 /** Needs real glyph metrics and pixels: legacy Robolectric graphics fakes both. */
-@RunWith(AndroidJUnit4::class)
+@RunWith(ParameterizedRobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-class HalloweenClockTest {
+class ThemedClockTest(private val look: Look) {
+    class Look(
+        val name: String,
+        val seasonal: SeasonalTheme?,
+        val birthday: Birthday?,
+        val face: FontFamily,
+        val night: HhColors,
+    ) {
+        override fun toString() = name
+    }
+
+    companion object {
+        private val pink = PersonPalette.colors[2]
+
+        @JvmStatic
+        @ParameterizedRobolectricTestRunner.Parameters(name = "{0}")
+        fun looks() = listOf(
+            Look("halloween", SeasonalTheme.HALLOWEEN, null, Creepster, HalloweenNight),
+            Look("birthday", null, Birthday(pink, listOf("Sam")), CherryBombOne, birthdayLook(pink)!!.night),
+        ).map { arrayOf<Any>(it) }
+    }
+
     @get:Rule val compose = createComposeRule()
     private var now by mutableStateOf(LocalDateTime.of(2026, 10, 29, 23, 58))
-    private var seasonal by mutableStateOf<SeasonalTheme?>(SeasonalTheme.HALLOWEEN)
+    private var lookOn by mutableStateOf(true)
 
     private fun show(items: List<HeaderItem> = emptyList()) = compose.setContent {
-        CulveryTheme(dark = true, seasonal = seasonal) {
-            Box(Modifier.background(HalloweenNight.bg)) { HomeHeader({ now }, items, Modifier.fillMaxWidth().testTag("header")) }
+        CulveryTheme(
+            dark = true,
+            seasonal = look.seasonal.takeIf { lookOn },
+            birthday = look.birthday.takeIf { lookOn },
+        ) {
+            Box(Modifier.background(Color.Black)) { HomeHeader({ now }, items, Modifier.fillMaxWidth().testTag("header")) }
         }
     }
 
@@ -59,10 +90,10 @@ class HalloweenClockTest {
     private fun bounds(tag: String) = compose.onNodeWithTag(tag).getUnclippedBoundsInRoot()
 
     @Test
-    fun theClockIsInCreepster() {
+    fun theClockIsInTheLooksFace() {
         show()
         val slots = compose.onAllNodesWithTag("clock_slot", useUnmergedTree = true)
-        assertThat(slots[0].textLayout().layoutInput.style.fontFamily).isEqualTo(Creepster)
+        assertThat(slots[0].textLayout().layoutInput.style.fontFamily).isEqualTo(look.face)
     }
 
     @Test
@@ -76,27 +107,25 @@ class HalloweenClockTest {
     }
 
     @Test
-    fun theHeaderKeepsItsHeightInEitherFace() {
+    fun theClockKeepsItsHeightInEitherFace() {
         show()
-        seasonal = null
+        lookOn = false
         compose.waitForIdle()
-        val normal = bounds("header").height.value to bounds("home_clock").height.value
-        seasonal = SeasonalTheme.HALLOWEEN
+        val normal = bounds("home_clock").height.value
+        lookOn = true
         compose.waitForIdle()
-        assertThat(bounds("header").height.value to bounds("home_clock").height.value).isEqualTo(normal)
+        assertThat(bounds("home_clock").height.value).isEqualTo(normal)
     }
 
     @Test
     fun theClockDrawsNothingIntoTheDate() {
         show()
-        // 22:22 and 23:58 hold Creepster's lowest drips.
         listOf(23 to 58, 22 to 22).forEach { (h, m) ->
             at(h, m)
-            val dateTop = compose.onNodeWithTag("home_date").fetchSemanticsNode().boundsInRoot.top.toInt()
+            val date = compose.onNodeWithTag("home_date").fetchSemanticsNode().boundsInRoot
             val clock = compose.onNodeWithTag("home_clock").fetchSemanticsNode().boundsInRoot
-            val image = snapshot()
-            val low = lowestPixel(image, HalloweenNight.accent, clock)
-            assertThat(low).isLessThan(dateTop)
+            val rows = Rect(clock.left, date.top, clock.right, date.bottom)
+            assertThat(hasPixel(snapshot(), look.night.accent, rows)).isFalse()
         }
     }
 
@@ -104,10 +133,10 @@ class HalloweenClockTest {
     fun theHeaderItemsDontMoveWhenTheFaceChanges() {
         val item = HeaderItem("sample", 10) { Box(Modifier.size(180.dp, 60.dp).background(Color.Red)) }
         show(listOf(item))
-        seasonal = null
+        lookOn = false
         compose.waitForIdle()
         val normal = compose.onNodeWithTag("home_header_items").fetchSemanticsNode().boundsInRoot
-        seasonal = SeasonalTheme.HALLOWEEN
+        lookOn = true
         compose.waitForIdle()
         assertThat(compose.onNodeWithTag("home_header_items").fetchSemanticsNode().boundsInRoot).isEqualTo(normal)
     }
@@ -120,12 +149,12 @@ class HalloweenClockTest {
     }
 
     @Test
-    fun theClockIsTheThemesOrange() {
+    fun theClockIsTheLooksAccent() {
         show()
         val clock = compose.onNodeWithTag("home_clock").fetchSemanticsNode().boundsInRoot
         val image = snapshot()
-        assertThat(lowestPixel(image, HalloweenNight.accent, clock)).isAtLeast(0)
-        assertThat(lowestPixel(image, HalloweenNight.ink, clock)).isLessThan(0)
+        assertThat(hasPixel(image, look.night.accent, clock)).isTrue()
+        assertThat(hasPixel(image, look.night.ink, clock)).isFalse()
     }
 
     /** The composed window drawn to a bitmap; `captureToImage` waits on a redraw that Robolectric never sends. */
@@ -134,14 +163,14 @@ class HalloweenClockTest {
         return Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
     }
 
-    /** The y of the lowest pixel exactly [colour] in the columns of [across], or -1. */
-    private fun lowestPixel(image: Bitmap, colour: Color, across: Rect): Int {
+    /** Whether any pixel in [area] is exactly [colour]. */
+    private fun hasPixel(image: Bitmap, colour: Color, area: Rect): Boolean {
         val want = colour.toArgb()
-        for (y in image.height - 1 downTo 0) {
-            for (x in across.left.toInt() until minOf(across.right.toInt(), image.width)) {
-                if (image.getPixel(x, y) == want) return y
+        for (y in area.top.toInt() until minOf(area.bottom.toInt(), image.height)) {
+            for (x in area.left.toInt() until minOf(area.right.toInt(), image.width)) {
+                if (image.getPixel(x, y) == want) return true
             }
         }
-        return -1
+        return false
     }
 }

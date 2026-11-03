@@ -27,17 +27,22 @@ class ClockFaceTest {
 
     @Test
     fun everyDigitGetsTheSameSlot() {
+        val faces = mapOf("creepster" to CreepsterClock, "cherry" to CherryBombClock)
         compose.setContent {
             Column {
-                SlotClock("11:11", CreepsterClock, Color.White, Modifier.testTag("ones"))
-                SlotClock("00:00", CreepsterClock, Color.White, Modifier.testTag("zeros"))
-                SlotClock("23:58", CreepsterClock, Color.White, Modifier.testTag("late"))
+                faces.forEach { (name, style) ->
+                    SlotClock("11:11", style, Color.White, Modifier.testTag("$name-ones"))
+                    SlotClock("00:00", style, Color.White, Modifier.testTag("$name-zeros"))
+                    SlotClock("23:58", style, Color.White, Modifier.testTag("$name-late"))
+                }
             }
         }
-        val ones = compose.onNodeWithTag("ones").getUnclippedBoundsInRoot().width.value
-        assertThat(ones).isGreaterThan(0f)
-        assertThat(compose.onNodeWithTag("zeros").getUnclippedBoundsInRoot().width.value).isEqualTo(ones)
-        assertThat(compose.onNodeWithTag("late").getUnclippedBoundsInRoot().width.value).isEqualTo(ones)
+        faces.keys.forEach { name ->
+            val ones = compose.onNodeWithTag("$name-ones").getUnclippedBoundsInRoot().width.value
+            assertThat(ones).isGreaterThan(0f)
+            assertThat(compose.onNodeWithTag("$name-zeros").getUnclippedBoundsInRoot().width.value).isEqualTo(ones)
+            assertThat(compose.onNodeWithTag("$name-late").getUnclippedBoundsInRoot().width.value).isEqualTo(ones)
+        }
     }
 
     @Test

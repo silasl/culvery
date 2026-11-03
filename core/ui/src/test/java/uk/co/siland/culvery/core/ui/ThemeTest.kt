@@ -71,6 +71,9 @@ class ThemeTest {
         val creepster = res.openRawResource(R.font.creepster).use { it.readBytes().size }
         assertThat(creepster).isGreaterThan(10_000)
         assertThat(creepster).isLessThan(500_000)
+        val cherryBomb = res.openRawResource(R.font.cherry_bomb_one).use { it.readBytes().size }
+        assertThat(cherryBomb).isGreaterThan(100_000)
+        assertThat(cherryBomb).isLessThan(500_000)
     }
 
     @Test
