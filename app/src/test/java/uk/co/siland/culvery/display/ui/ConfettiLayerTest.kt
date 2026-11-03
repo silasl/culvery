@@ -37,7 +37,7 @@ class ConfettiLayerTest {
     private val wakes = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private var awake by mutableStateOf(true)
     private var falls by mutableStateOf(true)
-    private var seeds = 0
+    private var clock = 1_000L
     private var clicks = 0
 
     @Before
@@ -47,7 +47,7 @@ class ConfettiLayerTest {
             CulveryTheme(dark = true) {
                 Box(Modifier.size(400.dp, 300.dp)) {
                     Box(Modifier.fillMaxSize().testTag("under").clickable { clicks++ })
-                    ConfettiLayer(wakes, awake, falls) { 1_000L + seeds++ }
+                    ConfettiLayer(wakes, awake, falls) { clock }
                 }
             }
         }
@@ -134,17 +134,29 @@ class ConfettiLayerTest {
         set { awake = true }
         compose.mainClock.advanceTimeBy(500)
         bursts().assertCountEquals(1)
-        assertThat(seeds).isEqualTo(1)
     }
 
     @Test
     fun aSecondWakeStartsAFreshBurst() {
         wake()
         compose.mainClock.advanceTimeBy(2_000)
+        clock += 2_000
         wake()
         compose.mainClock.advanceTimeBy(2_000)
+        clock += 2_000
         bursts().assertCountEquals(1)
-        assertThat(seeds).isEqualTo(2)
+    }
+
+    /** A wake the screen left again before it was seen awake must not show at the next unrelated wake of the screen. */
+    @Test
+    fun aWakeTheScreenNeverShowedIsDropped() {
+        set { awake = false }
+        wake()
+        compose.mainClock.advanceTimeBy(3_000)
+        clock += 3_000
+        set { awake = true }
+        compose.mainClock.advanceTimeBy(100)
+        bursts().assertCountEquals(0)
     }
 
     @Test

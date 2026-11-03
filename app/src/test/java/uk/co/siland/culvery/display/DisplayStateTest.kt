@@ -142,7 +142,7 @@ class DisplayStateTest {
         assertThat(wall.wakes).isEqualTo(1)
     }
 
-    /** Fails if the app starting, by day or at its first arrival in front, is a wake. */
+    /** Pin: Fails if the app starting, by day or at its first arrival in front, is a wake. */
     @Test
     fun startingIsNoWake() = runTest {
         val fresh = wall()
