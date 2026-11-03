@@ -125,7 +125,7 @@ class HolidayModePageTest {
         compose.onNodeWithTag("mode_turn").assertTextEquals("Turn on now")
     }
 
-    /** Fails if the heading, the fixed lines or the lights section are missing or out of order. */
+    /** Fails if the headings, the fixed lines or the lights section are missing or out of order. */
     @Test
     fun fixedLinesShow() {
         show(lights = setOf(FAKE_LIGHTS))
@@ -135,8 +135,9 @@ class HolidayModePageTest {
         compose.onNodeWithTag("holiday_fixed_0").assertTextEquals("Put the heating on Eco, and take it off Eco when you’re back.")
         compose.onNodeWithTag("holiday_fixed_1").assertTextEquals("Run the hoover the day before you’re back.")
         compose.onNodeWithTag("holiday_fixed_2").assertTextEquals("Keep the doorbell quiet. Rings and motion still show in the Door tab.")
+        val also = compose.onNode(hasContentDescription("Also while away")).getUnclippedBoundsInRoot().top.value
         val tops = listOf("fake_lights", "holiday_fixed_0", "holiday_fixed_1", "holiday_fixed_2").map { compose.onNodeWithTag(it).getUnclippedBoundsInRoot().top.value }
-        assertThat(tops).isInOrder()
+        assertThat(listOf(tops[0], also) + tops.drop(1)).isInStrictOrder()
     }
 
     /** Fails if Lights while away shows with no Hue to fill it, or the fixed lines go with it. */
@@ -144,6 +145,7 @@ class HolidayModePageTest {
     fun noLightsSectionWithNoHue() {
         show(lights = emptySet())
         compose.onAllNodes(hasContentDescription("Lights while away")).assertCountEquals(0)
+        compose.onNode(hasContentDescription("Also while away")).assertExists()
         compose.onNodeWithTag("holiday_fixed_0").assertExists()
     }
 
