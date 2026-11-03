@@ -60,7 +60,7 @@ class HolidayModePage @Inject constructor(
 
     @Composable
     override fun Sections() {
-        val away by house.awayLines.collectAsState(initial = HolidayWords.awayLines(heating = false, hoover = false))
+        val away by house.awayLines.collectAsState()
         Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap)) {
             if (lights.isNotEmpty()) {
                 HhSectionLabel(HolidayWords.LIGHTS_WHILE_AWAY)

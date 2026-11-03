@@ -22,7 +22,7 @@ private const val TAG = "LightsActions"
 const val DRAG_GAP_MS = 300L
 
 /** What the household asked of the lights, the only thing the logs name (7 §6). */
-enum class LightsCommand { ON, OFF, BRIGHTNESS, SCENE, ALL_OFF, HOLIDAY_ON, HOLIDAY_OFF }
+enum class LightsCommand { ON, OFF, BRIGHTNESS, SCENE, ALL_OFF, HOLIDAY_ON, HOLIDAY_OFF, HOLIDAY_PREVIEW }
 
 /**
  * The screens' commands (7 §4.3): each runs on the application scope, so leaving the screen doesn't cancel it. When Hue

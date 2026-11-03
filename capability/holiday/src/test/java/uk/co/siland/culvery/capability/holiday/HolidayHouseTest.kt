@@ -63,7 +63,7 @@ class HolidayHouseTest {
             hoover: HouseHoover? = this.hoover,
             settings: HolidaySettings = this.settings,
             plugs: HousePlugs? = this.plugs,
-        ) = HolidayHouse(settings, lights, heating, hoover, plugs, WallClock { wall }, { now })
+        ) = HolidayHouse(settings, lights, heating, hoover, plugs, WallClock { wall }, { now }, scope)
 
         /** The process starting again: a new store over the same file, seams with nothing done, and a new house. */
         fun restarted(lights: HouseLights? = this.lights, hoover: HouseHoover? = this.hoover) =
@@ -144,10 +144,12 @@ class HolidayHouseTest {
     fun awayLinesFollowTheSeams() = runTest {
         val rig = rig()
         val door = HolidayWords.DOOR
-        assertThat(rig.house().awayLines.first()).hasSize(3)
+        assertThat(rig.house().awayLines.first { it.size == 3 }.last()).isEqualTo(door)
         rig.hoover.readyNow.value = false
-        assertThat(rig.house().awayLines.first()).containsExactly("Put the heating on Eco, and take it off Eco when you’re back.", door).inOrder()
-        assertThat(rig.house(heating = null).awayLines.first()).containsExactly(door)
+        assertThat(rig.house().awayLines.first { it.size == 2 }).containsExactly("Put the heating on Eco, and take it off Eco when you’re back.", door).inOrder()
+        val noHeating = rig.house(heating = null)
+        runCurrent()
+        assertThat(noHeating.awayLines.value).containsExactly(door)
     }
 
     /** F3: fails if the sheet's automations don't come from the lights seam, or aren't null with no lights. */

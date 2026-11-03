@@ -26,6 +26,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.holiday.BackDatePick
 import uk.co.siland.culvery.capability.holiday.HolidayStep
+import uk.co.siland.culvery.capability.holiday.HolidayWords
 import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhTrayGrid
@@ -79,7 +80,7 @@ class HolidayScreenshotTest {
     ) =
         compose.snap(name, dark, Modifier.size(1_116.dp, 800.dp)) {
             Box(Modifier.size(1_116.dp, 800.dp), contentAlignment = Alignment.CenterEnd) {
-                HolidaySheet(back, today, pick, steps, plugs, listOf("Mimic presence"), choosing, turning = false, onChangeDate = {}, onPickDate = {}, onTurnOn = {}, onCancel = {})
+                HolidaySheet(back, today, pick, steps, plugs, HolidayWords.lightsLine(listOf("Mimic presence")), choosing, turning = false, onChangeDate = {}, onPickDate = {}, onTurnOn = {}, onCancel = {})
             }
         }
 

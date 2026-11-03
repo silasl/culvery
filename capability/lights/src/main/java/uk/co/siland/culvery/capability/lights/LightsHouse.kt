@@ -60,15 +60,7 @@ class LightsHouse internal constructor(
         val chosen = settings.prefs.first().holidayAutomations
         if (chosen.isEmpty()) return emptyList()
         val s = system() ?: return null
-        val list = try {
-            s.automations().also { lastList = it }
-        } catch (e: LightsUnreachableException) {
-            failedRead(e)
-            return null
-        } catch (e: LightsRefusedException) {
-            failedRead(e)
-            return null
-        }
+        val list = readAutomations(s, LightsCommand.HOLIDAY_PREVIEW).getOrNull() ?: return null
         return list.filter { it.id in chosen }.map { it.name }
     }
 
@@ -130,15 +122,7 @@ class LightsHouse internal constructor(
     private suspend fun start(prefs: LightsPrefs): List<String> {
         val chosen = prefs.holidayAutomations
         val s = system() ?: return chosen.toList()
-        val list = try {
-            s.automations().also { lastList = it }
-        } catch (e: LightsUnreachableException) {
-            failed(LightsCommand.HOLIDAY_ON, e)
-            return chosen.toList()
-        } catch (e: LightsRefusedException) {
-            failed(LightsCommand.HOLIDAY_ON, e)
-            return chosen.toList()
-        }
+        val list = readAutomations(s, LightsCommand.HOLIDAY_ON).getOrElse { return chosen.toList() }
         val toStart = list.filter { it.id in chosen && !it.on }
         var started = prefs.holidayStarted
         val notStarted = mutableListOf<String>()
@@ -168,14 +152,8 @@ class LightsHouse internal constructor(
             return HolidayResult.Done
         }
         val s = system() ?: return HolidayResult.CantReach(LightsProblem.UNREACHABLE)
-        val list = try {
-            s.automations().also { lastList = it }
-        } catch (e: LightsUnreachableException) {
-            failed(LightsCommand.HOLIDAY_OFF, e)
-            return HolidayResult.CantReach(e.problem)
-        } catch (e: LightsRefusedException) {
-            failed(LightsCommand.HOLIDAY_OFF, e)
-            return HolidayResult.Refused
+        val list = readAutomations(s, LightsCommand.HOLIDAY_OFF).getOrElse { e ->
+            return if (e is LightsUnreachableException) HolidayResult.CantReach(e.problem) else HolidayResult.Refused
         }
         val toStop = list.filter { it.id in prefs.holidayStarted && it.on }
         val kept = toStop.map { it.id }.toMutableSet()
@@ -202,7 +180,16 @@ class LightsHouse internal constructor(
 
     private fun failed(command: LightsCommand, e: Exception) = Log.w(TAG, "${command.name} failed (${e::class.simpleName})")
 
-    private fun failedRead(e: Exception) = Log.w(TAG, "Reading the Holiday automations failed (${e::class.simpleName})")
+    /** The bridge's automations, kept as [lastList]; a failure is logged under [command] and is the bridge's exception. */
+    private suspend fun readAutomations(s: LightsSystem, command: LightsCommand): Result<List<Automation>> = try {
+        Result.success(s.automations().also { lastList = it })
+    } catch (e: LightsUnreachableException) {
+        failed(command, e)
+        Result.failure(e)
+    } catch (e: LightsRefusedException) {
+        failed(command, e)
+        Result.failure(e)
+    }
 
     private suspend fun save(write: suspend () -> Unit) {
         try {

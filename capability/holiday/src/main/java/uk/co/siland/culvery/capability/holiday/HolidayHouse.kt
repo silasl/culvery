@@ -6,14 +6,18 @@ import java.time.LocalDateTime
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.capability.holiday.HolidayStep.ECO_OFF
@@ -34,8 +38,9 @@ import uk.co.siland.culvery.core.house.HouseStep
 import uk.co.siland.culvery.core.house.HouseTimings
 import uk.co.siland.culvery.core.house.ModeGrant
 import uk.co.siland.culvery.core.house.ModePlugs
-import uk.co.siland.culvery.core.house.isReady
 import uk.co.siland.culvery.core.house.PlugChange
+import uk.co.siland.culvery.core.house.isReady
+import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.attempt
@@ -59,6 +64,7 @@ class HolidayHouse internal constructor(
     plugs: HousePlugs?,
     private val wall: WallClock,
     private val now: () -> LocalDateTime?,
+    scope: CoroutineScope,
 ) : HouseMode, HouseModeSwitch {
     @Inject
     constructor(
@@ -69,7 +75,8 @@ class HolidayHouse internal constructor(
         plugs: Optional<HousePlugs>,
         wall: WallClock,
         clock: HouseholdClock,
-    ) : this(settings, lights.orElse(null), heating.orElse(null), hoover.orElse(null), plugs.orElse(null), wall, { clock.now.value })
+        @ApplicationScope scope: CoroutineScope,
+    ) : this(settings, lights.orElse(null), heating.orElse(null), hoover.orElse(null), plugs.orElse(null), wall, { clock.now.value }, scope)
 
     private val current = MutableStateFlow<HolidayRecord?>(null)
     private val on = MutableStateFlow<Boolean?>(null)
@@ -103,16 +110,26 @@ class HolidayHouse internal constructor(
     // Memory is the truth; true while the store holds an older record than it.
     private var unsaved = false
 
+    /** Which of the heating and the hoover are set up; the plan and the page's lines both follow it. */
+    private class Ready(val heating: Boolean, val hoover: Boolean)
+
+    private val ready: Flow<Ready> = combine(heating?.ready ?: flowOf(false), hoover?.ready ?: flowOf(false), ::Ready)
+
+    /** What Holiday mode does besides its lights and plugs, for its page: the heating and hoover lines only while they are set up. */
+    val awayLines: StateFlow<List<String>> = ready.map { HolidayWords.awayLines(it.heating, it.hoover) }
+        .stateIn(scope, SharingStarted.Eagerly, HolidayWords.awayLines(heating = false, hoover = false))
+
     /** The steps turning on now would take, for the sheet. */
     suspend fun plan(back: LocalDate): List<HolidayStep> {
-        val eco = heating?.ready.isReady()
+        val set = ready.first()
+        val eco = set.heating
         val plugsReady = plugs?.ready() == true
         val hooverInTime = now()?.let { it < hooverFrom(back) } == true
         return buildList {
             if (lights?.ready.isReady()) add(LIGHTS_ON)
             if (eco) add(ECO_ON)
             if (plugsReady) add(PLUGS_ON)
-            if (hooverInTime && hoover?.ready.isReady()) add(HOOVER)
+            if (hooverInTime && set.hoover) add(HOOVER)
             if (eco) add(ECO_OFF)
         }
     }
@@ -122,9 +139,6 @@ class HolidayHouse internal constructor(
 
     /** The Hue automations the lights step would start, for the sheet; null with no lights, or when the bridge can't say. */
     suspend fun lightsAutomations(): List<String>? = lights?.holidayAutomationNames()
-
-    /** What Holiday mode does besides its lights and plugs, for its page: by the rules [plan] uses, without the hoover's timing. */
-    val awayLines: Flow<List<String>> = combine(heating?.ready ?: flowOf(false), hoover?.ready ?: flowOf(false), HolidayWords::awayLines)
 
     suspend fun turnOn(back: LocalDate, by: Authorised) {
         require(HousePermissions.HOLIDAY_MODE in by.granted) { "Turning Holiday mode on needs its own grant" }

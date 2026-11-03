@@ -30,25 +30,25 @@ object HolidayWords {
     private val FULL: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
     private val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
 
-    /**
-     * The sheet's line for [step], or null for one the sheet doesn't list; the plugs' lines come from [willLines].
-     * [automations] are the Hue automations the lights step starts, null when the bridge couldn't say.
-     */
-    fun stepLine(step: HolidayStep, back: LocalDate, automations: List<String>?): String? = when (step) {
-        HolidayStep.LIGHTS_ON -> when {
-            automations == null -> "Turn the lights off and start the Hue automations you chose now."
-            automations.isEmpty() -> "Turn the lights off now."
-            else -> "Turn the lights off and start ${HouseLines.roomList(automations)} now."
-        }
+    /** The lights step's line: [automations] are the Hue automations it starts, null when the bridge couldn't say. */
+    fun lightsLine(automations: List<String>?): String = when {
+        automations == null -> "Turn the lights off and start the Hue automations you chose now."
+        automations.isEmpty() -> "Turn the lights off now."
+        else -> "Turn the lights off and start ${HouseLines.roomList(automations)} now."
+    }
+
+    /** The sheet's line for [step], or null for one the sheet doesn't list; the plugs' lines come from [willLines]. */
+    fun stepLine(step: HolidayStep, back: LocalDate, lightsLine: String): String? = when (step) {
+        HolidayStep.LIGHTS_ON -> lightsLine
         HolidayStep.ECO_ON -> "Put the heating on Eco now, and take it off Eco at 00:01 on ${backSpoken(back)}."
         HolidayStep.HOOVER -> "Run the hoover at 10:00 on ${backSpoken(back.minusDays(1))}."
         HolidayStep.PLUGS_ON, HolidayStep.ECO_OFF -> null
     }
 
     /** The sheet's list for [steps] in the order they run, a line for each plug that will switch, then the door and the screen (12 §5.5). */
-    fun willLines(steps: List<HolidayStep>, back: LocalDate, plugs: List<PlugChange>, automations: List<String>?): List<String> = buildList {
+    fun willLines(steps: List<HolidayStep>, back: LocalDate, plugs: List<PlugChange>, lightsLine: String): List<String> = buildList {
         for (step in steps) {
-            stepLine(step, back, automations)?.let(::add)
+            stepLine(step, back, lightsLine)?.let(::add)
             if (step == HolidayStep.PLUGS_ON && plugs.isNotEmpty()) {
                 plugs.forEach { add("Switch ${it.name} ${if (it.on) "on" else "off"}.") }
                 add(HouseLines.PLUGS_BACK)

@@ -20,6 +20,8 @@ import androidx.compose.ui.semantics.semantics
 import java.time.LocalDate
 import java.time.YearMonth
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.holiday.BackDatePick
 import uk.co.siland.culvery.capability.holiday.HolidayActions
@@ -47,7 +49,7 @@ private const val TAG = "HolidaySheet"
 
 /**
  * The "When are you back?" sheet (11 §5.2): the date, with the calendar's reason for it, then what Holiday mode will do
- * for [steps], [plugs] and the lights' [automations]. [choosing] swaps the steps for the month grid, which allows tomorrow to 90 days ahead.
+ * for [steps] and [plugs], the lights step saying [lightsLine]. [choosing] swaps the steps for the month grid, which allows tomorrow to 90 days ahead.
  */
 @Composable
 internal fun HolidaySheet(
@@ -56,7 +58,7 @@ internal fun HolidaySheet(
     pick: BackDatePick?,
     steps: List<HolidayStep>,
     plugs: List<PlugChange>,
-    automations: List<String>?,
+    lightsLine: String,
     choosing: Boolean,
     turning: Boolean,
     onChangeDate: () -> Unit,
@@ -112,13 +114,13 @@ internal fun HolidaySheet(
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
-            HouseModeLines(HolidayWords.WILL, HolidayWords.willLines(steps, back, plugs, automations), "holiday_steps")
+            HouseModeLines(HolidayWords.WILL, HolidayWords.willLines(steps, back, plugs, lightsLine), "holiday_steps")
         }
     }
 }
 
 /**
- * Reads the calendar's pick, the steps' and plugs' readiness and the lights' automations as it opens (11 §5.2). Turn on turns Holiday mode on, which carries on
+ * Reads the calendar's pick, the plugs' changes and the lights' automations as it opens, and the steps for each date (11 §5.2). Turn on turns Holiday mode on, which carries on
  * if the sheet closes meanwhile, then closes the sheet; with Party mode on by then it turns nothing on and the tile says why.
  */
 @Composable
@@ -138,22 +140,30 @@ internal fun HolidaySheetHost(by: Authorised, actions: HolidayActions, house: Ho
     }
     if (!read) return
     val back = chosen ?: pick?.back ?: today.plusDays(1)
+    LaunchedEffect(Unit) {
+        coroutineScope {
+            launch {
+                plugs = attempt({ house.plugChanges() }) { e ->
+                    Log.w(TAG, "Couldn't read which plugs Holiday mode will switch (${e::class.simpleName})")
+                    emptyList()
+                }
+            }
+            launch {
+                automations = attempt({ house.lightsAutomations() }) { e ->
+                    Log.w(TAG, "Couldn't read which automations Holiday mode will start (${e::class.simpleName})")
+                    null
+                }
+            }
+        }
+    }
     LaunchedEffect(back) {
         steps = attempt({ house.plan(back) }) { e ->
             Log.w(TAG, "Couldn't read which steps Holiday mode will take (${e::class.simpleName})")
             emptyList()
         }
-        plugs = attempt({ house.plugChanges() }) { e ->
-            Log.w(TAG, "Couldn't read which plugs Holiday mode will switch (${e::class.simpleName})")
-            emptyList()
-        }
-        automations = attempt({ house.lightsAutomations() }) { e ->
-            Log.w(TAG, "Couldn't read which automations Holiday mode will start (${e::class.simpleName})")
-            null
-        }
     }
     HolidaySheet(
-        back, today, pick, steps, plugs, automations, choosing, turning = action.busy,
+        back, today, pick, steps, plugs, HolidayWords.lightsLine(automations), choosing, turning = action.busy,
         onChangeDate = { choosing = true },
         onPickDate = {
             if (!action.busy) {

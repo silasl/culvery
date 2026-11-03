@@ -30,7 +30,7 @@ internal class HouseRig(scope: CoroutineScope) {
     var now: LocalDateTime = TODAY.atTime(9, 0)
     val house = HolidayHouse(
         HolidaySettings(MemoryStore(), scope), lights, heating, hoover, plugs,
-        WallClock { now.atZone(ZoneId.of("Europe/London")).toInstant().toEpochMilli() }, { now },
+        WallClock { now.atZone(ZoneId.of("Europe/London")).toInstant().toEpochMilli() }, { now }, scope,
     )
 
     /** Reads the stored record, as the scheduler's first tick does. */
