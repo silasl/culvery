@@ -333,13 +333,14 @@ class ModesStoreTest {
         assertThat(settings.record.value).isEqualTo(ModeRecord())
     }
 
+    /** F7: fails if a changed room moves from its place, or a new one doesn't go last. */
     @Test
     fun withLightReplacesThatRoomsChoice() {
         val relax = KITCHEN_BRIGHT.copy(choice = LightChoice.Scene("s2", "Relax"))
+        val hall = RoomChoice("r3", "Hall", LightChoice.Off)
 
-        val mode = FULL_MODE.withLight(relax)
-
-        assertThat(mode.lights).containsExactly(LOUNGE_RELAX, relax).inOrder()
+        assertThat(FULL_MODE.withLight(relax).lights).containsExactly(relax, LOUNGE_RELAX).inOrder()
+        assertThat(FULL_MODE.withLight(hall).lights).containsExactly(KITCHEN_BRIGHT, LOUNGE_RELAX, hall).inOrder()
     }
 
     @Test

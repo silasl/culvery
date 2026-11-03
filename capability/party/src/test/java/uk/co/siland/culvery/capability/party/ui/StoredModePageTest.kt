@@ -14,8 +14,10 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -396,7 +398,42 @@ class StoredModePageTest {
         compose.onNodeWithTag("light_chip_0").assertTextEquals("Off")
     }
 
+    /** F7: fails if a saved room's row doesn't open its choice already picked, or saving a new one moves the room. */
+    @Test
+    fun aSavedRoomsRowOpensItsChoice() {
+        val lounge = RoomChoice("r2", "Lounge", LightChoice.On(60))
+        val hall = RoomChoice("r3", "Hall", LightChoice.Off)
+        show(FILM_NIGHT.copy(lights = listOf(KITCHEN_BRIGHT, lounge, hall)))
+        compose.waitFor { exists("light_row_1") }
+
+        tap("light_row_1")
+        compose.waitFor { exists("light_sheet") }
+        compose.onNodeWithTag("light_on").assertIsSelected()
+        compose.onNodeWithTag("light_percent").assertTextEquals("60%")
+        tap("light_off")
+        tap("light_save")
+
+        compose.waitFor { saved().lights == listOf(KITCHEN_BRIGHT, lounge.copy(choice = LightChoice.Off), hall) }
+        compose.waitFor { textOf("light_chip_1") == "Off" }
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     // Plugs
+
+    /** F6: fails if a mode with no plugs doesn't say how to add one above Add a plug, or still says it once one is added. */
+    @Test
+    fun noPlugsSaysHowToAddOne() {
+        rig.plugs.offered = listOf(LAMP)
+        show(FILM_NIGHT)
+        compose.waitFor { exists("mode_plugs_empty") && exists("plug_add") }
+        compose.onNodeWithTag("mode_plugs_empty").assertTextEquals("No plugs yet. Add one to switch it with this mode.")
+        val line = compose.onNodeWithTag("mode_plugs_empty").getUnclippedBoundsInRoot()
+        assertThat(compose.onNodeWithTag("plug_add").getUnclippedBoundsInRoot().top).isAtLeast(line.bottom)
+
+        rig.plugs.addedNow.value = listOf(AddedPlug("lamp", on = true, needsPin = false))
+        compose.waitFor { exists("plug_row_0") }
+        gone("mode_plugs_empty")
+    }
 
     /** Fails if "Add a plug" offers a plug the mode has, or leaves out one it hasn't. */
     @Test

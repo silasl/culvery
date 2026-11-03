@@ -37,7 +37,7 @@ internal fun HousePlugs.addedOrNone(modeId: String, tag: String): Flow<List<Adde
 }
 
 /**
- * The plugs [modeId] switches (15b §4.2), [added] as read: each added plug with an On or Off chip and a padlock when it needs a PIN, then
+ * The plugs [modeId] switches (15b §4.2), [added] as read: a line saying how to add one while there are none, each added plug with an On or Off chip and a padlock when it needs a PIN, then
  * "Add a plug" for the Lights tab's plugs not added. Every plug not listed is left alone. A change is written through
  * [plugs] at once, and a write that fails says so through [toaster]; [onLockedAdded] runs after a plug that needs a PIN
  * was added, so the mode can hold the PIN too.
@@ -58,6 +58,7 @@ internal fun ModePlugsSection(modeId: String, plugs: HousePlugs, added: List<Add
         afterwards()
     }
     HhSectionLabel(ModesWords.PLUGS_SECTION)
+    if (added.isEmpty()) Line(ModesWords.NO_PLUGS, "mode_plugs_empty")
     added.forEachIndexed { i, plug ->
         val name = options.firstOrNull { it.id == plug.id }?.name ?: ModesWords.MISSING_PLUG
         HhListRow(

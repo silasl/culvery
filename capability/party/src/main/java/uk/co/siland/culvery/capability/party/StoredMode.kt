@@ -19,7 +19,9 @@ data class StoredMode(
     val speakers: List<HouseRoom>? = null,
     val lights: List<RoomChoice> = emptyList(),
 ) {
-    fun withLight(choice: RoomChoice) = copy(lights = lights.filterNot { it.roomId == choice.roomId } + choice)
+    /** A room already set keeps its place in the list; a new one goes last. */
+    fun withLight(choice: RoomChoice) =
+        copy(lights = if (lights.any { it.roomId == choice.roomId }) lights.map { if (it.roomId == choice.roomId) choice else it } else lights + choice)
 
     fun withoutLight(roomId: String) = copy(lights = lights.filterNot { it.roomId == roomId })
 

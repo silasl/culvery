@@ -41,7 +41,8 @@ import uk.co.siland.culvery.core.ui.Icons
 private const val TAG = "ModeLightsSection"
 
 /**
- * The rooms a mode sets (15b §4.2): each added room with its choice, a scene, On at a percent or Off, then "Add a light"
+ * The rooms a mode sets (15b §4.2): each added room with its choice, a scene, On at a percent or Off, which a tap on its
+ * row or chip changes, then "Add a light"
  * for the rooms not added. Every room not listed is left alone. Reads what Hue offers once as the section opens; [save]
  * changes the mode and writes it at once.
  */
@@ -70,12 +71,14 @@ internal fun ModeLightsSection(mode: StoredMode, lights: HouseLights?, save: ((S
     }
     mode.lights.forEachIndexed { i, saved ->
         val room = roomOf(saved)
+        val change = { overlay.show { LightChoiceSheet(room, saved.choice, { saveChoice(room, it) }, overlay::dismiss) } }
         HhListRow(
             saved.roomName, Modifier.testTag("light_row_$i"),
+            onClick = change, clickLabel = ModesWords.changeLight(saved.roomName),
             trailing = {
                 HhChoiceChip(
                     lightChip(saved.choice, room.dimmable), selected = false, tag = "light_chip_$i",
-                    onClick = { overlay.show { LightChoiceSheet(room, saved.choice, { saveChoice(room, it) }, overlay::dismiss) } },
+                    onClick = change,
                     role = Role.Button, clickLabel = ModesWords.changeLight(saved.roomName),
                     spokenName = "${saved.roomName}, ${lightChip(saved.choice, room.dimmable)}",
                 )
