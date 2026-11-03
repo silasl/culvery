@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,9 +75,9 @@ fun HouseModeOnPill(tag: String) {
 
 /**
  * A mode's tray tile, narrow enough for half the tray: [icon] with [trailing] on its right, then [label] and [second]
- * under them, all spoken as [spoken], then what didn't happen as [line] under the tile. A tap does nothing unless
- * [enabled]. Its tags start with [tag]; [second]'s is [secondTag]. [clickLabel] is what TalkBack offers for a tap, where
- * "Turn on" and "Turn off" would be wrong.
+ * under them, all spoken as [spoken]. What didn't happen, [line], goes under the tile's whole tray row, so the tile keeps
+ * its size; outside a tray it goes under the tile. A tap does nothing unless [enabled]. Its tags start with [tag];
+ * [second]'s is [secondTag]. [clickLabel] is what TalkBack offers for a tap, where "Turn on" and "Turn off" would be wrong.
  */
 @Composable
 fun HouseModeTile(
@@ -95,6 +96,13 @@ fun HouseModeTile(
 ) {
     val colors = Culvery.colors
     val ink = if (on) colors.accentInk else colors.ink
+    val toRow = LocalTrayLine.current
+    if (toRow != null) {
+        DisposableEffect(toRow, tag, line) {
+            toRow(tag, line)
+            onDispose { toRow(tag, null) }
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         Column(
             verticalArrangement = Arrangement.spacedBy(HouseModeDimens.gap, Alignment.CenterVertically),
@@ -125,17 +133,21 @@ fun HouseModeTile(
                 }
             }
         }
-        if (line != null) {
-            Text(
-                line,
-                style = HouseModeDimens.secondStyle,
-                color = colors.danger,
-                modifier = Modifier
-                    .padding(start = HouseModeDimens.paddingH, end = HouseModeDimens.paddingH, top = HouseModeDimens.lineGap)
-                    .testTag("${tag}_line"),
-            )
-        }
+        if (toRow == null && line != null) HouseModeLine(line, tag)
     }
+}
+
+/** A tile's line of what didn't happen, tagged `{tag}_line`. */
+@Composable
+internal fun HouseModeLine(line: String, tag: String) {
+    Text(
+        line,
+        style = HouseModeDimens.secondStyle,
+        color = Culvery.colors.danger,
+        modifier = Modifier
+            .padding(start = HouseModeDimens.paddingH, end = HouseModeDimens.paddingH, top = HouseModeDimens.lineGap)
+            .testTag("${tag}_line"),
+    )
 }
 
 /**

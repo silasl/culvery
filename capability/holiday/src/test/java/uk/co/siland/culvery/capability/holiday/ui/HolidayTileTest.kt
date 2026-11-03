@@ -147,7 +147,7 @@ class HolidayTileTest {
         assertThat(tile.width.value).isWithin(1f).of(row.width.value)
     }
 
-    /** 15a §2.1. Fails if a long line runs outside the tray or onto the Hoover row below, instead of growing its row. */
+    /** 15a §2.1, F4. Fails if a long line runs outside the tray or onto the Hoover row below, or squashes the tile above it. */
     @Test
     fun aLongLineGrowsItsRowAndStaysClearOfTheHoover() {
         on = true
@@ -160,12 +160,12 @@ class HolidayTileTest {
         val under = compose.onNodeWithTag("holiday_tile_line").getUnclippedBoundsInRoot()
         val row = compose.onNodeWithTag("tray_row_holiday").getUnclippedBoundsInRoot()
         val hoover = compose.onNodeWithTag("tray_row_hoover.start").getUnclippedBoundsInRoot()
-        assertThat(under.bottom.value).isAtMost(row.bottom.value + 0.5f)
-        assertThat(row.bottom.value).isAtMost(hoover.top.value)
+        assertThat(under.top.value).isAtLeast(row.bottom.value)
         assertThat(under.bottom.value).isAtMost(hoover.top.value)
         assertThat(tile.top.value).isAtLeast(tray.top.value)
         assertThat(hoover.bottom.value).isAtMost(tray.bottom.value)
-        assertThat(row.height.value).isGreaterThan(hoover.height.value)
+        // F4: the line goes under the row, so the tile keeps its size.
+        assertThat(row.height.value).isWithin(1f).of(hoover.height.value)
     }
 
     /** Review Focus 4. Fails if a tap while a change runs reaches [onTap], or the words don't say what is happening. */

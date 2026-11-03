@@ -14,7 +14,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
@@ -163,13 +167,18 @@ fun HhTrayGrid(label: String, rows: List<List<TrayCell>>, modifier: Modifier = M
     }
 }
 
+/** Where a tile in [HhTrayGrid] puts its line, as `(tag, line)`: under the tile's whole row. Null outside the tray. */
+internal val LocalTrayLine = compositionLocalOf<((String, String?) -> Unit)?> { null }
+
 /**
- * [TRAY_ROWS] rows, each at least a third of the height. A row whose content needs more (a tile with a "didn't happen"
- * line) grows, taking the height from the empty rows first and then from rows with room to spare, so no row is drawn over another.
+ * [TRAY_ROWS] rows, each at least a third of the height. The tiles' lines go under their row, stacked in tile order, and
+ * the row grows by them so its tiles keep their size; a row whose tiles need more grows too. The height comes from the
+ * empty rows first and then from rows with room to spare, so no row is drawn over another.
  */
 @Composable
 private fun TrayRows(rows: List<List<TrayCell>>, modifier: Modifier) {
     val slots = maxOf(TRAY_ROWS, rows.size)
+    val lines = remember { mutableStateMapOf<String, Pair<String, String>>() }
     Layout(
         content = {
             repeat(slots) { i ->
@@ -179,9 +188,19 @@ private fun TrayRows(rows: List<List<TrayCell>>, modifier: Modifier) {
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(TrayTokens.gap)) {
                         cells.forEach { (id, content) ->
-                            key(id) { Box(Modifier.weight(1f).fillMaxHeight().testTag("tray_row_$id")) { content() } }
+                            key(id) {
+                                val toRow: (String, String?) -> Unit = remember(id) {
+                                    { tag, line -> if (line == null) lines.remove(id) else lines[id] = tag to line }
+                                }
+                                CompositionLocalProvider(LocalTrayLine provides toRow) {
+                                    Box(Modifier.weight(1f).fillMaxHeight().testTag("tray_row_$id")) { content() }
+                                }
+                            }
                         }
                     }
+                }
+                Column(Modifier.fillMaxWidth()) {
+                    cells.orEmpty().mapNotNull { lines[it.first] }.forEach { (tag, line) -> HouseModeLine(line, tag) }
                 }
             }
         },
@@ -189,18 +208,30 @@ private fun TrayRows(rows: List<List<TrayCell>>, modifier: Modifier) {
     ) { measurables, constraints ->
         val width = constraints.maxWidth
         val gap = TrayTokens.gap.roundToPx()
+        val tiles = measurables.filterIndexed { i, _ -> i % 2 == 0 }
+        val under = measurables.filterIndexed { i, _ -> i % 2 == 1 }
         val filled = List(slots) { i -> !rows.getOrNull(i).isNullOrEmpty() }
-        val natural = measurables.mapIndexed { i, m -> if (filled[i]) m.minIntrinsicHeight(width) else 0 }
+        val lineHeights = under.map { it.minIntrinsicHeight(width) }
+        val tileHeights = tiles.mapIndexed { i, m -> if (filled[i]) m.minIntrinsicHeight(width) else 0 }
         val heights = if (constraints.hasBoundedHeight) {
+            val third = (constraints.maxHeight - gap * (slots - 1)) / slots
+            val natural = List(slots) { i -> if (lineHeights[i] > 0) maxOf(tileHeights[i], third) + lineHeights[i] else tileHeights[i] }
             trayRowHeights(natural, filled, constraints.maxHeight, gap)
         } else {
-            natural
+            List(slots) { i -> tileHeights[i] + lineHeights[i] }
         }
-        val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints.fixed(width, heights[i])) }
+        val placed = List(slots) { i ->
+            val tile = maxOf(0, heights[i] - lineHeights[i])
+            tiles[i].measure(Constraints.fixed(width, tile)) to under[i].measure(Constraints.fixed(width, heights[i] - tile))
+        }
         val height = if (constraints.hasBoundedHeight) constraints.maxHeight else heights.sum() + gap * (slots - 1)
         layout(width, height) {
             var y = 0
-            placeables.forEach { it.placeRelative(0, y); y += it.height + gap }
+            placed.forEach { (tile, line) ->
+                tile.placeRelative(0, y)
+                line.placeRelative(0, y + tile.height)
+                y += tile.height + line.height + gap
+            }
         }
     }
 }

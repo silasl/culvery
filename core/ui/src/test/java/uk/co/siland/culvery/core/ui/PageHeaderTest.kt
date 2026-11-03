@@ -282,4 +282,66 @@ class PageHeaderTest {
         val middle = c.top.value - a.bottom.value - 2 * gap
         assertThat(middle).isWithin(1f).of(2 * c.height.value - 150f)
     }
+
+    @Composable
+    private fun Tile(id: String, line: String? = null) =
+        HouseModeTile(id, Icons.BEACH_ACCESS, id, on = false, second = null, secondTag = "${id}_second", line = line, spoken = id, enabled = true, onTap = {})
+
+    private fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+    /** F4: fails if a tile's line squashes it, or sits beside its neighbour instead of under the whole row. */
+    @Test
+    fun aTilesLineGoesUnderItsWholeRowAndTheTileKeepsItsSize() {
+        val line = "The heating is still on Eco. Turn it off in the Nest app."
+        show {
+            HhTrayGrid(
+                "One-tap",
+                listOf(listOf("a" to { Tile("a", line) }, "b" to { Tile("b") }), listOf("c" to { Tile("c") })),
+                Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
+            )
+        }
+        val a = bounds("a")
+        val b = bounds("b")
+        val c = bounds("c")
+        val under = bounds("a_line")
+        assertThat(a.height.value).isWithin(0.5f).of(b.height.value)
+        assertThat(a.height.value).isWithin(0.5f).of(c.height.value)
+        assertThat(under.top.value).isAtLeast(maxOf(a.bottom.value, b.bottom.value))
+        assertThat(c.top.value).isAtLeast(under.bottom.value)
+    }
+
+    /** F4: fails if two lines in a row aren't both shown, one under the other in tile order. */
+    @Test
+    fun twoLinesInARowStackInTileOrder() {
+        show {
+            HhTrayGrid(
+                "One-tap",
+                listOf(listOf("a" to { Tile("a", "Turn Party mode off first.") }, "b" to { Tile("b", "The music didn’t start.") })),
+                Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
+            )
+        }
+        val a = bounds("a")
+        val first = bounds("a_line")
+        val second = bounds("b_line")
+        assertThat(first.top.value).isAtLeast(a.bottom.value)
+        assertThat(second.top.value).isAtLeast(first.bottom.value)
+        assertThat(second.left.value).isWithin(0.5f).of(first.left.value)
+        assertThat(bounds("b").height.value).isWithin(0.5f).of(a.height.value)
+    }
+
+    /** F4: fails if the gap between two rows of tiles differs from the gap between the tiles of a row. */
+    @Test
+    fun theRowGapIsTheTileGap() {
+        show {
+            HhTrayGrid(
+                "One-tap",
+                listOf(listOf("a" to { Tile("a") }, "b" to { Tile("b") }), listOf("c" to { Tile("c") }, "d" to { Tile("d") })),
+                Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
+            )
+        }
+        val a = bounds("a")
+        val b = bounds("b")
+        val c = bounds("c")
+        assertThat(c.top.value - a.bottom.value).isWithin(0.5f).of(b.left.value - a.right.value)
+    }
 }
