@@ -71,8 +71,11 @@ class TaekwondoRun(private val speaker: Speaker, private val scope: CoroutineSco
     }
 
     private suspend fun speak(move: Move, detailed: Boolean) {
-        val hangul = move.spokenHangul?.takeIf { speaker.hasKorean }
+        val hangul = move.spokenHangul?.takeIf { speaker.korean.value == true }
         if (hangul != null) speaker.say(hangul, korean = true) else speaker.say(move.romanised, korean = false)
-        if (detailed) speaker.say(move.description, korean = false)
+        if (detailed) {
+            speaker.say(move.english, korean = false)
+            speaker.say(move.description, korean = false)
+        }
     }
 }

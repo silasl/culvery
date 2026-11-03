@@ -116,7 +116,7 @@ class TaekwondoScreenTest {
     }
 
     @Test
-    fun theMoveShowsItsNumberKoreanAndEnglish() {
+    fun theMoveShowsItsNumberKoreanEnglishAndDescription() {
         show()
         start()
 
@@ -126,7 +126,7 @@ class TaekwondoScreenTest {
         tag("move_korean").assertTextEquals("나란히 준비 서기")
         tag("move_romanised").assertTextEquals("Narani junbi sogi")
         tag("move_english").assertTextEquals("Parallel ready stance")
-        assertThat(open("move_description")).isFalse()
+        tag("move_description").assertTextEquals("Feet parallel, shoulder width apart; calm and ready to begin.")
         assertThat(speaker.calls).containsExactly("나란히 준비 서기" to true)
     }
 
@@ -174,19 +174,36 @@ class TaekwondoScreenTest {
     }
 
     @Test
-    fun detailedShowsTheDescriptionToo() {
+    fun detailedReadsTheEnglishNameAndDescriptionToo() {
         runBlocking { settings.setDetailed(true) }
         content()
         compose.waitUntil(5_000) { switchIsOn() }
         compose.mainClock.autoAdvance = false
         start()
 
-        after(11_000)
+        after(12_000)
 
-        tag("move_description").assertTextEquals("Feet parallel, shoulder width apart; calm and ready to begin.")
         assertThat(speaker.calls).containsExactly(
-            "나란히 준비 서기" to true, "Feet parallel, shoulder width apart; calm and ready to begin." to false,
+            "나란히 준비 서기" to true,
+            "Parallel ready stance" to false,
+            "Feet parallel, shoulder width apart; calm and ready to begin." to false,
         ).inOrder()
+    }
+
+    @Test
+    fun noKoreanVoiceSaysHowToAddOne() {
+        speaker.korean.value = false
+        show()
+
+        tag("taekwondo_no_korean").assertExists()
+        assertThat(speaker.checks).isEqualTo(1)
+    }
+
+    @Test
+    fun aKoreanVoiceNeedsNoLine() {
+        show()
+
+        assertThat(open("taekwondo_no_korean")).isFalse()
     }
 
     @Test

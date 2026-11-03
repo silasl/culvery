@@ -11,13 +11,18 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 private const val TAG = "TtsSpeaker"
 
 interface Speaker {
-    /** True once a Korean voice is known to be on the tablet. */
-    val hasKorean: Boolean
+    /** Whether the tablet has a Korean voice; null until the speech engine has started. */
+    val korean: StateFlow<Boolean?>
+
+    /** Looks again for a Korean voice, which may have been installed since the engine started. */
+    fun checkKorean()
 
     /** Returns when [text] has been spoken, or at once if it can't be. */
     suspend fun say(text: String, korean: Boolean)
@@ -27,13 +32,11 @@ interface Speaker {
 
 /**
  * The tablet's own speech engine. It starts when first built, which is when the practice screen first opens, so it is ready
- * well inside the 10 s countdown. Nothing installs voice data: with no Korean voice [hasKorean] stays false.
+ * well inside the 10 s countdown. Nothing installs voice data: with no Korean voice [korean] is false.
  */
 @Singleton
 class TtsSpeaker @Inject constructor(@ApplicationContext context: Context) : Speaker {
-    @Volatile
-    override var hasKorean = false
-        private set
+    override val korean = MutableStateFlow<Boolean?>(null)
 
     @Volatile
     private var ready = false
@@ -61,8 +64,12 @@ class TtsSpeaker @Inject constructor(@ApplicationContext context: Context) : Spe
             // Reported when the engine is stopped or flushed elsewhere, so that say() doesn't wait for a done that never comes.
             override fun onStop(utteranceId: String?, interrupted: Boolean) = finished(utteranceId)
         })
-        hasKorean = engine.isLanguageAvailable(Locale.KOREAN) >= TextToSpeech.LANG_AVAILABLE
         ready = true
+        checkKorean()
+    }
+
+    override fun checkKorean() {
+        if (ready && korean.value != true) korean.value = engine.isLanguageAvailable(Locale.KOREAN) >= TextToSpeech.LANG_AVAILABLE
     }
 
     private fun finished(utteranceId: String?) {

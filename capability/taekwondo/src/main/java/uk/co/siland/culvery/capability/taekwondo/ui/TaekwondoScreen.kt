@@ -40,6 +40,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.hhClickable
@@ -48,6 +49,8 @@ import uk.co.siland.culvery.core.ui.hhClickable
 object TaekwondoWords {
     const val TITLE = "Taekwondo"
     const val DETAILED = "Detailed mode"
+    const val DETAILED_LINE = "Also reads the English name and description aloud."
+    const val NO_KOREAN = "This tablet has no Korean voice, so it reads the Korean names in English. To add one, go to Settings › General management › Text-to-speech and install the Korean voice data."
     const val CANCEL = "Cancel"
     const val CLOSE = "Close"
     const val OPEN = "Open"
@@ -83,15 +86,17 @@ fun TaekwondoScreen(settings: TaekwondoSettings, speaker: Speaker, onClose: () -
     val run = remember(speaker) { TaekwondoRun(speaker, scope) }
     val state by run.state.collectAsState()
     val detailed by settings.detailed.collectAsState(initial = false)
+    val korean by speaker.korean.collectAsState()
     val running = state != RunState.Idle
     var chosen by remember { mutableStateOf(PATTERNS.first()) }
 
+    LaunchedEffect(speaker) { speaker.checkKorean() }
     LaunchedEffect(running) { overlay.keepOpen(running) }
     LaunchedEffect(run) { alerts.showing.collect { if (it) run.stop() } }
     DisposableEffect(run) { onDispose { run.stop() } }
 
     TaekwondoPanel(
-        state = state, pattern = chosen, detailed = detailed,
+        state = state, pattern = chosen, detailed = detailed, noKorean = korean == false,
         onDetailed = { on -> scope.launch { settings.setDetailed(on) } },
         onPattern = {
             if (!alerts.showing.value) {
@@ -104,12 +109,13 @@ fun TaekwondoScreen(settings: TaekwondoSettings, speaker: Speaker, onClose: () -
     )
 }
 
-/** What the screen draws for [state]; [pattern] is the one chosen. */
+/** What the screen draws for [state]; [pattern] is the one chosen. [noKorean] adds a line on how to install a Korean voice. */
 @Composable
 internal fun TaekwondoPanel(
     state: RunState,
     pattern: Pattern,
     detailed: Boolean,
+    noKorean: Boolean,
     onDetailed: (Boolean) -> Unit,
     onPattern: (Pattern) -> Unit,
     onCancel: () -> Unit,
@@ -129,10 +135,10 @@ internal fun TaekwondoPanel(
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             when (state) {
-                RunState.Idle -> Grid(detailed, onDetailed, onPattern)
+                RunState.Idle -> Grid(detailed, noKorean, onDetailed, onPattern)
                 is RunState.Counting -> Big(state.seconds.toString(), "count", CountStyle)
                 is RunState.Again -> Big(TaekwondoWords.again(state.seconds), "again", AgainStyle)
-                is RunState.Moving -> MoveView(state, detailed)
+                is RunState.Moving -> MoveView(state)
             }
         }
         if (running) {
@@ -145,9 +151,10 @@ internal fun TaekwondoPanel(
 }
 
 @Composable
-private fun Grid(detailed: Boolean, onDetailed: (Boolean) -> Unit, onPattern: (Pattern) -> Unit) {
+private fun Grid(detailed: Boolean, noKorean: Boolean, onDetailed: (Boolean) -> Unit, onPattern: (Pattern) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(24.dp), modifier = Modifier.fillMaxSize()) {
-        HhSwitchRow(TaekwondoWords.DETAILED, null, detailed, "taekwondo_detailed", onDetailed)
+        HhSwitchRow(TaekwondoWords.DETAILED, TaekwondoWords.DETAILED_LINE, detailed, "taekwondo_detailed", onDetailed)
+        if (noKorean) HhStatusLine(TaekwondoWords.NO_KOREAN, "taekwondo_no_korean")
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp), modifier = Modifier.fillMaxWidth()) {
             PATTERNS.forEachIndexed { i, pattern ->
                 Box(
@@ -178,7 +185,7 @@ private fun Big(text: String, tag: String, style: TextStyle) {
 }
 
 @Composable
-private fun MoveView(s: RunState.Moving, detailed: Boolean) {
+private fun MoveView(s: RunState.Moving) {
     val move = s.move
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(move.number, style = HhType.headerValue.copy(fontSize = 48.sp), color = Culvery.colors.accent, modifier = Modifier.testTag("move_number"))
@@ -190,8 +197,6 @@ private fun MoveView(s: RunState.Moving, detailed: Boolean) {
             Text(move.romanised, style = HhType.sectionTitle, color = Culvery.colors.mute, textAlign = TextAlign.Center, modifier = Modifier.testTag("move_romanised"))
         }
         Text(move.english, style = HhType.screenTitle, color = Culvery.colors.ink, textAlign = TextAlign.Center, modifier = Modifier.testTag("move_english"))
-        if (detailed) {
-            Text(move.description, style = HhType.body.copy(fontSize = 24.sp), color = Culvery.colors.mute, textAlign = TextAlign.Center, modifier = Modifier.testTag("move_description"))
-        }
+        Text(move.description, style = HhType.body.copy(fontSize = 24.sp), color = Culvery.colors.mute, textAlign = TextAlign.Center, modifier = Modifier.testTag("move_description"))
     }
 }

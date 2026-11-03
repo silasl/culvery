@@ -45,9 +45,9 @@ class TaekwondoScreenshotTest {
     @After
     fun tearDown() = scope.cancel()
 
-    private fun snap(name: String, state: RunState, detailed: Boolean = false) =
+    private fun snap(name: String, state: RunState, detailed: Boolean = false, noKorean: Boolean = false) =
         compose.snap(name, dark = true, Modifier) {
-            TaekwondoPanel(state, CHOONG_MOO, detailed, onDetailed = {}, onPattern = {}, onCancel = {}, onClose = {})
+            TaekwondoPanel(state, CHOONG_MOO, detailed, noKorean, onDetailed = {}, onPattern = {}, onCancel = {}, onClose = {})
         }
 
     @Test
@@ -65,6 +65,8 @@ class TaekwondoScreenshotTest {
     }
 
     @Test fun gridDark() = snap("taekwondo_grid_dark", RunState.Idle)
+
+    @Test fun gridNoKoreanDark() = snap("taekwondo_grid_no_korean_dark", RunState.Idle, noKorean = true)
 
     @Test fun countingDark() = snap("taekwondo_counting_dark", RunState.Counting(10))
 

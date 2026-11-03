@@ -8,7 +8,9 @@ import kotlinx.coroutines.flow.StateFlow
 import uk.co.siland.culvery.core.plugin.AlertHost
 
 /** A speaker that records `(text, korean)` and each time it was asked, and takes a second to say anything. */
-class FakeSpeaker(override var hasKorean: Boolean = true, private val now: () -> Long = { 0L }) : Speaker {
+class FakeSpeaker(hasKorean: Boolean? = true, private val now: () -> Long = { 0L }) : Speaker {
+    override val korean = MutableStateFlow(hasKorean)
+    var checks = 0
     val calls = CopyOnWriteArrayList<Pair<String, Boolean>>()
     val times = CopyOnWriteArrayList<Long>()
     var stops = 0
@@ -17,6 +19,10 @@ class FakeSpeaker(override var hasKorean: Boolean = true, private val now: () ->
         calls += text to korean
         times += now()
         delay(1_000)
+    }
+
+    override fun checkKorean() {
+        checks++
     }
 
     override fun stop() {

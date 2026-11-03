@@ -17,7 +17,7 @@ import org.robolectric.shadows.ShadowLog
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class TaekwondoRunTest {
-    private class Rig(scope: TestScope, hasKorean: Boolean = true) {
+    private class Rig(scope: TestScope, hasKorean: Boolean? = true) {
         val speaker = FakeSpeaker(hasKorean) { scope.testScheduler.currentTime }
         val run = TaekwondoRun(speaker, scope.backgroundScope)
         val states = mutableListOf<RunState>()
@@ -50,16 +50,18 @@ class TaekwondoRunTest {
     }
 
     @Test
-    fun detailedAddsTheDescriptionInEnglish() = runTest {
+    fun detailedAddsTheEnglishNameAndDescription() = runTest {
         val rig = Rig(this)
 
         rig.run.start(CHOONG_MOO, detailed = true)
-        passes(17_001)
+        passes(18_001)
 
-        assertThat(rig.speaker.calls.take(4)).containsExactly(
+        assertThat(rig.speaker.calls.take(6)).containsExactly(
             "나란히 준비 서기" to true,
+            "Parallel ready stance" to false,
             "Feet parallel, shoulder width apart; calm and ready to begin." to false,
             "니은자 서 쌍 손칼 막기" to true,
+            "L-stance, twin knife-hand block" to false,
             "Both knife-hands block at once, guarding the front and the side." to false,
         ).inOrder()
     }
@@ -118,6 +120,16 @@ class TaekwondoRunTest {
     @Test
     fun noKoreanVoiceReadsTheRomanisedInEnglish() = runTest {
         val rig = Rig(this, hasKorean = false)
+
+        rig.run.start(CHOONG_MOO, detailed = false)
+        passes(10_000)
+
+        assertThat(rig.speaker.calls).containsExactly("Narani junbi sogi" to false)
+    }
+
+    @Test
+    fun aVoiceNotKnownYetReadsTheRomanisedInEnglish() = runTest {
+        val rig = Rig(this, hasKorean = null)
 
         rig.run.start(CHOONG_MOO, detailed = false)
         passes(10_000)
