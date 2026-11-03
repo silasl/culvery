@@ -36,6 +36,7 @@ import java.util.Locale
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.plugin.HomeLayout
+import uk.co.siland.culvery.core.ui.CakeMark
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.HomeSkyBand
@@ -113,7 +114,7 @@ fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modi
     }
 }
 
-/** A drawn cake will lead the line; the pill is read as the one line of text (16 ง3.2). */
+/** The drawn cake leads the line; the pill is read as the one line of text (16 ยง3.2). */
 @Composable
 private fun GreetingPill(greeting: String, band: HomeSkyBand?) {
     val c = Culvery.colors
@@ -127,7 +128,7 @@ private fun GreetingPill(greeting: String, band: HomeSkyBand?) {
             .background(c.accentSoft)
             .padding(horizontal = ShellDimens.greetingPaddingH, vertical = ShellDimens.greetingPaddingV),
     ) {
-        Spacer(Modifier.width(ShellDimens.greetingCake))
+        CakeMark(ShellDimens.greetingCake)
         Spacer(Modifier.width(ShellDimens.greetingCakeGap))
         Text(greeting, style = HhType.rowTitle, color = c.ink, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
     }

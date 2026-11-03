@@ -26,31 +26,37 @@ private val Looks: List<SeasonalLook> = listOf(
         night(0x2F6F54, 0x111817, 0x263030, 0x232F2C, 0x4CB387, 0x22342E),
         day(PersonPalette.colors[0], 0xE7F0EC, 0xE7EFEB, 0xBBD6CA, 0x2F6F54, 0xC9E8DB),
         clockFace = CherryBombClock,
+        mark = { width -> CakeMark(width) },
     ),
     SeasonalLook(
         night(0x2165AF, 0x12171B, 0x272F35, 0x242D33, 0x5B9BE0, 0x24303B),
         day(PersonPalette.colors[1], 0xE8EEF4, 0xE8EDF2, 0xBED1DE, 0x2165AF, 0xD1E3F6),
         clockFace = CherryBombClock,
+        mark = { width -> CakeMark(width) },
     ),
     SeasonalLook(
         night(0xB42A68, 0x181519, 0x2F2D32, 0x2E2A2F, 0xE07BA8, 0x382B33, danger = 0xEE8A5A),
         day(PersonPalette.colors[2], 0xF4EBEF, 0xF2EBEE, 0xDBCAD1, 0xB42A68, 0xF6D9E6, danger = 0xB8461A),
         clockFace = CherryBombClock,
+        mark = { width -> CakeMark(width) },
     ),
     SeasonalLook(
         night(0x546D24, 0x151914, 0x2B312C, 0x293027, 0x9CC44E, 0x2E3625),
         day(PersonPalette.colors[3], 0xEEF2E7, 0xEDF0E7, 0xCCDABE, 0x546D24, 0xDAE9BE),
         clockFace = CherryBombClock,
+        mark = { width -> CakeMark(width) },
     ),
     SeasonalLook(
         night(0xB3371A, 0x181312, 0x2F2A2A, 0x2E2624, 0xE66E51, 0x38241F, danger = 0xEE6FB0),
         day(PersonPalette.colors[4], 0xF4EAE7, 0xF5ECEA, 0xDBBFB5, 0xB3371A, 0xF8D9D1, danger = 0xA8236A),
         clockFace = CherryBombClock,
+        mark = { width -> CakeMark(width) },
     ),
     SeasonalLook(
         night(0x6D660D, 0x181911, 0x2E3129, 0x2D3023, 0xCEC018, 0x35351D),
         day(PersonPalette.colors[5], 0xF2F1E2, 0xF0EFE4, 0xD7D9B2, 0x6D660D, 0xECE6A5),
         clockFace = CherryBombClock,
+        mark = { width -> CakeMark(width) },
     ),
 )
 

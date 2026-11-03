@@ -26,7 +26,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.RailBadge
+import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
@@ -43,9 +45,10 @@ class NavRailTest {
     private val inAGroup = SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup)
 
     private var seasonal by mutableStateOf<SeasonalTheme?>(null)
+    private var birthday by mutableStateOf<Birthday?>(null)
 
     private fun show() = compose.setContent {
-        CulveryTheme(dark = true, seasonal = seasonal) {
+        CulveryTheme(dark = true, seasonal = seasonal, birthday = birthday) {
             NavRail(listOf(TabItem("calendar", "Calendar", Icons.CALENDAR_MONTH)), selected, onSelect = { selected = it }, onOpenSettings = {})
         }
     }
@@ -86,6 +89,26 @@ class NavRailTest {
         compose.waitForIdle()
         compose.onNode(hasTestTag("pumpkin_mark") and hasAnyAncestor(hasTestTag("culvery_mark")), useUnmergedTree = true).assertExists()
         assertThat(markBounds()).isEqualTo(normal)
+    }
+
+    @Test
+    fun theCakeTakesTheMarksPlace() {
+        show()
+        val normal = markBounds()
+        birthday = Birthday(PersonPalette.colors[2], listOf("Sam"))
+        compose.waitForIdle()
+        compose.onNode(hasTestTag("cake_mark") and hasAnyAncestor(hasTestTag("culvery_mark")), useUnmergedTree = true).assertExists()
+        assertThat(markBounds()).isEqualTo(normal)
+    }
+
+    /** **pin** */
+    @Test
+    fun thePumpkinStillShowsForHalloween() {
+        show()
+        seasonal = SeasonalTheme.HALLOWEEN
+        compose.waitForIdle()
+        compose.onNodeWithTag("pumpkin_mark", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("cake_mark", useUnmergedTree = true).assertDoesNotExist()
     }
 
     /** Pin: the Culvery mark is what shows without a theme. */

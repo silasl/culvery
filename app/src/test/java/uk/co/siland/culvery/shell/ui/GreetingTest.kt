@@ -34,6 +34,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.ui.Birthday
+import uk.co.siland.culvery.core.ui.BirthdayInks
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HomeSkyBand
 import uk.co.siland.culvery.core.ui.LocalHomeSkyBand
@@ -136,5 +137,20 @@ class GreetingTest {
         val x = ((pill.right.value - 7f) * density).toInt()
         val y = ((pill.top.value + pill.bottom.value) / 2f * density).toInt()
         assertThat(image.getPixel(x, y)).isEqualTo(androidx.compose.ui.graphics.Color(0xFF382B33).toArgb())
+    }
+
+    @Test
+    fun theIcingShowsOnThePill() {
+        show()
+        compose.waitForIdle()
+        val cake = compose.onNodeWithTag("cake_mark", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val view = (compose.onRoot().fetchSemanticsNode().root as ViewRootForTest).view
+        val image = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
+        val density = view.resources.displayMetrics.density
+        val icing = BirthdayInks.ICING.toArgb()
+        val found = ((cake.top.value * density).toInt() until (cake.bottom.value * density).toInt()).any { y ->
+            ((cake.left.value * density).toInt() until (cake.right.value * density).toInt()).any { x -> image.getPixel(x, y) == icing }
+        }
+        assertThat(found).isTrue()
     }
 }
