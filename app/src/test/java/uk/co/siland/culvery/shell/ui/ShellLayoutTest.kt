@@ -55,7 +55,9 @@ import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
+import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertAccessible
@@ -79,6 +81,17 @@ class ShellLayoutTest {
     fun theDateSits15dpBelowTheClock() {
         compose.setContent {
             CulveryTheme(dark = true) { HomeScreen({ at }, HomeLayout.Empty, emptyList()) }
+        }
+        val clock = compose.onNodeWithTag("home_clock").getUnclippedBoundsInRoot()
+        val date = compose.onNodeWithTag("home_date").getUnclippedBoundsInRoot()
+        assertThat((date.top - clock.bottom).value).isWithin(1f).of(15f)
+    }
+
+    /** **pin**: a birthday's greeting goes under the date and moves neither it nor the clock. */
+    @Test
+    fun theDateStaysUnderTheClockOnABirthday() {
+        compose.setContent {
+            CulveryTheme(dark = true, birthday = Birthday(PersonPalette.colors[2], listOf("Sam"))) { HomeScreen({ at }, HomeLayout.Empty, emptyList()) }
         }
         val clock = compose.onNodeWithTag("home_clock").getUnclippedBoundsInRoot()
         val date = compose.onNodeWithTag("home_date").getUnclippedBoundsInRoot()

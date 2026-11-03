@@ -71,6 +71,7 @@ class HomeSkyBand {
     var clockWidth by mutableIntStateOf(0)
     var dateWidth by mutableIntStateOf(0)
     var itemsWidth by mutableIntStateOf(0)
+    var greetingWidth by mutableIntStateOf(0)
 }
 
 val LocalHomeSkyBand = staticCompositionLocalOf<HomeSkyBand?> { null }

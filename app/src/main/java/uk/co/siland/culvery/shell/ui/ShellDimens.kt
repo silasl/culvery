@@ -57,6 +57,12 @@ internal object ShellDimens {
     val divider = 19.dp
     val dividerWidth = 1.dp
 
+    val greetingGap = 12.dp
+    val greetingPaddingH = 14.dp
+    val greetingPaddingV = 6.dp
+    val greetingCake = 22.dp
+    val greetingCakeGap = 8.dp
+
     val gridGap = 15.dp
     val cardRow = 212.dp
     val leftColumn = 400.dp

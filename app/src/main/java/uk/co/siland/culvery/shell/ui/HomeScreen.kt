@@ -6,18 +6,27 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
@@ -25,6 +34,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.core.plugin.HeaderItem
+import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhType
@@ -68,6 +78,7 @@ fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modi
     Layout(
         modifier = modifier.readAsOne().measuring(band) { w, h -> headerWidth = w; headerHeight = h },
         content = {
+            val birthday = Culvery.birthday
             val time = now().format(CLOCK)
             val clockModifier = Modifier.testTag("home_clock").lineBox(HhType.clock.lineHeight).semantics { traversalIndex = 0f }
                 .measuring(band) { w, _ -> clockWidth = w }
@@ -79,6 +90,7 @@ fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modi
             }
             Text(now().format(DATE), style = HhType.date, color = c.mute, modifier = Modifier.testTag("home_date").semantics { traversalIndex = 1f }.measuring(band) { w, _ -> dateWidth = w })
             HeaderItems(items, Modifier.measuring(band) { w, _ -> itemsWidth = w })
+            if (birthday != null) GreetingPill("Happy birthday " + HouseLines.roomList(birthday.names), band)
         },
     ) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
@@ -89,12 +101,35 @@ fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modi
         val dateY = clock.height + ShellDimens.clockToDate.roundToPx()
         val dateBottom = dateY + date.height
         val width = constraints.constrainWidth(maxOf(clock.width, date.width))
-        val height = constraints.constrainHeight(maxOf(dateBottom, right.height))
+        val pill = measurables.getOrNull(3)?.measure(loose.copy(maxWidth = (constraints.maxWidth - right.width - HEADER_ITEM_GAP.roundToPx()).coerceAtLeast(0)))
+        val pillY = dateBottom + ShellDimens.greetingGap.roundToPx()
+        val height = constraints.constrainHeight(maxOf(dateBottom, right.height, pill?.let { pillY + it.height } ?: 0))
         layout(width, height) {
             clock.place(0, 0)
             date.place(0, dateY)
+            pill?.place(0, pillY)
             right.place(width - right.width, maxOf(0, dateBottom - HEADER_ITEMS_BOTTOM.roundToPx() - right.height))
         }
+    }
+}
+
+/** A drawn cake will lead the line; the pill is read as the one line of text (16 §3.2). */
+@Composable
+private fun GreetingPill(greeting: String, band: HomeSkyBand?) {
+    val c = Culvery.colors
+    if (band != null) DisposableEffect(band) { onDispose { band.greetingWidth = 0 } }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.testTag("home_greeting")
+            .clearAndSetSemantics { text = AnnotatedString(greeting); traversalIndex = 1.5f }
+            .measuring(band) { w, _ -> greetingWidth = w }
+            .clip(CircleShape)
+            .background(c.accentSoft)
+            .padding(horizontal = ShellDimens.greetingPaddingH, vertical = ShellDimens.greetingPaddingV),
+    ) {
+        Spacer(Modifier.width(ShellDimens.greetingCake))
+        Spacer(Modifier.width(ShellDimens.greetingCakeGap))
+        Text(greeting, style = HhType.rowTitle, color = c.ink, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
     }
 }
 

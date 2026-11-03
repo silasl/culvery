@@ -535,6 +535,9 @@ class ShellScreenshotTest {
     @Test
     fun homeBirthdayPinkLight() = snap("home_birthday_pink_light", dark = false, state = fullHome(dark = false), birthday = pinkBirthday)
 
+    @Test
+    fun homeBirthdayTwoDark() = snap("home_birthday_two_dark", dark = true, state = fullHome(dark = true), birthday = Birthday(PersonPalette.colors[2], listOf("Sam", "Alex")))
+
     private val pinkBirthday = Birthday(PersonPalette.colors[2], listOf("Sam"))
 
     @Test

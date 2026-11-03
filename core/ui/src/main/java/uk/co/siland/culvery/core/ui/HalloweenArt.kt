@@ -147,7 +147,7 @@ fun skyBand(measured: HomeSkyBand?, size: Size, density: Density): Rect {
     if (measured == null) return Rect(Offset.Zero, size)
     val gap = with(density) { HalloweenDimens.skyGap.toPx() }
     val right = if (measured.itemsWidth > 0) measured.headerWidth - measured.itemsWidth - gap else measured.headerWidth.toFloat()
-    return Rect(maxOf(measured.clockWidth, measured.dateWidth) + gap, 0f, right, measured.headerHeight.toFloat())
+    return Rect(maxOf(measured.clockWidth, measured.dateWidth, measured.greetingWidth) + gap, 0f, right, measured.headerHeight.toFloat())
 }
 
 class Moon(val centre: Offset, val radius: Float)
