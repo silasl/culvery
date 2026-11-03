@@ -202,7 +202,7 @@ class MainActivity : ComponentActivity() {
         animatorsOn = animators.now()
         setContent {
             val state by shell.uiState.collectAsStateWithLifecycle()
-            val showing by seasonal.showing.collectAsStateWithLifecycle()
+            val dress by seasonal.dress.collectAsStateWithLifecycle()
             // Read inside the clocks only: a minute's tick recomposes them, not the shell (4c §4.2).
             val now = shell.now.collectAsStateWithLifecycle()
             val toast by toasts.current.collectAsStateWithLifecycle()
@@ -223,7 +223,7 @@ class MainActivity : ComponentActivity() {
                 LocalAlertHost provides alerts,
                 LocalUserActivity provides userActivity,
             ) {
-                CulveryTheme(dark = state.dark, seasonal = showing) {
+                CulveryTheme(dark = state.dark, seasonal = dress.seasonal, birthday = dress.birthday) {
                     // Zero while the bars are hidden (the pinned kiosk); after Use other apps the content clears them (K1).
                     Box(Modifier.fillMaxSize().background(Culvery.colors.bg).windowInsetsPadding(WindowInsets.systemBars)) {
                         val counting = countsTouches(complete, state.settingsOpen)

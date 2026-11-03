@@ -4,7 +4,7 @@ import java.io.File
 import org.junit.Test
 
 /**
- * D8: what a release build logs. Every Log.w, Log.e, Log.wtf and Log.println in shipped code passes a tag and one
+ * D8: what a release build logs. Every Log.w, Log.e, Log.i, Log.wtf and Log.println in shipped code passes a tag and one
  * message, never a throwable, and the message interpolates only a type, an HTTP code, or a qualified id in
  * [LogHygiene.ALLOWED].
  */
@@ -85,6 +85,12 @@ class LogHygieneTest {
     }
 
     @Test
+    fun anInfoLineIsChecked() {
+        assertThat(LogHygiene.problems("""Log.i(TAG, "x ${'$'}name")""")).hasSize(1)
+        assertThat(LogHygiene.problems("""Log.i(TAG, "Birthday look on for ${'$'}{names.size} people")""")).isEmpty()
+    }
+
+    @Test
     fun aTypeACodeAndAnAllowedIdPassAndDebugLinesAreNotChecked() {
         val source = """
             Log.w(TAG, "${'$'}{conn.id}: answered ${'$'}{answer.code} (${'$'}{e::class.simpleName})")
@@ -127,6 +133,8 @@ internal object LogHygiene {
      *
      * `own.logName` and `this.logName` in `ModePlugs` are how a mode is logged, "Holiday" or "a stored mode", never its name or id (15b §5).
      *
+     * `after.screen.name` is the screen's fixed state (`DisplayState`); `names.size` is how many people have a birthday today, never who (`SeasonalThemes`, 16 §3.2).
+     *
      * `sound.name` is a doorbell sound's fixed name, CLASSIC or ORGAN (`DoorSound`).
      */
     val ALLOWED = setOf(
@@ -134,10 +142,10 @@ internal object LogHygiene {
         "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
         "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
-        "step.name", "own.logName", "sound.name",
+        "step.name", "own.logName", "sound.name", "after.screen.name", "names.size",
     )
 
-    private val CALL = Regex("""\bLog\.(w|e|wtf|println)\(""")
+    private val CALL = Regex("""\bLog\.(w|e|i|wtf|println)\(""")
     private val TEMPLATE = Regex("""\$\{([^}]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)""")
 
     fun callCount(source: String): Int = CALL.findAll(source).count()

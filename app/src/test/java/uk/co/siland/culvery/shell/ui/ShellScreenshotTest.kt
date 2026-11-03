@@ -114,12 +114,14 @@ import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
+import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
@@ -377,6 +379,7 @@ class ShellScreenshotTest {
         fontScale: Float = 1f,
         watching: Boolean = false,
         seasonal: SeasonalTheme? = null,
+        birthday: Birthday? = null,
         ready: () -> Unit = {},
         tabContent: @Composable (String) -> Unit = {},
         overlay: @Composable () -> Unit = {},
@@ -384,7 +387,7 @@ class ShellScreenshotTest {
         val grey = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GRAY) }.asImageBitmap()
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalArtSource provides ArtSource { grey }) {
-                CulveryTheme(dark = dark, seasonal = seasonal) {
+                CulveryTheme(dark = dark, seasonal = seasonal, birthday = birthday) {
                     WithFontScale(fontScale) {
                         Box(Modifier.fillMaxSize()) {
                             CulveryShell(
@@ -525,6 +528,14 @@ class ShellScreenshotTest {
 
     @Test
     fun homeHalloweenLight() = snap("home_halloween_light", dark = false, state = fullHome(dark = false), seasonal = SeasonalTheme.HALLOWEEN)
+
+    @Test
+    fun homeBirthdayPinkDark() = snap("home_birthday_pink_dark", dark = true, state = fullHome(dark = true), birthday = pinkBirthday)
+
+    @Test
+    fun homeBirthdayPinkLight() = snap("home_birthday_pink_light", dark = false, state = fullHome(dark = false), birthday = pinkBirthday)
+
+    private val pinkBirthday = Birthday(PersonPalette.colors[2], listOf("Sam"))
 
     @Test
     fun doorCardOverHomeDark() = snap("home_door_card_dark", dark = true, state = fullHome(dark = true)) {

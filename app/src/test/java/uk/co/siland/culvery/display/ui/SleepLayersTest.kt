@@ -41,10 +41,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
+import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.test.pixelAt
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
@@ -74,6 +76,7 @@ class SleepLayersTest {
     private var insets by mutableStateOf(0.dp)
     private var dark by mutableStateOf(true)
     private var seasonal by mutableStateOf<SeasonalTheme?>(null)
+    private var birthday by mutableStateOf<Birthday?>(null)
     private var presses = 0
     private var touches = 0
     private var alertPresses = 0
@@ -88,7 +91,7 @@ class SleepLayersTest {
         screen = start
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            CulveryTheme(dark = dark, seasonal = seasonal) {
+            CulveryTheme(dark = dark, seasonal = seasonal, birthday = birthday) {
                 Box(Modifier.padding(top = insets, start = insets)) {
                     ShellLayers(
                         overlay = OverlayState(),
@@ -174,6 +177,37 @@ class SleepLayersTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theNightClockIsTheSameInEveryTheme() {
         seasonal = SeasonalTheme.HALLOWEEN
+        show(Screen.NIGHT_CLOCK) {
+            CulveryShell(
+                state = ShellUiState(dark = dark),
+                now = { at },
+                onSelectTab = {},
+                onOpenSettings = {},
+                onSignOut = {},
+                onToggleThemePreview = {},
+                watching = false,
+                tabContent = {},
+            )
+        }
+        for (isDark in listOf(true, false)) {
+            dark = isDark
+            settle()
+            val clock = compose.onNode(hasText("23:41") and !hasTestTag("home_clock"), useUnmergedTree = true)
+            val style = clock.textLayout().layoutInput.style
+            assertThat(style.fontFamily).isEqualTo(HhType.clock.fontFamily)
+            assertThat(style.fontSize).isEqualTo(200.sp)
+            assertThat(style.letterSpacing).isEqualTo((-8).sp)
+            assertThat(style.fontFeatureSettings).isEqualTo("tnum")
+            assertThat(style.color).isEqualTo(Color(0xFF5A5A5A))
+            assertThat(Color(pixelAt(compose.onRoot(), 0.dp, 0.dp))).isEqualTo(Color.Black)
+        }
+    }
+
+    /** Pin: a birthday leaves the night clock's face, size, spacing, figures and grey as they are, and the screen around it black (16 §3.3). */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun theNightClockIsTheSameOnABirthday() {
+        birthday = Birthday(PersonPalette.colors[2], listOf("Sam"))
         show(Screen.NIGHT_CLOCK) {
             CulveryShell(
                 state = ShellUiState(dark = dark),

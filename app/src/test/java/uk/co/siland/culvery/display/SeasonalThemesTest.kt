@@ -14,6 +14,13 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import org.robolectric.shadows.ShadowLog
+import org.junit.runner.RunWith
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.ui.Birthday
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.SeasonDates
@@ -22,6 +29,7 @@ import uk.co.siland.culvery.core.ui.defaultSeasonDates
 
 /** 14 §2.1, §3: which theme shows, and a preview that ends at the next midnight. */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(AndroidJUnit4::class)
 class SeasonalThemesTest {
     private fun at(month: Int, day: Int, hour: Int, minute: Int) = LocalDateTime.of(2026, month, day, hour, minute)
 
@@ -105,7 +113,7 @@ class SeasonalThemesTest {
 
     @Test
     fun aPreviewFromAnotherDayIsIgnored() {
-        val preview = ThemePreview(SeasonalTheme.HALLOWEEN, LocalDate.of(2026, 11, 4))
+        val preview = Preview.Theme(SeasonalTheme.HALLOWEEN, LocalDate.of(2026, 11, 4))
         assertThat(showingOn(LocalDate.of(2026, 11, 5), defaultSeasonDates(), preview)).isNull()
     }
 
@@ -174,5 +182,139 @@ class SeasonalThemesTest {
         val themes = SeasonalThemes(now, flowOf(edited), backgroundScope)
         runCurrent()
         assertThat(themes.next.value).isEqualTo(SeasonalTheme.HALLOWEEN to date(2026, 11, 1))
+    }
+
+    private val sam = Person(PersonId("sam"), "Sam", PersonPalette.colors[2])
+    private val alex = Person(PersonId("alex"), "Alex", PersonPalette.colors[1])
+    private val samDress = WallDress(birthday = Birthday(sam.color, listOf("Sam")))
+
+    private fun TestScope.dressed(
+        now: MutableStateFlow<LocalDateTime?>,
+        birthdays: List<Person> = emptyList(),
+        people: List<Person> = listOf(sam, alex),
+    ): SeasonalThemes {
+        val themes = SeasonalThemes(now, flowOf(defaultSeasonDates()), backgroundScope, flowOf(birthdays), flowOf(people))
+        runCurrent()
+        return themes
+    }
+
+    /** Fails unless a theme preview, a birthday preview, a real birthday and a theme's dates win in that order. */
+    @Test
+    fun dressOnFollowsTheOrder() {
+        val day = date(2026, 3, 12)
+        assertThat(dressOn(Preview.Theme(SeasonalTheme.HALLOWEEN, day), sam, listOf(alex), null))
+            .isEqualTo(WallDress(seasonal = SeasonalTheme.HALLOWEEN))
+        assertThat(dressOn(Preview.Birthday(day), sam, listOf(alex), SeasonalTheme.HALLOWEEN)).isEqualTo(samDress)
+        assertThat(dressOn(null, sam, listOf(sam, alex), SeasonalTheme.HALLOWEEN))
+            .isEqualTo(WallDress(birthday = Birthday(sam.color, listOf("Sam", "Alex"))))
+        assertThat(dressOn(null, sam, listOf(alex), SeasonalTheme.HALLOWEEN)).isEqualTo(WallDress(birthday = Birthday(alex.color, listOf("Alex"))))
+        assertThat(dressOn(null, sam, emptyList(), SeasonalTheme.HALLOWEEN)).isEqualTo(WallDress(seasonal = SeasonalTheme.HALLOWEEN))
+    }
+
+    /** Pin: nothing on, nothing worn. */
+    @Test
+    fun nothingOnDressesNothing() {
+        assertThat(dressOn(null, sam, emptyList(), null)).isEqualTo(WallDress())
+    }
+
+    /** Fails if Halloween beats a birthday on 31 October, or a birthday moves the doorbell's theme. */
+    @Test
+    fun aBirthdayOn31OctoberBeatsHalloween() = runTest {
+        val themes = dressed(MutableStateFlow(at(10, 31, 12, 0)), birthdays = listOf(sam))
+        assertThat(themes.dress.value).isEqualTo(samDress)
+        assertThat(themes.showing.value).isEqualTo(SeasonalTheme.HALLOWEEN)
+    }
+
+    /** Fails if a real birthday beats a theme's preview. */
+    @Test
+    fun aHalloweenPreviewBeatsARealBirthday() = runTest {
+        val themes = dressed(MutableStateFlow(at(3, 12, 12, 0)), birthdays = listOf(sam))
+        assertThat(themes.dress.value).isEqualTo(samDress)
+        themes.preview(SeasonalTheme.HALLOWEEN, true)
+        runCurrent()
+        assertThat(themes.dress.value).isEqualTo(WallDress(seasonal = SeasonalTheme.HALLOWEEN))
+    }
+
+    /** Fails if the two previews coexist, or the second doesn't replace the first. */
+    @Test
+    fun previewsReplaceEachOther() = runTest {
+        val themes = dressed(MutableStateFlow(at(3, 12, 12, 0)))
+        themes.preview(SeasonalTheme.HALLOWEEN, true)
+        runCurrent()
+        themes.previewBirthday(true)
+        runCurrent()
+        assertThat(themes.previewing.value).isNull()
+        assertThat(themes.previewingBirthday.value).isTrue()
+        assertThat(themes.dress.value).isEqualTo(samDress)
+        themes.preview(SeasonalTheme.HALLOWEEN, true)
+        runCurrent()
+        assertThat(themes.previewingBirthday.value).isFalse()
+        assertThat(themes.previewing.value).isEqualTo(SeasonalTheme.HALLOWEEN)
+        themes.previewBirthday(true)
+        runCurrent()
+        themes.preview(SeasonalTheme.HALLOWEEN, false)
+        runCurrent()
+        assertThat(themes.previewingBirthday.value).isTrue()
+        themes.previewBirthday(false)
+        runCurrent()
+        assertThat(themes.dress.value).isEqualTo(WallDress())
+    }
+
+    /** Fails if a birthday preview outlives the day. */
+    @Test
+    fun aBirthdayPreviewEndsAtMidnight() = runTest {
+        val now = MutableStateFlow<LocalDateTime?>(at(3, 12, 23, 59))
+        val themes = dressed(now)
+        themes.previewBirthday(true)
+        runCurrent()
+        assertThat(themes.dress.value).isEqualTo(samDress)
+        moveTo(now, at(3, 13, 0, 0))
+        assertThat(themes.dress.value).isEqualTo(WallDress())
+        assertThat(themes.previewingBirthday.value).isFalse()
+    }
+
+    /** Fails if a birthday preview reaches the doorbell's theme. */
+    @Test
+    fun theDoorbellFollowsOnlyTheSeason() = runTest {
+        val themes = dressed(MutableStateFlow(at(3, 12, 12, 0)))
+        themes.previewBirthday(true)
+        runCurrent()
+        assertThat(themes.dress.value).isEqualTo(samDress)
+        assertThat(themes.showing.value).isNull()
+    }
+
+    /** Fails if the preview dresses the wall for nobody. */
+    @Test
+    fun noPreviewWithNobody() = runTest {
+        val themes = dressed(MutableStateFlow(at(3, 12, 12, 0)), people = emptyList())
+        assertThat(themes.previewPerson.value).isNull()
+        themes.previewBirthday(true)
+        runCurrent()
+        assertThat(themes.dress.value).isEqualTo(WallDress())
+    }
+
+    /** Fails if the preview starts before the household's date is known. */
+    @Test
+    fun nothingPreviewsBeforeTheClockIsRead() = runTest {
+        val themes = dressed(MutableStateFlow(null))
+        themes.previewBirthday(true)
+        runCurrent()
+        assertThat(themes.previewingBirthday.value).isFalse()
+        assertThat(themes.dress.value).isEqualTo(WallDress())
+    }
+
+    /** Fails if the look logs anything but its two lines, once per change, or any name. */
+    @Test
+    fun theBirthdayLookLogsOnlyChanges() = runTest {
+        ShadowLog.clear()
+        val now = MutableStateFlow<LocalDateTime?>(at(3, 12, 12, 0))
+        val themes = dressed(now)
+        themes.previewBirthday(true)
+        runCurrent()
+        themes.previewBirthday(true)
+        runCurrent()
+        moveTo(now, at(3, 13, 0, 0))
+        val lines = ShadowLog.getLogsForTag("SeasonalThemes").map { it.msg }
+        assertThat(lines).containsExactly("Birthday look on for 1 people", "Birthday look off").inOrder()
     }
 }

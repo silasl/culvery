@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.display
 
+import android.util.Log
 import java.time.LocalDate
 import java.time.LocalDateTime
 import javax.inject.Inject
@@ -10,24 +11,48 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.house.TodaysBirthdays
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.HouseholdClock
+import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.SeasonDates
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.ShowingTheme
 import uk.co.siland.culvery.core.ui.defaultSeasonDates
 
-/** A theme shown by hand for [day] only (14 §3); it counts as off on any other day. */
-data class ThemePreview(val theme: SeasonalTheme, val day: LocalDate)
+/** One look shown by hand for [day] only (14 §3, 16 §3.2); it counts as off on any other day. */
+sealed interface Preview {
+    val day: LocalDate
+
+    data class Theme(val theme: SeasonalTheme, override val day: LocalDate) : Preview
+
+    data class Birthday(override val day: LocalDate) : Preview
+}
+
+/** What dresses the wall: a birthday's colours, else a seasonal theme's, else the normal ones. */
+data class WallDress(val seasonal: SeasonalTheme? = null, val birthday: Birthday? = null)
+
+/** A theme preview, then a birthday preview, then today's birthdays, then [seasonal] by its dates (16 §3.2). */
+internal fun dressOn(preview: Preview?, previewPerson: Person?, birthdays: List<Person>, seasonal: SeasonalTheme?): WallDress =
+    when {
+        preview is Preview.Theme -> WallDress(seasonal = preview.theme)
+        preview is Preview.Birthday && previewPerson != null -> WallDress(birthday = Birthday(previewPerson.color, listOf(previewPerson.name)))
+        birthdays.isNotEmpty() -> WallDress(birthday = Birthday(birthdays.first().color, birthdays.map { it.name }))
+        else -> WallDress(seasonal = seasonal)
+    }
 
 /** The preview's theme when it is for [date], else the first theme whose dates hold [date] (14 §4.1). */
-internal fun showingOn(date: LocalDate, dates: Map<SeasonalTheme, SeasonDates>, preview: ThemePreview?): SeasonalTheme? =
-    preview?.takeIf { it.day == date }?.theme
+internal fun showingOn(date: LocalDate, dates: Map<SeasonalTheme, SeasonDates>, preview: Preview?): SeasonalTheme? =
+    (preview as? Preview.Theme)?.takeIf { it.day == date }?.theme
         ?: SeasonalTheme.entries.firstOrNull { (dates[it] ?: it.defaultDates).contains(date) }
 
 /** The theme whose next start is soonest, with that day (today counts); ties go to list order (14 §4.5). */
@@ -46,12 +71,19 @@ class SeasonalThemes internal constructor(
     private val now: StateFlow<LocalDateTime?>,
     dates: Flow<Map<SeasonalTheme, SeasonDates>>,
     scope: CoroutineScope,
+    birthdays: Flow<List<Person>> = flowOf(emptyList()),
+    people: Flow<List<Person>> = flowOf(emptyList()),
 ) : ShowingTheme {
     @Inject
-    constructor(clock: HouseholdClock, settings: DisplaySettings, @ApplicationScope scope: CoroutineScope) :
-        this(clock.now, settings.read.filterNotNull().map { it.seasonDates }, scope)
+    constructor(
+        clock: HouseholdClock,
+        settings: DisplaySettings,
+        @ApplicationScope scope: CoroutineScope,
+        todays: TodaysBirthdays,
+        household: HouseholdRepository,
+    ) : this(clock.now, settings.read.filterNotNull().map { it.seasonDates }, scope, todays.today, household.people)
 
-    private val preview = MutableStateFlow<ThemePreview?>(null)
+    private val preview = MutableStateFlow<Preview?>(null)
 
     val dates: StateFlow<Map<SeasonalTheme, SeasonDates>> = dates.stateIn(scope, SharingStarted.Eagerly, defaultSeasonDates())
 
@@ -71,16 +103,55 @@ class SeasonalThemes internal constructor(
 
     /** The theme previewed today, else null. */
     val previewing: StateFlow<SeasonalTheme?> =
-        combine(today, preview) { today, preview -> preview?.takeIf { it.day == today }?.theme }
+        combine(today, preview) { today, preview -> (preview as? Preview.Theme)?.takeIf { it.day == today }?.theme }
             .stateIn(scope, SharingStarted.Eagerly, null)
+
+    /** The first person in People, whose birthday the preview shows; null with nobody in People. */
+    val previewPerson: StateFlow<Person?> =
+        people.map { it.firstOrNull() }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    /** Whether the birthday preview is on today. */
+    val previewingBirthday: StateFlow<Boolean> =
+        combine(today, preview) { today, preview -> preview is Preview.Birthday && preview.day == today }
+            .stateIn(scope, SharingStarted.Eagerly, false)
+
+    /** What dresses the wall; the doorbell reads [showing], which a birthday never changes (16 §3.2). */
+    val dress: StateFlow<WallDress> =
+        combine(preview.combine(today) { p, t -> p?.takeIf { it.day == t } }, previewPerson, birthdays, showing, ::dressOn)
+            .distinctUntilChanged()
+            .onEach { logBirthday(it.birthday) }
+            .stateIn(scope, SharingStarted.Eagerly, WallDress())
+
+    private var logged = 0
+
+    private fun logBirthday(birthday: Birthday?) {
+        val names = birthday?.names.orEmpty()
+        if (names.size == logged) return
+        if (names.isEmpty()) Log.i(TAG, "Birthday look off") else Log.i(TAG, "Birthday look on for ${names.size} people")
+        logged = names.size
+    }
 
     /** Turning one on replaces any other; nothing happens while the clock is unread. Off clears only [theme]'s own preview. */
     fun preview(theme: SeasonalTheme, on: Boolean) {
         if (on) {
             val today = now.value?.toLocalDate() ?: return
-            preview.value = ThemePreview(theme, today)
+            preview.value = Preview.Theme(theme, today)
         } else {
-            preview.update { it?.takeUnless { p -> p.theme == theme } }
+            preview.update { it?.takeUnless { p -> p is Preview.Theme && p.theme == theme } }
         }
+    }
+
+    /** On replaces a theme preview; nothing happens while the clock is unread. Off clears only a birthday preview. */
+    fun previewBirthday(on: Boolean) {
+        if (on) {
+            val today = now.value?.toLocalDate() ?: return
+            preview.value = Preview.Birthday(today)
+        } else {
+            preview.update { it?.takeUnless { p -> p is Preview.Birthday } }
+        }
+    }
+
+    private companion object {
+        const val TAG = "SeasonalThemes"
     }
 }
