@@ -7,7 +7,9 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import uk.co.siland.culvery.capability.holiday.ui.HOLIDAY_TILE_LINE_TAG
 import uk.co.siland.culvery.capability.holiday.ui.HolidayTileHost
+import uk.co.siland.culvery.capability.holiday.ui.holidayTileLine
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.ModeShelf
 import uk.co.siland.culvery.core.plugin.Capability
@@ -39,6 +41,12 @@ class HolidayCapability internal constructor(
 
     // What it can do depends on which seams are set up, which the sheet reads when it opens. With no shelf it is first.
     override fun trayButtons(): Flow<List<TrayButton>> = (shelf?.place(HouseModes.HOLIDAY) ?: flowOf(0)).map { place ->
-        listOfNotNull(place?.let { TrayButton(HouseModes.HOLIDAY_TRAY_ID, 10 + it, TrayWidth.HALF) { HolidayTileHost(actions, house) } })
+        listOfNotNull(
+            place?.let {
+                TrayButton(HouseModes.HOLIDAY_TRAY_ID, 10 + it, TrayWidth.HALF, holidayTileLine(actions, house), HOLIDAY_TILE_LINE_TAG) {
+                    HolidayTileHost(actions, house)
+                }
+            },
+        )
     }
 }

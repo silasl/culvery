@@ -5,12 +5,13 @@ import org.junit.Test
 import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.ui.TRAY_ROWS
+import uk.co.siland.culvery.core.ui.TrayCell
 
 /** The tray's spots (15b Ruling 11): halves fill the first row and then the third, the full-width buttons the middle one. */
 class TrayRowsTest {
     private fun half(id: String, order: Int) = TrayButton(id, order, TrayWidth.HALF) {}
     private fun full(id: String, order: Int) = TrayButton(id, order) {}
-    private fun ids(rows: List<List<Pair<String, *>>>) = rows.map { row -> row.map { it.first } }
+    private fun ids(rows: List<List<TrayCell>>) = rows.map { row -> row.map { it.id } }
 
     @Test fun threeRowsAlways() {
         assertThat(trayRows(emptyList())).hasSize(TRAY_ROWS)
@@ -27,4 +28,12 @@ class TrayRowsTest {
 
     @Test fun aLoneHalfStaysInRowOne() = assertThat(ids(trayRows(listOf(half("h1", 10), full("hoover", 20)))))
         .containsExactly(listOf("h1"), listOf("hoover"), emptyList<String>()).inOrder()
+
+    /** Fails if a cell doesn't carry its button's line and line tag. */
+    @Test fun aCellCarriesItsButtonsLine() {
+        val holiday = TrayButton("holiday.mode", 10, TrayWidth.HALF, lineTag = "holiday_tile_line") {}
+        val cell = trayRows(listOf(holiday), mapOf("holiday.mode" to "Turn Party mode off first.")).first().single()
+        assertThat(cell.line).isEqualTo("Turn Party mode off first.")
+        assertThat(cell.lineTag).isEqualTo("holiday_tile_line")
+    }
 }

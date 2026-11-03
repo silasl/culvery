@@ -19,7 +19,6 @@ fun TaekwondoTile(settings: TaekwondoSettings, speaker: Provider<Speaker>) {
         on = false,
         second = null,
         secondTag = "taekwondo_tile_state",
-        line = null,
         spoken = TaekwondoWords.TITLE,
         enabled = true,
         clickLabel = TaekwondoWords.OPEN,

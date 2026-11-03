@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.capability.party.ui.ModeControls
 import uk.co.siland.culvery.capability.party.ui.ModesPage
 import uk.co.siland.culvery.capability.party.ui.StoredModeTileHost
+import uk.co.siland.culvery.capability.party.ui.storedModeTileLine
+import uk.co.siland.culvery.capability.party.ui.storedModeTileLineTag
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseModes
@@ -59,7 +61,9 @@ class ModesCapability @Inject constructor(
         }
     }.distinctUntilChanged().map { modes ->
         modes.map { m ->
-            TrayButton(HouseModes.trayId(m.id), 10 + m.place, TrayWidth.HALF) { StoredModeTileHost(m.id, m.name, m.icon, actions, house) }
+            TrayButton(
+                HouseModes.trayId(m.id), 10 + m.place, TrayWidth.HALF, storedModeTileLine(m.id, actions, house), storedModeTileLineTag(m.id),
+            ) { StoredModeTileHost(m.id, m.name, m.icon, actions, house) }
         }
     }
 

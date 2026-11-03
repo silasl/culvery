@@ -14,11 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
@@ -143,15 +139,15 @@ object TrayTokens {
     val gap = 8.dp
 }
 
-/** One cell of [HhTrayGrid]: a key for its `tray_row_{key}` tag and what it draws. */
-typealias TrayCell = Pair<String, @Composable () -> Unit>
+/** One cell of [HhTrayGrid]: [id] for its `tray_row_{id}` tag, what it draws, and its [line] of what didn't happen, drawn under its row and tagged [lineTag]. */
+class TrayCell(val id: String, val line: String? = null, val lineTag: String = "${id}_line", val content: @Composable () -> Unit)
 
 /** How many rows [HhTrayGrid] always lays out, so a tray with few buttons keeps its rows' height (15a §2.1). */
 const val TRAY_ROWS = 3
 
 /**
- * [HhTray]'s Home form: the [label] on top, not spoken, then [TRAY_ROWS] rows of equal height. A row holds one cell at
- * full width or two side by side; a row with no cell, or past `rows.size`, is an empty spacer. Each cell is tagged `tray_row_{key}`.
+ * [HhTray]'s Home form: the [label] on top, not spoken, then the rows of [rows] that hold a cell, at the top and a gap apart.
+ * A row holds one cell at full width or two side by side, with its cells' lines under it. Each cell is tagged `tray_row_{id}`.
  */
 @Composable
 fun HhTrayGrid(label: String, rows: List<List<TrayCell>>, modifier: Modifier = Modifier) {
@@ -167,64 +163,48 @@ fun HhTrayGrid(label: String, rows: List<List<TrayCell>>, modifier: Modifier = M
     }
 }
 
-/** Where a tile in [HhTrayGrid] puts its line, as `(tag, line)`: under the tile's whole row. Null outside the tray. */
-internal val LocalTrayLine = compositionLocalOf<((String, String?) -> Unit)?> { null }
-
 /**
- * [TRAY_ROWS] rows, each at least a third of the height. The tiles' lines go under their row, stacked in tile order, and
- * the row grows by them so its tiles keep their size; a row whose tiles need more grows too. The height comes from the
- * empty rows first and then from rows with room to spare, so no row is drawn over another.
+ * The rows that hold a cell, each at least a third of a [TRAY_ROWS]-row tray plus its cells' lines, stacked in cell order
+ * under it; a row whose cells need more grows too. They sit at the top a gap apart, and empty rows take no room.
  */
 @Composable
 private fun TrayRows(rows: List<List<TrayCell>>, modifier: Modifier) {
-    val slots = maxOf(TRAY_ROWS, rows.size)
-    val lines = remember { mutableStateMapOf<String, Pair<String, String>>() }
+    val filled = rows.filter { it.isNotEmpty() }
     Layout(
-        content = {
-            repeat(slots) { i ->
-                val cells = rows.getOrNull(i)
-                if (cells.isNullOrEmpty()) {
-                    Spacer(Modifier)
-                } else {
+        contents = listOf(
+            {
+                filled.forEach { cells ->
                     Row(horizontalArrangement = Arrangement.spacedBy(TrayTokens.gap)) {
-                        cells.forEach { (id, content) ->
-                            key(id) {
-                                val toRow: (String, String?) -> Unit = remember(id) {
-                                    { tag, line -> if (line == null) lines.remove(id) else lines[id] = tag to line }
-                                }
-                                CompositionLocalProvider(LocalTrayLine provides toRow) {
-                                    Box(Modifier.weight(1f).fillMaxHeight().testTag("tray_row_$id")) { content() }
-                                }
-                            }
+                        cells.forEach { cell ->
+                            key(cell.id) { Box(Modifier.weight(1f).fillMaxHeight().testTag("tray_row_${cell.id}")) { cell.content() } }
                         }
                     }
                 }
-                Column(Modifier.fillMaxWidth()) {
-                    cells.orEmpty().mapNotNull { lines[it.first] }.forEach { (tag, line) -> HouseModeLine(line, tag) }
+            },
+            {
+                filled.forEach { cells ->
+                    Column(Modifier.fillMaxWidth()) {
+                        cells.forEach { cell -> cell.line?.let { TrayLine(it, cell.lineTag) } }
+                    }
                 }
-            }
-        },
+            },
+        ),
         modifier = modifier,
-    ) { measurables, constraints ->
+    ) { (tiles, lines), constraints ->
         val width = constraints.maxWidth
         val gap = TrayTokens.gap.roundToPx()
-        val tiles = measurables.filterIndexed { i, _ -> i % 2 == 0 }
-        val under = measurables.filterIndexed { i, _ -> i % 2 == 1 }
-        val filled = List(slots) { i -> !rows.getOrNull(i).isNullOrEmpty() }
-        val lineHeights = under.map { it.minIntrinsicHeight(width) }
-        val tileHeights = tiles.mapIndexed { i, m -> if (filled[i]) m.minIntrinsicHeight(width) else 0 }
+        val lineHeights = lines.map { it.minIntrinsicHeight(width) }
+        val tileHeights = tiles.map { it.minIntrinsicHeight(width) }
         val heights = if (constraints.hasBoundedHeight) {
-            val third = (constraints.maxHeight - gap * (slots - 1)) / slots
-            val natural = List(slots) { i -> if (lineHeights[i] > 0) maxOf(tileHeights[i], third) + lineHeights[i] else tileHeights[i] }
-            trayRowHeights(natural, filled, constraints.maxHeight, gap)
+            trayRowHeights(tileHeights, lineHeights, constraints.maxHeight, gap)
         } else {
-            List(slots) { i -> tileHeights[i] + lineHeights[i] }
+            tileHeights.zip(lineHeights, Int::plus)
         }
-        val placed = List(slots) { i ->
+        val placed = heights.indices.map { i ->
             val tile = maxOf(0, heights[i] - lineHeights[i])
-            tiles[i].measure(Constraints.fixed(width, tile)) to under[i].measure(Constraints.fixed(width, heights[i] - tile))
+            tiles[i].measure(Constraints.fixed(width, tile)) to lines[i].measure(Constraints.fixed(width, heights[i] - tile))
         }
-        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else heights.sum() + gap * (slots - 1)
+        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else heights.sum() + gap * maxOf(0, heights.size - 1)
         layout(width, height) {
             var y = 0
             placed.forEach { (tile, line) ->
@@ -236,27 +216,38 @@ private fun TrayRows(rows: List<List<TrayCell>>, modifier: Modifier) {
     }
 }
 
-/** Each row's height: a third of [total] less the gaps, grown to its [natural] height where that is more and the others can give, empty rows first. */
-private fun trayRowHeights(natural: List<Int>, filled: List<Boolean>, total: Int, gap: Int): List<Int> {
-    val third = (total - gap * (natural.size - 1)) / natural.size
-    val heights = MutableList(natural.size) { third }
-    val demand = natural.mapIndexed { i, n -> if (filled[i]) maxOf(0, n - third) else 0 }
-    var need = demand.sum()
-    var donated = 0
-    fun give(i: Int, room: Int) {
-        val g = minOf(room, need)
-        heights[i] -= g
-        need -= g
-        donated += g
+/**
+ * Each filled row's height: a third of a [TRAY_ROWS]-row [total] less its gaps, or its [tiles]' height where that is more,
+ * plus its [lines]. When they don't fit, rows whose tiles need less than a third give first, then rows that grew past it.
+ */
+private fun trayRowHeights(tiles: List<Int>, lines: List<Int>, total: Int, gap: Int): List<Int> {
+    val third = (total - gap * (TRAY_ROWS - 1)) / TRAY_ROWS
+    val heights = tiles.indices.map { i -> maxOf(tiles[i], third) + lines[i] }.toMutableList()
+    var over = heights.sum() + gap * maxOf(0, heights.size - 1) - total
+    for (i in heights.indices) {
+        val give = minOf(maxOf(0, over), maxOf(0, third - tiles[i]))
+        heights[i] -= give
+        over -= give
     }
-    for (i in natural.indices) if (!filled[i]) give(i, third)
-    for (i in natural.indices) if (filled[i]) give(i, maxOf(0, third - natural[i]))
-    for (i in natural.indices) {
-        val g = minOf(demand[i], donated)
-        heights[i] += g
-        donated -= g
+    for (i in heights.indices) {
+        val give = minOf(maxOf(0, over), maxOf(0, heights[i] - third))
+        heights[i] -= give
+        over -= give
     }
     return heights
+}
+
+/** A cell's line of what didn't happen, under its row and tagged [tag]. */
+@Composable
+private fun TrayLine(line: String, tag: String) {
+    Text(
+        line,
+        style = HouseModeDimens.secondStyle,
+        color = Culvery.colors.danger,
+        modifier = Modifier
+            .padding(start = HouseModeDimens.paddingH, end = HouseModeDimens.paddingH, top = HouseModeDimens.lineGap)
+            .testTag(tag),
+    )
 }
 
 @Composable

@@ -14,9 +14,13 @@ import uk.co.siland.culvery.core.ui.TrayCell
 const val TRAY_WIDTH_DP = 333
 const val TRAY_HEIGHT_DP = 359
 
-/** One [cell] in the One-tap tray at its home-screen size, beside an empty neighbour cell or (with [neighbour] false) across the full width. */
+/**
+ * One [cell] in the One-tap tray at its home-screen size, beside an empty neighbour cell or (with [neighbour] false) across
+ * the full width, with its [line] under the row tagged [lineTag].
+ */
 @Composable
-fun OneTapTray(id: String, neighbour: Boolean = true, cell: @Composable () -> Unit) {
-    val row: List<TrayCell> = if (neighbour) listOf(id to cell, "neighbour" to { Spacer(Modifier.fillMaxSize()) }) else listOf(id to cell)
+fun OneTapTray(id: String, neighbour: Boolean = true, line: String? = null, lineTag: String = "${id}_line", cell: @Composable () -> Unit) {
+    val own = TrayCell(id, line, lineTag, cell)
+    val row = if (neighbour) listOf(own, TrayCell("neighbour") { Spacer(Modifier.fillMaxSize()) }) else listOf(own)
     HhTrayGrid("One-tap", listOf(row), Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp))
 }

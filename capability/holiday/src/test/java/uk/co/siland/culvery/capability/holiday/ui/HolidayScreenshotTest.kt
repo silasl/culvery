@@ -30,6 +30,7 @@ import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhTrayGrid
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.TrayCell
 import uk.co.siland.culvery.core.ui.test.TRAY_HEIGHT_DP
 import uk.co.siland.culvery.core.ui.test.TRAY_WIDTH_DP
 import uk.co.siland.culvery.core.ui.test.snap
@@ -49,8 +50,8 @@ class HolidayScreenshotTest {
             HhTrayGrid(
                 "One-tap",
                 listOf(
-                    listOf("holiday" to { HolidayTile(on, back.takeIf { on }, line, null) {} }, "party" to { Spacer(Modifier.fillMaxSize()) }),
-                    listOf("hoover" to { HooverSizedRow() }),
+                    listOf(TrayCell("holiday", line, HOLIDAY_TILE_LINE_TAG) { HolidayTile(on, back.takeIf { on }, null) {} }, TrayCell("party") { Spacer(Modifier.fillMaxSize()) }),
+                    listOf(TrayCell("hoover") { HooverSizedRow() }),
                 ),
                 Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
             )

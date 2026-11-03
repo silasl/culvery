@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -53,6 +55,7 @@ import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhTrayGrid
+import uk.co.siland.culvery.core.ui.TrayCell
 import uk.co.siland.culvery.core.ui.test.OneTapTray
 import uk.co.siland.culvery.core.ui.test.TRAY_HEIGHT_DP
 import uk.co.siland.culvery.core.ui.test.TRAY_WIDTH_DP
@@ -79,8 +82,8 @@ class HolidayTileTest {
                     HhTrayGrid(
                         "One-tap",
                         listOf(
-                            listOf("holiday" to { HolidayTile(on, back, line, running) { taps++ } }, "neighbour" to { Spacer(Modifier.fillMaxSize()) }),
-                            listOf("hoover.start" to { Box(Modifier.fillMaxSize().background(Culvery.colors.surf2).testTag("hoover_standin")) }),
+                            listOf(TrayCell("holiday", line, HOLIDAY_TILE_LINE_TAG) { HolidayTile(on, back, running) { taps++ } }, TrayCell("neighbour") { Spacer(Modifier.fillMaxSize()) }),
+                            listOf(TrayCell("hoover.start") { Box(Modifier.fillMaxSize().background(Culvery.colors.surf2).testTag("hoover_standin")) }),
                         ),
                         Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
                     )
@@ -205,7 +208,8 @@ class HolidayTileTest {
                 CulveryTheme(dark = true) {
                     CompositionLocalProvider(LocalOverlayHost provides overlay) {
                         Box(Modifier.background(Culvery.colors.bg)) {
-                            OneTapTray("holiday") { HolidayTileHost(actions, rig.house) }
+                            val line by remember { holidayTileLine(actions, rig.house) }.collectAsState(null)
+                            OneTapTray("holiday", line = line, lineTag = HOLIDAY_TILE_LINE_TAG) { HolidayTileHost(actions, rig.house) }
                         }
                     }
                 }

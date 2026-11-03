@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -16,6 +17,7 @@ import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDateTime
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -218,6 +220,19 @@ class HomeGridTest {
         assertThat(row.width.value).isWithin(1f).of(tray.width.value - 2 * padding)
         assertThat(row.top.value).isWithin(0.5f).of(cells[0].bottom.value + gap)
         assertThat(cells[2].top.value).isWithin(0.5f).of(row.bottom.value + gap)
+    }
+
+    /** Fails if a tray button's line isn't drawn under its row with its own tag, or stays once the flow clears it. */
+    @Test
+    fun aTrayButtonsLineShowsUnderItsRow() {
+        val line = MutableStateFlow<String?>("Turn Party mode off first.")
+        val holiday = TrayButton("holiday.mode", 10, TrayWidth.HALF, line, "holiday_tile_line") { Box(Modifier.fillMaxSize()) }
+        show(today, tray = listOf(holiday))
+        compose.onNodeWithTag("holiday_tile_line").assertTextEquals("Turn Party mode off first.")
+        assertThat(compose.onNodeWithTag("holiday_tile_line", useUnmergedTree = true).getUnclippedBoundsInRoot().top).isAtLeast(bounds("tray_row_holiday.mode").bottom)
+        line.value = null
+        compose.waitForIdle()
+        compose.onNodeWithTag("holiday_tile_line").assertDoesNotExist()
     }
 
     @Test

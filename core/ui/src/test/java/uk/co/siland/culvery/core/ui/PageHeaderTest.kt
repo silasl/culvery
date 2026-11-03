@@ -197,13 +197,13 @@ class PageHeaderTest {
     private val gap = TrayTokens.gap.value
     private val padding = TrayTokens.padding.value
 
-    /** 15a §2.1. Fails if the label isn't on top and unspoken, the rows aren't 8 apart and equal, or an empty row is missing. */
+    /** 15a §2.1. Fails if the label isn't on top and unspoken, the rows aren't 8 apart and equal, or the spare room isn't below them. */
     @Test
     fun theGridKeepsThreeEqualRowsUnderItsLabel() {
         show {
             HhTrayGrid(
                 "One-tap",
-                listOf(listOf("a" to { Box(Modifier.fillMaxWidth().height(40.dp)) }), listOf("b" to { Box(Modifier.fillMaxWidth().height(60.dp)) })),
+                listOf(listOf(TrayCell("a") { Box(Modifier.fillMaxWidth().height(40.dp)) }), listOf(TrayCell("b") { Box(Modifier.fillMaxWidth().height(60.dp)) })),
                 Modifier.height(300.dp),
             )
         }
@@ -214,7 +214,7 @@ class PageHeaderTest {
         assertThat(a.top.value - label.bottom.value).isWithin(0.5f).of(gap)
         assertThat(a.height.value).isWithin(0.5f).of(b.height.value)
         assertThat(b.top.value - a.bottom.value).isWithin(0.5f).of(gap)
-        // The third row is empty but still takes its share: the tray ends a gap, a row and the padding under b.
+        // The third row is empty: its row and gap are left as spare room under b.
         assertThat(tray.bottom.value - b.bottom.value).isWithin(0.5f).of(gap + a.height.value + padding)
         compose.onNodeWithTag("tray_label", useUnmergedTree = true).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
     }
@@ -225,7 +225,7 @@ class PageHeaderTest {
         show {
             HhTrayGrid(
                 "One-tap",
-                listOf(listOf("a" to { Box(Modifier.fillMaxWidth().height(40.dp)) }, "b" to { Box(Modifier.fillMaxWidth().height(40.dp)) })),
+                listOf(listOf(TrayCell("a") { Box(Modifier.fillMaxWidth().height(40.dp)) }, TrayCell("b") { Box(Modifier.fillMaxWidth().height(40.dp)) })),
                 Modifier.width(TRAY_WIDTH_DP.dp).height(300.dp),
             )
         }
@@ -244,8 +244,8 @@ class PageHeaderTest {
             HhTrayGrid(
                 "One-tap",
                 listOf(
-                    listOf("a" to { Box(Modifier.fillMaxWidth().height(150.dp)) }, "b" to { Box(Modifier.fillMaxSize()) }),
-                    listOf("c" to { Box(Modifier.fillMaxSize()) }),
+                    listOf(TrayCell("a") { Box(Modifier.fillMaxWidth().height(150.dp)) }, TrayCell("b") { Box(Modifier.fillMaxSize()) }),
+                    listOf(TrayCell("c") { Box(Modifier.fillMaxSize()) }),
                 ),
                 Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
             )
@@ -261,31 +261,54 @@ class PageHeaderTest {
         assertThat(c.height.value).isGreaterThan(0f)
     }
 
-    /** 15b Ruling 11. Fails if an empty row between two filled ones draws anything, or doesn't give its height first. */
+    /** User ruling: fails if an empty row between two filled ones takes any room, or a short row isn't kept at a third. */
     @Test
-    fun anEmptyMiddleRowIsASpacerThatGivesFirst() {
+    fun anEmptyMiddleRowClosesUp() {
         show {
             HhTrayGrid(
                 "One-tap",
                 listOf(
-                    listOf("a" to { Box(Modifier.fillMaxWidth().height(150.dp)) }),
+                    listOf(TrayCell("a") { Box(Modifier.fillMaxWidth().height(150.dp)) }),
                     emptyList(),
-                    listOf("c" to { Box(Modifier.fillMaxSize()) }),
+                    listOf(TrayCell("c") { Box(Modifier.fillMaxSize()) }),
                 ),
                 Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
             )
         }
         val a = compose.onNodeWithTag("tray_row_a").getUnclippedBoundsInRoot()
         val c = compose.onNodeWithTag("tray_row_c").getUnclippedBoundsInRoot()
+        val tray = compose.onNodeWithTag("tray_column").getUnclippedBoundsInRoot()
         assertThat(a.height.value).isWithin(0.5f).of(150f)
-        // c keeps its third, and the empty middle row is what is left of its own: a third less a's extra.
-        val middle = c.top.value - a.bottom.value - 2 * gap
-        assertThat(middle).isWithin(1f).of(2 * c.height.value - 150f)
+        assertThat(c.top.value - a.bottom.value).isWithin(0.5f).of(gap)
+        assertThat(c.bottom.value).isLessThan(tray.bottom.value - padding)
+    }
+
+    /** User ruling: fails if rows [A,B],[],[C,D] don't sit together at the top, C and D one gap under A and B. */
+    @Test
+    fun filledRowsSitTogetherAtTheTop() {
+        show {
+            HhTrayGrid(
+                "One-tap",
+                listOf(
+                    listOf(TrayCell("a") { Tile("a") }, TrayCell("b") { Tile("b") }),
+                    emptyList(),
+                    listOf(TrayCell("c") { Tile("c") }, TrayCell("d") { Tile("d") }),
+                ),
+                Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
+            )
+        }
+        val a = bounds("a")
+        val c = bounds("c")
+        val tray = compose.onNodeWithTag("tray_column").getUnclippedBoundsInRoot()
+        assertThat(c.top.value - a.bottom.value).isWithin(0.5f).of(gap)
+        assertThat(c.height.value).isWithin(0.5f).of(a.height.value)
+        // The spare room is below the last row: a row and a gap of it.
+        assertThat(tray.bottom.value - padding - c.bottom.value).isWithin(2f).of(a.height.value + gap)
     }
 
     @Composable
-    private fun Tile(id: String, line: String? = null) =
-        HouseModeTile(id, Icons.BEACH_ACCESS, id, on = false, second = null, secondTag = "${id}_second", line = line, spoken = id, enabled = true, onTap = {})
+    private fun Tile(id: String) =
+        HouseModeTile(id, Icons.BEACH_ACCESS, id, on = false, second = null, secondTag = "${id}_second", spoken = id, enabled = true, onTap = {})
 
     private fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
 
@@ -296,7 +319,7 @@ class PageHeaderTest {
         show {
             HhTrayGrid(
                 "One-tap",
-                listOf(listOf("a" to { Tile("a", line) }, "b" to { Tile("b") }), listOf("c" to { Tile("c") })),
+                listOf(listOf(TrayCell("a", line) { Tile("a") }, TrayCell("b") { Tile("b") }), listOf(TrayCell("c") { Tile("c") })),
                 Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
             )
         }
@@ -316,7 +339,7 @@ class PageHeaderTest {
         show {
             HhTrayGrid(
                 "One-tap",
-                listOf(listOf("a" to { Tile("a", "Turn Party mode off first.") }, "b" to { Tile("b", "The music didn’t start.") })),
+                listOf(listOf(TrayCell("a", "Turn Party mode off first.") { Tile("a") }, TrayCell("b", "The music didn’t start.") { Tile("b") })),
                 Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
             )
         }
@@ -335,7 +358,7 @@ class PageHeaderTest {
         show {
             HhTrayGrid(
                 "One-tap",
-                listOf(listOf("a" to { Tile("a") }, "b" to { Tile("b") }), listOf("c" to { Tile("c") }, "d" to { Tile("d") })),
+                listOf(listOf(TrayCell("a") { Tile("a") }, TrayCell("b") { Tile("b") }), listOf(TrayCell("c") { Tile("c") }, TrayCell("d") { Tile("d") })),
                 Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp),
             )
         }

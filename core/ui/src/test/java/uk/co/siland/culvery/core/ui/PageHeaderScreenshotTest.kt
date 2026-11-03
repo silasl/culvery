@@ -50,10 +50,10 @@ class PageHeaderScreenshotTest {
                         "One-tap",
                         listOf(
                             listOf(
-                                "a" to { HhButton("Holiday mode", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) },
-                                "b" to { HhButton("Party mode", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) },
+                                TrayCell("a") { HhButton("Holiday mode", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) },
+                                TrayCell("b") { HhButton("Party mode", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) },
                             ),
-                            listOf("c" to { HhButton("Start cleaning", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) }),
+                            listOf(TrayCell("c") { HhButton("Start cleaning", {}, Modifier.fillMaxWidth(), on = ButtonSurface.Bg) }),
                         ),
                         Modifier.width(333.dp).height(300.dp),
                     )

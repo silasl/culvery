@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,9 +74,9 @@ fun HouseModeOnPill(tag: String) {
 
 /**
  * A mode's tray tile, narrow enough for half the tray: [icon] with [trailing] on its right, then [label] and [second]
- * under them, all spoken as [spoken]. What didn't happen, [line], goes under the tile's whole tray row, so the tile keeps
- * its size; outside a tray it goes under the tile. A tap does nothing unless [enabled]. Its tags start with [tag];
- * [second]'s is [secondTag]. [clickLabel] is what TalkBack offers for a tap, where "Turn on" and "Turn off" would be wrong.
+ * under them, all spoken as [spoken]; what didn't happen is its tray cell's line, under the whole row. A tap does nothing
+ * unless [enabled]. Its tags start with [tag]; [second]'s is [secondTag]. [clickLabel] is what TalkBack offers for a tap,
+ * where "Turn on" and "Turn off" would be wrong.
  */
 @Composable
 fun HouseModeTile(
@@ -87,7 +86,6 @@ fun HouseModeTile(
     on: Boolean,
     second: String?,
     secondTag: String,
-    line: String?,
     spoken: String,
     enabled: Boolean,
     onTap: () -> Unit,
@@ -96,58 +94,34 @@ fun HouseModeTile(
 ) {
     val colors = Culvery.colors
     val ink = if (on) colors.accentInk else colors.ink
-    val toRow = LocalTrayLine.current
-    if (toRow != null) {
-        DisposableEffect(toRow, tag, line) {
-            toRow(tag, line)
-            onDispose { toRow(tag, null) }
-        }
-    }
-    Column(Modifier.fillMaxSize()) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(HouseModeDimens.gap, Alignment.CenterVertically),
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .testTag(tag)
-                .clip(RoundedCornerShape(HouseModeDimens.radius))
-                .background(if (on) colors.accent else colors.surf2)
-                .hhClickable(onTap, label = clickLabel ?: if (on) HouseModeWords.CLICK_OFF else HouseModeWords.CLICK_ON, enabled = enabled, spoken = spoken)
-                .padding(horizontal = HouseModeDimens.paddingH, vertical = HouseModeDimens.paddingV),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                HhIcon(icon, size = HouseModeDimens.icon, filled = true, tint = if (on) ink else colors.accent)
-                Spacer(Modifier.weight(1f))
-                trailing()
-            }
-            Column(Modifier.shownNotSpoken()) {
-                Text(label, style = HhType.buttonLabel, color = ink, maxLines = 1)
-                if (second != null) {
-                    Text(
-                        second,
-                        style = HouseModeDimens.secondStyle,
-                        color = if (on) ink else colors.mute,
-                        maxLines = 1,
-                        modifier = Modifier.testTag(secondTag),
-                    )
-                }
-            }
-        }
-        if (toRow == null && line != null) HouseModeLine(line, tag)
-    }
-}
-
-/** A tile's line of what didn't happen, tagged `{tag}_line`. */
-@Composable
-internal fun HouseModeLine(line: String, tag: String) {
-    Text(
-        line,
-        style = HouseModeDimens.secondStyle,
-        color = Culvery.colors.danger,
+    Column(
+        verticalArrangement = Arrangement.spacedBy(HouseModeDimens.gap, Alignment.CenterVertically),
         modifier = Modifier
-            .padding(start = HouseModeDimens.paddingH, end = HouseModeDimens.paddingH, top = HouseModeDimens.lineGap)
-            .testTag("${tag}_line"),
-    )
+            .fillMaxSize()
+            .testTag(tag)
+            .clip(RoundedCornerShape(HouseModeDimens.radius))
+            .background(if (on) colors.accent else colors.surf2)
+            .hhClickable(onTap, label = clickLabel ?: if (on) HouseModeWords.CLICK_OFF else HouseModeWords.CLICK_ON, enabled = enabled, spoken = spoken)
+            .padding(horizontal = HouseModeDimens.paddingH, vertical = HouseModeDimens.paddingV),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            HhIcon(icon, size = HouseModeDimens.icon, filled = true, tint = if (on) ink else colors.accent)
+            Spacer(Modifier.weight(1f))
+            trailing()
+        }
+        Column(Modifier.shownNotSpoken()) {
+            Text(label, style = HhType.buttonLabel, color = ink, maxLines = 1)
+            if (second != null) {
+                Text(
+                    second,
+                    style = HouseModeDimens.secondStyle,
+                    color = if (on) ink else colors.mute,
+                    maxLines = 1,
+                    modifier = Modifier.testTag(secondTag),
+                )
+            }
+        }
+    }
 }
 
 /**

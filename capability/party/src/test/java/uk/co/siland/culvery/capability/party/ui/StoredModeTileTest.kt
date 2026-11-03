@@ -61,7 +61,7 @@ class StoredModeTileTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 Box(Modifier.background(Culvery.colors.bg)) {
-                    OneTapTray(FILM_ID) { StoredModeTile(FILM_ID, "Film night", Icons.BEDTIME, on, line, running) { taps++ } }
+                    OneTapTray(FILM_ID, line = line, lineTag = storedModeTileLineTag(FILM_ID)) { StoredModeTile(FILM_ID, "Film night", Icons.BEDTIME, on, running) { taps++ } }
                 }
             }
         }

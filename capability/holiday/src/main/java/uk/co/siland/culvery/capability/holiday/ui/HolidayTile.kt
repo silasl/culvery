@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import java.time.LocalDate
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import uk.co.siland.culvery.capability.holiday.HolidayActions
 import uk.co.siland.culvery.capability.holiday.HolidayHouse
 import uk.co.siland.culvery.capability.holiday.HolidayRun
@@ -19,11 +21,11 @@ import uk.co.siland.culvery.core.ui.rememberSingleAction
 private const val TAG = "HolidayTile"
 
 /**
- * The tray tile (11 §5.2): the icon and label spoken as one item, "ON" and the back date while it is on, then what
- * didn't happen as [line] under it. A tap does nothing while [running] says a change is out.
+ * The tray tile (11 §5.2): the icon and label spoken as one item, and "ON" and the back date while it is on. A tap does
+ * nothing while [running] says a change is out.
  */
 @Composable
-internal fun HolidayTile(on: Boolean, back: LocalDate?, line: String?, running: HolidayRun?, onTap: () -> Unit) {
+internal fun HolidayTile(on: Boolean, back: LocalDate?, running: HolidayRun?, onTap: () -> Unit) {
     val second = when (running) {
         HolidayRun.TURNING_ON -> HouseModeWords.TURNING_ON
         HolidayRun.TURNING_OFF -> HouseModeWords.TURNING_OFF
@@ -36,7 +38,6 @@ internal fun HolidayTile(on: Boolean, back: LocalDate?, line: String?, running: 
         on = on,
         second = second,
         secondTag = if (running != null) "holiday_tile_state" else "holiday_tile_back",
-        line = line,
         spoken = if (running != null) HolidayWords.runningSpoken(running) else HolidayWords.tileSpoken(on, back),
         enabled = running == null,
         onTap = onTap,
@@ -52,12 +53,17 @@ internal fun HolidayTile(on: Boolean, back: LocalDate?, line: String?, running: 
 @Composable
 fun HolidayTileHost(actions: HolidayActions, house: HolidayHouse) {
     val record by house.record.collectAsState()
-    val houseLine by house.line.collectAsState()
-    val refusal by actions.refusal.line.collectAsState(initial = actions.refusal.current())
     val running by house.running.collectAsState()
     val overlay = LocalOverlayHost.current
     val action = rememberSingleAction(house) { e -> Log.w(TAG, "Holiday mode tile action failed: ${e::class.simpleName}") }
-    HolidayTile(record?.on == true, record?.back, refusal ?: houseLine, running) {
+    HolidayTile(record?.on == true, record?.back, running) {
         action.run { actions.toggle { by -> overlay.show { HolidaySheetHost(by, actions, house, overlay::dismiss) } } }
     }
 }
+
+/** The tile's line under its tray row: why a tap was refused, else what didn't happen. */
+fun holidayTileLine(actions: HolidayActions, house: HolidayHouse): Flow<String?> =
+    combine(actions.refusal.line, house.line) { refusal, houseLine -> refusal ?: houseLine }
+
+/** The tag the tile's line has under its tray row. */
+const val HOLIDAY_TILE_LINE_TAG = "holiday_tile_line"

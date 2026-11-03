@@ -64,7 +64,7 @@ class StoredModeScreenshotTest {
 
     private fun tile(name: String, dark: Boolean, on: Boolean, line: String? = null, running: ModeRun? = null) =
         compose.snap(name, dark, Modifier.padding(16.dp)) {
-            OneTapTray("party") { StoredModeTile("party", "Party mode", PARTY_ICON, on, line, running) {} }
+            OneTapTray("party", line = line, lineTag = storedModeTileLineTag("party")) { StoredModeTile("party", "Party mode", PARTY_ICON, on, running) {} }
         }
 
     @Test fun tileOffDark() = tile("party_tile_off_dark", true, on = false)
