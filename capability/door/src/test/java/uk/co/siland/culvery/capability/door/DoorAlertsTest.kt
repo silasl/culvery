@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.door
 
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.time.LocalTime
@@ -11,12 +12,15 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.door.ui.DoorCardUi
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 /** 5 §4.6–4.7: card and chime for a new ring in front; record only otherwise; 60 seconds, Got it, quiet hours, 10 seconds. */
+@RunWith(AndroidJUnit4::class)
 class DoorAlertsTest {
     private val london = ZoneId.of("Europe/London")
     private val host = FakeAlertHost()
@@ -27,7 +31,7 @@ class DoorAlertsTest {
     // NOW is 14:02 in London: not quiet.
     private var start = NOW
 
-    private var night = false
+    private var night: Boolean? = false
     private var holiday: Boolean? = null
     private var theme: SeasonalTheme? = null
 
@@ -253,6 +257,45 @@ class DoorAlertsTest {
         assertThat(host.shown).isEqualTo(0)
         assertThat(chime.volumes).isEmpty()
         assertThat(seen).isEmpty()
+    }
+
+    private fun warnings() = ShadowLog.getLogsForTag("DoorAlerts").map { it.msg }
+
+    @Test
+    fun aSkippedRingSaysEveryReason() = runTest {
+        ShadowLog.clear()
+        host.inFront.value = false
+        night = true
+        holiday = true
+        alerts().onRecorded(rung(1))
+        assertThat(warnings()).containsExactly(
+            "No card for a ring: Culvery was not in front",
+            "No card for a ring: it was night",
+            "No card for a ring: Holiday mode was on",
+        ).inOrder()
+    }
+
+    @Test
+    fun aRingBeforeNightHoursAreKnownSaysSo() = runTest {
+        ShadowLog.clear()
+        night = null
+        alerts().onRecorded(rung(1))
+        assertThat(warnings()).containsExactly("No card for a ring: night hours were not known yet")
+    }
+
+    @Test
+    fun aRepeatOfAnEarlierRingSaysSo() = runTest {
+        ShadowLog.clear()
+        alerts().onRecorded(rung(1, isNew = false))
+        assertThat(host.shown).isEqualTo(0)
+        assertThat(warnings()).containsExactly("No card for a ring: it repeats a ring already recorded")
+    }
+
+    @Test
+    fun aShownRingWarnsOfNothing() = runTest {
+        ShadowLog.clear()
+        alerts().onRecorded(rung(1))
+        assertThat(warnings()).isEmpty()
     }
 
     /** 5 §4.3: Ring's text post, then the same notification with the snapshot: one card, its picture, one chime, the same 60 seconds. */

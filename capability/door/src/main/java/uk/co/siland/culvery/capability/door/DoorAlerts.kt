@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.door
 
+import android.util.Log
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,6 +29,8 @@ const val CARD_MS = 60_000L
 
 /** A chime waits this long after the last one (5 §4.6). */
 const val CHIME_GAP_MS = 10_000L
+
+private const val TAG = "DoorAlerts"
 
 data class ShowingRing(val eventId: Long, val card: DoorCardUi)
 
@@ -77,11 +80,24 @@ class DoorAlerts internal constructor(
         val z = zone()
         val card = DoorCardUi(event.unrecognised, event.device, clockTime(event.atMillis, z), event.snapshot)
         if (!recorded.isNew) {
-            if (_showing.value?.eventId == event.id) _showing.value = ShowingRing(event.id, card)
+            if (_showing.value?.eventId == event.id) {
+                _showing.value = ShowingRing(event.id, card)
+            } else {
+                Log.w(TAG, "No card for a ring: it repeats a ring already recorded")
+            }
             return@withLock
         }
         // Not known yet counts as night, so a ring just after a restart at night stays quiet.
-        if (!host.inFront.value || night.isNight() != false || holiday() == true) return@withLock
+        val away = !host.inFront.value
+        val isNight = night.isNight()
+        val onHoliday = holiday() == true
+        if (away || isNight != false || onHoliday) {
+            if (away) Log.w(TAG, "No card for a ring: Culvery was not in front")
+            if (isNight == null) Log.w(TAG, "No card for a ring: night hours were not known yet")
+            if (isNight == true) Log.w(TAG, "No card for a ring: it was night")
+            if (onHoliday) Log.w(TAG, "No card for a ring: Holiday mode was on")
+            return@withLock
+        }
         val alreadyShowing = _showing.value != null
         _showing.value = ShowingRing(event.id, card)
         if (!alreadyShowing) host.show(loud = true) { DoorCardHost(this@DoorAlerts) }
