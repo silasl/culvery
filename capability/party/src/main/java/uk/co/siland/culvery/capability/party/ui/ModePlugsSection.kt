@@ -46,7 +46,7 @@ internal fun HousePlugs.addedOrNone(modeId: String, tag: String): Flow<List<Adde
 internal fun ModePlugsSection(modeId: String, plugs: HousePlugs, added: List<AddedPlug>, onLockedAdded: () -> Unit, toaster: Toaster) {
     val overlay = LocalOverlayHost.current
     val change = rememberCoroutineScope().saving(toaster, logSave)
-    val options by produceState(emptyList<PlugOption>(), plugs) {
+    val read by produceState<List<PlugOption>?>(null, plugs) {
         value = attempt({ plugs.options() }) { e ->
             Log.w(TAG, "Couldn't read the plugs (${e::class.simpleName})")
             emptyList()
@@ -57,8 +57,10 @@ internal fun ModePlugsSection(modeId: String, plugs: HousePlugs, added: List<Add
         plugs.choose(modeId, plugId, on)
         afterwards()
     }
+    val options = read.orEmpty()
+    val unused = options.filter { option -> added.none { it.id == option.id } }
     HhSectionLabel(ModesWords.PLUGS_SECTION)
-    if (added.isEmpty()) Line(ModesWords.NO_PLUGS, "mode_plugs_empty")
+    if (added.isEmpty() && read != null) Line(if (unused.isEmpty()) ModesWords.NO_PLUGS_OFFERED else ModesWords.NO_PLUGS, "mode_plugs_empty")
     added.forEachIndexed { i, plug ->
         val name = options.firstOrNull { it.id == plug.id }?.name ?: ModesWords.MISSING_PLUG
         HhListRow(
@@ -82,7 +84,6 @@ internal fun ModePlugsSection(modeId: String, plugs: HousePlugs, added: List<Add
             },
         )
     }
-    val unused = options.filter { option -> added.none { it.id == option.id } }
     if (unused.isNotEmpty()) {
         HhAddRow(ModesWords.ADD_PLUG, "plug_add", {
             overlay.show {

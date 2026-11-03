@@ -84,6 +84,7 @@ object ModesWords {
     const val ADD_LIGHT = "Add a light"
     const val ADD_PLUG = "Add a plug"
     const val NO_PLUGS = "No plugs yet. Add one to switch it with this mode."
+    const val NO_PLUGS_OFFERED = "No plugs to add. Show a plug on the Lights tab in Settings › Home Assistant, then add it here."
     const val ADD_LIGHT_TITLE = "Choose a room"
     const val ADD_PLUG_TITLE = "Choose a plug"
     const val SAVE_LIGHT = "Save light"

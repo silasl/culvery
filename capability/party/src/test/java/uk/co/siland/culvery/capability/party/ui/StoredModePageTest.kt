@@ -445,6 +445,17 @@ class StoredModePageTest {
         gone("mode_plugs_empty")
     }
 
+    /** Fails if a mode with no plugs and none to add points at an Add a plug that isn't there. */
+    @Test
+    fun noPlugsToAddSaysWhereToShowOne() {
+        rig.plugs.offered = emptyList()
+        show(FILM_NIGHT)
+        compose.waitFor { exists("mode_plugs_empty") }
+        compose.onNodeWithTag("mode_plugs_empty")
+            .assertTextEquals("No plugs to add. Show a plug on the Lights tab in Settings › Home Assistant, then add it here.")
+        gone("plug_add")
+    }
+
     /** Fails if "Add a plug" offers a plug the mode has, or leaves out one it hasn't. */
     @Test
     fun addAPlugListsTabPlugsNotAdded() {
