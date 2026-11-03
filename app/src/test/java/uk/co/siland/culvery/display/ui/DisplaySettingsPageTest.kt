@@ -47,7 +47,11 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
+import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.SeasonDates
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.defaultSeasonDates
@@ -56,6 +60,7 @@ import uk.co.siland.culvery.display.CameraAccess
 import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DisplayPrefs
 import uk.co.siland.culvery.display.SeasonalThemes
+import uk.co.siland.culvery.display.WallDress
 import uk.co.siland.culvery.display.appDetailsIntents
 import uk.co.siland.culvery.display.displaySettings
 import uk.co.siland.culvery.shell.SunToday
@@ -75,6 +80,7 @@ class DisplaySettingsPageTest {
     private var allows = 0
     private var opens = 0
     private val previews = mutableListOf<Pair<SeasonalTheme, Boolean>>()
+    private val birthdayPreviews = mutableListOf<Boolean>()
     private val dated = mutableListOf<Pair<SeasonalTheme, SeasonDates?>>()
     private val overlay = TestOverlay()
     private val actions = DisplaySettingsActions(
@@ -86,6 +92,7 @@ class DisplaySettingsPageTest {
         onAllowCamera = { allows++ },
         onOpenAndroidSettings = { opens++ },
         onPreview = { theme, on -> previews += theme to on },
+        onPreviewBirthday = { birthdayPreviews += it },
         onDates = { theme, dates -> dated += theme to dates },
     )
 
@@ -104,13 +111,15 @@ class DisplaySettingsPageTest {
         dates: Map<SeasonalTheme, SeasonDates> = defaultSeasonDates(),
         next: Pair<SeasonalTheme, LocalDate>? = null,
         today: LocalDate = TODAY,
+        birthdayName: String? = null,
+        previewingBirthday: Boolean = false,
     ) {
         compose.setContent {
             CompositionLocalProvider(LocalOverlayHost provides overlay) {
                 CulveryTheme(dark = true) {
                     Box {
                         InSettingsPane {
-                            val ui = DisplaySettingsUi(prefs, camera, sunKnown, today, previewing, dates, next)
+                            val ui = DisplaySettingsUi(prefs, camera, sunKnown, today, previewing, dates, next, birthdayName, previewingBirthday)
                             BrightnessAndNightScreen(ui, actions)
                             SeasonalLooksScreen(ui, actions)
                         }
@@ -121,7 +130,10 @@ class DisplaySettingsPageTest {
         }
     }
 
-    private fun themes(now: MutableStateFlow<LocalDateTime?>) = SeasonalThemes(now, flowOf(defaultSeasonDates()), io)
+    private val sam = Person(PersonId("sam"), "Sam", PersonPalette.colors[2])
+
+    private fun themes(now: MutableStateFlow<LocalDateTime?>, people: List<Person> = emptyList()) =
+        SeasonalThemes(now, flowOf(defaultSeasonDates()), io, people = flowOf(people))
 
     private fun shows(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
@@ -352,9 +364,97 @@ class DisplaySettingsPageTest {
         assertThat(previews).containsExactly(SeasonalTheme.HALLOWEEN to false)
     }
 
-    private fun showHost(now: MutableStateFlow<LocalDateTime?>): SeasonalThemes {
+    /** Fails if the row is missing, starts on, or says anything but the plan's words. */
+    @Test
+    fun theBirthdayPreviewRow() {
+        show(birthdayName = "Sam")
+        compose.onNodeWithTag("display_preview_birthday").performScrollTo().assertIsOff()
+        compose.onNodeWithText("Preview a birthday").assertExists()
+        compose.onNodeWithText("Shows Sam’s birthday on the wall until midnight, with confetti each time the screen wakes.").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if a running birthday preview doesn't say when it ends. */
+    @Test
+    fun theBirthdayPreviewSaysWhenItEnds() {
+        show(birthdayName = "Sam", previewingBirthday = true)
+        compose.onNodeWithTag("display_preview_birthday").performScrollTo().assertIsOn()
+        compose.onNodeWithText("Showing now. It ends at midnight.").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the switch hands on anything but the opposite of what it shows. */
+    @Test
+    fun theSwitchPreviewsABirthday() {
+        show(birthdayName = "Sam")
+        compose.onNodeWithTag("display_preview_birthday").performScrollTo().performClick()
+        assertThat(birthdayPreviews).containsExactly(true)
+    }
+
+    /** Fails if an on switch turns the preview on again instead of off. */
+    @Test
+    fun anOnBirthdaySwitchPreviewsOff() {
+        show(birthdayName = "Sam", previewingBirthday = true)
+        compose.onNodeWithTag("display_preview_birthday").performScrollTo().performClick()
+        assertThat(birthdayPreviews).containsExactly(false)
+    }
+
+    /** Fails if the row shows with nobody in People. */
+    @Test
+    fun noRowWithNobody() {
+        show()
+        compose.onNodeWithTag("display_preview_halloween").performScrollTo()
+        assertThat(shows("display_preview_birthday")).isFalse()
+        compose.onNodeWithText("Preview a birthday").assertDoesNotExist()
+    }
+
+    /** Fails if the host doesn't preview a birthday through SeasonalThemes, or Halloween's switch leaves the birthday on. */
+    @Test
+    fun theHostPreviewsABirthdayThroughSeasonalThemes() {
+        val themes = showHost(MutableStateFlow(LocalDateTime.of(2026, 3, 5, 10, 0)), listOf(sam))
+        compose.waitUntil(5_000) {
+            compose.waitForIdle()
+            shows("display_preview_birthday")
+        }
+        val samDress = WallDress(birthday = Birthday(sam.color, listOf("Sam")))
+        compose.onNodeWithTag("display_preview_birthday").performScrollTo().performClick()
+        compose.waitUntil(5_000) {
+            compose.waitForIdle()
+            themes.dress.value == samDress
+        }
+        compose.onNodeWithTag("display_preview_birthday").assertIsOn()
+        compose.onNodeWithTag("display_preview_halloween").performScrollTo().performClick()
+        waitUntilShowing(SeasonalTheme.HALLOWEEN, themes)
+        compose.onNodeWithTag("display_preview_halloween").assertIsOn()
+        compose.onNodeWithTag("display_preview_birthday").assertIsOff()
+    }
+
+    /** Fails if the birthday switch stays on after the household's clock passes midnight. */
+    @Test
+    fun aBirthdayPreviewEndingAtMidnightTurnsTheSwitchOff() {
+        val now = MutableStateFlow<LocalDateTime?>(LocalDateTime.of(2026, 3, 5, 23, 59))
+        val themes = showHost(now, listOf(sam))
+        compose.waitUntil(5_000) {
+            compose.waitForIdle()
+            shows("display_preview_birthday")
+        }
+        compose.onNodeWithTag("display_preview_birthday").performScrollTo().performClick()
+        compose.waitUntil(5_000) {
+            compose.waitForIdle()
+            themes.previewingBirthday.value
+        }
+        compose.onNodeWithTag("display_preview_birthday").assertIsOn()
+        now.value = LocalDateTime.of(2026, 3, 6, 0, 0)
+        compose.waitUntil(5_000) {
+            compose.waitForIdle()
+            !themes.previewingBirthday.value
+        }
+        compose.onNodeWithTag("display_preview_birthday").assertIsOff()
+    }
+
+    private fun showHost(now: MutableStateFlow<LocalDateTime?>, people: List<Person> = emptyList()): SeasonalThemes {
         val settings = displaySettings(folder.root, io)
-        val themes = themes(now)
+        val themes = themes(now, people)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides overlay) {
                 CulveryTheme(dark = true) {

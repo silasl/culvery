@@ -24,7 +24,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
+import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.display.CameraState
@@ -53,14 +55,15 @@ class DisplaySettingsScreenshotTest {
         previewing: SeasonalTheme? = null,
         next: Pair<SeasonalTheme, LocalDate>? = null,
         seasonal: Boolean = false,
+        birthday: Birthday? = null,
         beforeShot: () -> Unit = {},
     ) {
         compose.setContent {
             CompositionLocalProvider(LocalOverlayHost provides overlay) {
-                CulveryTheme(dark = dark, seasonal = previewing) {
+                CulveryTheme(dark = dark, seasonal = previewing, birthday = birthday) {
                     Box(Modifier.size(960.dp, 1000.dp).background(Culvery.colors.bg)) {
                         InSettingsPane {
-                            val ui = DisplaySettingsUi(DisplayPrefs(), camera, sunKnown = true, today = TODAY, previewing = previewing, next = next)
+                            val ui = DisplaySettingsUi(DisplayPrefs(), camera, sunKnown = true, today = TODAY, previewing = previewing, next = next, birthdayName = birthday?.names?.first(), previewingBirthday = birthday != null)
                             if (seasonal) SeasonalLooksScreen(ui, actions) else BrightnessAndNightScreen(ui, actions)
                         }
                         Box(Modifier.align(Alignment.CenterEnd)) { overlay.content?.invoke() }
@@ -92,6 +95,11 @@ class DisplaySettingsScreenshotTest {
     @Test fun previewDark() = snap("settings_display_preview_dark", true, CameraState.ALLOWED, SeasonalTheme.HALLOWEEN, seasonal = true)
 
     @Test fun previewLight() = snap("settings_display_preview_light", false, CameraState.ALLOWED, SeasonalTheme.HALLOWEEN, seasonal = true)
+
+    @Test fun birthdayDark() = snap(
+        "settings_seasonal_birthday_dark", true, CameraState.ALLOWED, seasonal = true,
+        birthday = Birthday(PersonPalette.colors[2], listOf("Sam")),
+    ) { compose.onNodeWithTag("display_preview_birthday").performScrollTo() }
 
     @Test fun datesSheetDark() = datesSheet("settings_display_dates_sheet_dark", true)
 

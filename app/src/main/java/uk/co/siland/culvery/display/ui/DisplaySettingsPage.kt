@@ -87,6 +87,7 @@ import uk.co.siland.culvery.display.NO_FRONT_CAMERA
 import uk.co.siland.culvery.display.NO_SUN_TIMES
 import uk.co.siland.culvery.display.OPEN_ANDROIDS_SETTINGS
 import uk.co.siland.culvery.display.SAVE_DATES
+import uk.co.siland.culvery.display.PREVIEW_A_BIRTHDAY
 import uk.co.siland.culvery.display.SEASONAL_LOOKS
 import uk.co.siland.culvery.display.SEASONAL_THEMES
 import uk.co.siland.culvery.display.SLEEP
@@ -98,6 +99,7 @@ import uk.co.siland.culvery.display.WAKE_BY_CAMERA
 import uk.co.siland.culvery.display.WAKE_BY_CAMERA_DEFAULT
 import uk.co.siland.culvery.display.WAKE_BY_CAMERA_LINE
 import uk.co.siland.culvery.display.appDetailsIntents
+import uk.co.siland.culvery.display.birthdayPreviewLine
 import uk.co.siland.culvery.display.datesLine
 import uk.co.siland.culvery.display.datesTitle
 import uk.co.siland.culvery.display.lastDayBeforeFirst
@@ -184,7 +186,12 @@ data class DisplaySettingsUi(
     val previewing: SeasonalTheme? = null,
     val dates: Map<SeasonalTheme, SeasonDates> = defaultSeasonDates(),
     val next: Pair<SeasonalTheme, LocalDate>? = null,
-)
+    /** The first person in People, whose birthday the preview shows; null hides the row. */
+    val birthdayName: String? = null,
+    val previewingBirthday: Boolean = false,
+) {
+    override fun toString() = "DisplaySettingsUi"
+}
 
 class DisplaySettingsActions(
     val onNight: (LocalTime, LocalTime) -> Unit,
@@ -195,6 +202,7 @@ class DisplaySettingsActions(
     val onAllowCamera: () -> Unit,
     val onOpenAndroidSettings: () -> Unit,
     val onPreview: (SeasonalTheme, Boolean) -> Unit = { _, _ -> },
+    val onPreviewBirthday: (Boolean) -> Unit = {},
     /** Null puts back the theme's default dates. */
     val onDates: (SeasonalTheme, SeasonDates?) -> Unit = { _, _ -> },
 )
@@ -279,6 +287,9 @@ internal fun SeasonalLooksScreen(ui: DisplaySettingsUi, actions: DisplaySettings
                 modifier = Modifier.testTag("display_dates_${theme.name.lowercase()}"),
             )
             HhSwitchRow(previewTitle(theme.label), previewLine(theme.label, on), on, "display_preview_${theme.name.lowercase()}", { actions.onPreview(theme, it) })
+        }
+        ui.birthdayName?.let { name ->
+            HhSwitchRow(PREVIEW_A_BIRTHDAY, birthdayPreviewLine(name, ui.previewingBirthday), ui.previewingBirthday, "display_preview_birthday", actions.onPreviewBirthday)
         }
         ui.next?.let { (theme, date) ->
             Text(nextLine(theme, date), style = HhType.body, color = c.mute, modifier = Modifier.testTag("display_next"))
@@ -397,13 +408,15 @@ internal fun DisplaySettingsHost(
     val dates by themes.dates.collectAsStateWithLifecycle()
     val next by themes.next.collectAsStateWithLifecycle()
     val today by themes.today.collectAsStateWithLifecycle()
+    val previewPerson by themes.previewPerson.collectAsStateWithLifecycle()
+    val previewingBirthday by themes.previewingBirthday.collectAsStateWithLifecycle()
     val packageName = LocalContext.current.packageName
     val scope = rememberCoroutineScope()
     val p = prefs ?: return
     val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a display setting (${it::class.simpleName})") }
     screen(
         // The device date only places the grid until the household clock is read; it never picks the theme.
-        DisplaySettingsUi(p, camera, sunKnown = sun != null, today = today ?: LocalDate.now(), previewing = previewing, dates = dates, next = next),
+        DisplaySettingsUi(p, camera, sunKnown = sun != null, today = today ?: LocalDate.now(), previewing = previewing, dates = dates, next = next, birthdayName = previewPerson?.name, previewingBirthday = previewingBirthday),
         DisplaySettingsActions(
             onNight = { from, until -> change { settings.setNight(from, until) } },
             onDay = { v -> change { settings.setDayPercent(v) } },
@@ -413,6 +426,7 @@ internal fun DisplaySettingsHost(
             onAllowCamera = access::ask,
             onOpenAndroidSettings = { navigator.openSystemScreen(appDetailsIntents(packageName), CANT_OPEN_ANDROIDS_SETTINGS) },
             onPreview = themes::preview,
+            onPreviewBirthday = themes::previewBirthday,
             onDates = { theme, chosen ->
                 change { if (chosen == null) settings.resetSeasonDates(theme) else settings.setSeasonDates(theme, chosen) }
             },

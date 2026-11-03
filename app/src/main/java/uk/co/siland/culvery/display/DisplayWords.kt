@@ -53,6 +53,11 @@ internal fun previewTitle(label: String): String = "Preview $label"
 internal fun previewLine(label: String, on: Boolean): String =
     if (on) "Showing now. It ends at midnight." else "Shows $label on the wall and plays its doorbell until midnight."
 
+internal const val PREVIEW_A_BIRTHDAY = "Preview a birthday"
+
+internal fun birthdayPreviewLine(name: String, on: Boolean): String =
+    if (on) "Showing now. It ends at midnight." else "Shows $name’s birthday on the wall until midnight, with confetti each time the screen wakes."
+
 /** Android's details screen for this app, where its permissions are; the first intent the tablet has opens. */
 fun appDetailsIntents(packageName: String): List<Intent> =
     listOf(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
