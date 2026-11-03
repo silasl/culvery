@@ -35,11 +35,11 @@ import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.HalloweenDay
 import uk.co.siland.culvery.core.ui.HalloweenInks
 import uk.co.siland.culvery.core.ui.HalloweenNight
 import uk.co.siland.culvery.core.ui.HalloweenDimens
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.moonIn
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
@@ -175,6 +175,7 @@ class CulveryShellSkyTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** **pin**: no bunting off Home. */
     @Test
     fun noBirthdaySkyOffHome() {
         show(fullHome(dark = true, tab = "door"), null, sam)
@@ -182,7 +183,7 @@ class CulveryShellSkyTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Pin: Halloween's bats still fly, and nobody's birthday hangs bunting over them. */
+    /** **pin**: Halloween alone still flies its bats, and no birthday sky shows. */
     @Test
     fun theBatsStillFlyForHalloween() {
         show(fullHome(dark = true), SeasonalTheme.HALLOWEEN)

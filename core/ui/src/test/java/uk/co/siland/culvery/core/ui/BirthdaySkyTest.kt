@@ -10,7 +10,10 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.AccessibilityAction
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
@@ -99,9 +102,13 @@ class BirthdaySkyTest {
     @Test
     fun theSkyIsSilent() {
         show(null)
-        val node = compose.onNodeWithTag("birthday_sky").fetchSemanticsNode()
-        assertThat(node.config.contains(SemanticsProperties.ContentDescription)).isFalse()
-        assertThat(node.children).isEmpty()
-        assertThat(node.config.contains(SemanticsProperties.Text)).isFalse()
+        val nodes = listOf(compose.onNodeWithTag("birthday_sky", useUnmergedTree = true).fetchSemanticsNode()) +
+            compose.onAllNodes(hasAnyAncestor(hasTestTag("birthday_sky")), useUnmergedTree = true).fetchSemanticsNodes()
+        nodes.forEach { node ->
+            assertThat(node.config.contains(SemanticsProperties.Text)).isFalse()
+            assertThat(node.config.contains(SemanticsProperties.ContentDescription)).isFalse()
+            assertThat(node.config.filter { it.value is AccessibilityAction<*> }).isEmpty()
+        }
+        assertThat(nodes.first().config.isClearingSemantics).isTrue()
     }
 }
