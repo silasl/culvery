@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -113,6 +114,13 @@ class StoredModePageTest {
     }
 
     private fun gone(tag: String) = compose.onAllNodesWithTag(tag).assertCountEquals(0)
+
+    /** A saved room's choice, which its row reads as part of itself. */
+    private fun chip(i: Int) = compose.onNodeWithTag("light_chip_$i", useUnmergedTree = true)
+
+    private fun chipShows(i: Int) = compose.onAllNodesWithTag("light_chip_$i", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    private fun chipText(i: Int) = chip(i).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text }.orEmpty()
 
     private fun textOf(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().config
         .getOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text }.orEmpty()
@@ -349,12 +357,12 @@ class StoredModePageTest {
     fun aRoomTakesASceneOnOrOff() {
         show(FILM_NIGHT)
         compose.waitFor { exists("light_add") }
-        compose.onNodeWithTag("light_chip_0").assertTextEquals("Scene: Bright")
+        chip(0).assertTextEquals("Scene: Bright")
 
-        tap("light_chip_0")
+        tap("light_row_0")
         tap("light_scene_1")
         tap("light_save")
-        compose.waitFor { textOf("light_chip_0") == "Scene: Relax" }
+        compose.waitFor { chipText(0) == "Scene: Relax" }
 
         tap("light_add")
         tap("light_room_0")
@@ -362,15 +370,15 @@ class StoredModePageTest {
         repeat(4) { tap("light_minus") }
         compose.onNodeWithTag("light_percent").assertTextEquals("60%")
         tap("light_save")
-        compose.waitFor { exists("light_chip_1") }
-        compose.onNodeWithTag("light_chip_1").assertTextEquals("On · 60%")
+        compose.waitFor { chipShows(1) }
+        chip(1).assertTextEquals("On · 60%")
 
         tap("light_add")
         tap("light_room_0")
         tap("light_off")
         tap("light_save")
-        compose.waitFor { exists("light_chip_2") }
-        compose.onNodeWithTag("light_chip_2").assertTextEquals("Off")
+        compose.waitFor { chipShows(2) }
+        chip(2).assertTextEquals("Off")
         assertThat(saved().lights.map { it.choice }).containsExactly(LightChoice.Scene("s2", "Relax"), LightChoice.On(60), LightChoice.Off).inOrder()
         assertThat(saved().lights.map { it.roomName }).containsExactly("Kitchen", "Lounge", "Hall").inOrder()
         compose.assertClickablesHaveRoleAndLabel()
@@ -380,9 +388,9 @@ class StoredModePageTest {
     @Test
     fun aRoomThatCantDimShowsOnWithNoPercent() {
         show(FILM_NIGHT.copy(lights = listOf(RoomChoice("r3", "Hall", LightChoice.On(100)))))
-        compose.waitFor { exists("light_chip_0") }
+        compose.waitFor { chipShows(0) }
 
-        compose.onNodeWithTag("light_chip_0").assertTextEquals("On")
+        chip(0).assertTextEquals("On")
     }
 
     /** Fails if a light can't be taken out, or taking one out takes another. */
@@ -394,17 +402,19 @@ class StoredModePageTest {
         tap("light_remove_0")
 
         compose.waitFor { saved().lights == listOf(RoomChoice("r2", "Lounge", LightChoice.Off)) }
-        compose.waitFor { !exists("light_chip_1") }
-        compose.onNodeWithTag("light_chip_0").assertTextEquals("Off")
+        compose.waitFor { !chipShows(1) }
+        chip(0).assertTextEquals("Off")
     }
 
-    /** F7: fails if a saved room's row doesn't open its choice already picked, or saving a new one moves the room. */
+    /** F7: fails if a saved room's row doesn't open its choice already picked, its choice is a second tap target, or saving moves the room. */
     @Test
     fun aSavedRoomsRowOpensItsChoice() {
         val lounge = RoomChoice("r2", "Lounge", LightChoice.On(60))
         val hall = RoomChoice("r3", "Hall", LightChoice.Off)
         show(FILM_NIGHT.copy(lights = listOf(KITCHEN_BRIGHT, lounge, hall)))
         compose.waitFor { exists("light_row_1") }
+        // The row is the one tap target; its choice is part of what it reads, not a second action.
+        chip(1).assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
 
         tap("light_row_1")
         compose.waitFor { exists("light_sheet") }
@@ -414,7 +424,7 @@ class StoredModePageTest {
         tap("light_save")
 
         compose.waitFor { saved().lights == listOf(KITCHEN_BRIGHT, lounge.copy(choice = LightChoice.Off), hall) }
-        compose.waitFor { textOf("light_chip_1") == "Off" }
+        compose.waitFor { chipText(1) == "Off" }
         compose.assertClickablesHaveRoleAndLabel()
     }
 

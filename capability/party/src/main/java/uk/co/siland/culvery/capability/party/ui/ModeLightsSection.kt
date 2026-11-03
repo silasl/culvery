@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Text
@@ -11,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
@@ -26,9 +26,10 @@ import uk.co.siland.culvery.core.house.RoomChoice
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ControlTokens
+import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhAddRow
-import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhRoundButton
@@ -42,7 +43,7 @@ private const val TAG = "ModeLightsSection"
 
 /**
  * The rooms a mode sets (15b §4.2): each added room with its choice, a scene, On at a percent or Off, which a tap on its
- * row or chip changes, then "Add a light"
+ * row changes, then "Add a light"
  * for the rooms not added. Every room not listed is left alone. Reads what Hue offers once as the section opens; [save]
  * changes the mode and writes it at once.
  */
@@ -71,16 +72,14 @@ internal fun ModeLightsSection(mode: StoredMode, lights: HouseLights?, save: ((S
     }
     mode.lights.forEachIndexed { i, saved ->
         val room = roomOf(saved)
-        val change = { overlay.show { LightChoiceSheet(room, saved.choice, { saveChoice(room, it) }, overlay::dismiss) } }
         HhListRow(
             saved.roomName, Modifier.testTag("light_row_$i"),
-            onClick = change, clickLabel = ModesWords.changeLight(saved.roomName),
+            onClick = { overlay.show { LightChoiceSheet(room, saved.choice, { saveChoice(room, it) }, overlay::dismiss) } },
+            clickLabel = ModesWords.changeLight(saved.roomName),
             trailing = {
-                HhChoiceChip(
-                    lightChip(saved.choice, room.dimmable), selected = false, tag = "light_chip_$i",
-                    onClick = change,
-                    role = Role.Button, clickLabel = ModesWords.changeLight(saved.roomName),
-                    spokenName = "${saved.roomName}, ${lightChip(saved.choice, room.dimmable)}",
+                Text(
+                    lightChip(saved.choice, room.dimmable), style = ControlType.chip, color = Culvery.colors.ink,
+                    modifier = Modifier.testTag("light_chip_$i").padding(horizontal = ControlTokens.chipPaddingH),
                 )
                 HhRoundButton(
                     Icons.CLOSE, ModesWords.removeLight(saved.roomName), { save { it.withoutLight(saved.roomId) } },
