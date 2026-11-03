@@ -116,6 +116,7 @@ import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.ConfettiBurst
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.HhCard
@@ -537,6 +538,17 @@ class ShellScreenshotTest {
 
     @Test
     fun homeBirthdayTwoDark() = snap("home_birthday_two_dark", dark = true, state = fullHome(dark = true), birthday = Birthday(PersonPalette.colors[2], listOf("Sam", "Alex")))
+
+    /** A second into a burst; the clock is held so the pieces stand where that second puts them. */
+    @Test
+    fun homeBirthdayConfettiDark() {
+        compose.mainClock.autoAdvance = false
+        snap(
+            "home_birthday_confetti_dark", dark = true, state = fullHome(dark = true), birthday = pinkBirthday,
+            ready = { compose.mainClock.advanceTimeBy(1_000) },
+            overlay = { ConfettiBurst(seed = 11L, onDone = {}, Modifier.fillMaxSize()) },
+        )
+    }
 
     private val pinkBirthday = Birthday(PersonPalette.colors[2], listOf("Sam"))
 

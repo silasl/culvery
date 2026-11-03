@@ -71,6 +71,7 @@ import uk.co.siland.culvery.display.ScreenBrightness
 import uk.co.siland.culvery.display.SeasonalThemes
 import uk.co.siland.culvery.display.applyBrightness
 import uk.co.siland.culvery.display.camera.Presence
+import uk.co.siland.culvery.display.ui.ConfettiLayer
 import uk.co.siland.culvery.display.ui.SleepLayer
 import uk.co.siland.culvery.shell.HomeAppRequest
 import uk.co.siland.culvery.shell.OverlayState
@@ -271,6 +272,12 @@ class MainActivity : ComponentActivity() {
                                 onHomeDrawn = firstDraw::markDrawn,
                             )
                         }
+                        ConfettiLayer(
+                            wakes = display.dayWakes,
+                            awake = screen == Screen.AWAKE,
+                            falls = dress.birthday != null && animatorsOn && pinRequest == null && alert == null,
+                            seed = wallClock::nowMillis,
+                        )
                     }
                 }
             }

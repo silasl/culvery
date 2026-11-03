@@ -10,8 +10,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -56,6 +58,13 @@ internal data class Display(
     /** Holiday mode came on during the current hold: the screen goes dark as the hold ends (11 §5.3). */
     val darkenOnRelease: Boolean = false,
 )
+
+/**
+ * The dark screen or the night clock turning to the awake screen while in front by day (16 §3.3). The app's start,
+ * leaving or returning to the front, and any wake in the night hours, a tap on the night clock included, are none.
+ */
+internal fun dayWake(before: Display, after: Display): Boolean =
+    before.screen != Screen.AWAKE && after.screen == Screen.AWAKE && before.inFront && after.inFront && after.night == false
 
 /** The idle wait running, if any: after [ms] with no activity the screen becomes [then]. */
 internal data class Wait(val ms: Long, val then: Screen)
@@ -135,6 +144,11 @@ class DisplayState internal constructor(
     private val state = MutableStateFlow(next(START, prefs.value, now.value, shown.value, holiday.value))
     private val activity = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
+    private val wakes = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** Each [dayWake]; hot and never replayed, so a collector that starts late hears nothing of earlier ones. */
+    val dayWakes: SharedFlow<Unit> = wakes.asSharedFlow()
+
     val screen: StateFlow<Screen> = state.map { it.screen }.distinctUntilChanged()
         .stateIn(scope, SharingStarted.Eagerly, state.value.screen)
 
@@ -197,6 +211,7 @@ class DisplayState internal constructor(
             val before = state.value
             val after = step(before)
             state.value = after
+            if (dayWake(before, after)) wakes.tryEmit(Unit)
             // A wait the collector never saw end (a hold on and off between its runs) is restarted here.
             if (after.waiting() != before.waiting()) activity.tryEmit(Unit)
             if (after.screen != before.screen) Log.i(TAG, "Screen ${after.screen.name}")

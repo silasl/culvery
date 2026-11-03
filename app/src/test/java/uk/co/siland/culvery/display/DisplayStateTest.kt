@@ -6,7 +6,9 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
@@ -37,6 +39,12 @@ private class Wall(
     val camera = MutableStateFlow(camera)
     val holiday = MutableStateFlow<Boolean?>(null)
     val display = DisplayState(this.prefs, now, touches, this.inFront, this.camera, holiday, test.backgroundScope)
+    var wakes = 0
+        private set
+
+    init {
+        test.backgroundScope.launch(UnconfinedTestDispatcher(test.testScheduler)) { display.dayWakes.collect { wakes++ } }
+    }
 
     val screen: Screen get() = display.screen.value
     val wanted: Boolean get() = display.cameraWanted.value
@@ -112,6 +120,84 @@ private fun Wall.changesAt(boundary: Long, before: Screen, later: Screen) {
 
 @RunWith(AndroidJUnit4::class)
 class DisplayStateTest {
+    /** 16 §3.3: Fails if a tap on the dark screen by day isn't a wake, or is more than one. */
+    @Test
+    fun aTapOnTheDarkScreenByDayIsAWake() = runTest {
+        val wall = wall()
+        wall.asleep()
+        assertThat(wall.wakes).isEqualTo(0)
+        wall.tap()
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        assertThat(wall.wakes).isEqualTo(1)
+    }
+
+    /** Fails if the night clock ending in the morning isn't a wake. */
+    @Test
+    fun theNightClockEndingIsAWake() = runTest {
+        val wall = wall(at = DAY.atTime(23, 0))
+        wall.after(THIRTY_MINUTES)
+        assertThat(wall.wakes).isEqualTo(0)
+        wall.at(DAY.plusDays(1).atTime(7, 0))
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        assertThat(wall.wakes).isEqualTo(1)
+    }
+
+    /** Fails if the app starting, by day or at its first arrival in front, is a wake. */
+    @Test
+    fun startingIsNoWake() = runTest {
+        val fresh = wall()
+        assertThat(fresh.screen).isEqualTo(AWAKE)
+        assertThat(fresh.wakes).isEqualTo(0)
+
+        val arriving = wall(inFront = false)
+        arriving.front(true)
+        assertThat(arriving.screen).isEqualTo(AWAKE)
+        assertThat(arriving.wakes).isEqualTo(0)
+    }
+
+    /** Fails if leaving the front, or returning to it, is a wake. */
+    @Test
+    fun leavingAndReturningIsNoWake() = runTest {
+        val wall = wall()
+        wall.asleep()
+        wall.front(false)
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        wall.front(true)
+        assertThat(wall.wakes).isEqualTo(0)
+    }
+
+    /** Fails if a tap on the night clock at night is a wake. */
+    @Test
+    fun aTapOnTheNightClockAtNightIsNoWake() = runTest {
+        val wall = wall(at = DAY.atTime(23, 30))
+        assertThat(wall.screen).isEqualTo(NIGHT_CLOCK)
+        wall.tap()
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        assertThat(wall.wakes).isEqualTo(0)
+    }
+
+    /** Fails if the wakes replay to a collector that starts after them. */
+    @Test
+    fun aLateCollectorGetsNoWake() = runTest {
+        val wall = wall()
+        wall.asleep()
+        wall.tap()
+        var late = 0
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { wall.display.dayWakes.collect { late++ } }
+        runCurrent()
+        assertThat(late).isEqualTo(0)
+        assertThat(wall.wakes).isEqualTo(1)
+    }
+
+    /** Fails if a hold waking the dark screen by day (a door card) isn't a wake; the layer, not the state, drops that burst. */
+    @Test
+    fun aHoldWakingTheDarkScreenByDayIsAWake() = runTest {
+        val wall = wall()
+        wall.asleep()
+        wall.hold(true)
+        assertThat(wall.wakes).isEqualTo(1)
+    }
+
     /** Fails if a daytime start is anything but awake, or the night isn't known to be over. */
     @Test
     fun startsAwake() = runTest {
