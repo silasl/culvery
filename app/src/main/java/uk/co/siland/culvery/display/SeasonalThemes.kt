@@ -11,17 +11,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import uk.co.siland.culvery.core.plugin.ApplicationScope
-import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.house.TodaysBirthdays
+import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.SeasonDates
@@ -41,13 +41,15 @@ sealed interface Preview {
 /** What dresses the wall: a birthday's colours, else a seasonal theme's, else the normal ones. */
 data class WallDress(val seasonal: SeasonalTheme? = null, val birthday: Birthday? = null)
 
+private fun birthdayOf(people: List<Person>): Birthday? =
+    people.firstOrNull()?.let { Birthday(it.color, people.map(Person::name)) }
+
 /** A theme preview, then a birthday preview, then today's birthdays, then [seasonal] by its dates (16 §3.2). */
 internal fun dressOn(preview: Preview?, previewPerson: Person?, birthdays: List<Person>, seasonal: SeasonalTheme?): WallDress =
     when {
         preview is Preview.Theme -> WallDress(seasonal = preview.theme)
-        preview is Preview.Birthday && previewPerson != null -> WallDress(birthday = Birthday(previewPerson.color, listOf(previewPerson.name)))
-        birthdays.isNotEmpty() -> WallDress(birthday = Birthday(birthdays.first().color, birthdays.map { it.name }))
-        else -> WallDress(seasonal = seasonal)
+        preview is Preview.Birthday && previewPerson != null -> WallDress(birthday = birthdayOf(listOf(previewPerson)))
+        else -> birthdayOf(birthdays)?.let { WallDress(birthday = it) } ?: WallDress(seasonal = seasonal)
     }
 
 /** The preview's theme when it is for [date], else the first theme whose dates hold [date] (14 §4.1). */
@@ -91,6 +93,9 @@ class SeasonalThemes internal constructor(
     val today: StateFlow<LocalDate?> =
         now.map { it?.toLocalDate() }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, null)
 
+    /** The preview, only while it is for today. */
+    private val livePreview: Flow<Preview?> = combine(today, preview) { today, preview -> preview?.takeIf { it.day == today } }
+
     /** The theme to look for next and its first day; null while a theme is in its dates or the clock is unread. */
     val next: StateFlow<Pair<SeasonalTheme, LocalDate>?> =
         combine(today, this.dates) { today, dates ->
@@ -103,7 +108,7 @@ class SeasonalThemes internal constructor(
 
     /** The theme previewed today, else null. */
     val previewing: StateFlow<SeasonalTheme?> =
-        combine(today, preview) { today, preview -> (preview as? Preview.Theme)?.takeIf { it.day == today }?.theme }
+        livePreview.map { (it as? Preview.Theme)?.theme }
             .stateIn(scope, SharingStarted.Eagerly, null)
 
     /** The first person in People, whose birthday the preview shows; null with nobody in People. */
@@ -112,12 +117,12 @@ class SeasonalThemes internal constructor(
 
     /** Whether the birthday preview is on today. */
     val previewingBirthday: StateFlow<Boolean> =
-        combine(today, preview) { today, preview -> preview is Preview.Birthday && preview.day == today }
+        livePreview.map { it is Preview.Birthday }
             .stateIn(scope, SharingStarted.Eagerly, false)
 
     /** What dresses the wall; the doorbell reads [showing], which a birthday never changes (16 §3.2). */
     val dress: StateFlow<WallDress> =
-        combine(preview.combine(today) { p, t -> p?.takeIf { it.day == t } }, previewPerson, birthdays, showing, ::dressOn)
+        combine(livePreview, previewPerson, birthdays, showing, ::dressOn)
             .distinctUntilChanged()
             .onEach { logBirthday(it.birthday) }
             .stateIn(scope, SharingStarted.Eagerly, WallDress())
@@ -132,22 +137,17 @@ class SeasonalThemes internal constructor(
     }
 
     /** Turning one on replaces any other; nothing happens while the clock is unread. Off clears only [theme]'s own preview. */
-    fun preview(theme: SeasonalTheme, on: Boolean) {
-        if (on) {
-            val today = now.value?.toLocalDate() ?: return
-            preview.value = Preview.Theme(theme, today)
-        } else {
-            preview.update { it?.takeUnless { p -> p is Preview.Theme && p.theme == theme } }
-        }
-    }
+    fun preview(theme: SeasonalTheme, on: Boolean) = setPreview(on, { Preview.Theme(theme, it) }) { it is Preview.Theme && it.theme == theme }
 
     /** On replaces a theme preview; nothing happens while the clock is unread. Off clears only a birthday preview. */
-    fun previewBirthday(on: Boolean) {
+    fun previewBirthday(on: Boolean) = setPreview(on, Preview::Birthday) { it is Preview.Birthday }
+
+    private fun setPreview(on: Boolean, make: (LocalDate) -> Preview, isOurs: (Preview) -> Boolean) {
         if (on) {
             val today = now.value?.toLocalDate() ?: return
-            preview.value = Preview.Birthday(today)
+            preview.value = make(today)
         } else {
-            preview.update { it?.takeUnless { p -> p is Preview.Birthday } }
+            preview.update { it?.takeUnless(isOurs) }
         }
     }
 

@@ -119,7 +119,6 @@ class BirthdaySkyTest {
             val moved = (((a.y - b.y) % cycle) + cycle) % cycle
             assertThat(moved).isWithin(0.01f).of(cycle / 2)
         }
-        assertThat(balloons(BALLOON_LAP_MS).map { it.y }).isEqualTo(start.map { it.y })
         assertThat(balloons(BALLOON_LAP_MS)).isEqualTo(start)
         // A quarter lap apart, each in its own lane, swaying no more than the sway.
         for (at in listOf(0L, 7_000L, 13_000L, 29_000L)) {

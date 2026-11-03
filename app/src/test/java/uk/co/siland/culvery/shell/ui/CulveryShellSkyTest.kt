@@ -36,9 +36,9 @@ import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HalloweenDay
+import uk.co.siland.culvery.core.ui.HalloweenDimens
 import uk.co.siland.culvery.core.ui.HalloweenInks
 import uk.co.siland.culvery.core.ui.HalloweenNight
-import uk.co.siland.culvery.core.ui.HalloweenDimens
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.moonIn

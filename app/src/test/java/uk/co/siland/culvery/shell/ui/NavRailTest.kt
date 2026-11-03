@@ -28,8 +28,8 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel

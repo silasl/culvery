@@ -86,8 +86,8 @@ import uk.co.siland.culvery.display.NIGHT_START
 import uk.co.siland.culvery.display.NO_FRONT_CAMERA
 import uk.co.siland.culvery.display.NO_SUN_TIMES
 import uk.co.siland.culvery.display.OPEN_ANDROIDS_SETTINGS
-import uk.co.siland.culvery.display.SAVE_DATES
 import uk.co.siland.culvery.display.PREVIEW_A_BIRTHDAY
+import uk.co.siland.culvery.display.SAVE_DATES
 import uk.co.siland.culvery.display.SEASONAL_LOOKS
 import uk.co.siland.culvery.display.SEASONAL_THEMES
 import uk.co.siland.culvery.display.SLEEP
@@ -109,8 +109,8 @@ import uk.co.siland.culvery.display.nextLine
 import uk.co.siland.culvery.display.nightClockLine
 import uk.co.siland.culvery.display.previewLine
 import uk.co.siland.culvery.display.previewTitle
-import uk.co.siland.culvery.display.shortDatesLine
 import uk.co.siland.culvery.display.putBack
+import uk.co.siland.culvery.display.shortDatesLine
 import uk.co.siland.culvery.display.sleepAfter
 import uk.co.siland.culvery.shell.SunToday
 

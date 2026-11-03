@@ -28,6 +28,9 @@ object PersonPalette {
     fun nameOf(argb: Long): String? = colors.indexOf(argb).takeIf { it >= 0 }?.let(names::get)
 }
 
+/** The colour for the [i]th person or slot, cycling when there are more than six. */
+fun PersonPalette.colourAt(i: Int): Color = Color(colors[i % colors.size])
+
 /** Family's colour, by name. */
 const val FAMILY_COLOUR_NAME = "Violet"
 

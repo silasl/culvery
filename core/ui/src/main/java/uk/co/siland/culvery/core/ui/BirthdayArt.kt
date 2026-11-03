@@ -87,7 +87,6 @@ fun balloonPositions(elapsedMillis: Long, band: Rect, density: Density): List<Of
         }
     }
 
-
 private const val BUNTING_MIN_FLAGS = 3
 
 /** How many flags fit [bandWidthPx] a pitch apart; none for a band narrower than three pitches. */
@@ -116,39 +115,47 @@ internal fun lowestFlagTip(band: Rect, density: Density): Float = with(density) 
     if (anchors.isEmpty()) stringY(band, band.center.x, density) else anchors.maxOf { it.y } + BirthdayDimens.flagHeight.toPx()
 }
 
-/** A [string]-coloured line sagging across [band], with a triangular flag in each person colour, in order, hung from it (16 §4.2). A band too narrow for three flags gets nothing. */
-fun DrawScope.drawBunting(band: Rect, string: Color, density: Density) {
+/** The string and a triangular flag in each person colour, in order, hung from it, built once for a band size (16 §4.2). */
+private class Bunting(val string: Path, val stroke: Stroke, val flags: List<Pair<Path, Color>>)
+
+/** The bunting across [band]; null for a band too narrow for three flags. */
+private fun buntingIn(band: Rect, density: Density): Bunting? = with(density) {
     val anchors = flagAnchors(band, density)
-    if (anchors.isEmpty()) return
-    val dip = with(density) { BirthdayDimens.buntingSag.toPx() }
-    val y = band.top + with(density) { BirthdayDimens.buntingTop.toPx() }
-    val line = Path().apply {
-        moveTo(band.left, y)
-        quadraticTo(band.center.x, y + 2 * dip, band.right, y)
+    if (anchors.isEmpty()) return null
+    val ends = stringY(band, band.left, density)
+    // The quadratic's control point is where the parabola through both ends and the middle puts it.
+    val string = Path().apply {
+        moveTo(band.left, ends)
+        quadraticTo(band.center.x, 2 * stringY(band, band.center.x, density) - ends, band.right, ends)
     }
-    drawPath(line, string, style = Stroke(with(density) { BirthdayDimens.buntingStroke.toPx() }))
-    val half = with(density) { BirthdayDimens.flagWidth.toPx() } / 2
-    val height = with(density) { BirthdayDimens.flagHeight.toPx() }
-    anchors.forEachIndexed { i, at ->
+    val half = BirthdayDimens.flagWidth.toPx() / 2
+    val height = BirthdayDimens.flagHeight.toPx()
+    val flags = anchors.mapIndexed { i, at ->
         val flag = Path().apply {
             moveTo(at.x - half, at.y)
             lineTo(at.x + half, at.y)
             lineTo(at.x, at.y + height)
             close()
         }
-        drawPath(flag, BirthdayInks.flag(PersonPalette.colors[i % PersonPalette.colors.size]))
+        flag to BirthdayInks.flag(PersonPalette.colourAt(i))
     }
+    Bunting(string, Stroke(BirthdayDimens.buntingStroke.toPx()), flags)
+}
+
+private fun DrawScope.drawBunting(bunting: Bunting, string: Color) {
+    drawPath(bunting.string, string, style = bunting.stroke)
+    bunting.flags.forEach { (flag, colour) -> drawPath(flag, colour) }
 }
 
 /** Four balloons, one per lane, each with its string, under whatever is drawn after them (16 §4.2). */
-private fun DrawScope.drawBalloons(elapsedMillis: Long, band: Rect, c: HhColors, density: Density) {
-    val w = with(density) { BirthdayDimens.balloonWidth.toPx() }
-    val h = with(density) { BirthdayDimens.balloonHeight.toPx() }
-    val string = with(density) { BirthdayDimens.balloonString.toPx() }
-    val stroke = with(density) { 1.dp.toPx() }
+private fun DrawScope.drawBalloons(elapsedMillis: Long, band: Rect, c: HhColors, density: Density) = with(density) {
+    val w = BirthdayDimens.balloonWidth.toPx()
+    val h = BirthdayDimens.balloonHeight.toPx()
+    val string = BirthdayDimens.balloonString.toPx()
+    val stroke = 1.dp.toPx()
     balloonPositions(elapsedMillis, band, density).forEachIndexed { i, at ->
         drawLine(c.mute, Offset(at.x, at.y + h), Offset(at.x, at.y + h + string), stroke)
-        drawOval(BirthdayInks.balloon(PersonPalette.colors[i % PersonPalette.colors.size], c), Offset(at.x - w / 2, at.y), Size(w, h))
+        drawOval(BirthdayInks.balloon(PersonPalette.colourAt(i), c), Offset(at.x - w / 2, at.y), Size(w, h))
     }
 }
 
@@ -160,7 +167,6 @@ private fun DrawScope.drawBalloons(elapsedMillis: Long, band: Rect, c: HhColors,
 @Composable
 fun BirthdaySky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: MutableLongState = remember { mutableLongStateOf(0L) }) {
     val colors = Culvery.colors
-    val string = colors.mute
     SkyFrames(drifting, elapsed)
     val measured = LocalHomeSkyBand.current
     Box(modifier) {
@@ -172,10 +178,11 @@ fun BirthdaySky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Mutab
                 .graphicsLayer { clip = true }
                 .drawWithCache {
                     val band = Rect(Offset.Zero, size)
+                    val bunting = buntingIn(band, this)
                     onDrawBehind {
                         if (size.width <= 0f || size.height <= 0f) return@onDrawBehind
                         drawBalloons(elapsed.longValue, band, colors, this)
-                        drawBunting(band, string, this)
+                        bunting?.let { drawBunting(it, colors.mute) }
                     }
                 },
         )

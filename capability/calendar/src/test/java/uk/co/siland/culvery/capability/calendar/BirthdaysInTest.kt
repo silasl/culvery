@@ -64,6 +64,11 @@ class BirthdaysInTest {
     }
 
     @Test
+    fun aSeriesStartLineBeforeTheRuleStillCounts() {
+        assertThat(on(yearly("Sam’s birthday", "sam", rule = "DTSTART:20200312\nRRULE:FREQ=YEARLY;INTERVAL=1"))).containsExactly(sam)
+    }
+
+    @Test
     fun onlyTheWholeWordCounts() {
         for (title in listOf("Birthday", "birthday!", "BIRTHDAYS")) {
             assertThat(on(yearly(title, "sam"))).containsExactly(sam)

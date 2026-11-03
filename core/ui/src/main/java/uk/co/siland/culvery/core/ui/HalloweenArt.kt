@@ -3,14 +3,12 @@ package uk.co.siland.culvery.core.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -25,23 +23,16 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.toPath
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.round
 import kotlin.math.PI
 import kotlin.math.cos
-import kotlin.math.roundToInt
 import kotlin.math.sin
-import kotlinx.coroutines.delay
 
 object HalloweenDimens {
     /** How far the Today card's cobweb reaches from the card's top-right corner. */
@@ -65,9 +56,6 @@ object HalloweenDimens {
 
 /** How long a bat takes to cross the sky and come back in at the left. */
 internal const val BAT_LAP_MS = 45_000L
-
-/** The sky moves at most this often, about 15 frames a second. */
-internal const val SKY_FRAME_MS = 66L
 
 // The pumpkin's viewport has the Culvery mark's aspect, so it takes the mark's place without moving anything.
 private const val PUMPKIN_W = 54f
@@ -139,17 +127,6 @@ private const val BAT_PATH =
     "M13,3.5 L11.6,0.5 L10.6,3.2 C8.5,2.4 4.5,2 0,1.2 C1.6,4 2.2,7 3,9 C4.6,7.4 6,7.2 7.6,8.6 C8.6,7.4 9.6,7.6 10.6,9 " +
         "L13,12.5 L15.4,9 C16.4,7.6 17.4,7.4 18.4,8.6 C20,7.2 21.4,7.4 23,9 C23.8,7 24.4,4 26,1.2 C21.5,2 17.5,2.4 15.4,3.2 L14.4,0.5 Z"
 
-/**
- * The open band in Home's header where the sky is drawn: right of the clock and date, left of the header items, from Home's
- * top to the header's bottom. With nothing measured the band is all of [size] (14 §4.3).
- */
-fun skyBand(measured: HomeSkyBand?, size: Size, density: Density): Rect {
-    if (measured == null) return Rect(Offset.Zero, size)
-    val gap = with(density) { HalloweenDimens.skyGap.toPx() }
-    val right = if (measured.itemsWidth > 0) measured.headerWidth - measured.itemsWidth - gap else measured.headerWidth.toFloat()
-    return Rect(maxOf(measured.clockWidth, measured.dateWidth, measured.greetingWidth) + gap, 0f, right, measured.headerHeight.toFloat())
-}
-
 class Moon(val centre: Offset, val radius: Float)
 
 /** The moon near the band's right end, shrunk to fit a band shorter than it. */
@@ -193,22 +170,6 @@ private class SkyFrame(size: Size, density: Density) {
     val fit = track.span / BAT_W
 }
 
-/** While [drifting], adds the time since the last step to [elapsed] about every [SKY_FRAME_MS]; still, it runs no frames at all. */
-@Composable
-internal fun SkyFrames(drifting: Boolean, elapsed: MutableLongState) {
-    LaunchedEffect(drifting) {
-        if (!drifting) return@LaunchedEffect
-        var last = -1L
-        while (true) {
-            withFrameMillis { now ->
-                if (last >= 0) elapsed.longValue += now - last
-                last = now
-            }
-            delay(SKY_FRAME_MS)
-        }
-    }
-}
-
 /**
  * The moon and the bats in Home's open header band. Nothing in it is read by TalkBack. While [drifting] it advances [elapsed]
  * about every [SKY_FRAME_MS]; the time is read only when drawing, so a step redraws this small layer and nothing else (14 §4.3).
@@ -245,14 +206,3 @@ fun HalloweenSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Muta
         )
     }
 }
-
-/** Sizes and places a node as [skyBand] of [measured] inside the room it is given. */
-internal fun Modifier.inSkyBand(measured: HomeSkyBand?): Modifier = this
-    .offset { measured?.let { skyBand(it, Size.Zero, this).topLeft.round() } ?: IntOffset.Zero }
-    .layout { measurable, constraints ->
-        val band = skyBand(measured, Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()), this)
-        val width = band.width.roundToInt().coerceAtLeast(0)
-        val height = band.height.roundToInt().coerceAtLeast(0)
-        val placeable = measurable.measure(Constraints.fixed(width, height))
-        layout(width, height) { placeable.place(0, 0) }
-    }

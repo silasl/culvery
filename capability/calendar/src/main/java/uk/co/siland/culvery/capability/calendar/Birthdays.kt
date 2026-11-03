@@ -43,7 +43,7 @@ private fun StoredEvent.isYearlyBirthdayOn(date: LocalDate, zone: ZoneId): Boole
     val first = start as? EventTime.AllDay ?: return false
     val last = end as? EventTime.AllDay ?: return false
     return daySpan(first, last, zone) == date to date &&
-        recurring && (recurrenceRule == null || "FREQ=YEARLY" in recurrenceRule.uppercase()) &&
+        recurring && (recurrenceRule == null || ruleParts(recurrenceRule)?.get("FREQ") == "YEARLY") &&
         BIRTHDAY_TITLE.containsMatchIn(title)
 }
 
