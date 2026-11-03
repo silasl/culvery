@@ -113,4 +113,4 @@ internal const val DOORBELL = "Doorbell"
 internal const val LOWER_MUSIC_TO = "Lower music on a ring to"
 
 /** The doorbell's share, said as what it does: 0 % mutes (6 §5.4). */
-fun lowerToWords(percent: Int): String = if (percent == 0) "0 % (muted)" else "$percent % of its volume"
+fun lowerToWords(percent: Int): String = if (percent == 0) "0% (muted)" else "$percent% of its volume"

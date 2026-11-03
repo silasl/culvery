@@ -71,9 +71,9 @@ class MusicSettingsPageTest {
         compose.onNodeWithTag("music_usual_RINCON_B").performClick()
         compose.onNodeWithTag("music_lower_to")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lower music on a ring to")))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "20 % of its volume"))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "20% of its volume"))
             .performSemanticsAction(SemanticsActions.SetProgress) { it(0f) }
-        compose.onNodeWithText("0 % (muted)").assertExists()
+        compose.onNodeWithText("0% (muted)").assertExists()
         assertThat(calls).containsExactly("usual RINCON_B", "lower 0").inOrder()
         compose.assertAccessible()
     }
@@ -96,7 +96,7 @@ class MusicSettingsPageTest {
     fun lowerMusicToIsASliderRow() {
         show(connected)
         assertThat(compose.onNodeWithTag("music_lower_to_row").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(69f)
-        compose.onNodeWithTag("music_lower_to_value", useUnmergedTree = true).assertTextEquals("20 % of its volume")
+        compose.onNodeWithTag("music_lower_to_value", useUnmergedTree = true).assertTextEquals("20% of its volume")
         val range = compose.onNodeWithTag("music_lower_to").fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo]
         assertThat(range.steps).isEqualTo(9)
         compose.onNodeWithTag("music_lower_to").performSemanticsAction(SemanticsActions.SetProgress) { it(25f) }
@@ -109,7 +109,7 @@ class MusicSettingsPageTest {
     @Test
     fun noShareSaysMuted() {
         show(connected.copy(lowerTo = 0))
-        compose.onNodeWithTag("music_lower_to").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "0 % (muted)"))
+        compose.onNodeWithTag("music_lower_to").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "0% (muted)"))
     }
 
     @Test
