@@ -907,6 +907,9 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
   - App settings composing every section at once (only if the tablet janks).
 - **From 15a, still open:** in a plugs-only house, some copy still says "Lights tab" (Holiday's lights lines; Add a plug's list).
 
+## Plan 16 (birthdays): on the tablet (2026-11-03)
+- The next family birthday's event was checked as yearly, all-day and tagged; nothing needed changing. Its untagged duplicate is on Family, so it gets no look.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
@@ -921,6 +924,8 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **Not tried yet:** "Use for new events" with real calendars, and a new Sonos playlist appearing on the next open.
 - **TalkBack checks from 9c-2:** dropped; the user will raise them if they show in use.
 - **Accented letters broken on the Music card (seen 2026-10-30):** on the tablet, Home's Lounge card showed a Polish track title with Ż and ą as stray marks (the Ż's dot above the line, ą as an apostrophe). Either Sonos sends the text mangled, or the card's font or line height clips marks above and below the letters. Compare the raw title from Sonos with what's drawn before fixing.
+
+- **Music card volume squashed (seen 2026-11-03):** when nothing plays, Home's Lounge card shows "Shuffle everything" in Next's place and the volume pill (`MusicCard.kt:61`, `weight(1f)`) is squeezed to a green stripe. The user suggests a mute button instead; Culvery sends no mute to Sonos yet. Waiting on the user: hide the pill while nothing plays, a mute button, or both.
 
 ## Feature ideas (2026-10-02, after v1)
 
