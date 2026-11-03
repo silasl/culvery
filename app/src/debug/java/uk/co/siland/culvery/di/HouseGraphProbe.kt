@@ -17,6 +17,7 @@ import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.MultiDayEvents
+import uk.co.siland.culvery.core.house.TodaysBirthdays
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Startable
@@ -40,6 +41,7 @@ interface HouseGraphProbe {
     fun speakers(): Speakers
     fun bridges(): Bridges
     fun multiDayEvents(): Optional<MultiDayEvents>
+    fun todaysBirthdays(): TodaysBirthdays
     fun startables(): Set<@JvmSuppressWildcards Startable>
     fun showingTheme(): ShowingTheme
     fun seasonalThemes(): SeasonalThemes

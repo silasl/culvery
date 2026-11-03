@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.household.Person
 
 /** What a device step did: [Failed.line] is the line to show. */
 sealed interface HouseStep {
@@ -217,6 +218,12 @@ data class PlugOption(val id: String, val name: String, val needsPin: Boolean) {
 /** A plug a mode switches to [on]. [toString] leaves out the id. */
 data class AddedPlug(val id: String, val on: Boolean, val needsPin: Boolean) {
     override fun toString() = "AddedPlug"
+}
+
+/** Who has a birthday today. */
+interface TodaysBirthdays {
+    /** Today's birthday people in People order (16 §3.1); holds names, never logged. */
+    val today: StateFlow<List<Person>>
 }
 
 interface MultiDayEvents {

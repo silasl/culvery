@@ -11,6 +11,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import uk.co.siland.culvery.capability.calendar.CalendarBirthdays
 import uk.co.siland.culvery.core.house.HouseModeScheduler
 import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.di.HouseGraphProbe
@@ -84,5 +85,10 @@ class HouseGraphTest {
     @Test
     fun theShowingThemeIsSeasonalThemes() {
         assertThat(probe.showingTheme()).isSameInstanceAs(probe.seasonalThemes())
+    }
+
+    @Test
+    fun theCalendarFindsTheBirthdays() {
+        assertThat(probe.todaysBirthdays()).isInstanceOf(CalendarBirthdays::class.java)
     }
 }

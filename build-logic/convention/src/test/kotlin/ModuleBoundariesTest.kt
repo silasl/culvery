@@ -124,6 +124,7 @@ class ModuleBoundariesTest {
     @Test
     fun theHouseModulesKeepToTheirFamilies() {
         allowed(":core:house", ":core:access", "api")
+        allowed(":core:house", ":core:household", "api")
         allowed(":capability:heating", ":core:house")
         allowed(":capability:holiday", ":core:house", "api")
         banned(":core:house", ":capability:heating")
