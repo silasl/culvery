@@ -220,14 +220,7 @@ fun HalloweenSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Muta
     Box(modifier) {
         Spacer(
             Modifier
-                .offset { measured?.let { skyBand(it, Size.Zero, this).topLeft.round() } ?: IntOffset.Zero }
-                .layout { measurable, constraints ->
-                    val band = skyBand(measured, Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()), this)
-                    val width = band.width.roundToInt().coerceAtLeast(0)
-                    val height = band.height.roundToInt().coerceAtLeast(0)
-                    val placeable = measurable.measure(Constraints.fixed(width, height))
-                    layout(width, height) { placeable.place(0, 0) }
-                }
+                .inSkyBand(measured)
                 .testTag("halloween_sky")
                 .clearAndSetSemantics {}
                 .graphicsLayer { clip = true }
@@ -246,3 +239,14 @@ fun HalloweenSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Muta
         )
     }
 }
+
+/** Sizes and places a node as [skyBand] of [measured] inside the room it is given. */
+internal fun Modifier.inSkyBand(measured: HomeSkyBand?): Modifier = this
+    .offset { measured?.let { skyBand(it, Size.Zero, this).topLeft.round() } ?: IntOffset.Zero }
+    .layout { measurable, constraints ->
+        val band = skyBand(measured, Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()), this)
+        val width = band.width.roundToInt().coerceAtLeast(0)
+        val height = band.height.roundToInt().coerceAtLeast(0)
+        val placeable = measurable.measure(Constraints.fixed(width, height))
+        layout(width, height) { placeable.place(0, 0) }
+    }

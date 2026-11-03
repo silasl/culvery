@@ -33,7 +33,9 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.HalloweenDay
 import uk.co.siland.culvery.core.ui.HalloweenInks
 import uk.co.siland.culvery.core.ui.HalloweenNight
@@ -73,8 +75,8 @@ class CulveryShellSkyTest {
         ),
     )
 
-    private fun show(state: ShellUiState, seasonal: SeasonalTheme?) = compose.setContent {
-        CulveryTheme(dark = state.dark, seasonal = seasonal) {
+    private fun show(state: ShellUiState, seasonal: SeasonalTheme?, birthday: Birthday? = null) = compose.setContent {
+        CulveryTheme(dark = state.dark, seasonal = seasonal, birthday = birthday) {
             CulveryShell(state, { at }, {}, {}, {}, {}, tabContent = {})
         }
     }
@@ -151,6 +153,42 @@ class CulveryShellSkyTest {
 
     @Test
     fun theSkyStaysInTheOpenBandByDay() = skyStaysInTheBand(dark = false)
+
+    private val sam = Birthday(PersonPalette.colors[2], listOf("Sam"))
+
+    @Test
+    fun theBirthdaySkyIsBehindHome() {
+        show(fullHome(dark = true), null, sam)
+        val sky = bounds("birthday_sky")
+        val clock = bounds("home_clock")
+        val greeting = bounds("home_greeting")
+        val items = bounds("home_header_items")
+        assertThat(sky.top).isWithin(1f).of(clock.top)
+        assertThat(sky.left).isAtLeast(maxOf(clock.right, greeting.right))
+        assertThat(sky.right).isAtMost(items.left)
+        compose.onAllNodesWithTag("halloween_sky").assertCountEquals(0)
+        val skyNode = compose.onNodeWithTag("birthday_sky").fetchSemanticsNode()
+        val siblings = skyNode.parent!!.children.map { it.id }
+        var above = compose.onNodeWithTag("home_clock", useUnmergedTree = true).fetchSemanticsNode()
+        while (above.parent!!.id != skyNode.parent!!.id) above = above.parent!!
+        assertThat(siblings.indexOf(skyNode.id)).isLessThan(siblings.indexOf(above.id))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun noBirthdaySkyOffHome() {
+        show(fullHome(dark = true, tab = "door"), null, sam)
+        compose.onAllNodesWithTag("birthday_sky").assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: Halloween's bats still fly, and nobody's birthday hangs bunting over them. */
+    @Test
+    fun theBatsStillFlyForHalloween() {
+        show(fullHome(dark = true), SeasonalTheme.HALLOWEEN)
+        compose.onNodeWithTag("halloween_sky").assertExists()
+        compose.onAllNodesWithTag("birthday_sky").assertCountEquals(0)
+    }
 
     @Test
     fun noSkyOffHome() {

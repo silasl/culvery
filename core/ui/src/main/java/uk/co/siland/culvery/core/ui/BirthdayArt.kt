@@ -2,15 +2,29 @@ package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import kotlin.math.floor
 
 // The cake's viewport has the Culvery mark's aspect, so it takes the mark's place without moving anything.
 private const val CAKE_W = 54f
@@ -38,4 +52,89 @@ fun CakeMark(width: Dp, modifier: Modifier = Modifier) {
             .build()
     }
     Image(cake, contentDescription = null, modifier = modifier.testTag("cake_mark").semantics { hideFromAccessibility() })
+}
+
+object BirthdayDimens {
+    /** How far the bunting's string hangs below the band's top, and how far it sags at the middle below that. */
+    val buntingTop = 6.dp
+    val buntingSag = 16.dp
+    val buntingStroke = 1.5.dp
+    val flagWidth = 18.dp
+    val flagHeight = 22.dp
+    val flagPitch = 28.dp
+}
+
+private const val BUNTING_MIN_FLAGS = 3
+
+/** How many flags fit [bandWidthPx] a pitch apart; none for a band narrower than three pitches. */
+internal fun flagCount(bandWidthPx: Float, density: Density): Int {
+    val pitch = with(density) { BirthdayDimens.flagPitch.toPx() }
+    return if (bandWidthPx < BUNTING_MIN_FLAGS * pitch) 0 else floor(bandWidthPx / pitch).toInt()
+}
+
+/** The string's height at [x]: a parabola from [BirthdayDimens.buntingTop] at both ends to the sag at the middle. */
+private fun stringY(band: Rect, x: Float, density: Density): Float = with(density) {
+    val t = (x - band.left) / band.width
+    band.top + BirthdayDimens.buntingTop.toPx() + BirthdayDimens.buntingSag.toPx() * 4f * t * (1f - t)
+}
+
+/** Where each flag hangs from the string (the middle of its top edge), the row centred in [band]. */
+internal fun flagAnchors(band: Rect, density: Density): List<Offset> {
+    val n = flagCount(band.width, density)
+    val pitch = with(density) { BirthdayDimens.flagPitch.toPx() }
+    val first = band.left + (band.width - n * pitch) / 2 + pitch / 2
+    return List(n) { i -> (first + i * pitch).let { x -> Offset(x, stringY(band, x, density)) } }
+}
+
+/** The bottom of the lowest flag's point, or of the string's middle where there are no flags. */
+internal fun lowestFlagTip(band: Rect, density: Density): Float = with(density) {
+    val anchors = flagAnchors(band, density)
+    if (anchors.isEmpty()) stringY(band, band.center.x, density) else anchors.maxOf { it.y } + BirthdayDimens.flagHeight.toPx()
+}
+
+/** A [string]-coloured line sagging across [band], with a triangular flag in each person colour, in order, hung from it (16 §4.2). A band too narrow for three flags gets nothing. */
+fun DrawScope.drawBunting(band: Rect, string: Color, density: Density) {
+    val anchors = flagAnchors(band, density)
+    if (anchors.isEmpty()) return
+    val dip = with(density) { BirthdayDimens.buntingSag.toPx() }
+    val y = band.top + with(density) { BirthdayDimens.buntingTop.toPx() }
+    val line = Path().apply {
+        moveTo(band.left, y)
+        quadraticTo(band.center.x, y + 2 * dip, band.right, y)
+    }
+    drawPath(line, string, style = Stroke(with(density) { BirthdayDimens.buntingStroke.toPx() }))
+    val half = with(density) { BirthdayDimens.flagWidth.toPx() } / 2
+    val height = with(density) { BirthdayDimens.flagHeight.toPx() }
+    anchors.forEachIndexed { i, at ->
+        val flag = Path().apply {
+            moveTo(at.x - half, at.y)
+            lineTo(at.x + half, at.y)
+            lineTo(at.x, at.y + height)
+            close()
+        }
+        drawPath(flag, BirthdayInks.flag(PersonPalette.colors[i % PersonPalette.colors.size]))
+    }
+}
+
+/**
+ * The bunting across Home's open header band. Nothing in it is read by TalkBack. [drifting] is for the balloons that
+ * will rise through it; the bunting itself is still. It is as big as the band, so [modifier] gives the room the band sits in (16 §4.2).
+ */
+@Composable
+fun BirthdaySky(drifting: Boolean, modifier: Modifier = Modifier) {
+    val string = Culvery.colors.mute
+    val measured = LocalHomeSkyBand.current
+    Box(modifier) {
+        Spacer(
+            Modifier
+                .inSkyBand(measured)
+                .testTag("birthday_sky")
+                .clearAndSetSemantics {}
+                .graphicsLayer { clip = true }
+                .drawWithCache {
+                    val band = Rect(Offset.Zero, size)
+                    onDrawBehind { if (size.width > 0f && size.height > 0f) drawBunting(band, string, this) }
+                },
+        )
+    }
 }
