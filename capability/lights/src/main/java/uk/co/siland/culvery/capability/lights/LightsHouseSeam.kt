@@ -30,6 +30,8 @@ class LightsHouseSeam @Inject constructor(
         }
     }
 
+    override suspend fun holidayAutomationNames(): List<String>? = house.holidayAutomationNames()
+
     override suspend fun lightOptions(): LightOptions = modes.options()
 
     override suspend fun modeBefore(choices: List<RoomChoice>): List<RoomBefore> = modes.before(choices)

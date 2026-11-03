@@ -139,6 +139,26 @@ class HolidayHouseTest {
         assertThat(filmRefusal.current()).isEqualTo("Turn Holiday mode off first.")
     }
 
+    /** F3: fails if the page lists the heating or hoover while it isn't set up, or ever leaves out the doorbell. */
+    @Test
+    fun awayLinesFollowTheSeams() = runTest {
+        val rig = rig()
+        val door = HolidayWords.DOOR
+        assertThat(rig.house().awayLines.first()).hasSize(3)
+        rig.hoover.readyNow.value = false
+        assertThat(rig.house().awayLines.first()).containsExactly("Put the heating on Eco, and take it off Eco when you’re back.", door).inOrder()
+        assertThat(rig.house(heating = null).awayLines.first()).containsExactly(door)
+    }
+
+    /** F3: fails if the sheet's automations don't come from the lights seam, or aren't null with no lights. */
+    @Test
+    fun lightsAutomationsComeFromTheSeam() = runTest {
+        val rig = rig()
+        rig.lights.automationNames = listOf("Mimic presence")
+        assertThat(rig.house().lightsAutomations()).containsExactly("Mimic presence")
+        assertThat(rig.house(lights = null).lightsAutomations()).isNull()
+    }
+
     /** Fails if a part with no seam, or one not ready, is planned, recorded or called. */
     @Test
     fun eachMissingPartIsLeftOut() = runTest {

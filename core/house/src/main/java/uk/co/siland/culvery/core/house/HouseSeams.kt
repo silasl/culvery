@@ -68,6 +68,12 @@ interface HouseLights {
     val ready: Flow<Boolean>
     suspend fun setHoliday(on: Boolean, by: Authorised): HouseStep
 
+    /**
+     * The names of the automations Holiday lights starts, read afresh in the bridge's order; one the bridge no longer has
+     * is left out. Empty, with no read, when none are chosen; null when the bridge can't be read. Never throws.
+     */
+    suspend fun holidayAutomationNames(): List<String>?
+
     /** Every room and its scenes, read afresh; [LightOptions.line] says why they couldn't be. */
     suspend fun lightOptions(): LightOptions
 

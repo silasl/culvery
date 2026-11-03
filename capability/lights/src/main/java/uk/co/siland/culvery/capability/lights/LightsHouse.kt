@@ -55,6 +55,23 @@ class LightsHouse internal constructor(
     /** The automation's name in the last list read from the bridge; null when it wasn't in it. */
     fun nameOf(automationId: String): String? = lastList.firstOrNull { it.id == automationId }?.name
 
+    /** The chosen Holiday automations' names, read afresh in the bridge's order (see HouseLights.holidayAutomationNames). Only reads. */
+    suspend fun holidayAutomationNames(): List<String>? {
+        val chosen = settings.prefs.first().holidayAutomations
+        if (chosen.isEmpty()) return emptyList()
+        val s = system() ?: return null
+        val list = try {
+            s.automations().also { lastList = it }
+        } catch (e: LightsUnreachableException) {
+            failedRead(e)
+            return null
+        } catch (e: LightsRefusedException) {
+            failedRead(e)
+            return null
+        }
+        return list.filter { it.id in chosen }.map { it.name }
+    }
+
     /** Every room off except those Settings › Lights leaves out; null when another run holds the house. */
     suspend fun allOff(): AllOffResult? = holding({ HouseRun.ALL_OFF }) { prefs, _ -> offExcept(prefs.leftOut) }
 
@@ -184,6 +201,8 @@ class LightsHouse internal constructor(
     }
 
     private fun failed(command: LightsCommand, e: Exception) = Log.w(TAG, "${command.name} failed (${e::class.simpleName})")
+
+    private fun failedRead(e: Exception) = Log.w(TAG, "Reading the Holiday automations failed (${e::class.simpleName})")
 
     private suspend fun save(write: suspend () -> Unit) {
         try {

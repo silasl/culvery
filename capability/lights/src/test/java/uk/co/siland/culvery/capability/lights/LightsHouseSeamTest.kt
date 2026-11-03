@@ -99,4 +99,25 @@ class LightsHouseSeamTest {
         system.failures["recallScene Lounge-id relax-id"] = LightsRefusedException()
         assertThat(seam.modeOn(before)).containsExactly("Lounge")
     }
+
+    /** Fails if the names aren't in the bridge's order, keep one the bridge no longer has, or read the bridge with none chosen. */
+    @Test
+    fun holidayAutomationNamesFollowTheBridge() = runTest {
+        assertThat(seam.holidayAutomationNames()).isEmpty()
+        assertThat(system.calls).doesNotContain("automations")
+
+        soon { settings.setHolidayAutomations(setOf("away-id", "gone-id", "mimic-id")) }
+        assertThat(seam.holidayAutomationNames()).containsExactly("Mimic presence", "Away from home").inOrder()
+        assertThat(system.calls).doesNotContain("setAutomation mimic-id true")
+    }
+
+    /** Fails if a bridge that can't be read throws or answers anything but null. */
+    @Test
+    fun holidayAutomationNamesAreNullWhenTheBridgeCantBeRead() = runTest {
+        soon { settings.setHolidayAutomations(setOf("mimic-id")) }
+        system.failures["automations"] = LightsUnreachableException(LightsProblem.UNREACHABLE)
+        assertThat(seam.holidayAutomationNames()).isNull()
+        system.failures["automations"] = LightsRefusedException()
+        assertThat(seam.holidayAutomationNames()).isNull()
+    }
 }

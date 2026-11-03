@@ -252,6 +252,8 @@ internal class FakeLights(private val trace: Trace = Trace()) : HouseLights {
 
     override suspend fun setHoliday(on: Boolean, by: Authorised): HouseStep = HouseStep.Done
 
+    override suspend fun holidayAutomationNames(): List<String>? = emptyList()
+
     @Volatile var offered = LightOptions(emptyList(), null)
 
     @Volatile var optionsGate: CompletableDeferred<Unit>? = null

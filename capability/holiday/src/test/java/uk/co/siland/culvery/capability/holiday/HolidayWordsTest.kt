@@ -13,13 +13,23 @@ class HolidayWordsTest {
     /** Fails if a sheet line differs from the copy, or its dates aren't filled in. */
     @Test
     fun theSheetsLines() {
-        assertThat(HolidayWords.stepLine(HolidayStep.LIGHTS_ON, back)).isEqualTo("Switch on Holiday lights now.")
-        assertThat(HolidayWords.stepLine(HolidayStep.ECO_ON, back))
+        assertThat(HolidayWords.stepLine(HolidayStep.ECO_ON, back, null))
             .isEqualTo("Put the heating on Eco now, and take it off Eco at 00:01 on Saturday 31 October.")
-        assertThat(HolidayWords.stepLine(HolidayStep.HOOVER, back)).isEqualTo("Run the hoover at 10:00 on Friday 30 October.")
-        assertThat(HolidayWords.stepLine(HolidayStep.ECO_OFF, back)).isNull()
+        assertThat(HolidayWords.stepLine(HolidayStep.HOOVER, back, null)).isEqualTo("Run the hoover at 10:00 on Friday 30 October.")
+        assertThat(HolidayWords.stepLine(HolidayStep.ECO_OFF, back, null)).isNull()
         assertThat(HolidayWords.DOOR).isEqualTo("Keep the doorbell quiet. Rings and motion still show in the Door tab.")
         assertThat(HolidayWords.SCREEN).isEqualTo("Turn the screen off until someone taps it.")
+    }
+
+    /** F3: fails if the lights line promises automations none are chosen, or doesn't name the chosen ones. */
+    @Test
+    fun theLightsLineSaysWhatTheStepDoes() {
+        fun line(names: List<String>?) = HolidayWords.stepLine(HolidayStep.LIGHTS_ON, back, names)
+        assertThat(line(emptyList())).isEqualTo("Turn the lights off now.")
+        assertThat(line(listOf("Mimic presence"))).isEqualTo("Turn the lights off and start Mimic presence now.")
+        assertThat(line(listOf("Mimic", "Away"))).isEqualTo("Turn the lights off and start Mimic and Away now.")
+        assertThat(line(listOf("Mimic", "Away", "Late"))).isEqualTo("Turn the lights off and start Mimic, Away and Late now.")
+        assertThat(line(null)).isEqualTo("Turn the lights off and start the Hue automations you chose now.")
     }
 
     /** Fails if the tile's back date isn't short, or the spoken one isn't in full. */
@@ -57,20 +67,20 @@ class HolidayWordsTest {
         val steps = listOf(HolidayStep.LIGHTS_ON, HolidayStep.ECO_ON, HolidayStep.PLUGS_ON, HolidayStep.HOOVER, HolidayStep.ECO_OFF)
         val plugs = listOf(PlugChange("Lamp", false), PlugChange("Desk", true))
 
-        assertThat(HolidayWords.willLines(steps, back, plugs)).containsExactly(
-            HolidayWords.stepLine(HolidayStep.LIGHTS_ON, back),
-            HolidayWords.stepLine(HolidayStep.ECO_ON, back),
+        assertThat(HolidayWords.willLines(steps, back, plugs, listOf("Mimic presence"))).containsExactly(
+            "Turn the lights off and start Mimic presence now.",
+            HolidayWords.stepLine(HolidayStep.ECO_ON, back, null),
             "Switch Lamp off.",
             "Switch Desk on.",
             "Plugs go back as they were when you turn it off.",
-            HolidayWords.stepLine(HolidayStep.HOOVER, back),
+            HolidayWords.stepLine(HolidayStep.HOOVER, back, null),
             HolidayWords.DOOR,
             HolidayWords.SCREEN,
         ).inOrder()
-        assertThat(HolidayWords.willLines(steps, back, emptyList())).containsExactly(
-            HolidayWords.stepLine(HolidayStep.LIGHTS_ON, back),
-            HolidayWords.stepLine(HolidayStep.ECO_ON, back),
-            HolidayWords.stepLine(HolidayStep.HOOVER, back),
+        assertThat(HolidayWords.willLines(steps, back, emptyList(), listOf("Mimic presence"))).containsExactly(
+            "Turn the lights off and start Mimic presence now.",
+            HolidayWords.stepLine(HolidayStep.ECO_ON, back, null),
+            HolidayWords.stepLine(HolidayStep.HOOVER, back, null),
             HolidayWords.DOOR,
             HolidayWords.SCREEN,
         ).inOrder()
@@ -79,7 +89,7 @@ class HolidayWordsTest {
     /** Fails if the plugs step lists a line of its own, or its missed, threw and turn-off lines differ from the copy. */
     @Test
     fun thePlugsStepsOtherLines() {
-        assertThat(HolidayWords.stepLine(HolidayStep.PLUGS_ON, back)).isNull()
+        assertThat(HolidayWords.stepLine(HolidayStep.PLUGS_ON, back, null)).isNull()
         assertThat(HolidayWords.missedLine(HolidayStep.PLUGS_ON)).isEqualTo("The plugs didn’t switch. Switch them on the Lights tab.")
         assertThat(HolidayWords.failedLine(HolidayStep.PLUGS_ON)).isEqualTo("The plugs didn’t switch. They’ll keep trying.")
         assertThat(HouseLines.PLUGS_LEAVE_THREW).isEqualTo("Some plugs may not have gone back. Check them on the Lights tab.")

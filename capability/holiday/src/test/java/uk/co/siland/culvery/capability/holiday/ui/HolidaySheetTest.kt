@@ -146,11 +146,27 @@ class HolidaySheetTest {
     fun onlyTheStepsThatWillHappenAreListed() {
         rig.hoover.readyNow.value = false
         open()
-        compose.waitFor { shows("Switch on Holiday lights now.") }
+        compose.waitFor { shows("Turn the lights off now.") }
         compose.onNodeWithText("Put the heating on Eco now, and take it off Eco at 00:01 on Sunday 1 November.", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Keep the doorbell quiet. Rings and motion still show in the Door tab.", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Turn the screen off until someone taps it.", useUnmergedTree = true).assertExists()
         compose.onAllNodes(hasText("Run the hoover", substring = true), useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    /** F3: fails if the lights line doesn't name the chosen automations, or promises them when the bridge can't say which. */
+    @Test
+    fun theLightsLineNamesTheAutomations() {
+        rig.lights.automationNames = listOf("Mimic presence", "Away from home")
+        open()
+        compose.waitFor { shows("Turn the lights off and start Mimic presence and Away from home now.") }
+    }
+
+    /** F3: fails if a bridge that can't be read loses the lights line or names automations. */
+    @Test
+    fun theLightsLineWhenTheBridgeCantSay() {
+        rig.lights.automationNames = null
+        open()
+        compose.waitFor { shows("Turn the lights off and start the Hue automations you chose now.") }
     }
 
     /** Fails if the plugs' changes, or the line that they go back, are missing from the steps. */
@@ -172,7 +188,7 @@ class HolidaySheetTest {
         val gate = CompletableDeferred<Unit>()
         rig.lights.gate = gate
         open()
-        compose.waitFor { shows("Switch on Holiday lights now.") }
+        compose.waitFor { shows("Turn the lights off now.") }
         compose.onNodeWithTag("holiday_turn_on").performClick()
         compose.waitFor { rig.lights.calls.size == 1 }
         compose.onNode(hasText("Turning on…") and hasAnyAncestor(hasTestTag("holiday_turn_on")), useUnmergedTree = true).assertExists()

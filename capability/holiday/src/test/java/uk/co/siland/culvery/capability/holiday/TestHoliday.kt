@@ -60,6 +60,11 @@ internal class FakeLights : Script(), HouseLights {
     val calls = CopyOnWriteArrayList<Boolean>()
     override val ready: Flow<Boolean> = readyNow
 
+    /** What [holidayAutomationNames] answers; null is a bridge that can't be read. */
+    @Volatile var automationNames: List<String>? = emptyList()
+
+    override suspend fun holidayAutomationNames() = automationNames
+
     override suspend fun setHoliday(on: Boolean, by: Authorised): HouseStep {
         calls += on
         return answer()

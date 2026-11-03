@@ -6,11 +6,14 @@ import java.time.LocalDateTime
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.capability.holiday.HolidayStep.ECO_OFF
@@ -116,6 +119,12 @@ class HolidayHouse internal constructor(
 
     /** What the plugs step would switch, for the sheet. */
     suspend fun plugChanges(): List<PlugChange> = plugs?.preview().orEmpty()
+
+    /** The Hue automations the lights step would start, for the sheet; null with no lights, or when the bridge can't say. */
+    suspend fun lightsAutomations(): List<String>? = lights?.holidayAutomationNames()
+
+    /** What Holiday mode does besides its lights and plugs, for its page: by the rules [plan] uses, without the hoover's timing. */
+    val awayLines: Flow<List<String>> = combine(heating?.ready ?: flowOf(false), hoover?.ready ?: flowOf(false), HolidayWords::awayLines)
 
     suspend fun turnOn(back: LocalDate, by: Authorised) {
         require(HousePermissions.HOLIDAY_MODE in by.granted) { "Turning Holiday mode on needs its own grant" }

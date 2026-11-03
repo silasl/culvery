@@ -29,7 +29,7 @@ import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "HolidayModePage"
 
-/** Holiday mode's own parts of its page in Settings › Modes (15b §4.2): the turn button and Lights while away with its fixed lines. */
+/** Holiday mode's own parts of its page in Settings › Modes (15b §4.2): the turn button and Lights while away, then what else it does while away. */
 @Singleton
 class HolidayModePage @Inject constructor(
     private val actions: HolidayActions,
@@ -60,12 +60,13 @@ class HolidayModePage @Inject constructor(
 
     @Composable
     override fun Sections() {
+        val away by house.awayLines.collectAsState(initial = HolidayWords.awayLines(heating = false, hoover = false))
         Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap)) {
             if (lights.isNotEmpty()) {
                 HhSectionLabel(HolidayWords.LIGHTS_WHILE_AWAY)
                 lights.forEach { it.Content(Modifier) }
             }
-            HolidayWords.FIXED_LINES.forEachIndexed { i, line ->
+            away.forEachIndexed { i, line ->
                 Text(line, style = HhType.body, color = Culvery.colors.mute, modifier = Modifier.testTag("holiday_fixed_$i"))
             }
         }

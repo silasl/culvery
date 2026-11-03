@@ -78,7 +78,7 @@ class HolidayScreenshotTest {
     ) =
         compose.snap(name, dark, Modifier.size(1_116.dp, 800.dp)) {
             Box(Modifier.size(1_116.dp, 800.dp), contentAlignment = Alignment.CenterEnd) {
-                HolidaySheet(back, today, pick, steps, plugs, choosing, turning = false, onChangeDate = {}, onPickDate = {}, onTurnOn = {}, onCancel = {})
+                HolidaySheet(back, today, pick, steps, plugs, listOf("Mimic presence"), choosing, turning = false, onChangeDate = {}, onPickDate = {}, onTurnOn = {}, onCancel = {})
             }
         }
 

@@ -129,6 +129,7 @@ class HolidayModePageTest {
     @Test
     fun fixedLinesShow() {
         show(lights = setOf(FAKE_LIGHTS))
+        compose.waitFor { exists("holiday_fixed_2") }
         compose.onNode(hasContentDescription("Lights while away")).assertExists()
         compose.onNodeWithTag("fake_lights").assertExists()
         compose.onNodeWithTag("holiday_fixed_0").assertTextEquals("Put the heating on Eco, and take it off Eco when you’re back.")
@@ -144,6 +145,20 @@ class HolidayModePageTest {
         show(lights = emptySet())
         compose.onAllNodes(hasContentDescription("Lights while away")).assertCountEquals(0)
         compose.onNodeWithTag("holiday_fixed_0").assertExists()
+    }
+
+    /** F3: fails if the heating or hoover line shows while its seam isn't set up, or the doorbell line ever goes. */
+    @Test
+    fun onlyWhatWillHappenIsListed() {
+        rig.heating.readyNow.value = false
+        show()
+        compose.waitFor { !exists("holiday_fixed_2") }
+        compose.onNodeWithTag("holiday_fixed_0").assertTextEquals("Run the hoover the day before you’re back.")
+        compose.onNodeWithTag("holiday_fixed_1").assertTextEquals("Keep the doorbell quiet. Rings and motion still show in the Door tab.")
+
+        rig.hoover.readyNow.value = false
+        compose.waitFor { !exists("holiday_fixed_1") }
+        compose.onNodeWithTag("holiday_fixed_0").assertTextEquals("Keep the doorbell quiet. Rings and motion still show in the Door tab.")
     }
 
     /** T3: fails if a stored mode being on asks for a PIN, or the page doesn't say which mode to turn off. */
