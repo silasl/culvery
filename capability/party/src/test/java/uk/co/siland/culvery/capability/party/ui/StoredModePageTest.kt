@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -79,15 +81,15 @@ class StoredModePageTest {
 
     @After fun stop() = scope.cancel()
 
-    /** Shows Settings › Modes with [modes] stored and the page of [open] showing; [read] false leaves the record unread. */
-    private fun show(vararg modes: StoredMode, open: String = modes.last().id, read: Boolean = true) {
+    /** Shows Settings › Modes [height] tall with [modes] stored and the page of [open] showing; [read] false leaves the record unread. */
+    private fun show(vararg modes: StoredMode, open: String = modes.last().id, read: Boolean = true, height: Dp = 2400.dp) {
         runBlocking { rig.settings.update { ModesPrefs(true, modes.toList()) } }
         if (read) rig.loaded()
         val page = rig.page(toaster)
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
-                    Box(Modifier.size(960.dp, 2400.dp)) {
+                    Box(Modifier.size(960.dp, height)) {
                         InSettingsPane { page.Content() }
                         overlay.content?.invoke()
                     }
@@ -493,6 +495,15 @@ class StoredModePageTest {
         assertThat(runBlocking { rig.settings.prefs.first().modes.map { it.id } }).containsExactly("party")
         gone("mode_header")
         gone("mode_row_$FILM_ID")
+    }
+
+    /** F5: fails if Delete mode's card opens with its buttons off the bottom of a page taller than the screen. */
+    @Test
+    fun deletesCardScrollsIntoView() {
+        show(PARTY_MODE, FILM_NIGHT, open = "party", height = 700.dp)
+        tap("mode_delete")
+        compose.onNodeWithTag("mode_delete_go").assertIsDisplayed()
+        compose.onNodeWithTag("mode_delete_keep").assertIsDisplayed()
     }
 
     /** Fails if a mode that is on can be deleted, or the refusal doesn't name the mode. */

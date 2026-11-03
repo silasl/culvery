@@ -484,7 +484,7 @@ fun HhPersonChip(
  * A confirmation card on `dangerSoft`: [question] above two buttons. Keep sits on the left where the action that opened
  * the card was, so a double tap on it is harmless; the confirming button is [ButtonTone.Destroy]. TalkBack announces
  * [title] as the card appears, which it otherwise does silently under the focus it leaves on the sheet; [question]
- * shows it unless the card says more.
+ * shows it unless the card says more. The card scrolls itself fully into view as it appears, so its buttons are on screen.
  */
 @Composable
 fun HhConfirmCard(
@@ -500,9 +500,12 @@ fun HhConfirmCard(
     confirmIcon: String? = null,
     question: @Composable () -> Unit = { Text(title, style = ControlType.confirmTitle, color = Culvery.colors.ink) },
 ) {
+    val inView = remember { BringIntoViewRequester() }
+    LaunchedEffect(Unit) { inView.bringIntoView() }
     Column(
         verticalArrangement = Arrangement.spacedBy(ControlTokens.confirmGap),
         modifier = Modifier
+            .bringIntoViewRequester(inView)
             .testTag(tag)
             .semantics { paneTitle = title }
             .readAsOne()
