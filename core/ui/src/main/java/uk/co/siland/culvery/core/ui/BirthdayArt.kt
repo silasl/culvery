@@ -4,11 +4,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableLongState
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
@@ -24,7 +27,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
 import kotlin.math.floor
+import kotlin.math.sin
 
 // The cake's viewport has the Culvery mark's aspect, so it takes the mark's place without moving anything.
 private const val CAKE_W = 54f
@@ -62,7 +67,26 @@ object BirthdayDimens {
     val flagWidth = 18.dp
     val flagHeight = 22.dp
     val flagPitch = 28.dp
+    val balloonWidth = 30.dp
+    val balloonHeight = 38.dp
+    val balloonString = 26.dp
+    val balloonSway = 6.dp
 }
+
+internal const val BALLOON_LAP_MS = 40_000L
+internal const val BALLOONS = 4
+
+/** Where each balloon's body hangs (its centre x, top y) in [band] [elapsedMillis] into the drift. */
+fun balloonPositions(elapsedMillis: Long, band: Rect, density: Density): List<Offset> =
+    with(density) {
+        val travel = band.height + BirthdayDimens.balloonHeight.toPx() + BirthdayDimens.balloonString.toPx()
+        val sway = BirthdayDimens.balloonSway.toPx()
+        List(BALLOONS) { i ->
+            val lap = ((elapsedMillis % BALLOON_LAP_MS).toFloat() / BALLOON_LAP_MS + i / BALLOONS.toFloat()) % 1f
+            Offset(band.left + band.width * (i + 0.5f) / BALLOONS + sway * sin(2f * PI.toFloat() * lap), band.bottom - lap * travel)
+        }
+    }
+
 
 private const val BUNTING_MIN_FLAGS = 3
 
@@ -116,13 +140,28 @@ fun DrawScope.drawBunting(band: Rect, string: Color, density: Density) {
     }
 }
 
+/** Four balloons, one per lane, each with its string, under whatever is drawn after them (16 §4.2). */
+private fun DrawScope.drawBalloons(elapsedMillis: Long, band: Rect, c: HhColors, density: Density) {
+    val w = with(density) { BirthdayDimens.balloonWidth.toPx() }
+    val h = with(density) { BirthdayDimens.balloonHeight.toPx() }
+    val string = with(density) { BirthdayDimens.balloonString.toPx() }
+    val stroke = with(density) { 1.dp.toPx() }
+    balloonPositions(elapsedMillis, band, density).forEachIndexed { i, at ->
+        drawLine(c.mute, Offset(at.x, at.y + h), Offset(at.x, at.y + h + string), stroke)
+        drawOval(BirthdayInks.balloon(PersonPalette.colors[i % PersonPalette.colors.size], c), Offset(at.x - w / 2, at.y), Size(w, h))
+    }
+}
+
 /**
- * The bunting across Home's open header band. Nothing in it is read by TalkBack. [drifting] is for the balloons that
- * will rise through it; the bunting itself is still. It is as big as the band, so [modifier] gives the room the band sits in (16 §4.2).
+ * Balloons rising and bunting across Home's open header band. Nothing in it is read by TalkBack. While [drifting] it advances
+ * [elapsed] about every [SKY_FRAME_MS]; the time is read only when drawing. Still, it runs no frames and draws the balloons once.
+ * It is as big as the band, so [modifier] gives the room the band sits in (16 §4.2).
  */
 @Composable
-fun BirthdaySky(drifting: Boolean, modifier: Modifier = Modifier) {
-    val string = Culvery.colors.mute
+fun BirthdaySky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: MutableLongState = remember { mutableLongStateOf(0L) }) {
+    val colors = Culvery.colors
+    val string = colors.mute
+    SkyFrames(drifting, elapsed)
     val measured = LocalHomeSkyBand.current
     Box(modifier) {
         Spacer(
@@ -133,7 +172,11 @@ fun BirthdaySky(drifting: Boolean, modifier: Modifier = Modifier) {
                 .graphicsLayer { clip = true }
                 .drawWithCache {
                     val band = Rect(Offset.Zero, size)
-                    onDrawBehind { if (size.width > 0f && size.height > 0f) drawBunting(band, string, this) }
+                    onDrawBehind {
+                        if (size.width <= 0f || size.height <= 0f) return@onDrawBehind
+                        drawBalloons(elapsed.longValue, band, colors, this)
+                        drawBunting(band, string, this)
+                    }
                 },
         )
     }

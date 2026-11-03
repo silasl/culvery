@@ -193,6 +193,22 @@ private class SkyFrame(size: Size, density: Density) {
     val fit = track.span / BAT_W
 }
 
+/** While [drifting], adds the time since the last step to [elapsed] about every [SKY_FRAME_MS]; still, it runs no frames at all. */
+@Composable
+internal fun SkyFrames(drifting: Boolean, elapsed: MutableLongState) {
+    LaunchedEffect(drifting) {
+        if (!drifting) return@LaunchedEffect
+        var last = -1L
+        while (true) {
+            withFrameMillis { now ->
+                if (last >= 0) elapsed.longValue += now - last
+                last = now
+            }
+            delay(SKY_FRAME_MS)
+        }
+    }
+}
+
 /**
  * The moon and the bats in Home's open header band. Nothing in it is read by TalkBack. While [drifting] it advances [elapsed]
  * about every [SKY_FRAME_MS]; the time is read only when drawing, so a step redraws this small layer and nothing else (14 §4.3).
@@ -205,17 +221,7 @@ fun HalloweenSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Muta
     val bat = HalloweenInks.bat(colors)
     val measured = LocalHomeSkyBand.current
     val batShape = remember { addPathNodes(BAT_PATH).toPath() }
-    LaunchedEffect(drifting) {
-        if (!drifting) return@LaunchedEffect
-        var last = -1L
-        while (true) {
-            withFrameMillis { now ->
-                if (last >= 0) elapsed.longValue += now - last
-                last = now
-            }
-            delay(SKY_FRAME_MS)
-        }
-    }
+    SkyFrames(drifting, elapsed)
     // The box gives the band its room; the band's own node is placed inside it, so the box's size can't stretch it.
     Box(modifier) {
         Spacer(
