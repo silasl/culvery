@@ -13,6 +13,8 @@ data class ProviderDescriptor(
     val userConnectable: Boolean = true,
     /** The connecting card's second line, e.g. what to choose in the provider's screens; none when it has nothing to add. */
     val connectHint: String? = null,
+    /** Its calendars hold bin collections, so Settings offers a colour for each kind of bin. */
+    val carriesBins: Boolean = false,
 )
 
 /** The first provider a household may connect to, by its [descriptor], so a debug sample never answers a Find or a typed address. */

@@ -18,8 +18,9 @@ internal class ScriptedProvider(
     var sourceList: List<CalendarSource> = emptyList(),
     features: Set<Feature> = setOf(Feature.READ),
     displayName: String = id,
+    carriesBins: Boolean = false,
 ) : CalendarProvider {
-    override val descriptor = ProviderDescriptor(id, displayName, "event", features)
+    override val descriptor = ProviderDescriptor(id, displayName, "event", features, carriesBins = carriesBins)
     val calls = mutableListOf<SyncCall>()
     var failWith: Throwable? = null
     /** Per-source failures, by source id; they win over [failWith]. */

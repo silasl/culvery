@@ -64,7 +64,8 @@ class CalendarReviewTest {
     private val settings = testCalendarSettings()
     private val binColours = testBinColours()
 
-    private suspend fun TestScope.review(uses: Set<AccountUse> = emptySet()): Pair<CalendarReview, TestAccess> {
+    private suspend fun TestScope.review(uses: Set<AccountUse> = emptySet(), carriesBins: Boolean = false): Pair<CalendarReview, TestAccess> {
+        val google = if (carriesBins) ScriptedProvider("calendar.google", google.sourceList, google.descriptor.features, "Google Calendar", carriesBins = true) else google
         val access = testAccess(household)
         val setup = CalendarSetup(store, setOf(google), { household.people.first() }, toaster, WallClock { 0L }, EmptyCoroutineContext)
         val connections = CalendarConnections(store, setup, access.control, setOf(google), backgroundScope)
@@ -246,8 +247,14 @@ class CalendarReviewTest {
     }
 
     @Test
+    fun aBinsConnectionListsTheFourKindsBeforeTheFirstRead() = runTest {
+        val (review, _) = review(carriesBins = true)
+        assertThat(review.connections.first().single().binKinds).containsExactly("food", "garden", "recycling", "waste").inOrder()
+    }
+
+    @Test
     fun binKindsAreTheFourKnownAndTheOnesSeen() = runTest {
-        val (review, _) = review()
+        val (review, _) = review(carriesBins = true)
         binDay(listOf("waste", "Glass"))
         assertThat(review.connections.first().single().binKinds).containsExactly("food", "garden", "recycling", "waste", "Glass").inOrder()
     }

@@ -66,6 +66,7 @@ class MidSussexBinsProvider @Inject constructor(
         Icons.DELETE,
         setOf(Feature.READ),
         connectHint = "Enter the house name or number and the postcode, as on the council’s site.",
+        carriesBins = true,
     )
 
     private val lock = Mutex()

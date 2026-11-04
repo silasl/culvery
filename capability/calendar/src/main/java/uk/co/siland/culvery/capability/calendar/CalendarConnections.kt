@@ -22,6 +22,7 @@ data class CalendarRow(
     val icon: String,
     val health: ConnectionHealth,
     val lastSyncMillis: Long?,
+    val carriesBins: Boolean = false,
 )
 
 /**
@@ -45,8 +46,11 @@ class CalendarConnections @Inject constructor(
 
     val rows: Flow<List<CalendarRow>> = store.connections().map { stored ->
         stored.map { s ->
-            val icon = provider(s.connection.providerId)?.descriptor?.icon ?: DEFAULT_ICON
-            CalendarRow(s.connection, serviceNameOf(s.connection, providers::displayNameOf), icon, s.health, s.lastSyncMillis)
+            val descriptor = provider(s.connection.providerId)?.descriptor
+            CalendarRow(
+                s.connection, serviceNameOf(s.connection, providers::displayNameOf), descriptor?.icon ?: DEFAULT_ICON, s.health, s.lastSyncMillis,
+                carriesBins = descriptor?.carriesBins == true,
+            )
         }
     }
 

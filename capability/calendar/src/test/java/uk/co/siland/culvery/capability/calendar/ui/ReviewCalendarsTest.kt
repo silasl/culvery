@@ -699,6 +699,12 @@ class ReviewCalendarsTest {
     }
 
     @Test
+    fun binColourRowsShowBeforeTheFirstRead() {
+        showBins(listOf("food", "garden", "recycling", "waste"))
+        listOf("Food", "Garden", "Recycling", "Waste").forEach { compose.onNodeWithText(it).assertExists() }
+    }
+
+    @Test
     fun aConnectionWithoutBinDaysHasNoColourRows() {
         showBins(null)
         compose.onAllNodes(hasTestTag("bin_row_food")).assertCountEquals(0)

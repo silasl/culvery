@@ -22,7 +22,7 @@ import uk.co.siland.culvery.core.ui.BinInk
 
 /**
  * One connection as Review calendars shows it (4a design §4.5): its row, and its calendars. [binKinds] is set for a
- * connection whose events are bin days: the four known kinds, then any other the council has named.
+ * connection whose provider carries bins: the four known kinds, then any other seen in its stored events.
  */
 data class ReviewConnection(val row: CalendarRow, val sources: List<StoredSource>, val binKinds: List<String>? = null)
 
@@ -66,11 +66,11 @@ class CalendarReview @Inject constructor(
 ) {
     val connections: Flow<List<ReviewConnection>> = combine(calendarConnections.rows, store.sources(), store.binsHeld()) { rows, sources, bins ->
         rows.map { row ->
-            val seen = bins[row.connection.id]
+            val seen = bins[row.connection.id].orEmpty()
             ReviewConnection(
                 row,
                 sources.filter { it.connectionId == row.connection.id },
-                binKinds = seen?.let { orderedBins(BinKind.entries.map(BinKind::key) + it) },
+                binKinds = if (row.carriesBins) orderedBins(BinKind.entries.map(BinKind::key) + seen) else null,
             )
         }
     }
