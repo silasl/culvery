@@ -671,11 +671,15 @@ class ReviewCalendarsTest {
     private val binsSource = StoredSource("b1", CalendarSource("bins", "Bins", writable = false, shown = true, primary = true), SourceMapping(PersonId.FAMILY, visible = true))
     private var inked: Pair<String, String>? = null
 
+    private var updates = 0
+
     private fun showBins(kinds: List<String>?, picking: String? = null, inks: Map<String, String> = emptyMap()) = compose.setContent {
         CulveryTheme(dark = true) {
             ReviewCalendars(
                 title = "Calendars",
-                connections = listOf(ReviewConnection(CalendarRow(bins, "Mid Sussex bins", "delete", ConnectionHealth.Ok, now - 2 * 60_000), listOf(binsSource), kinds)),
+                connections = listOf(
+                    ReviewConnection(CalendarRow(bins, "Mid Sussex bins", "delete", ConnectionHealth.Ok, now - 2 * 60_000, carriesBins = true), listOf(binsSource), kinds),
+                ),
                 people = listOf(Person.Family, mia),
                 nowMillis = now,
                 busy = false,
@@ -683,9 +687,30 @@ class ReviewCalendarsTest {
                 confirming = null,
                 connectable = emptyList(),
                 binInks = inks,
-                actions = ReviewActions(onPick = { picked = it }, onBinInk = { kind, ink -> inked = kind to ink.id }),
+                actions = ReviewActions(onPick = { picked = it }, onBinInk = { kind, ink -> inked = kind to ink.id }, onUpdateNow = { updates++ }),
             )
         }
+    }
+
+    @Test
+    fun aBinsConnectionOffersUpdateNowBesideDisconnect() {
+        showBins(listOf("food"))
+        compose.onNodeWithTag("review_disconnect_b1").assertExists()
+        compose.onNode(hasTestTag("review_update_now_b1") and hasAnyDescendant(hasText("Update now")), useUnmergedTree = true).performClick()
+        assertThat(updates).isEqualTo(1)
+    }
+
+    @Test
+    fun aCalendarWithoutBinsOffersNoUpdateNow() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars(
+                    title = "Calendars", connections = listOf(ReviewConnection(row(), listOf(family))), people = listOf(Person.Family),
+                    nowMillis = now, busy = false, picking = null, confirming = null, connectable = emptyList(), actions = ReviewActions(onUpdateNow = { updates++ }),
+                )
+            }
+        }
+        compose.onAllNodes(hasText("Update now")).assertCountEquals(0)
     }
 
     @Test

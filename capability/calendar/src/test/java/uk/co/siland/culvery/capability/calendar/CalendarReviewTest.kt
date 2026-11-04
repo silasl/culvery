@@ -260,6 +260,37 @@ class CalendarReviewTest {
     }
 
     @Test
+    fun anUnknownKindStaysListedAfterALaterReadDropsIt() = runTest {
+        val (review, _) = review(carriesBins = true)
+        binDay(listOf("waste", "Glass"))
+        assertThat(review.connections.first().single().binKinds).contains("Glass")
+        binDay(listOf("waste"))
+        assertThat(review.connections.first().single().binKinds).containsExactly("food", "garden", "recycling", "waste", "Glass").inOrder()
+        assertThat(binColours.seen.first()).containsExactly("Glass")
+    }
+
+    @Test
+    fun rememberedKindsComeBeforeOnesOnlyInStoredEvents() = runTest {
+        val (review, _) = review(carriesBins = true)
+        binColours.remember(listOf("Textiles"))
+        binDay(listOf("waste", "Batteries"))
+        assertThat(review.connections.first().single().binKinds)
+            .containsExactly("food", "garden", "recycling", "waste", "Textiles", "Batteries").inOrder()
+    }
+
+    @Test
+    fun disconnectingTheLastBinsConnectionForgetsTheUnknownKinds() = runTest {
+        val (review, access) = review(carriesBins = true)
+        binDay(listOf("waste", "Glass"))
+        val row = review.connections.first().single().row
+        binColours.set("waste", "purple")
+        access.answer(TestAccess.ALEX)
+        assertThat(review.disconnect(row)).isTrue()
+        assertThat(binColours.seen.first()).isEmpty()
+        assertThat(binColours.inkFor("waste")?.id).isEqualTo("purple")
+    }
+
+    @Test
     fun choosingAnInkSavesItAndSaysSo() = runTest {
         val (review, access) = review()
         access.answer(TestAccess.ALEX)

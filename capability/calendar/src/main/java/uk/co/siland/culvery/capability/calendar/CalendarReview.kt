@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
+import java.io.IOException
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,7 +24,8 @@ import uk.co.siland.culvery.core.ui.BinInk
 
 /**
  * One connection as Review calendars shows it (4a design §4.5): its row, and its calendars. [binKinds] is set for a
- * connection whose provider carries bins: the four known kinds, then any other seen in its stored events.
+ * connection whose provider carries bins: the four known kinds, then the unknown ones remembered, then any other in its
+ * stored events.
  */
 data class ReviewConnection(val row: CalendarRow, val sources: List<StoredSource>, val binKinds: List<String>? = null)
 
@@ -55,7 +57,7 @@ fun disconnectQuestion(service: String, queued: Int, shoppingUses: Boolean = fal
 class CalendarReview @Inject constructor(
     private val store: CalendarStore,
     private val setup: CalendarSetup,
-    calendarConnections: CalendarConnections,
+    private val calendarConnections: CalendarConnections,
     private val household: HouseholdRepository,
     private val access: AccessControl,
     private val toaster: Toaster,
@@ -65,14 +67,26 @@ class CalendarReview @Inject constructor(
     private val binColours: BinColours,
     private val accountUses: Set<@JvmSuppressWildcards AccountUse> = emptySet(),
 ) {
-    val connections: Flow<List<ReviewConnection>> = combine(calendarConnections.rows, store.sources(), store.binsHeld().distinctUntilChanged()) { rows, sources, bins ->
-        rows.map { row ->
-            val seen = bins[row.connection.id].orEmpty()
-            ReviewConnection(
-                row,
-                sources.filter { it.connectionId == row.connection.id },
-                binKinds = if (row.carriesBins) orderedBins(BinKind.entries.map(BinKind::key) + seen) else null,
-            )
+    /** Remembers an unknown kind the first time this sees it in stored events: the page is where a colour is chosen. */
+    val connections: Flow<List<ReviewConnection>> =
+        combine(calendarConnections.rows, store.sources(), store.binsHeld().distinctUntilChanged(), binColours.seen) { rows, sources, bins, remembered ->
+            rows.map { row ->
+                val held = bins[row.connection.id].orEmpty()
+                val fresh = held.filter { binKindOf(it) == null && it !in remembered }
+                if (row.carriesBins && fresh.isNotEmpty()) rememberKinds(fresh)
+                ReviewConnection(
+                    row,
+                    sources.filter { it.connectionId == row.connection.id },
+                    binKinds = if (row.carriesBins) (BinKind.entries.map(BinKind::key) + orderedBins(remembered) + orderedBins(fresh)).distinct() else null,
+                )
+            }
+        }
+
+    private suspend fun rememberKinds(kinds: List<String>) {
+        try {
+            binColours.remember(kinds)
+        } catch (e: IOException) {
+            Log.w(TAG, "Couldn't remember a kind of bin (${e::class.simpleName})")
         }
     }
 
@@ -124,9 +138,20 @@ class CalendarReview @Inject constructor(
         return accountUses.any { it.uses(account) }
     }
 
-    /** D14: the connection with its calendars, events and queued changes. The grant in the Google account stays. */
+    /**
+     * D14: the connection with its calendars, events and queued changes. The grant in the Google account stays. The last bins
+     * connection takes the unknown kinds it brought with it.
+     */
     suspend fun disconnect(row: CalendarRow): Boolean = change {
+        val lastBins = row.carriesBins && calendarConnections.rows.first().none { it.carriesBins && it.connection.id != row.connection.id }
         store.removeConnection(row.connection.id)
+        if (lastBins) {
+            try {
+                binColours.forgetSeen()
+            } catch (e: IOException) {
+                Log.w(TAG, "Couldn't forget the kinds of bin (${e::class.simpleName})")
+            }
+        }
         toaster.show(disconnected(row.service))
     }
 

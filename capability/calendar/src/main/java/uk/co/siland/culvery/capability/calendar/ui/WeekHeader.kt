@@ -183,5 +183,4 @@ private fun ReconnectChip(label: String, onClick: () -> Unit) {
 
 /** How long "Updating…" stands in for an out-of-date line before a failed sync shows it again. */
 internal const val UPDATING_SHOWN_MS = 30_000L
-private const val UPDATE_NOW = "Update now"
 private const val UPDATING = "Updating…"

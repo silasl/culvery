@@ -183,11 +183,11 @@ class ReviewScreenshotTest {
     @Test fun settingsCalendarsPageLight() = settings("settings_calendars_page_light", false)
     @Test fun calendarsEmptyDark() = settings("settings_calendars_empty_dark", true, connected = false)
 
-    /** Settings › Calendars with the bins calendar: the four known kinds and one the council named, waste's inks open. */
+    /** Settings › Calendars with the bins calendar: the four known kinds and one the council named, waste's inks open, Update now beside Disconnect. */
     @Test
     fun settingsCalendarsBins() {
         val bins = Connection("b1", "calendar.midsussex", "Mid Sussex bins", emptyMap())
-        val binsRow = CalendarRow(bins, "Mid Sussex bins", "delete", ConnectionHealth.Ok, now - 2 * 60_000)
+        val binsRow = CalendarRow(bins, "Mid Sussex bins", "delete", ConnectionHealth.Ok, now - 2 * 60_000, carriesBins = true)
         val binsSource = StoredSource("b1", CalendarSource("bins", "Bins", writable = false, shown = true, primary = true), SourceMapping(PersonId.FAMILY, visible = true))
         val pages = listOf(
             StillPage("app", "App settings", 0) {},
@@ -204,7 +204,7 @@ class ReviewScreenshotTest {
                     confirming = null,
                     connectable = emptyList(),
                     binInks = mapOf("recycling" to "yellow"),
-                    actions = ReviewActions(),
+                    actions = ReviewActions(onUpdateNow = {}),
                 )
             },
             StillPage("shopping", "Shopping", 420) {},

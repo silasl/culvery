@@ -44,7 +44,7 @@ class CalendarCapability @Inject constructor(
         CalendarConnectStep(repo, connections),
         ReviewCalendarsStep(repo, review, connections, clock),
     )
-    private val pages: List<SettingsPage> = listOf(CalendarsPage(review, connections, clock))
+    private val pages: List<SettingsPage> = listOf(CalendarsPage(review, connections, clock, editor::updateNow))
 
     override fun setupSteps(): List<SetupStep> = steps
 

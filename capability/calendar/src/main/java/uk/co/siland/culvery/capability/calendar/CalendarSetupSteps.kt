@@ -42,11 +42,16 @@ class ReviewCalendarsStep(
 }
 
 /** Settings › Calendars (4a design D4): Review calendars, and Connect for a service not yet connected (ruling 14). */
-class CalendarsPage(private val review: CalendarReview, private val connections: CalendarConnections, private val clock: HouseholdClock) : SettingsPage {
+class CalendarsPage(
+    private val review: CalendarReview,
+    private val connections: CalendarConnections,
+    private val clock: HouseholdClock,
+    private val updateNow: () -> Unit,
+) : SettingsPage {
     override val id = SettingsPageIds.CALENDARS
     override val title = CALENDARS
     override val order = 400
 
     @Composable
-    override fun Content() = ReviewCalendarsHost(review, connections, clock, CALENDARS, offerConnect = true, offerWeeks = true)
+    override fun Content() = ReviewCalendarsHost(review, connections, clock, CALENDARS, offerConnect = true, offerWeeks = true, onUpdateNow = updateNow)
 }

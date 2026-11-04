@@ -95,6 +95,7 @@ internal const val MAIN_NEW_EVENTS_GO_HERE = "Main · new events go here"
 internal const val USE_FOR_NEW_EVENTS = "Use for new events"
 internal const val HIDE_THIS_CALENDAR = "Hide this calendar"
 internal const val BIN_COLOURS = "Bin colours"
+internal const val UPDATE_NOW = "Update now"
 
 /** The read problem's sentence (9 §4.12); screen text only, never a toast or a log. */
 internal fun cantRead(account: String?, main: Boolean): String {
@@ -161,7 +162,16 @@ internal fun ConnectedStepCard(rows: List<CalendarRow>) {
 }
 
 @Composable
-internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: HouseholdClock, title: String, offerConnect: Boolean, line: String? = null, offerWeeks: Boolean = false) {
+internal fun ReviewCalendarsHost(
+    review: CalendarReview,
+    connections: CalendarConnections,
+    clock: HouseholdClock,
+    title: String,
+    offerConnect: Boolean,
+    line: String? = null,
+    offerWeeks: Boolean = false,
+    onUpdateNow: (() -> Unit)? = null,
+) {
     // Null until the store answers, so the page draws nothing rather than "Connect…" first.
     val list by review.connections.collectAsStateWithLifecycle<List<ReviewConnection>?>(null)
     val people by review.people.collectAsStateWithLifecycle<List<Person>?>(null)
@@ -203,6 +213,7 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
             onDisconnect = { row -> action.run { confirming = Confirming(row, review.queuedChanges(row.connection.id), review.shoppingUses(row)) } },
             onKeep = { confirming = null },
             onConfirmDisconnect = { row -> action.run { if (review.disconnect(row)) confirming = null } },
+            onUpdateNow = onUpdateNow,
         ),
     )
 }
@@ -220,6 +231,8 @@ internal class ReviewActions(
     val onDisconnect: (CalendarRow) -> Unit = {},
     val onKeep: () -> Unit = {},
     val onConfirmDisconnect: (CalendarRow) -> Unit = {},
+    /** A bins connection's Update now (spec 3.5); null offers none. */
+    val onUpdateNow: (() -> Unit)? = null,
 )
 
 /**
@@ -255,7 +268,7 @@ internal fun ReviewCalendars(
             )
         }
         connections.forEach { connection ->
-            ConnectionHeader(connection.row, nowMillis, busy, actions.onReconnect, actions.onDisconnect)
+            ConnectionHeader(connection.row, nowMillis, busy, actions.onReconnect, actions.onDisconnect, actions.onUpdateNow.takeIf { connection.row.carriesBins })
             if (confirming != null && confirming.row.connection.id == connection.row.connection.id) {
                 HhConfirmCard(
                     tag = "review_confirm",
@@ -367,7 +380,14 @@ private fun WeeksAheadRows(chosen: WeeksShown, onWeeks: (WeeksShown) -> Unit) {
 }
 
 @Composable
-private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, onReconnect: (Connection) -> Unit, onDisconnect: (CalendarRow) -> Unit) {
+private fun ConnectionHeader(
+    row: CalendarRow,
+    nowMillis: Long,
+    busy: Boolean,
+    onReconnect: (Connection) -> Unit,
+    onDisconnect: (CalendarRow) -> Unit,
+    onUpdateNow: (() -> Unit)?,
+) {
     val c = Culvery.colors
     val needsReconnect = row.health == ConnectionHealth.NeedsSignIn
     HhListRow(
@@ -382,6 +402,12 @@ private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, o
                 HhButton(
                     "Reconnect", { onReconnect(row.connection) }, Modifier.testTag("settings_reconnect"),
                     tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf, spokenName = forAccount("Reconnect", row),
+                )
+            }
+            if (onUpdateNow != null) {
+                HhButton(
+                    UPDATE_NOW, onUpdateNow, Modifier.testTag("review_update_now_${row.connection.id}"),
+                    enabled = !busy, on = ButtonSurface.Surf, spokenName = forAccount(UPDATE_NOW, row),
                 )
             }
             HhButton(

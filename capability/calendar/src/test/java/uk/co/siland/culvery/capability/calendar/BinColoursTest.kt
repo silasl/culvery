@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -30,6 +31,16 @@ class BinColoursTest {
         colours.set("Glass", "grey")
         assertThat(colours.inkFor("waste")?.id).isEqualTo("black")
         assertThat(colours.inkFor("Glass")).isNull()
+    }
+
+    @Test
+    fun rememberKeepsOnlyUnknownKinds() = runTest {
+        val colours = colours()
+        colours.remember(listOf("waste", "Glass"))
+        colours.remember(listOf("Glass", "Textiles"))
+        assertThat(colours.seen.first()).containsExactly("Glass", "Textiles")
+        colours.forgetSeen()
+        assertThat(colours.seen.first()).isEmpty()
     }
 
     @Test
