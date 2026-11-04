@@ -115,6 +115,7 @@ class CalendarEditor internal constructor(
     private val order: suspend () -> List<PersonId>,
     private val undone: UndoneKeys,
     private val shown: () -> WeeksShown,
+    private val updates: UpdateRequests,
 ) {
     @Inject
     constructor(
@@ -131,14 +132,18 @@ class CalendarEditor internal constructor(
         providers: Set<@JvmSuppressWildcards CalendarProvider>,
         undone: UndoneKeys,
         repo: CalendarRepository,
+        updates: UpdateRequests,
     ) : this(
         store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS, writeLock,
         household::person, providers::displayNameOf, { household.people.first().map { it.id } }, undone,
-        repo.shown::value,
+        repo.shown::value, updates,
     )
 
     /** The week's Update now: a sync pass at once. It changes nothing, so it asks for no PIN. */
-    fun updateNow() = requestSync()
+    fun updateNow() {
+        updates.request(clock.nowMillis())
+        requestSync()
+    }
 
     /** Who is signed in now: the add/edit sheet's Who default and its disabled chips (2b-2 design D2). */
     internal val session: StateFlow<Identified?> get() = access.session

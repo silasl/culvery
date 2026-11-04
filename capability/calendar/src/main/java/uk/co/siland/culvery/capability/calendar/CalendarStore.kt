@@ -208,7 +208,11 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
             health == ConnectionHealth.NeedsSignIn && row.needsSignInSinceMillis == null -> dao.setNeedsSignInSince(connectionId, nowMillis)
             health == ConnectionHealth.Ok -> endPause(row, nowMillis)
         }
-        dao.setHealth(connectionId, health.code(), (health as? ConnectionHealth.Error)?.message)
+        dao.setHealth(connectionId, health.code(), when (health) {
+            is ConnectionHealth.Error -> health.message
+            is ConnectionHealth.Unreadable -> health.line
+            else -> null
+        })
     }
 
     /**
@@ -522,6 +526,7 @@ internal fun ConnectionHealth.code(): String = when (this) {
     ConnectionHealth.Offline -> "OFFLINE"
     ConnectionHealth.NeedsSignIn -> "NEEDS_SIGN_IN"
     is ConnectionHealth.Error -> "ERROR"
+    is ConnectionHealth.Unreadable -> "UNREADABLE"
 }
 
 /** An unknown code (a newer app's value, or corruption) must not read as healthy. */
@@ -531,6 +536,7 @@ internal fun healthOf(code: String, message: String?): ConnectionHealth = when (
     "OFFLINE" -> ConnectionHealth.Offline
     "NEEDS_SIGN_IN" -> ConnectionHealth.NeedsSignIn
     "ERROR" -> ConnectionHealth.Error(message ?: "Unknown error")
+    "UNREADABLE" -> ConnectionHealth.Unreadable(message ?: "Can’t read this calendar.")
     else -> ConnectionHealth.Error("Unknown health code $code")
 }
 

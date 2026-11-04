@@ -38,6 +38,9 @@ sealed interface ConnectionHealth {
 
     data object NeedsSignIn : ConnectionHealth
     data class Error(val message: String) : ConnectionHealth
+
+    /** The service answered, but not in a shape the provider can read; [line] is the wall's words for it. */
+    data class Unreadable(val line: String) : ConnectionHealth
 }
 
 /** The connection's sign-in has expired or been revoked (Google: 401, or a refused token refresh). */

@@ -94,10 +94,10 @@ class CalendarEditorTest {
      * write open use Dispatchers.Default, so its 10 s timeout runs on real time and runTest can't skip past it
      * while the test waits for Room.
      */
-    private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext, shown: WeeksShown = WeeksShown.EIGHT) = testEditor(
+    private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext, shown: WeeksShown = WeeksShown.EIGHT, updates: UpdateRequests = UpdateRequests()) = testEditor(
         store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { opened + testScheduler.currentTime },
         backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock, personOf = household::person,
-        order = { household.people.first().map { it.id } }, undone = undone, shown = { shown },
+        order = { household.people.first().map { it.id } }, undone = undone, shown = { shown }, updates = updates,
     )
 
     /** As the sheet chooses them: "key-1", "key-2"… in the order Save is tapped. */
@@ -203,6 +203,13 @@ class CalendarEditorTest {
         editor(access).updateNow()
         assertThat(syncRequests).isEqualTo(1)
         assertThat(access.requests).isEmpty()
+    }
+
+    @Test
+    fun updateNowRecordsARequest() = runTest {
+        val updates = UpdateRequests()
+        editor(testAccess(household), updates = updates).updateNow()
+        assertThat(updates.last.value).isEqualTo(opened + testScheduler.currentTime)
     }
 
     @Test

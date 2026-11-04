@@ -197,8 +197,9 @@ private fun unhealthyPeople(sources: List<StoredSource>, connections: List<Store
         .flatMapTo(mutableSetOf()) { if (it.isMaster || it.source.writable) order else listOf(it.mapping.person) } - PersonId.FAMILY
 }
 
-/** Signing in first (only the family can fix it), then the tablet offline, then a service that didn't answer. */
+/** Signing in first (only the family can fix it), then the tablet offline, then a service that didn't answer, then one whose answer can't be read. */
 internal fun problemOf(connections: List<StoredConnection>, service: (StoredConnection) -> String): SyncProblem? =
     connections.firstOrNull { it.health == ConnectionHealth.NeedsSignIn }?.let { SyncProblem.SignIn(service(it)) }
         ?: SyncProblem.Offline.takeIf { connections.any { it.health == ConnectionHealth.Offline } }
         ?: connections.firstOrNull { it.health == ConnectionHealth.Unreachable }?.let { SyncProblem.NoAnswer(service(it)) }
+        ?: connections.firstNotNullOfOrNull { (it.health as? ConnectionHealth.Unreadable)?.let { h -> SyncProblem.Unreadable(h.line) } }

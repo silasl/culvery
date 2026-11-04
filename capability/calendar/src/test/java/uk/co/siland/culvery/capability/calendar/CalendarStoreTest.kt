@@ -83,6 +83,15 @@ class CalendarStoreTest {
     }
 
     @Test
+    fun healthRoundTripsUnreadable() = runTest {
+        connect("s1")
+        assertThat(ConnectionHealth.Unreadable("x").code()).isEqualTo("UNREADABLE")
+        store.setHealth("c1", ConnectionHealth.Unreadable("Can’t read the bin dates."), 0L)
+        assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.Unreadable("Can’t read the bin dates."))
+        assertThat(healthOf("UNREADABLE", "Can’t read the bin dates.")).isEqualTo(ConnectionHealth.Unreadable("Can’t read the bin dates."))
+    }
+
+    @Test
     fun markSyncedSetsOkAndTheTime() = runTest {
         connect("s1")
         store.setHealth("c1", ConnectionHealth.NeedsSignIn, 0L)

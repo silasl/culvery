@@ -36,8 +36,9 @@ internal fun testEditor(
     order: suspend () -> List<PersonId> = { emptyList() },
     undone: UndoneKeys = UndoneKeys(),
     shown: () -> WeeksShown = { WeeksShown.EIGHT },
+    updates: UpdateRequests = UpdateRequests(),
 ): CalendarEditor =
-    CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf, order, undone, shown)
+    CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf, order, undone, shown, updates)
 
 /** The Calendar's setting, held in memory and read at once; [shown] is what it starts at. */
 internal fun testCalendarSettings(shown: WeeksShown = WeeksShown.EIGHT): CalendarSettings {

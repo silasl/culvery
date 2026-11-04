@@ -91,6 +91,11 @@ class SyncLabelsTest {
             .isEqualTo("Google Calendar needs you to sign in again. Reconnect in Settings › Calendars.")
     }
 
+    @Test
+    fun weekLineShowsTheUnreadableLine() {
+        assertThat(weekLine(status(2, SyncProblem.Unreadable("Can’t read the bin dates.")), now)).isEqualTo("Can’t read the bin dates.")
+    }
+
     /** 5 §A.3: the last pass failed, so the line says so however recent the last good one was. */
     @Test
     fun aProblemShowsEvenWhileTheWeekIsFreshAndNoProblemShowsTheAge() {

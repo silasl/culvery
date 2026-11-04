@@ -93,6 +93,8 @@ sealed interface SyncProblem {
     data class NoAnswer(val service: String) : SyncProblem
 
     data class SignIn(val service: String) : SyncProblem
+
+    data class Unreadable(val line: String) : SyncProblem
 }
 
 /**
@@ -153,6 +155,7 @@ fun problemLine(problem: SyncProblem): String = when (problem) {
     SyncProblem.Offline -> "The tablet is offline. Check the Wi-Fi, then Update now."
     is SyncProblem.NoAnswer -> "${problem.service} didn’t answer. Try Update now in a few minutes."
     is SyncProblem.SignIn -> "${problem.service} needs you to sign in again. Reconnect in Settings › Calendars."
+    is SyncProblem.Unreadable -> problem.line
 }
 
 internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)

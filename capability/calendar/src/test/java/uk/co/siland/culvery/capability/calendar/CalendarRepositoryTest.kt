@@ -348,6 +348,15 @@ class CalendarRepositoryTest {
         assertThat(repo.syncStatus.first().problem).isNull()
     }
 
+    @Test
+    fun problemOfReportsUnreadableLast() = runTest {
+        store.addConnection(Connection("c2", "calendar.test", "School", emptyMap()), emptyList(), emptyMap())
+        store.setHealth("c1", ConnectionHealth.Unreadable("Can’t read the bin dates."), 0L)
+        assertThat(repo.syncStatus.first().problem).isEqualTo(SyncProblem.Unreadable("Can’t read the bin dates."))
+        store.setHealth("c2", ConnectionHealth.Offline, 0L)
+        assertThat(repo.syncStatus.first().problem).isEqualTo(SyncProblem.Offline)
+    }
+
     private fun ref(id: String, source: String = "s-family") = EventRef("c1", source, id)
 
     private val key = "0123456789abcdef0123456789abcdef"

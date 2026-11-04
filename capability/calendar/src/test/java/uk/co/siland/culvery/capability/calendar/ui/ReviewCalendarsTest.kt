@@ -297,6 +297,14 @@ class ReviewCalendarsTest {
     }
 
     @Test
+    fun settingsRowShowsTheUnreadableLineInDanger() {
+        show(ConnectionHealth.Unreadable("Can’t read the bin dates."))
+        compose.onNodeWithText("Can’t read the bin dates.").assertExists()
+        compose.onNodeWithTag("settings_reconnect").assertDoesNotExist()
+        assertThat(healthWords(row(ConnectionHealth.Unreadable("Can’t read the bin dates.")), now)).isEqualTo("Can’t read the bin dates.")
+    }
+
+    @Test
     fun theMainBadgeIsInline() {
         show()
         val badge = compose.onNodeWithTag("review_main_family").getBoundsInRoot()

@@ -137,6 +137,12 @@ typealias OfflineException = uk.co.siland.culvery.core.plugin.OfflineException
 class SourceGoneException(message: String? = null, cause: Throwable? = null) : UnreachableException(message, cause)
 
 /**
+ * The service answered, but not in a shape the provider can read. The third exception [CalendarProvider.sources]
+ * and [CalendarProvider.sync] may throw; [line] is the wall's words for it.
+ */
+class UnreadableException(val line: String, message: String? = null) : Exception(message)
+
+/**
  * A permanent refusal: retrying would not help (Google: a 4xx other than 401, 429 and the 403 rate limits).
  * A delete that finds the event already gone (404 or 410) is a success, not a refusal. [message] is the reason in
  * lower case, to follow a dash; null when the provider can say no more, shown as "{service} wouldn’t accept this change."
@@ -147,7 +153,7 @@ class WriteRejectedException(message: String? = null, cause: Throwable? = null) 
  * A calendar service. Implementations live in :provider:calendar-* and bind themselves with
  * `@Binds @IntoSet`. Behaviour is pinned by CalendarProviderContractTest in :capability:calendar-testkit.
  *
- * - [sources] and [sync] throw only [NeedsSignInException] (auth) or [UnreachableException] (network).
+ * - [sources] and [sync] throw only [NeedsSignInException] (auth), [UnreachableException] (network) or [UnreadableException].
  * - They must be main-safe and cancellable: no uninterruptible blocking I/O. The sync engine calls them on
  *   Dispatchers.IO under a 60 s timeout, and a call that times out counts as Unreachable.
  * - [sync] without a cursor returns only events that overlap the range. With a cursor, incremental upserts

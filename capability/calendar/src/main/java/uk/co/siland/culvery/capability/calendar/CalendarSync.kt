@@ -412,6 +412,10 @@ class CalendarSync internal constructor(
             Log.w(TAG, "${conn.id}: a source is unreachable (${e::class.simpleName})")
             if (e.isOffline()) ConnectionHealth.Offline else ConnectionHealth.Unreachable
         }
+        is UnreadableException -> {
+            Log.w(TAG, "${conn.id}: a source couldn’t be read")
+            ConnectionHealth.Unreadable(e.line)
+        }
         else -> {
             Log.e(TAG, "${conn.id}: a source failed (${e::class.simpleName})")
             ConnectionHealth.Error(e.message ?: e.javaClass.simpleName)
@@ -421,7 +425,7 @@ class CalendarSync internal constructor(
     private fun ConnectionHealth.severity(): Int = when (this) {
         ConnectionHealth.NeedsSignIn -> 3
         ConnectionHealth.Unreachable, ConnectionHealth.Offline -> 2
-        is ConnectionHealth.Error -> 1
+        is ConnectionHealth.Error, is ConnectionHealth.Unreadable -> 1
         ConnectionHealth.Ok -> 0
     }
 

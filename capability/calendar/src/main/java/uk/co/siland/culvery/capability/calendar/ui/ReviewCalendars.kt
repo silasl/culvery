@@ -104,6 +104,7 @@ internal fun healthWords(row: CalendarRow, nowMillis: Long): String = when (row.
     ConnectionHealth.Offline -> "The tablet is offline — check the Wi-Fi."
     ConnectionHealth.NeedsSignIn -> NEEDS_RECONNECTING
     is ConnectionHealth.Error -> STOPPED_UPDATING
+    is ConnectionHealth.Unreadable -> row.health.line
 }
 
 const val WEEKS_AHEAD = "Weeks ahead in the Calendar"
@@ -280,7 +281,7 @@ private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, o
         leading = { HhIcon(row.icon, size = CalendarDimens.settingsIcon, tint = c.ink) },
         subtitle = healthWords(row, nowMillis),
         minHeight = CalendarDimens.accountRowMinHeight,
-        subtitleColor = if (needsReconnect) c.danger else c.mute,
+        subtitleColor = if (needsReconnect || row.health is ConnectionHealth.Unreadable) c.danger else c.mute,
         trailing = {
             if (needsReconnect) {
                 HhButton(
