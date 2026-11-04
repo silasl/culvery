@@ -87,7 +87,7 @@ class LogHygieneTest {
     @Test
     fun anInfoLineIsChecked() {
         assertThat(LogHygiene.problems("""Log.i(TAG, "x ${'$'}name")""")).hasSize(1)
-        assertThat(LogHygiene.problems("""Log.i(TAG, "Birthday look on for ${'$'}{names.size} people")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.i(TAG, "Birthday look on, people: ${'$'}{names.size}")""")).isEmpty()
     }
 
     @Test

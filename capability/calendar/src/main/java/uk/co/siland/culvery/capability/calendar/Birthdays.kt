@@ -29,7 +29,7 @@ private val BIRTHDAY_TITLE = Regex("""\bbirthdays?\b""", RegexOption.IGNORE_CASE
 /**
  * The household members with a birthday on [date] (16 §3.1): a yearly, one-day, all-day event with the word
  * "birthday" in its title, tagged for them. The tag decides, never the calendar the event came from or the title's
- * name, so an untagged or Family event greets nobody. An unreadable series rule counts as yearly; a known other one doesn't.
+ * name, so an untagged or Family event greets nobody. A series whose rule wasn't stored counts as yearly; any stored rule must say yearly.
  */
 internal fun birthdaysIn(events: List<StoredEvent>, date: LocalDate, order: List<PersonId>, zone: ZoneId): List<PersonId> {
     return events.filter { it.isYearlyBirthdayOn(date, zone) }

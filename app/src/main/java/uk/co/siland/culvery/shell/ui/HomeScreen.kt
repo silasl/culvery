@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
@@ -130,7 +131,7 @@ private fun GreetingPill(greeting: String, band: HomeSkyBand?) {
     ) {
         CakeMark(ShellDimens.greetingCake)
         Spacer(Modifier.width(ShellDimens.greetingCakeGap))
-        Text(greeting, style = HhType.rowTitle, color = c.ink, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
+        Text(greeting, style = HhType.rowTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
     }
 }
 

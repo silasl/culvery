@@ -67,7 +67,7 @@ internal fun nextTheme(today: LocalDate, dates: Map<SeasonalTheme, SeasonDates>)
         }
         .minByOrNull { it.second }
 
-/** Which seasonal theme the wall shows, by the household's date; the clock is read from [now], never the device's own. */
+/** Which seasonal theme the wall shows, and what dresses it for a birthday, by the household's date; the clock is read from [now], never the device's own. */
 @Singleton
 class SeasonalThemes internal constructor(
     private val now: StateFlow<LocalDateTime?>,
@@ -132,7 +132,7 @@ class SeasonalThemes internal constructor(
     private fun logBirthday(birthday: Birthday?) {
         val names = birthday?.names.orEmpty()
         if (names.size == logged) return
-        if (names.isEmpty()) Log.i(TAG, "Birthday look off") else Log.i(TAG, "Birthday look on for ${names.size} people")
+        if (names.isEmpty()) Log.i(TAG, "Birthday look off") else Log.i(TAG, "Birthday look on, people: ${names.size}")
         logged = names.size
     }
 

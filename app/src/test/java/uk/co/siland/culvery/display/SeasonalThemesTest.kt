@@ -315,6 +315,6 @@ class SeasonalThemesTest {
         runCurrent()
         moveTo(now, at(3, 13, 0, 0))
         val lines = ShadowLog.getLogsForTag("SeasonalThemes").map { it.msg }
-        assertThat(lines).containsExactly("Birthday look on for 1 people", "Birthday look off").inOrder()
+        assertThat(lines).containsExactly("Birthday look on, people: 1", "Birthday look off").inOrder()
     }
 }

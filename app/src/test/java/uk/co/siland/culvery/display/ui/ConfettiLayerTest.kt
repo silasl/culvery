@@ -83,7 +83,7 @@ class ConfettiLayerTest {
         bursts().assertCountEquals(0)
     }
 
-    /** Pin until the layer exists: a burst that mustn't fall is none either way. */
+    /** Pin: a wake while it mustn't fall drops nothing. */
     @Test
     fun noBurstWhenItShouldntFall() {
         set { falls = false }

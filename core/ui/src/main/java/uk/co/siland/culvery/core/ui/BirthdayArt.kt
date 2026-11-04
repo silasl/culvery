@@ -47,7 +47,7 @@ private const val CAKE_FLAME = "M27,1 C29.5,4 29.5,7 27,8 C24.5,7 24.5,4 27,1 Z"
 @Composable
 fun CakeMark(width: Dp, modifier: Modifier = Modifier) {
     val c = Culvery.colors
-    val cake = remember(c, width) {
+    val cake = remember(c.accent, c.accentSoft, c.ink, c.weather, width) {
         ImageVector.Builder(name = "CakeMark", defaultWidth = width, defaultHeight = width * (CAKE_H / CAKE_W), viewportWidth = CAKE_W, viewportHeight = CAKE_H)
             .addPath(addPathNodes(CAKE_PLATE), fill = SolidColor(c.accentSoft))
             .addPath(addPathNodes(CAKE_TIERS), fill = SolidColor(c.accent))
