@@ -910,6 +910,10 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 ## Plan 16 (birthdays): on the tablet (2026-11-03)
 - The next family birthday's event was checked as yearly, all-day and tagged; nothing needed changing. Its untagged duplicate is on Family, so it gets no look.
 
+## Plan 16 (birthdays): from main
+- Merged with `--ff-only` at 3f3b5ce6. The tablet runs this release (mapping `mapping-3f3b5ce.txt`).
+- **Final review, left for later:** rename `Preview.Birthday` (it shares the look's name); draw confetti straight from its parameters if a burst ever stutters on the tablet.
+
 ## Plan 16 (birthdays): emulator walk-through
 - All eight checks passed on `culvery-5` with the debug sample household; no faults.
   - A tagged yearly all-day birthday gives the person's look by night and by day, on every tab, a sheet, the PIN pad, a toast, Settings and the door card.
