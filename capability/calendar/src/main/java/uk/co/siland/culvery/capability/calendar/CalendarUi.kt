@@ -51,11 +51,13 @@ data class EventUi(
     val assignable: Boolean = readOnlyReason == null,
     /** Which day of a multi-day event this slice is; null for an event within one day, overnight ones included. */
     val span: DaySpan? = null,
-    /** Bin kinds when this is a bin collection day: drawn as bin-coloured stripes rather than people. */
-    val bins: List<String>? = null,
+    /** A bin collection day's bins, in [orderedBins] order with their inks: drawn as bin-coloured stripes rather than people. */
+    val bins: List<BinUi>? = null,
 ) {
     val editable: Boolean get() = readOnlyReason == null
-    val shared: Boolean get() = people.size > 1
+
+    /** Drawn neutral with a striped edge: an event for several people, or a bin day. */
+    val shared: Boolean get() = people.size > 1 || bins != null
 }
 
 /** The detail sheet's model: the event plus its "When" row. */
@@ -180,8 +182,8 @@ internal val MONTH_SHORT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM",
 
 internal val FULL_WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
 
-/** "Tuesday 7 October": how TalkBack names a day. */
-internal val FULL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
+/** "Tuesday 7 October": how TalkBack names a day, and the bins connect screen's next collection. */
+val FULL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
 
 internal const val DAYS_PER_WEEK = 7
 
@@ -368,6 +370,7 @@ internal fun StoredEvent.toUi(
     order: List<PersonId>,
     catalog: SourceCatalog,
     syncing: Boolean = false,
+    binChoices: Map<String, String> = emptyMap(),
 ): EventUi {
     val slice = sliceOn(date, zone)
     val source = catalog.source(connectionId, sourceId)
@@ -392,6 +395,6 @@ internal fun StoredEvent.toUi(
         createdBy = createdByLabel(createdBy, reason, people, serviceName, sourceName),
         assignable = mayAssign(this, reason),
         span = dayOfSpan(date, zone),
-        bins = bins,
+        bins = bins?.let { kinds -> orderedBins(kinds).map { BinUi(it, binInkFor(binChoices, it)) } },
     )
 }

@@ -33,7 +33,7 @@ class CalendarRepository @Inject constructor(
     providers: Set<@JvmSuppressWildcards CalendarProvider>,
     writers: Set<@JvmSuppressWildcards CalendarWriter>,
     settings: CalendarSettings,
-    binColours: BinColours,
+    private val binColours: BinColours,
     private val clock: WallClock = WallClock(System::currentTimeMillis),
 ) {
     private val writerIds = writers.map { it.providerId }.toSet()
@@ -47,9 +47,6 @@ class CalendarRepository @Inject constructor(
 
     /** How many weeks the Calendar tab shows; the sync reads 12 whatever it is (15a §2.3). */
     val shown: StateFlow<WeeksShown> = settings.current
-
-    /** The ink the family chose for each kind of bin (kind to ink id); kinds not in it are in their defaults. */
-    internal val binInks: StateFlow<Map<String, String>> = binColours.current
 
     /** Titles remembered from visible calendars, matched as a new event's title is typed (9c §4). */
     val suggestions = TitleSuggestions(store)
@@ -97,7 +94,7 @@ class CalendarRepository @Inject constructor(
         // Wide enough for all-day rows synced in any other zone; each day then picks its own (4c C4).
         val from = millis(start, z) - ZONE_MARGIN_MS
         val to = millis(start.plusDays(count.toLong()), z) + ZONE_MARGIN_MS
-        combine(store.eventsBetween(from, to), store.pending(), catalog, household.peopleWithFamily) { events, pending, cat, people ->
+        combine(store.eventsBetween(from, to), store.pending(), catalog, household.peopleWithFamily, binColours.current) { events, pending, cat, people, inks ->
             val byId = people.associateBy { it.id }
             val order = people.map { it.id }
             val shown = overlayPending(events, pending, cat::source, z, from, to)
@@ -106,7 +103,7 @@ class CalendarRepository @Inject constructor(
                 DayUi(
                     date,
                     shown.filter { it.event.isOn(date, z) }
-                        .map { it.event.toUi(date, z, byId, order, cat, it.syncing) }
+                        .map { it.event.toUi(date, z, byId, order, cat, it.syncing, inks) }
                         .sortedWith(compareByDescending<EventUi> { it.allDay }.thenBy { it.startSort }.thenBy { it.title }),
                 )
             }
@@ -156,7 +153,7 @@ class CalendarRepository @Inject constructor(
         if (s == null) return@map null
         val e = s.shown.event
         val day = e.start.instantIn(s.zone).atZone(s.zone).toLocalDate()
-        val event = e.toUi(day, s.zone, s.people, s.order, s.catalog, s.shown.syncing).copy(repeats = repeatsLabel(e.recurrenceRule, e.start, s.zone))
+        val event = e.toUi(day, s.zone, s.people, s.order, s.catalog, s.shown.syncing, s.binInks).copy(repeats = repeatsLabel(e.recurrenceRule, e.start, s.zone))
         EventDetailUi(event, whenLabel(e.start, e.end, s.zone, today))
     }
 
@@ -168,16 +165,23 @@ class CalendarRepository @Inject constructor(
         }
     }
 
-    private class Shown(val shown: ShownEvent, val catalog: SourceCatalog, val people: Map<PersonId, Person>, val order: List<PersonId>, val zone: ZoneId)
+    private class Shown(
+        val shown: ShownEvent,
+        val catalog: SourceCatalog,
+        val people: Map<PersonId, Person>,
+        val order: List<PersonId>,
+        val zone: ZoneId,
+        val binInks: Map<String, String>,
+    )
 
     /** [ref] with its queued changes laid over it; a queued create not yet in the mirror counts (2b-2 design D6). */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun shownEvent(ref: EventRef): Flow<Shown?> = zone.zone.flatMapLatest { z ->
-        combine(store.event(ref), store.pending(), catalog, household.peopleWithFamily) { stored, pending, cat, people ->
+        combine(store.event(ref), store.pending(), catalog, household.peopleWithFamily, binColours.current) { stored, pending, cat, people, inks ->
             val forIt = pending.filter { it.ref == ref || (it.kind == ChangeKind.ASSIGN_SERIES && it.remoteId == stored?.seriesId) }
             overlayPending(listOfNotNull(stored), forIt, cat::source, z, Long.MIN_VALUE, Long.MAX_VALUE)
                 .singleOrNull()
-                ?.let { Shown(it, cat, people.associateBy { p -> p.id }, people.map { p -> p.id }, z) }
+                ?.let { Shown(it, cat, people.associateBy { p -> p.id }, people.map { p -> p.id }, z, inks) }
         }
     }
 

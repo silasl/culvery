@@ -8,6 +8,8 @@ import uk.co.siland.culvery.capability.calendar.DaySpan
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
+import uk.co.siland.culvery.capability.calendar.BinUi
+import uk.co.siland.culvery.capability.calendar.binInkFor
 import uk.co.siland.culvery.capability.calendar.binsTitle
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
@@ -151,9 +153,9 @@ object SampleUi {
         },
     ).let { it.copy(spans = laneRows(weekSpans(it.days))) }
 
-    /** A bin collection day: all-day, for nobody in particular, drawn as one stripe per bin. */
-    fun bins(vararg kinds: String) = allDay(binsTitle(kinds.toList()), family).copy(
-        bins = kinds.toList(), readOnlyReason = ReadOnlyReason.OtherCalendar, sourceName = "Bins", createdBy = "Bins",
+    /** A bin collection day: all-day, for nobody in particular, drawn as one stripe per bin in its [inks] choice. */
+    fun bins(vararg kinds: String, inks: Map<String, String> = emptyMap()) = allDay(binsTitle(kinds.toList()), family).copy(
+        bins = kinds.map { BinUi(it, binInkFor(inks, it)) }, readOnlyReason = ReadOnlyReason.OtherCalendar, sourceName = "Bins", createdBy = "Bins",
     )
 
     /** [week] with all four bins on its Monday and the waste bin alone on Saturday. */

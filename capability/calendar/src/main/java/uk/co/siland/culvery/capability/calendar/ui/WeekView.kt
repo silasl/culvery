@@ -72,7 +72,6 @@ import java.time.LocalDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.capability.calendar.DayUi
-import uk.co.siland.culvery.capability.calendar.BINS_WHO
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.MONTH_SHORT
@@ -383,8 +382,7 @@ private fun Modifier.todayRing(color: Color): Modifier = drawWithContent {
 @Composable
 internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Unit)?) {
     val c = Culvery.colors
-    val bins = event.bins
-    val shared = event.shared || bins != null
+    val shared = event.shared
     Row(
         Modifier
             .fillMaxWidth()
@@ -394,8 +392,7 @@ internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Un
             .semantics(mergeDescendants = true) { contentDescription = eventOnDay(event, day) }
             .then(if (onOpen != null) Modifier.hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS) else Modifier),
     ) {
-        if (bins != null) StripedBar(binStripes(bins), width = CalendarDimens.sharedChipEdge, radius = 0.dp)
-        else if (shared) StripedBar(event.people, width = CalendarDimens.sharedChipEdge, radius = 0.dp)
+        if (shared) StripedBar(event.stripes(), width = CalendarDimens.sharedChipEdge, radius = 0.dp)
         Column(
             Modifier
                 .weight(1f)
@@ -411,7 +408,7 @@ internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Un
                 horizontalArrangement = Arrangement.spacedBy(CalendarDimens.chipDotGap),
                 modifier = Modifier.shownNotSpoken(),
             ) {
-                if (bins != null) {
+                if (event.bins != null) {
                     HhIcon(Icons.DELETE, size = CalendarDimens.chipDot, tint = c.mute, modifier = Modifier.testTag("chip_bins_icon"))
                 } else if (shared) {
                     PersonDots(event.people, CalendarDimens.sharedDot, ring = c.surf2, dotTag = "chip_dot", modifier = Modifier.testTag("chip_dots"))
@@ -420,7 +417,7 @@ internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Un
                 }
                 // One line: the who shortens first, then a long name is cut before the time (4d-1 Decision 2, 9c §5).
                 ShorteningText(
-                    (if (bins != null) listOf(BINS_WHO) else whoLineForms(event.people)).map { "${event.startLabel} · $it" },
+                    event.whoLineForms().map { "${event.startLabel} · $it" },
                     style = CalendarType.chipTime,
                     color = c.mute,
                     modifier = Modifier.weight(1f).testTag("chip_who"),

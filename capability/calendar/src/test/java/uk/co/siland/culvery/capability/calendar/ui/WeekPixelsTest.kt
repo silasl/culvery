@@ -6,7 +6,6 @@ import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -43,16 +42,14 @@ class WeekPixelsTest {
 
     private var accent = 0
 
-    private fun drawn(dark: Boolean, week: WeekUi = SampleUi.week, inks: Map<String, String> = emptyMap()): Bitmap {
+    private fun drawn(dark: Boolean, week: WeekUi = SampleUi.week): Bitmap {
         lateinit var window: View
         compose.setContent {
             window = LocalView.current.rootView
             CulveryTheme(dark = dark) {
                 accent = Culvery.colors.accent.toArgb()
                 Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
-                    CompositionLocalProvider(LocalBinInks provides inks) {
-                        WeekView(WeekViewState(week, SampleUi.TODAY, SyncStatusUi(SampleUi.NOW - 120_000, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false), SampleUi.NOW))
-                    }
+                    WeekView(WeekViewState(week, SampleUi.TODAY, SyncStatusUi(SampleUi.NOW - 120_000, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false), SampleUi.NOW))
                 }
             }
         }
@@ -111,7 +108,10 @@ class WeekPixelsTest {
 
     @Test
     fun aChosenInkReachesTheChipsStripe() {
-        drawn(dark = true, SampleUi.weekWithBins, inks = mapOf("waste" to "purple"))
+        val week = SampleUi.week.copy(
+            days = SampleUi.week.days.mapIndexed { i, d -> if (i == 3) d.copy(events = listOf(SampleUi.bins("waste", inks = mapOf("waste" to "purple"))) + d.events) else d },
+        )
+        drawn(dark = true, week)
         val chip = compose.onNode(hasContentDescription("Bins: Waste, Bins, Saturday", substring = true))
         val height = chip.getUnclippedBoundsInRoot().height
         assertThat(pixelAt(chip, 2.dp, height / 2)).isEqualTo(BinInks.byId("purple")!!.night.toArgb())

@@ -26,13 +26,13 @@ internal fun TodayCardHost(repo: CalendarRepository, editor: CalendarEditor, wee
     val open = rememberEventOpener(repo, editor, weekFocus, today, EditorFrom.Home)
     val add = rememberEventAdder(repo, editor, weekFocus, today, EditorFrom.Home)
     val days: List<DayUi>? by remember(today) { repo.days(today, 2) }.collectAsState(initial = null)
-    WithBinInks(repo) { TodayCard(days?.first()?.events, onOpen = open, onAdd = add?.let { a -> { a(today) } }, tomorrow = days?.last()) }
+    TodayCard(days?.first()?.events, onOpen = open, onAdd = add?.let { a -> { a(today) } }, tomorrow = days?.last())
 }
 
 @Composable
 internal fun ComingUpCardHost(repo: CalendarRepository, today: LocalDate) {
     val days: List<DayUi>? by remember(today) { repo.days(today.plusDays(1), 3) }.collectAsState(initial = null)
-    WithBinInks(repo) { ComingUpCard(days) }
+    ComingUpCard(days)
 }
 
 /**
@@ -68,16 +68,14 @@ internal fun WeekViewHost(
     val sync: SyncStatusUi? by repo.syncStatus.collectAsState(initial = null)
     val w = week ?: return
     val s = sync ?: return
-    WithBinInks(repo) {
-        WeekView(
-            WeekViewState(
-                w, today, s, nowMillis, shown.weeks, weeksTo(today, w.days.first().date, chosen) ?: shown.weeks, chosen.weeksAfter,
-            ),
-            onOpen = open,
-            onAdd = add,
-            onWeeksAhead = shown::show,
-            onReconnect = { s.reconnect?.let(onReconnect) },
-            onUpdateNow = editor::updateNow,
-        )
-    }
+    WeekView(
+        WeekViewState(
+            w, today, s, nowMillis, shown.weeks, weeksTo(today, w.days.first().date, chosen) ?: shown.weeks, chosen.weeksAfter,
+        ),
+        onOpen = open,
+        onAdd = add,
+        onWeeksAhead = shown::show,
+        onReconnect = { s.reconnect?.let(onReconnect) },
+        onUpdateNow = editor::updateNow,
+    )
 }

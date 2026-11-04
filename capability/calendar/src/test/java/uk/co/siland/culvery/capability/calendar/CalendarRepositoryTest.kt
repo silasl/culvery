@@ -29,6 +29,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.BinInks
 
 @RunWith(AndroidJUnit4::class)
 class CalendarRepositoryTest {
@@ -37,6 +38,7 @@ class CalendarRepositoryTest {
     private lateinit var store: CalendarStore
     private lateinit var household: HouseholdRepository
     private lateinit var repo: CalendarRepository
+    private val binColours = testBinColours()
     private lateinit var alex: Person
     private lateinit var sam: Person
 
@@ -50,7 +52,7 @@ class CalendarRepositoryTest {
         householdDb = householdDb()
         store = CalendarStore(calendar)
         household = HouseholdRepository(householdDb)
-        repo = CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings(), testBinColours())
+        repo = CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings(), binColours)
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
         sam = household.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
@@ -363,6 +365,18 @@ class CalendarRepositoryTest {
         store.setHealth("c2", ConnectionHealth.Unreadable("Can’t read the bin dates."), 0L)
         store.setHealth("c1", ConnectionHealth.Unreachable, 0L)
         assertThat(repo.syncStatus.first().problem).isEqualTo(SyncProblem.NoAnswer("Google"))
+    }
+
+    @Test
+    fun aBinDayCarriesItsBinsInOrderWithTheChosenInks() = runTest {
+        put("s-family", allDay("Bins", 23, 24).copy(bins = listOf("waste", "Glass", "food")))
+        binColours.set("waste", "purple")
+
+        assertThat(repo.day(sept(23)).first().single().bins).containsExactly(
+            BinUi("food", BinInks.byId("green")),
+            BinUi("waste", BinInks.byId("purple")),
+            BinUi("Glass", null),
+        ).inOrder()
     }
 
     private fun ref(id: String, source: String = "s-family") = EventRef("c1", source, id)
