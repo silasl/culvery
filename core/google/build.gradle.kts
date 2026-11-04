@@ -12,6 +12,7 @@ android {
 
 dependencies {
     api(project(":core:plugin"))
+    implementation(project(":core:net"))
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.play.services.auth)

@@ -1,5 +1,8 @@
 package uk.co.siland.culvery.core.plugin
 
+import java.io.IOException
+import java.net.UnknownHostException
+
 enum class Feature { READ, WRITE }
 
 /** A provider module's identity. [id] is stable and namespaced by capability, e.g. "calendar.google". */
@@ -56,6 +59,14 @@ open class UnreachableException(message: String? = null, cause: Throwable? = nul
 
 /** The tablet itself has no network (5 §A.3): what a provider throws when it knows, rather than leaving it to a cause. */
 class OfflineException(message: String? = null, cause: Throwable? = null) : UnreachableException(message, cause)
+
+/** A failed connection to [service] as "try later"; no network at all is [OfflineException] when [offlineOnUnknownHost]. */
+fun IOException.asUnreachable(service: String, offlineOnUnknownHost: Boolean): UnreachableException =
+    if (offlineOnUnknownHost && this is UnknownHostException) {
+        OfflineException("No network to $service", this)
+    } else {
+        UnreachableException("Couldn't reach $service", this)
+    }
 
 /** Whether a capability uses a connected account; bound into a set, so a disconnect can say who else depends on it. */
 fun interface AccountUse {

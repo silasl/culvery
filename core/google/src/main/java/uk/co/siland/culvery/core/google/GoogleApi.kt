@@ -2,8 +2,6 @@ package uk.co.siland.culvery.core.google
 
 import android.util.Log
 import java.io.IOException
-import java.net.UnknownHostException
-import java.time.Duration
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -13,9 +11,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import uk.co.siland.culvery.core.net.internetHttpClient
+import uk.co.siland.culvery.core.net.withUserAgent
 import uk.co.siland.culvery.core.plugin.NeedsSignInException
-import uk.co.siland.culvery.core.plugin.OfflineException
 import uk.co.siland.culvery.core.plugin.UnreachableException
+import uk.co.siland.culvery.core.plugin.asUnreachable
 
 /** The one JSON setup: unknown keys ignored; a null field is left out unless a PATCH builds its body by hand. */
 val GoogleJson = Json {
@@ -89,13 +89,9 @@ suspend fun TokenSource.sendRetrying401(
     return second
 }
 
-/** A failed connection as "try later"; no network at all is [OfflineException] when [offlineOnUnknownHost]. */
+/** The core [asUnreachable], named for a Google [service]. */
 fun IOException.asUnreachable(service: GoogleService, offlineOnUnknownHost: Boolean): UnreachableException =
-    if (offlineOnUnknownHost && this is UnknownHostException) {
-        OfflineException("No network to ${service.displayName}", this)
-    } else {
-        UnreachableException("Couldn't reach ${service.displayName}", this)
-    }
+    asUnreachable(service.displayName, offlineOnUnknownHost)
 
 private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
 
@@ -133,19 +129,7 @@ fun GoogleAnswer.readOrUnreachable(service: GoogleService, what: GoogleCallLabel
     throw UnreachableException("${service.displayName} answered $code")
 }
 
-private val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(15)
-private val READ_TIMEOUT: Duration = Duration.ofSeconds(30)
-
-// The engine gives a call 60 s too; this ends a body that drips in.
-private val CALL_TIMEOUT: Duration = Duration.ofSeconds(60)
-
 /** Google compresses only for a User-Agent that contains "gzip"; OkHttp sends Accept-Encoding itself. */
 fun userAgent(version: String): String = "Culvery/$version (gzip)"
 
-/** OkHttp's own timeouts sit inside the engines' (10 s editor, 60 s drain and sync), so the engines decide. */
-fun googleHttpClient(version: String): OkHttpClient = OkHttpClient.Builder()
-    .connectTimeout(CONNECT_TIMEOUT)
-    .readTimeout(READ_TIMEOUT)
-    .callTimeout(CALL_TIMEOUT)
-    .addInterceptor { chain -> chain.proceed(chain.request().newBuilder().header("User-Agent", userAgent(version)).build()) }
-    .build()
+fun googleHttpClient(version: String): OkHttpClient = internetHttpClient().withUserAgent(userAgent(version)).build()

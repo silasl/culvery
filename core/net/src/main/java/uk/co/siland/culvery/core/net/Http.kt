@@ -27,6 +27,19 @@ fun homeHttpClient(timeoutMs: Long, pool: ConnectionPool? = null): OkHttpClient 
     .apply { if (pool != null) connectionPool(pool) }
     .build()
 
+/**
+ * A client for a service on the internet. OkHttp's own timeouts sit inside the engines' (10 s editor, 60 s drain and
+ * sync), so the engines decide; the 60 s call timeout ends a body that drips in.
+ */
+fun internetHttpClient(): OkHttpClient.Builder = OkHttpClient.Builder()
+    .connectTimeout(Duration.ofSeconds(15))
+    .readTimeout(Duration.ofSeconds(30))
+    .callTimeout(Duration.ofSeconds(60))
+
+/** Sends [userAgent] on every request. */
+fun OkHttpClient.Builder.withUserAgent(userAgent: String): OkHttpClient.Builder =
+    addInterceptor { chain -> chain.proceed(chain.request().newBuilder().header("User-Agent", userAgent).build()) }
+
 /** A finished HTTP answer: its status [code] and whole body. */
 class Answer(val code: Int, val bytes: ByteArray) {
     val text: String get() = bytes.toString(Charsets.UTF_8)
