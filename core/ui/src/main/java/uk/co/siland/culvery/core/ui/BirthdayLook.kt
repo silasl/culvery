@@ -67,8 +67,12 @@ fun birthdayLook(colour: Long): SeasonalLook? = Looks[colour]
 
 /** The drawings' colours, here so ContrastTest checks them against every set (16 §4.2). */
 object BirthdayInks {
-    /** Cream: visible on the cake's tiers in both themes and on the greeting pill, where an `accentSoft` icing would vanish. */
+    /** The cake keeps its own colours whoever's birthday it is; a cake in the person's colour looked odd. */
+    val SPONGE = Color(0xFFEC4F8F)
     val ICING = Color(0xFFFFF4E8)
+    val PLATE = Color(0xFFE3A72F)
+    val CANDLE = Color(0xFF3D8BE8)
+    val FLAME = Color(0xFFFF9F1C)
     const val BALLOON_ALPHA = 0.5f
 
     fun balloon(colour: Color, c: HhColors): Color = colour.copy(alpha = BALLOON_ALPHA).compositeOver(c.bg)

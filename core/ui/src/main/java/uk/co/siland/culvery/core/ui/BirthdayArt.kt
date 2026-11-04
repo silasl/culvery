@@ -46,14 +46,13 @@ private const val CAKE_FLAME = "M27,1 C29.5,4 29.5,7 27,8 C24.5,7 24.5,4 27,1 Z"
 /** A two-tier cake with one lit candle, [width] wide, taking the Culvery mark's place. A picture only; TalkBack skips it (16 §4.2). */
 @Composable
 fun CakeMark(width: Dp, modifier: Modifier = Modifier) {
-    val c = Culvery.colors
-    val cake = remember(c.accent, c.accentSoft, c.ink, c.weather, width) {
+    val cake = remember(width) {
         ImageVector.Builder(name = "CakeMark", defaultWidth = width, defaultHeight = width * (CAKE_H / CAKE_W), viewportWidth = CAKE_W, viewportHeight = CAKE_H)
-            .addPath(addPathNodes(CAKE_PLATE), fill = SolidColor(c.accentSoft))
-            .addPath(addPathNodes(CAKE_TIERS), fill = SolidColor(c.accent))
+            .addPath(addPathNodes(CAKE_PLATE), fill = SolidColor(BirthdayInks.PLATE))
+            .addPath(addPathNodes(CAKE_TIERS), fill = SolidColor(BirthdayInks.SPONGE))
             .addPath(addPathNodes(CAKE_ICING), fill = SolidColor(BirthdayInks.ICING))
-            .addPath(addPathNodes(CAKE_CANDLE), fill = SolidColor(c.ink))
-            .addPath(addPathNodes(CAKE_FLAME), fill = SolidColor(c.weather))
+            .addPath(addPathNodes(CAKE_CANDLE), fill = SolidColor(BirthdayInks.CANDLE))
+            .addPath(addPathNodes(CAKE_FLAME), fill = SolidColor(BirthdayInks.FLAME))
             .build()
     }
     Image(cake, contentDescription = null, modifier = modifier.testTag("cake_mark").semantics { hideFromAccessibility() })
@@ -73,7 +72,7 @@ object BirthdayDimens {
     val balloonSway = 6.dp
 }
 
-internal const val BALLOON_LAP_MS = 40_000L
+internal const val BALLOON_LAP_MS = 30_000L
 internal const val BALLOONS = 4
 
 /** Where each balloon's body hangs (its centre x, top y) in [band] [elapsedMillis] into the drift. */

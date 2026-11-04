@@ -33,9 +33,8 @@ class BirthdayArtTest {
         fun drawn(colour: Color) = (bounds.top.toInt() until bounds.bottom.toInt()).any { y ->
             (bounds.left.toInt() until bounds.right.toInt()).any { x -> image.getPixel(x, y) == colour.toArgb() }
         }
-        val colours = birthdayLook(pink)!!.night
-        assertThat(drawn(colours.accent)).isTrue()
-        assertThat(drawn(colours.weather)).isTrue()
-        assertThat(drawn(BirthdayInks.ICING)).isTrue()
+        listOf(BirthdayInks.SPONGE, BirthdayInks.ICING, BirthdayInks.PLATE, BirthdayInks.CANDLE, BirthdayInks.FLAME)
+            .forEach { assertThat(drawn(it)).isTrue() }
+        assertThat(drawn(birthdayLook(pink)!!.night.accent)).isFalse()
     }
 }
