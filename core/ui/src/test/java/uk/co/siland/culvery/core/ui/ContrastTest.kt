@@ -244,4 +244,14 @@ class ContrastTest {
             }
         }
     }
+
+    @Test
+    fun everyBinInkStandsOffTheChip() {
+        themes.forEach { (name, set) ->
+            BinInks.all.forEach { ink ->
+                check("$name ${ink.id} on surf2", BinInks.colour(ink, set), set.surf2, NON_TEXT)
+                check("$name ${ink.id} on surf", BinInks.colour(ink, set), set.surf, NON_TEXT)
+            }
+        }
+    }
 }
