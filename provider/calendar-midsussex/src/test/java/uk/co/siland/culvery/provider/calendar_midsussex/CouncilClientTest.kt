@@ -1,12 +1,18 @@
 package uk.co.siland.culvery.provider.calendar_midsussex
 
 import com.google.common.truth.Truth.assertThat
+import java.net.InetAddress
+import java.net.UnknownHostException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import okhttp3.Dns
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.UnreachableException
+import uk.co.siland.culvery.core.plugin.OfflineException
 
 class CouncilClientTest {
     private val council = FakeCouncil()
@@ -53,6 +59,27 @@ class CouncilClientTest {
             "2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX",
         ).inOrder()
         assertThat(council.requests).isEqualTo(2)
+    }
+
+    @Test
+    fun anAddressFromASearchIsReadInItsSession() = runTest {
+        val found = subject.search(HOUSE, POSTCODE)
+        assertThat(subject.readAddress(found.last())).hasSize(3)
+
+        assertThat(council.requests).isEqualTo(3)
+        repeat(2) { council.takeRequest() }
+        val house = council.takeRequest()
+        assertThat(house.requestUrl?.queryParameter("pIndex")).isEqualTo("2")
+        assertThat(house.getHeader("Cookie")).isEqualTo("session=1")
+    }
+
+    @Test
+    fun noDnsMeansOffline() {
+        val noDns = object : Dns {
+            override fun lookup(hostname: String): List<InetAddress> = throw UnknownHostException(hostname)
+        }
+        val offline = CouncilClient("http://council.invalid/".toHttpUrl(), lazy { OkHttpClient.Builder().dns(noDns).build() })
+        assertThat(failure { offline.search(HOUSE, POSTCODE) }).isInstanceOf(OfflineException::class.java)
     }
 
     @Test

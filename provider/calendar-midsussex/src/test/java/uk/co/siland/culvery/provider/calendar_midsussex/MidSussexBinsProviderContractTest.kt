@@ -1,6 +1,5 @@
 package uk.co.siland.culvery.provider.calendar_midsussex
 
-import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
 import org.junit.After
@@ -16,7 +15,7 @@ import uk.co.siland.culvery.capability.calendar_testkit.CalendarProviderContract
 @RunWith(RobolectricTestRunner::class)
 class MidSussexBinsProviderContractTest : CalendarProviderContractTest() {
     @get:Rule
-    val dir = TemporaryFolder(File("C:/t9").apply { mkdirs() })
+    val dir = TemporaryFolder()
 
     private val council = FakeCouncil()
     private val base = council.start()

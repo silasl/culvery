@@ -30,6 +30,7 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.today
 import uk.co.siland.culvery.core.plugin.within
 import uk.co.siland.culvery.core.ui.Icons
 
@@ -86,73 +87,76 @@ class MidSussexBinsProvider internal constructor(
 
     override suspend fun sources(conn: Connection): List<CalendarSource> = listOf(SOURCE_BINS)
 
+    /** The cursor stamps the stored read and [range]: an unchanged read for the same range writes nothing. */
     override suspend fun sync(conn: Connection, source: CalendarSource, range: DateRange, cursor: SyncCursor?): SyncResult {
         val read = lock.withLock { latest(conn, range.zone) }
         read.failure?.let { throw UnreadableException(BINS_UNREADABLE, it.name) }
-        if (read.lastGoodDay == null) throw UnreachableException("The council’s site hasn’t been read yet")
-        val upserts = read.collections.map(::eventOf).filter { range.overlaps(it.start, it.end) }
-        return SyncResult(upserts, emptyList(), cursor = null, fullReplace = true)
+        val goodMillis = read.lastGoodMillis ?: throw UnreachableException("The council’s site hasn’t been read yet")
+        val stamp = SyncCursor("$goodMillis:${range.start}:${range.endExclusive}")
+        if (cursor == stamp) return SyncResult(emptyList(), emptyList(), stamp, fullReplace = false)
+        val upserts = read.collections.filter { range.overlaps(EventTime.AllDay(it.date), EventTime.AllDay(it.date.plusDays(1))) }.map(::eventOf)
+        return SyncResult(upserts, emptyList(), stamp, fullReplace = true)
     }
 
-    private suspend fun latest(conn: Connection, zone: ZoneId): BinsRead {
+    private suspend fun latest(conn: Connection, householdZone: ZoneId): BinsRead {
         if (conn.id !in held) held[conn.id] = reads.load(conn.id)
         val now = clock.nowMillis()
-        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        val today = clock.today(householdZone)
         val key = addressKey(conn)
         val stored = held[conn.id]?.takeIf { it.addressKey == key }
-        if (stored != null && !due(stored, today)) return stored
-        val read = try {
+        if (stored != null && !due(stored, today, householdZone)) return stored
+        return try {
             val config = conn.config
             val collections = council.read(config[CONFIG_HOUSE].orEmpty(), config[CONFIG_POSTCODE].orEmpty(), config[CONFIG_ADDRESS].orEmpty())
             Log.i(TAG, "Bins read: ${collections.size} collections")
-            BinsRead(key, now, lastGoodDay = today, collections = collections)
+            keep(conn.id, BinsRead(key, now, lastGoodMillis = now, collections = collections))
         } catch (e: BinsReadFailed) {
-            val kind = e.kind
-            Log.w(TAG, "Bins read failed: ${kind.name}")
-            attempted(stored, key, now, today).copy(failure = kind)
-        } catch (e: UnreachableException) {
-            countAttempt(conn.id, attempted(stored, key, now, today))
-            throw e
-        } catch (e: CancellationException) {
-            // The engine's timeout: an attempt like any unreachable one.
-            countAttempt(conn.id, attempted(stored, key, now, today))
+            Log.w(TAG, "Bins read failed: ${e.kind.name}")
+            keep(conn.id, attempted(stored, key, now, today, householdZone).copy(failure = e.kind))
+        } catch (e: Exception) {
+            // A CancellationException is the engine's timeout: an attempt like any unreachable one.
+            if (e !is UnreachableException && e !is CancellationException) throw e
+            keep(conn.id, attempted(stored, key, now, today, householdZone))
             throw e
         }
-        keep(conn.id, read)
-        return read
     }
 
-    private fun due(read: BinsRead, today: LocalDate): Boolean {
+    private fun due(read: BinsRead, today: LocalDate, householdZone: ZoneId): Boolean {
         if ((updates.last.value ?: Long.MIN_VALUE) > read.lastAttemptMillis) return true
-        if (read.lastGoodDay?.isBefore(today) == false) return false
-        if (read.failureDay != today) return true
+        if (read.lastGoodMillis?.let { dayOf(it, householdZone) } == today) return false
+        if (dayOf(read.lastAttemptMillis, householdZone) != today) return true
         return read.failuresToday < ATTEMPTS_A_DAY && !clock.within(read.lastAttemptMillis, RETRY_GAP_MS)
     }
 
-    private fun attempted(stored: BinsRead?, key: String, now: Long, today: LocalDate): BinsRead {
+    private fun attempted(stored: BinsRead?, key: String, now: Long, today: LocalDate, householdZone: ZoneId): BinsRead {
         val base = stored ?: BinsRead(key, now)
-        val failures = if (base.failureDay == today) base.failuresToday + 1 else 1
-        return base.copy(lastAttemptMillis = now, failuresToday = failures, failureDay = today)
+        val failures = if (dayOf(base.lastAttemptMillis, householdZone) == today) base.failuresToday + 1 else 1
+        return base.copy(lastAttemptMillis = now, failuresToday = failures)
     }
 
-    private suspend fun keep(connectionId: String, read: BinsRead) {
+    /** Saved even while the read is being cancelled, so a timed-out attempt still counts. */
+    private suspend fun keep(connectionId: String, read: BinsRead): BinsRead = withContext(NonCancellable) {
         held[connectionId] = read
         reads.save(connectionId, read)
+        read
     }
-
-    private suspend fun countAttempt(connectionId: String, read: BinsRead) = withContext(NonCancellable) { keep(connectionId, read) }
 }
+
+private fun dayOf(millis: Long, zone: ZoneId): LocalDate = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
 
 // A hash, not the address: it only has to change when the connection's address does.
 private fun addressKey(conn: Connection): String =
     listOf(CONFIG_HOUSE, CONFIG_POSTCODE, CONFIG_ADDRESS).joinToString("\n") { conn.config[it].orEmpty() }.hashCode().toString()
 
-private fun eventOf(day: BinDay): RemoteEvent = RemoteEvent(
-    remoteId = "bins-${day.date}",
-    title = binsTitle(day.kinds),
-    start = EventTime.AllDay(day.date),
-    end = EventTime.AllDay(day.date.plusDays(1)),
-    recurring = false,
-    forPerson = PersonId.FAMILY.value,
-    bins = orderedBins(day.kinds),
-)
+private fun eventOf(day: BinDay): RemoteEvent {
+    val bins = orderedBins(day.kinds)
+    return RemoteEvent(
+        remoteId = "bins-${day.date}",
+        title = binsTitle(bins),
+        start = EventTime.AllDay(day.date),
+        end = EventTime.AllDay(day.date.plusDays(1)),
+        recurring = false,
+        forPerson = PersonId.FAMILY.value,
+        bins = bins,
+    )
+}

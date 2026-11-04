@@ -2,7 +2,6 @@ package uk.co.siland.culvery.provider.calendar_midsussex
 
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
-import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +28,7 @@ import uk.co.siland.culvery.core.plugin.Feature
 @RunWith(RobolectricTestRunner::class)
 class MidSussexBinsProviderTest {
     @get:Rule
-    val dir = TemporaryFolder(File("C:/t9").apply { mkdirs() })
+    val dir = TemporaryFolder()
 
     private val today = LocalDate.of(2026, 11, 4)
     private val council = FakeCouncil()
@@ -86,7 +85,6 @@ class MidSussexBinsProviderTest {
         val result = subject.read()
 
         assertThat(result.fullReplace).isTrue()
-        assertThat(result.cursor).isNull()
         val mixed = result.upserts.single { it.remoteId == "bins-2026-11-16" }
         assertThat(mixed.title).isEqualTo("Bins: Food, Garden, Recycling, Waste")
         assertThat(mixed.bins).containsExactly("food", "garden", "recycling", "waste").inOrder()
@@ -95,6 +93,38 @@ class MidSussexBinsProviderTest {
         assertThat(mixed.recurring).isFalse()
         assertThat(mixed.forPerson).isEqualTo("family")
         assertThat(result.upserts.map { it.remoteId }).containsExactly("bins-2026-11-09", "bins-2026-11-16", "bins-2026-11-23")
+    }
+
+    @Test
+    fun anUnchangedReadWritesNothing() = runTest {
+        val first = subject.read()
+        wall.plusMinutes(5)
+
+        val again = subject.sync(binsConnection(), SOURCE_BINS, range, first.cursor)
+        assertThat(again.upserts).isEmpty()
+        assertThat(again.removedIds).isEmpty()
+        assertThat(again.fullReplace).isFalse()
+        assertThat(again.cursor).isEqualTo(first.cursor)
+
+        val moved = DateRange(range.start.plusDays(1), range.endExclusive.plusDays(1), LONDON)
+        assertThat(subject.sync(binsConnection(), SOURCE_BINS, moved, first.cursor).fullReplace).isTrue()
+
+        wall.at(today.plusDays(1), LocalTime.of(0, 5))
+        val next = subject.sync(binsConnection(), SOURCE_BINS, range, first.cursor)
+        assertThat(next.fullReplace).isTrue()
+        assertThat(next.upserts).hasSize(3)
+        assertThat(next.cursor).isNotEqualTo(first.cursor)
+        assertThat(council.requests).isEqualTo(6)
+    }
+
+    @Test
+    fun aStoredFailureIsThrownWhateverTheCursor() = runTest {
+        val good = subject.read()
+        council.collections = "collections_missing.html"
+        wall.at(today.plusDays(1), LocalTime.of(0, 5))
+
+        val e = runCatching { subject.sync(binsConnection(), SOURCE_BINS, range, good.cursor) }.exceptionOrNull()
+        assertThat(e).isInstanceOf(UnreadableException::class.java)
     }
 
     @Test
@@ -301,6 +331,8 @@ class MidSussexBinsProviderTest {
 
         wall.plusMinutes(60)
         assertThat(subject.read(gran).upserts).hasSize(3)
+        assertThat(council.requests).isEqualTo(9)
+        assertThat(subject.read(home).upserts).hasSize(3)
         assertThat(council.requests).isEqualTo(9)
     }
 

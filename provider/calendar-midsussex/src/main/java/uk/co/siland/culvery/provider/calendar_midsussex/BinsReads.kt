@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
-import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
@@ -23,15 +22,14 @@ private const val FILE = "bins_reads"
 /**
  * A connection's last read and how today's attempts went. [addressKey] tells the connection's address from an earlier
  * one's without holding it. [failure] is the last read's failure, null once a read works; [failuresToday] counts the failed
- * attempts on [failureDay], unreachable ones included.
+ * attempts on the day of [lastAttemptMillis], unreachable ones included.
  */
 @Serializable
 internal data class BinsRead(
     val addressKey: String,
     val lastAttemptMillis: Long,
-    @Serializable(with = IsoDate::class) val lastGoodDay: LocalDate? = null,
+    val lastGoodMillis: Long? = null,
     val failuresToday: Int = 0,
-    @Serializable(with = IsoDate::class) val failureDay: LocalDate? = null,
     val failure: BinsFailure? = null,
     val collections: List<BinDay> = emptyList(),
 )

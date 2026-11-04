@@ -41,7 +41,10 @@ internal object IsoDate : KSerializer<LocalDate> {
 }
 
 private val KNOWN_KINDS = listOf("food" to "food", "garden" to "garden", "recycling" to "recycling", "refuse" to "waste")
-private val DATE = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)
+/** How the council's collections page writes a date. */
+const val COUNCIL_DATE_PATTERN = "dd/MM/uuuu"
+
+private val DATE = DateTimeFormatter.ofPattern(COUNCIL_DATE_PATTERN).withResolverStyle(ResolverStyle.STRICT)
 
 fun searchUrl(startHtml: String, baseUrl: HttpUrl): HttpUrl {
     val href = Jsoup.parse(startHtml).select("a[href]")

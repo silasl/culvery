@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.provider.calendar_midsussex
 
 import java.io.IOException
-import java.time.Duration
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import okhttp3.Cookie
@@ -13,35 +12,40 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.core.net.await
+import uk.co.siland.culvery.core.net.internetHttpClient
+import uk.co.siland.culvery.core.net.withUserAgent
+import uk.co.siland.culvery.core.plugin.asUnreachable
 
 const val COUNCIL_BASE_URL = "https://waste.services.midsussex.gov.uk/"
+
+private const val COUNCIL_SITE = "the council’s site"
 
 private const val MAX_PAGE_BYTES = 2L * 1024 * 1024
 
 /** A plain browser User-Agent, as the council's site expects; [interceptors] are the debug build's sample council. */
-internal fun councilHttpClient(version: String, interceptors: Set<Interceptor>): OkHttpClient = OkHttpClient.Builder()
-    .connectTimeout(Duration.ofSeconds(15))
-    .readTimeout(Duration.ofSeconds(30))
-    .callTimeout(Duration.ofSeconds(60))
-    .followRedirects(true)
-    .addInterceptor { chain ->
-        chain.proceed(chain.request().newBuilder().header("User-Agent", "Mozilla/5.0 (Linux; Android) Culvery/$version").build())
-    }
+internal fun councilHttpClient(version: String, interceptors: Set<Interceptor>): OkHttpClient = internetHttpClient()
+    .withUserAgent("Mozilla/5.0 (Linux; Android) Culvery/$version")
     .apply { interceptors.forEach(::addInterceptor) }
     .build()
 
 /**
- * The council's three pages (spec 4.1). Each read or search is its own session: the start page's cookie is kept only
- * for that walk. Throws [UnreachableException] for the network or a busy site, [BinsReadFailed] for a page that isn't
- * what it should be.
+ * The council's three pages (spec 4.1). Each read or search is its own session, its start page's cookie kept only for
+ * that walk; [readAddress] goes on in the last search's. Throws [UnreachableException] for the network or a busy site,
+ * [BinsReadFailed] for a page that isn't what it should be.
  */
 class CouncilClient(private val baseUrl: HttpUrl, private val client: Lazy<OkHttpClient>) {
-    suspend fun search(house: String, postcode: String): List<Address> = Session().search(house, postcode)
+    /** The last search's session: an address link it found needs its cookie. */
+    @Volatile
+    private var searched: Session? = null
+
+    suspend fun search(house: String, postcode: String): List<Address> = Session().also { searched = it }.search(house, postcode)
+
+    /** The collections at [address], one of the last [search]'s, without walking from the start again. */
+    suspend fun readAddress(address: Address): List<BinDay> = (searched ?: Session()).collectionsAt(address)
 
     suspend fun read(house: String, postcode: String, line: String): List<BinDay> {
         val session = Session()
-        val address = pick(session.search(house, postcode), line)
-        return collections(session.page(Request.Builder().url(address.url).build(), BinsFailure.NO_COLLECTIONS))
+        return session.collectionsAt(pick(session.search(house, postcode), line))
     }
 
     private inner class Session {
@@ -54,12 +58,15 @@ class CouncilClient(private val baseUrl: HttpUrl, private val client: Lazy<OkHtt
             return addresses(list, baseUrl)
         }
 
-        suspend fun page(request: Request, refused: BinsFailure): String {
+        suspend fun collectionsAt(address: Address): List<BinDay> =
+            collections(page(Request.Builder().url(address.url).build(), BinsFailure.NO_COLLECTIONS))
+
+        private suspend fun page(request: Request, refused: BinsFailure): String {
             val answer = try {
                 http.newCall(request).await(MAX_PAGE_BYTES)
             } catch (e: IOException) {
                 currentCoroutineContext().ensureActive()
-                throw UnreachableException("Couldn’t reach the council’s site", e)
+                throw e.asUnreachable(COUNCIL_SITE, offlineOnUnknownHost = true)
             }
             if (answer.code == 429 || answer.code >= 500) {
                 throw UnreachableException("The council’s site asked to try later (${answer.code})")

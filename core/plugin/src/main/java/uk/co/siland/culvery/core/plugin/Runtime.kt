@@ -3,6 +3,9 @@ package uk.co.siland.culvery.core.plugin
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Qualifier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -14,6 +17,8 @@ fun interface WallClock {
 
 /** Whether less than [span] has passed since [since]; a wall that went back counts as passed. */
 fun WallClock.within(since: Long?, span: Long): Boolean = since != null && nowMillis() - since in 0 until span
+
+fun WallClock.today(zone: ZoneId): LocalDate = Instant.ofEpochMilli(nowMillis()).atZone(zone).toLocalDate()
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)

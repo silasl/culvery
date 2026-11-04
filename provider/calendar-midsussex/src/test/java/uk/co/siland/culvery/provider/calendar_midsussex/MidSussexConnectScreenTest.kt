@@ -9,7 +9,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import com.google.common.truth.Truth.assertThat
-import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -29,7 +28,7 @@ class MidSussexConnectScreenTest {
     val compose = createComposeRule()
 
     @get:Rule
-    val dir = TemporaryFolder(File("C:/t9").apply { mkdirs() })
+    val dir = TemporaryFolder()
 
     private val council = FakeCouncil()
     private val base = council.start()
@@ -75,6 +74,7 @@ class MidSussexConnectScreenTest {
         waitFor("Next: ")
         compose.onNodeWithText("Next: Monday 9 November — Food").assertExists()
         compose.onNodeWithText("Add calendar").assertExists()
+        assertThat(council.requests).isEqualTo(3)
     }
 
     @Test
@@ -86,6 +86,7 @@ class MidSussexConnectScreenTest {
         compose.onNodeWithText("2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX").performClick()
         waitFor("Next: ")
         compose.onNodeWithText("Next: Monday 9 November — Food").assertExists()
+        assertThat(council.requests).isEqualTo(3)
     }
 
     @Test
