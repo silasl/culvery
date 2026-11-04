@@ -90,6 +90,22 @@ class MidSussexConnectScreenTest {
     }
 
     @Test
+    fun tryAgainAfterAFailedPickWalksAgain() {
+        show()
+        find()
+        waitFor("2 EXAMPLE ROAD")
+        council.collections = "collections_missing.html"
+        compose.onNodeWithText("2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX").performClick()
+        waitFor(COUNCIL_UNREADABLE)
+        council.collections = "collections.html"
+        val before = council.requests
+
+        compose.onNodeWithText("Try again").performClick()
+        waitFor("Next: ")
+        assertThat(council.requests - before).isEqualTo(3)
+    }
+
+    @Test
     fun noAddressSaysSo() {
         council.addresses = "addresses_none.html"
         show()

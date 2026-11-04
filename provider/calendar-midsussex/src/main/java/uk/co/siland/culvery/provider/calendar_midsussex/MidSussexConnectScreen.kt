@@ -45,7 +45,7 @@ private sealed interface Step {
     data object Working : Step
     data object NoAddress : Step
     /** [house] and [postcode] are what was searched, whatever the fields hold now. */
-    data class Pick(val house: String, val postcode: String, val addresses: List<Address>) : Step
+    data class Pick(val house: String, val postcode: String, val found: CouncilClient.Found) : Step
     data class Ready(val house: String, val postcode: String, val line: String, val next: String) : Step
     /** [ready] has gone to onConnected and is still shown; a second tap adds nothing. */
     data class Done(val ready: Ready) : Step
@@ -66,19 +66,23 @@ private class Connecting(
     var step by mutableStateOf<Step>(Step.Idle)
         private set
 
-    /** The step that last ran, for Try again. */
+    /** What Try again runs: the last step, or the retry it gave. */
     private var last: suspend () -> Step = { Step.Idle }
 
-    fun search(house: String, postcode: String) = run {
+    fun search(house: String, postcode: String) = run({
         val found = council.search(house, postcode)
-        when (found.size) {
+        when (found.addresses.size) {
             0 -> Step.NoAddress
-            1 -> ready(house, postcode, found.single())
+            1 -> found.addresses.single().let { address -> ready(house, postcode, address.line) { council.readAddress(found, address) } }
             else -> Step.Pick(house, postcode, found)
         }
-    }
+    })
 
-    fun pick(from: Step.Pick, address: Address) = run { ready(from.house, from.postcode, address) }
+    /** Try again walks from the start: the council may have ended the search's session. */
+    fun pick(from: Step.Pick, address: Address) = run(
+        { ready(from.house, from.postcode, address.line) { council.readAddress(from.found, address) } },
+        retry = { ready(from.house, from.postcode, address.line) { council.read(from.house, from.postcode, address.line) } },
+    )
 
     fun retry() = run(last)
 
@@ -89,21 +93,21 @@ private class Connecting(
         onConnected(Connection(existing?.id ?: UUID.randomUUID().toString(), MIDSUSSEX_PROVIDER_ID, BINS_LABEL, config))
     }
 
-    private suspend fun ready(house: String, postcode: String, address: Address) =
-        Step.Ready(house, postcode, address.line, nextLine(council.readAddress(address), today()))
+    private suspend fun ready(house: String, postcode: String, line: String, read: suspend () -> List<BinDay>) =
+        Step.Ready(house, postcode, line, nextLine(read(), today()))
 
     /** A tap while a step runs is dropped: the button's disabled look can lag a frame behind. */
-    private fun run(block: suspend () -> Step) {
+    private fun run(block: suspend () -> Step, retry: suspend () -> Step = block) {
         if (step == Step.Working) return
-        last = block
+        last = retry
         step = Step.Working
         scope.launch {
             step = try {
                 block()
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: BinsReadFailed) {
-                Log.w(TAG, "Bins connect failed: ${e.kind.name}")
+            } catch (failed: BinsReadFailed) {
+                Log.w(TAG, "Bins connect failed: ${failed.kind.name}")
                 Step.Failed
             } catch (e: UnreachableException) {
                 Log.w(TAG, "Bins connect failed (${e::class.simpleName})")
@@ -153,7 +157,7 @@ internal fun MidSussexConnectScreen(
             )
             when (step) {
                 Step.NoAddress -> Text(NO_ADDRESS, style = HhType.secondary, color = Culvery.colors.danger)
-                is Step.Pick -> step.addresses.forEach { address ->
+                is Step.Pick -> step.found.addresses.forEach { address ->
                     HhListRow(address.line, onClick = { connecting.pick(step, address) })
                 }
                 Step.Failed -> {

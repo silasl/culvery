@@ -30,25 +30,24 @@ internal fun councilHttpClient(version: String, interceptors: Set<Interceptor>):
 
 /**
  * The council's three pages (spec 4.1). Each read or search is its own session, its start page's cookie kept only for
- * that walk; [readAddress] goes on in the last search's. Throws [UnreachableException] for the network or a busy site,
- * [BinsReadFailed] for a page that isn't what it should be.
+ * that walk; [readAddress] goes on in the session of the search that [Found] the address. Throws [UnreachableException]
+ * for the network or a busy site, [BinsReadFailed] for a page that isn't what it should be.
  */
 class CouncilClient(private val baseUrl: HttpUrl, private val client: Lazy<OkHttpClient>) {
-    /** The last search's session: an address link it found needs its cookie. */
-    @Volatile
-    private var searched: Session? = null
+    /** A search's [addresses], with the session whose cookie their links need. */
+    class Found internal constructor(val addresses: List<Address>, internal val session: CouncilClient.Session)
 
-    suspend fun search(house: String, postcode: String): List<Address> = Session().also { searched = it }.search(house, postcode)
+    suspend fun search(house: String, postcode: String): Found = Session().let { Found(it.search(house, postcode), it) }
 
-    /** The collections at [address], one of the last [search]'s, without walking from the start again. */
-    suspend fun readAddress(address: Address): List<BinDay> = (searched ?: Session()).collectionsAt(address)
+    /** The collections at [address], one of [found]'s, without walking from the start again. */
+    suspend fun readAddress(found: Found, address: Address): List<BinDay> = found.session.collectionsAt(address)
 
     suspend fun read(house: String, postcode: String, line: String): List<BinDay> {
         val session = Session()
         return session.collectionsAt(pick(session.search(house, postcode), line))
     }
 
-    private inner class Session {
+    internal inner class Session {
         private val http = client.value.newBuilder().cookieJar(SessionCookies()).build()
 
         suspend fun search(house: String, postcode: String): List<Address> {

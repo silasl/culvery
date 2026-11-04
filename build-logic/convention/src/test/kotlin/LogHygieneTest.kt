@@ -94,7 +94,7 @@ class LogHygieneTest {
     @Test
     fun theBinsLinesPass() {
         assertThat(LogHygiene.problems("""Log.i(TAG, "Bins read: ${'$'}{collections.size} collections")""")).isEmpty()
-        assertThat(LogHygiene.problems("""Log.w(TAG, "Bins read failed: ${'$'}{e.kind.name}")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.w(TAG, "Bins read failed: ${'$'}{failed.kind.name}")""")).isEmpty()
         assertThat(LogHygiene.problems("""Log.i(TAG, "Bins read for ${'$'}{conn.config}")""")).hasSize(1)
     }
 
@@ -145,8 +145,8 @@ internal object LogHygiene {
      *
      * `sound.name` is a doorbell sound's fixed name, CLASSIC or ORGAN (`DoorSound`).
      *
-     * `collections.size` is how many collection days a bins read found, never the address or a date (17 §3.7); `e.kind.name`
-     * is the step a bins read or connect failed at (`BinsFailure`).
+     * `collections.size` is how many collection days a bins read found, never the address or a date (17 §3.7); `failed.kind.name`
+     * is the step a bins read or connect failed at (`BinsReadFailed.kind`).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
@@ -154,7 +154,7 @@ internal object LogHygiene {
         "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
         "step.name", "own.logName", "sound.name", "after.screen.name", "names.size",
-        "collections.size", "e.kind.name",
+        "collections.size", "failed.kind.name",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|i|wtf|println)\(""")

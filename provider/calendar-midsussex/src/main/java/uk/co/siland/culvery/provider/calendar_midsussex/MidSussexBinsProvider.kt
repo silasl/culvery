@@ -94,7 +94,7 @@ class MidSussexBinsProvider internal constructor(
         val goodMillis = read.lastGoodMillis ?: throw UnreachableException("The council’s site hasn’t been read yet")
         val stamp = SyncCursor("$goodMillis:${range.start}:${range.endExclusive}")
         if (cursor == stamp) return SyncResult(emptyList(), emptyList(), stamp, fullReplace = false)
-        val upserts = read.collections.filter { range.overlaps(EventTime.AllDay(it.date), EventTime.AllDay(it.date.plusDays(1))) }.map(::eventOf)
+        val upserts = read.collections.filter { !it.date.isBefore(range.start) && it.date.isBefore(range.endExclusive) }.map(::eventOf)
         return SyncResult(upserts, emptyList(), stamp, fullReplace = true)
     }
 
@@ -110,9 +110,9 @@ class MidSussexBinsProvider internal constructor(
             val collections = council.read(config[CONFIG_HOUSE].orEmpty(), config[CONFIG_POSTCODE].orEmpty(), config[CONFIG_ADDRESS].orEmpty())
             Log.i(TAG, "Bins read: ${collections.size} collections")
             keep(conn.id, BinsRead(key, now, lastGoodMillis = now, collections = collections))
-        } catch (e: BinsReadFailed) {
-            Log.w(TAG, "Bins read failed: ${e.kind.name}")
-            keep(conn.id, attempted(stored, key, now, today, householdZone).copy(failure = e.kind))
+        } catch (failed: BinsReadFailed) {
+            Log.w(TAG, "Bins read failed: ${failed.kind.name}")
+            keep(conn.id, attempted(stored, key, now, today, householdZone).copy(failure = failed.kind))
         } catch (e: Exception) {
             // A CancellationException is the engine's timeout: an attempt like any unreachable one.
             if (e !is UnreachableException && e !is CancellationException) throw e

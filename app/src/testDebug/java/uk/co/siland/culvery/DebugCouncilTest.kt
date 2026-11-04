@@ -52,8 +52,8 @@ class DebugCouncilTest {
 
     @Test
     fun servesThePagesForTheSamplePostcodeOnly() = runTest {
-        assertThat(subject.search("1 Example Road", "ZZ99 9ZZ").map { it.line }).containsExactly(LINE_ONE, LINE_TWO).inOrder()
-        assertThat(subject.search("1 Example Road", "zz999zz")).hasSize(2)
+        assertThat(subject.search("1 Example Road", "ZZ99 9ZZ").addresses.map { it.line }).containsExactly(LINE_ONE, LINE_TWO).inOrder()
+        assertThat(subject.search("1 Example Road", "zz999zz").addresses).hasSize(2)
 
         val good = subject.read("2 Example Road", "ZZ99 9ZZ", LINE_TWO)
         assertThat(good.map { it.date }).isInStrictOrder()

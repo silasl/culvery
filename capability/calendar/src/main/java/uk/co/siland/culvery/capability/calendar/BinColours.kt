@@ -53,7 +53,7 @@ class BinColours internal constructor(private val store: DataStore<Preferences>,
         }
         .distinctUntilChanged()
 
-    /** Kind to ink id for the kinds the family has changed; read synchronously where drawing can't wait. */
+    /** Kind to ink id for the kinds the family has changed: the repository puts these inks on events; [inkFor] reads it at once. */
     internal val current: StateFlow<Map<String, String>> = chosen.stateIn(scope, SharingStarted.Eagerly, emptyMap())
 
     suspend fun set(kind: String, inkId: String) {

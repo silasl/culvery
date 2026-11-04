@@ -54,7 +54,7 @@ class CouncilClientTest {
 
     @Test
     fun searchListsTheAddresses() = runTest {
-        assertThat(subject.search(HOUSE, POSTCODE).map { it.line }).containsExactly(
+        assertThat(subject.search(HOUSE, POSTCODE).addresses.map { it.line }).containsExactly(
             LINE,
             "2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX",
         ).inOrder()
@@ -64,7 +64,7 @@ class CouncilClientTest {
     @Test
     fun anAddressFromASearchIsReadInItsSession() = runTest {
         val found = subject.search(HOUSE, POSTCODE)
-        assertThat(subject.readAddress(found.last())).hasSize(3)
+        assertThat(subject.readAddress(found, found.addresses.last())).hasSize(3)
 
         assertThat(council.requests).isEqualTo(3)
         repeat(2) { council.takeRequest() }

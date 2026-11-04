@@ -379,6 +379,17 @@ class CalendarRepositoryTest {
         ).inOrder()
     }
 
+    @Test
+    fun aChangedBinColourReachesTheNextEmission() = runTest {
+        put("s-family", allDay("Bins", 23, 24).copy(bins = listOf("waste")))
+
+        repo.day(sept(23)).test {
+            assertThat(awaitItem().single().bins).containsExactly(BinUi("waste", BinInks.byId("black")))
+            binColours.set("waste", "purple")
+            assertThat(awaitItem().single().bins).containsExactly(BinUi("waste", BinInks.byId("purple")))
+        }
+    }
+
     private fun ref(id: String, source: String = "s-family") = EventRef("c1", source, id)
 
     private val key = "0123456789abcdef0123456789abcdef"
