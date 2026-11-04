@@ -38,7 +38,7 @@ internal fun councilHttpClient(version: String, interceptors: Set<Interceptor>):
 class CouncilClient(private val baseUrl: HttpUrl, private val client: Lazy<OkHttpClient>) {
     suspend fun search(house: String, postcode: String): List<Address> = Session().search(house, postcode)
 
-    suspend fun read(house: String, postcode: String, line: String): List<Collection> {
+    suspend fun read(house: String, postcode: String, line: String): List<BinDay> {
         val session = Session()
         val address = pick(session.search(house, postcode), line)
         return collections(session.page(Request.Builder().url(address.url).build(), BinsFailure.NO_COLLECTIONS))

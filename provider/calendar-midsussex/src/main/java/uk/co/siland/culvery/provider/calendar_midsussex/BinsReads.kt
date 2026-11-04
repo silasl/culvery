@@ -21,8 +21,8 @@ import uk.co.siland.culvery.core.plugin.settingsDataStore
 private const val FILE = "bins_reads"
 
 /**
- * The last read and how today's attempts went. [addressKey] tells one connection's address from another's without
- * holding it. [failure] is the last read's failure, null once a read works; [failuresToday] counts the failed
+ * A connection's last read and how today's attempts went. [addressKey] tells the connection's address from an earlier
+ * one's without holding it. [failure] is the last read's failure, null once a read works; [failuresToday] counts the failed
  * attempts on [failureDay], unreachable ones included.
  */
 @Serializable
@@ -33,19 +33,19 @@ internal data class BinsRead(
     val failuresToday: Int = 0,
     @Serializable(with = IsoDate::class) val failureDay: LocalDate? = null,
     val failure: BinsFailure? = null,
-    val collections: List<Collection> = emptyList(),
+    val collections: List<BinDay> = emptyList(),
 )
 
-/** The bins provider's last read, in a DataStore file of its own, so a restart answers without asking the council. */
+/** Each bins connection's last read, in a DataStore file of its own, so a restart answers without asking the council. */
 @Singleton
 class BinsReads internal constructor(private val store: DataStore<Preferences>) {
     @Inject
     constructor(@ApplicationContext context: Context) : this(settingsDataStore { context.preferencesDataStoreFile(FILE) })
 
     /** Null when nothing is stored, or what is stored can't be read. */
-    internal suspend fun load(): BinsRead? {
+    internal suspend fun load(connectionId: String): BinsRead? {
         val text = try {
-            store.data.first()[READ]
+            store.data.first()[keyOf(connectionId)]
         } catch (e: IOException) {
             Log.w(TAG, "Couldn't read the last bins read (${e::class.simpleName})")
             null
@@ -59,15 +59,13 @@ class BinsReads internal constructor(private val store: DataStore<Preferences>) 
     }
 
     /** A failed write is logged: the provider still holds [read] until a restart. */
-    internal suspend fun save(read: BinsRead) {
+    internal suspend fun save(connectionId: String, read: BinsRead) {
         try {
-            store.edit { it[READ] = Json.encodeToString(BinsRead.serializer(), read) }
+            store.edit { it[keyOf(connectionId)] = Json.encodeToString(BinsRead.serializer(), read) }
         } catch (e: IOException) {
             Log.w(TAG, "Couldn't save the bins read (${e::class.simpleName})")
         }
     }
 
-    private companion object {
-        val READ = stringPreferencesKey("last_read")
-    }
+    private fun keyOf(connectionId: String) = stringPreferencesKey("last_read_$connectionId")
 }

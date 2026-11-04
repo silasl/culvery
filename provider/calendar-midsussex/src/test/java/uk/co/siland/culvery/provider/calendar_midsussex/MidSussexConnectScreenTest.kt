@@ -1,15 +1,18 @@
 package uk.co.siland.culvery.provider.calendar_midsussex
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -31,17 +34,17 @@ class MidSussexConnectScreenTest {
     private val council = FakeCouncil()
     private val base = council.start()
     private val wall = FakeWall(LocalDate.of(2026, 11, 4), LocalTime.of(8, 0))
-    private var connected: Connection? = null
-    private var cancelled = false
+    private val connections = mutableListOf<Connection>()
+    private val connected: Connection? get() = connections.lastOrNull()
 
     @After
     fun tearDown() = council.shutdown()
 
-    private fun show(existing: Connection? = null) {
-        val provider = MidSussexBinsProvider(testCouncil(base), testReads(dir.root), wall, UpdateRequests())
+    private fun show(existing: Connection? = null, zone: ZoneId = LONDON) {
+        val provider = MidSussexBinsProvider(testCouncil(base), testReads(dir.root), wall, UpdateRequests()) { zone }
         compose.setContent {
             CulveryTheme(dark = true) {
-                provider.ConnectScreen(existing, onConnected = { connected = it }, onCancel = { cancelled = true })
+                provider.ConnectScreen(existing, onConnected = { connections += it }, onCancel = {})
             }
         }
     }
@@ -50,6 +53,15 @@ class MidSussexConnectScreenTest {
         compose.onNodeWithTag("bins_house").performTextInput(HOUSE)
         compose.onNodeWithTag("bins_postcode").performTextInput(POSTCODE)
         compose.onNodeWithText("Find the address").performClick()
+    }
+
+    /** Two taps before the screen can redraw, as a quick double tap can land. */
+    private fun tapTwiceInOneFrame(text: String) {
+        val tap = checkNotNull(compose.onNodeWithText(text).fetchSemanticsNode().config[SemanticsActions.OnClick].action)
+        compose.runOnIdle {
+            tap()
+            tap()
+        }
     }
 
     private fun waitFor(text: String) =
@@ -63,7 +75,6 @@ class MidSussexConnectScreenTest {
         waitFor("Next: ")
         compose.onNodeWithText("Next: Monday 9 November — Food").assertExists()
         compose.onNodeWithText("Add calendar").assertExists()
-        compose.onNodeWithText("Cancel").assertExists()
     }
 
     @Test
@@ -129,13 +140,72 @@ class MidSussexConnectScreenTest {
     }
 
     @Test
-    fun cancelReportsCancel() {
+    fun theReadyStepLeavesCancelToTheConnectingCard() {
         council.addresses = "addresses_one.html"
         show()
         find()
         waitFor("Next: ")
-        compose.onNodeWithText("Cancel").performClick()
-        assertThat(cancelled).isTrue()
-        assertThat(connected).isNull()
+        compose.onNodeWithText("Cancel").assertDoesNotExist()
+    }
+
+    @Test
+    fun aSecondTapOnFindStartsNoSecondSearch() {
+        council.addresses = "addresses_one.html"
+        council.stalled = true
+        show()
+        compose.onNodeWithTag("bins_house").performTextInput(HOUSE)
+        compose.onNodeWithTag("bins_postcode").performTextInput(POSTCODE)
+        tapTwiceInOneFrame("Find the address")
+        council.takeRequest()
+        compose.waitForIdle()
+        assertThat(council.takeRequestOrNull()).isNull()
+    }
+
+    @Test
+    fun aSecondTapOnAddConnectsOnce() {
+        council.addresses = "addresses_one.html"
+        show()
+        find()
+        waitFor("Next: ")
+        tapTwiceInOneFrame("Add calendar")
+        assertThat(connections).hasSize(1)
+    }
+
+    @Test
+    fun pickingUsesTheSearchedHouseAndPostcode() {
+        show()
+        find()
+        waitFor("2 EXAMPLE ROAD")
+        compose.onNodeWithTag("bins_house").performTextReplacement("9 Other Road")
+        compose.onNodeWithTag("bins_postcode").performTextReplacement("ZZ1 1ZZ")
+        compose.onNodeWithText("2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX").performClick()
+        waitFor("Next: ")
+        compose.onNodeWithText("Add calendar").performClick()
+
+        assertThat(connected?.config).containsExactly(
+            CONFIG_HOUSE, HOUSE,
+            CONFIG_POSTCODE, POSTCODE,
+            CONFIG_ADDRESS, "2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX",
+        )
+    }
+
+    @Test
+    fun aChangedPageOffersToTryAgain() {
+        council.start = "collections_missing.html"
+        show()
+        find()
+        waitFor("Can’t read the council’s site.")
+        compose.onNodeWithText("Try again").assertExists()
+    }
+
+    /** 23:30 in London on the 9th is already the 10th in Tokyo, so the household's next collection is the 16th. */
+    @Test
+    fun theNextCollectionCountsFromTheHouseholdsToday() {
+        council.addresses = "addresses_one.html"
+        wall.at(LocalDate.of(2026, 11, 9), LocalTime.of(23, 30))
+        show(zone = ZoneId.of("Asia/Tokyo"))
+        find()
+        waitFor("Next: ")
+        compose.onNodeWithText("Next: Monday 16 November — Food, Garden, Recycling, Waste").assertExists()
     }
 }

@@ -28,7 +28,7 @@ data class Address(val line: String, val url: HttpUrl)
 
 /** [kinds] are keys (food, garden, recycling, waste) or the council's own words for a bin we don't know. */
 @Serializable
-data class Collection(@Serializable(with = IsoDate::class) val date: LocalDate, val kinds: List<String>)
+data class BinDay(@Serializable(with = IsoDate::class) val date: LocalDate, val kinds: List<String>)
 
 internal object IsoDate : KSerializer<LocalDate> {
     override val descriptor = PrimitiveSerialDescriptor("IsoDate", PrimitiveKind.STRING)
@@ -62,7 +62,7 @@ fun addresses(listHtml: String, baseUrl: HttpUrl): List<Address> {
 fun pick(addresses: List<Address>, line: String): Address =
     addresses.firstOrNull { it.line == line } ?: throw BinsReadFailed(BinsFailure.ADDRESS_GONE)
 
-fun collections(houseHtml: String): List<Collection> {
+fun collections(houseHtml: String): List<BinDay> {
     val page = Jsoup.parse(houseHtml)
     if (page.selectFirst("span#waste-hint") != null) throw BinsReadFailed(BinsFailure.NO_SERVICES)
     val section = page.selectFirst("section#scheduled-collections")
@@ -72,7 +72,7 @@ fun collections(houseHtml: String): List<Collection> {
     if (rows.isEmpty()) throw BinsReadFailed(BinsFailure.NO_COLLECTIONS)
     return rows.groupBy({ it.first }, { it.second })
         .toSortedMap()
-        .map { (date, kinds) -> Collection(date, kinds.distinct().sortedWith(KIND_ORDER)) }
+        .map { (date, kinds) -> BinDay(date, kinds.distinct().sortedWith(KIND_ORDER)) }
 }
 
 private fun row(ul: Element): Pair<LocalDate, String>? {

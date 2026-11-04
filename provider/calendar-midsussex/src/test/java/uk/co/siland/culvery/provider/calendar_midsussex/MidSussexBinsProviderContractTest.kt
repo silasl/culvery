@@ -21,7 +21,7 @@ class MidSussexBinsProviderContractTest : CalendarProviderContractTest() {
     private val council = FakeCouncil()
     private val base = council.start()
     private val subject by lazy {
-        MidSussexBinsProvider(testCouncil(base), testReads(dir.root), FakeWall(LocalDate.of(2026, 11, 4), LocalTime.NOON), UpdateRequests())
+        MidSussexBinsProvider(testCouncil(base), testReads(dir.root), FakeWall(LocalDate.of(2026, 11, 4), LocalTime.NOON), UpdateRequests()) { LONDON }
     }
 
     @After

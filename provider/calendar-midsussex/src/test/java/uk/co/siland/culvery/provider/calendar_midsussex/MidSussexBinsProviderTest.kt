@@ -7,9 +7,9 @@ import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -39,7 +39,7 @@ class MidSussexBinsProviderTest {
     private val reads by lazy { testReads(dir.root) }
     private val range = DateRange(today.minusDays(1), today.plusDays(127), LONDON)
 
-    private fun provider() = MidSussexBinsProvider(testCouncil(base), reads, wall, updates)
+    private fun provider() = MidSussexBinsProvider(testCouncil(base), reads, wall, updates) { LONDON }
 
     private val subject by lazy { provider() }
 
@@ -49,16 +49,16 @@ class MidSussexBinsProviderTest {
     private suspend fun MidSussexBinsProvider.read(conn: Connection = binsConnection(), within: DateRange = range): SyncResult =
         sync(conn, SOURCE_BINS, within, null)
 
-    private suspend fun MidSussexBinsProvider.failure(): Throwable? =
+    private suspend fun MidSussexBinsProvider.failure(conn: Connection = binsConnection()): Throwable? =
         try {
-            read()
+            read(conn)
             null
         } catch (e: Exception) {
             e
         }
 
-    private suspend fun MidSussexBinsProvider.unreadable(): UnreadableException {
-        val e = failure()
+    private suspend fun MidSussexBinsProvider.unreadable(conn: Connection = binsConnection()): UnreadableException {
+        val e = failure(conn)
         assertWithMessage("$e").that(e).isInstanceOf(UnreadableException::class.java)
         return e as UnreadableException
     }
@@ -233,10 +233,12 @@ class MidSussexBinsProviderTest {
 
     @Test
     fun aTimedOutReadWaitsAnHour() = runTest {
-        council.slow = true
-        // Real time, as the engine's timeout is: the test clock would jump past it while the store loads.
-        assertThat(withContext(Dispatchers.Default) { withTimeoutOrNull(1_000) { subject.read() } }).isNull()
-        council.slow = false
+        council.stalled = true
+        // The engine's timeout, cancelling once the council has the request and will never answer it.
+        val stuck = launch(Dispatchers.Default) { subject.read() }
+        council.takeRequest()
+        stuck.cancelAndJoin()
+        council.stalled = false
         val asked = council.requests
 
         wall.plusMinutes(5)
@@ -278,6 +280,28 @@ class MidSussexBinsProviderTest {
 
         subject.read(binsConnection(house = "2 Example Road"))
         assertThat(council.requests).isEqualTo(6)
+    }
+
+    @Test
+    fun twoConnectionsKeepTheirOwnReads() = runTest {
+        val home = binsConnection(id = "bins1")
+        val gran = binsConnection(id = "bins2", house = "2 Example Road")
+        assertThat(subject.read(home).upserts).hasSize(3)
+        council.collections = "collections_missing.html"
+        subject.unreadable(gran)
+        assertThat(council.requests).isEqualTo(6)
+
+        council.collections = "collections.html"
+        wall.plusMinutes(5)
+        assertThat(subject.read(home).upserts).hasSize(3)
+        subject.unreadable(gran)
+        assertThat(provider().read(home).upserts).hasSize(3)
+        provider().unreadable(gran)
+        assertThat(council.requests).isEqualTo(6)
+
+        wall.plusMinutes(60)
+        assertThat(subject.read(gran).upserts).hasSize(3)
+        assertThat(council.requests).isEqualTo(9)
     }
 
     @Test

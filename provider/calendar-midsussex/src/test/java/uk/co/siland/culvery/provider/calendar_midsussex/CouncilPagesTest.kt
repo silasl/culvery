@@ -107,6 +107,18 @@ class CouncilPagesTest {
             </section>
         """.trimIndent()
 
-        assertThat(collections(html)).containsExactly(Collection(LocalDate.of(2026, 11, 16), listOf("food")))
+        assertThat(collections(html)).containsExactly(BinDay(LocalDate.of(2026, 11, 16), listOf("food")))
+    }
+
+    @Test
+    fun withoutTheSectionTheHeadingsParentHoldsTheRows() {
+        val html = """
+            <div>
+            <h2 id="upcoming-scheduled-collections">Your upcoming scheduled collections</h2>
+            <ul class="displayinlineblock"><li><img/></li><li><p>16/11/2026</p></li><li><p>Domestic Garden Waste Service</p></li></ul>
+            </div>
+        """.trimIndent()
+
+        assertThat(collections(html)).containsExactly(BinDay(LocalDate.of(2026, 11, 16), listOf("garden")))
     }
 }

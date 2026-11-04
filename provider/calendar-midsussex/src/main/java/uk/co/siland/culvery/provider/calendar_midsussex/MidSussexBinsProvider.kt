@@ -24,6 +24,7 @@ import uk.co.siland.culvery.capability.calendar.UnreadableException
 import uk.co.siland.culvery.capability.calendar.UpdateRequests
 import uk.co.siland.culvery.capability.calendar.binsTitle
 import uk.co.siland.culvery.capability.calendar.orderedBins
+import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
@@ -54,12 +55,17 @@ private const val ATTEMPTS_A_DAY = 4
  * Update now. Every other pass answers from the stored read, and a stored failure is thrown until a read works.
  */
 @Singleton
-class MidSussexBinsProvider @Inject constructor(
+class MidSussexBinsProvider internal constructor(
     private val council: CouncilClient,
     private val reads: BinsReads,
     private val clock: WallClock,
     private val updates: UpdateRequests,
+    private val zone: suspend () -> ZoneId,
 ) : CalendarProvider {
+    @Inject
+    constructor(council: CouncilClient, reads: BinsReads, clock: WallClock, updates: UpdateRequests, zone: HouseholdZone) :
+        this(council, reads, clock, updates, zone::current)
+
     override val descriptor = ProviderDescriptor(
         MIDSUSSEX_PROVIDER_ID,
         BINS_LABEL,
@@ -70,12 +76,13 @@ class MidSussexBinsProvider @Inject constructor(
     )
 
     private val lock = Mutex()
-    private var loaded = false
-    private var held: BinsRead? = null
+
+    /** Each connection's read, by connection id; a null value means nothing is stored for it. */
+    private val held = mutableMapOf<String, BinsRead?>()
 
     @Composable
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) =
-        MidSussexConnectScreen(council, clock, existing, onConnected, onCancel)
+        MidSussexConnectScreen(council, clock, zone, existing, onConnected)
 
     override suspend fun sources(conn: Connection): List<CalendarSource> = listOf(SOURCE_BINS)
 
@@ -88,14 +95,11 @@ class MidSussexBinsProvider @Inject constructor(
     }
 
     private suspend fun latest(conn: Connection, zone: ZoneId): BinsRead {
-        if (!loaded) {
-            held = reads.load()
-            loaded = true
-        }
+        if (conn.id !in held) held[conn.id] = reads.load(conn.id)
         val now = clock.nowMillis()
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
         val key = addressKey(conn)
-        val stored = held?.takeIf { it.addressKey == key }
+        val stored = held[conn.id]?.takeIf { it.addressKey == key }
         if (stored != null && !due(stored, today)) return stored
         val read = try {
             val config = conn.config
@@ -107,14 +111,14 @@ class MidSussexBinsProvider @Inject constructor(
             Log.w(TAG, "Bins read failed: ${kind.name}")
             attempted(stored, key, now, today).copy(failure = kind)
         } catch (e: UnreachableException) {
-            countAttempt(attempted(stored, key, now, today))
+            countAttempt(conn.id, attempted(stored, key, now, today))
             throw e
         } catch (e: CancellationException) {
             // The engine's timeout: an attempt like any unreachable one.
-            countAttempt(attempted(stored, key, now, today))
+            countAttempt(conn.id, attempted(stored, key, now, today))
             throw e
         }
-        keep(read)
+        keep(conn.id, read)
         return read
     }
 
@@ -131,19 +135,19 @@ class MidSussexBinsProvider @Inject constructor(
         return base.copy(lastAttemptMillis = now, failuresToday = failures, failureDay = today)
     }
 
-    private suspend fun keep(read: BinsRead) {
-        held = read
-        reads.save(read)
+    private suspend fun keep(connectionId: String, read: BinsRead) {
+        held[connectionId] = read
+        reads.save(connectionId, read)
     }
 
-    private suspend fun countAttempt(read: BinsRead) = withContext(NonCancellable) { keep(read) }
+    private suspend fun countAttempt(connectionId: String, read: BinsRead) = withContext(NonCancellable) { keep(connectionId, read) }
 }
 
 // A hash, not the address: it only has to change when the connection's address does.
 private fun addressKey(conn: Connection): String =
-    "${conn.id}:" + listOf(CONFIG_HOUSE, CONFIG_POSTCODE, CONFIG_ADDRESS).joinToString("\n") { conn.config[it].orEmpty() }.hashCode()
+    listOf(CONFIG_HOUSE, CONFIG_POSTCODE, CONFIG_ADDRESS).joinToString("\n") { conn.config[it].orEmpty() }.hashCode().toString()
 
-private fun eventOf(day: Collection): RemoteEvent = RemoteEvent(
+private fun eventOf(day: BinDay): RemoteEvent = RemoteEvent(
     remoteId = "bins-${day.date}",
     title = binsTitle(day.kinds),
     start = EventTime.AllDay(day.date),

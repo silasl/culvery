@@ -3,7 +3,6 @@ package uk.co.siland.culvery.provider.calendar_midsussex
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,13 +47,14 @@ private sealed interface Step {
     data object Idle : Step
     data object Working : Step
     data object NoAddress : Step
-    data class Pick(val addresses: List<Address>) : Step
-    data class Ready(val line: String, val next: String) : Step
+    /** [house] and [postcode] are what was searched, whatever the fields hold now. */
+    data class Pick(val house: String, val postcode: String, val addresses: List<Address>) : Step
+    data class Ready(val house: String, val postcode: String, val line: String, val next: String) : Step
     data class Failed(val retry: () -> Unit) : Step
 }
 
 /** "Next: Monday 9 November — Food": the first collection from [today] on, and the bins in it. */
-internal fun nextLine(days: List<Collection>, today: LocalDate): String {
+internal fun nextLine(days: List<BinDay>, today: LocalDate): String {
     val next = days.firstOrNull { !it.date.isBefore(today) } ?: days.first()
     return "Next: ${NEXT_DATE.format(next.date)} — " + orderedBins(next.kinds).joinToString(", ") { binLabel(it) }
 }
@@ -62,7 +62,7 @@ internal fun nextLine(days: List<Collection>, today: LocalDate): String {
 private class Connecting(
     private val council: CouncilClient,
     private val scope: CoroutineScope,
-    private val today: () -> LocalDate,
+    private val today: suspend () -> LocalDate,
 ) {
     var step by mutableStateOf<Step>(Step.Idle)
         private set
@@ -72,16 +72,18 @@ private class Connecting(
         when (found.size) {
             0 -> Step.NoAddress
             1 -> ready(house, postcode, found.single().line)
-            else -> Step.Pick(found)
+            else -> Step.Pick(house, postcode, found)
         }
     }
 
-    fun pick(house: String, postcode: String, line: String): Unit = run({ pick(house, postcode, line) }) { ready(house, postcode, line) }
+    fun pick(from: Step.Pick, line: String): Unit = run({ pick(from, line) }) { ready(from.house, from.postcode, line) }
 
     private suspend fun ready(house: String, postcode: String, line: String) =
-        Step.Ready(line, nextLine(council.read(house, postcode, line), today()))
+        Step.Ready(house, postcode, line, nextLine(council.read(house, postcode, line), today()))
 
+    /** A tap while a step runs is dropped: the button's disabled look can lag a frame behind. */
     private fun run(retry: () -> Unit, block: suspend () -> Step) {
+        if (step == Step.Working) return
         step = Step.Working
         scope.launch {
             step = try {
@@ -105,32 +107,34 @@ private class Connecting(
 internal fun MidSussexConnectScreen(
     council: CouncilClient,
     clock: WallClock,
+    zone: suspend () -> ZoneId,
     existing: Connection?,
     onConnected: (Connection) -> Unit,
-    onCancel: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val connecting = remember {
-        Connecting(council, scope) { Instant.ofEpochMilli(clock.nowMillis()).atZone(ZoneId.systemDefault()).toLocalDate() }
+        Connecting(council, scope) { Instant.ofEpochMilli(clock.nowMillis()).atZone(zone()).toLocalDate() }
     }
     var house by remember { mutableStateOf(existing?.config?.get(CONFIG_HOUSE).orEmpty()) }
     var postcode by remember { mutableStateOf(existing?.config?.get(CONFIG_POSTCODE).orEmpty()) }
+    var added by remember { mutableStateOf(false) }
     val step = connecting.step
     Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
         if (step is Step.Ready) {
             Text(step.next, style = HhType.secondary, color = Culvery.colors.ink, modifier = Modifier.testTag("bins_next"))
-            Row(horizontalArrangement = Arrangement.spacedBy(GAP)) {
-                HhButton(
-                    "Add calendar",
-                    {
-                        val config = mapOf(CONFIG_HOUSE to house.trim(), CONFIG_POSTCODE to postcode.trim(), CONFIG_ADDRESS to step.line)
+            // The connecting card below has the Cancel.
+            HhButton(
+                "Add calendar",
+                {
+                    if (!added) {
+                        added = true
+                        val config = mapOf(CONFIG_HOUSE to step.house, CONFIG_POSTCODE to step.postcode, CONFIG_ADDRESS to step.line)
                         onConnected(Connection(existing?.id ?: UUID.randomUUID().toString(), MIDSUSSEX_PROVIDER_ID, BINS_LABEL, config))
-                    },
-                    tone = ButtonTone.Primary,
-                    on = ButtonSurface.Surf,
-                )
-                HhButton("Cancel", onCancel, on = ButtonSurface.Surf)
-            }
+                    }
+                },
+                tone = ButtonTone.Primary,
+                on = ButtonSurface.Surf,
+            )
         } else {
             val working = step is Step.Working
             HhTextField(
@@ -152,7 +156,7 @@ internal fun MidSussexConnectScreen(
             when (step) {
                 Step.NoAddress -> Text(NO_ADDRESS, style = HhType.secondary, color = Culvery.colors.danger)
                 is Step.Pick -> step.addresses.forEach { address ->
-                    HhListRow(address.line, onClick = { connecting.pick(house.trim(), postcode.trim(), address.line) })
+                    HhListRow(address.line, onClick = { connecting.pick(step, address.line) })
                 }
                 is Step.Failed -> {
                     Text(COUNCIL_UNREADABLE, style = HhType.secondary, color = Culvery.colors.danger)

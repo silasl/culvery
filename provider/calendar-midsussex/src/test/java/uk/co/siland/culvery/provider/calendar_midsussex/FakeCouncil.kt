@@ -10,6 +10,7 @@ import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import okhttp3.mockwebserver.SocketPolicy
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.settingsDataStore
@@ -39,8 +40,11 @@ internal class FakeCouncil {
     /** The second page's fixture. */
     @Volatile var addresses = "addresses_two.html"
 
-    /** When set, every page takes two seconds to start answering. */
-    @Volatile var slow = false
+    /** The first page's fixture. */
+    @Volatile var start = "start.html"
+
+    /** When set, no page ever answers. */
+    @Volatile var stalled = false
 
     /** When set, every page answers this status. */
     @Volatile var status: Int? = null
@@ -60,9 +64,9 @@ internal class FakeCouncil {
                     url.queryParameter("seq") == "3" -> MockResponse().setBody(fixture(collections))
                     else -> MockResponse()
                         .setHeader("Set-Cookie", "session=${++sessions}; Path=/")
-                        .setBody(fixture("start.html").replace("https://waste.services.midsussex.gov.uk", base.toString().trimEnd('/')))
+                        .setBody(fixture(start).replace("https://waste.services.midsussex.gov.uk", base.toString().trimEnd('/')))
                 }
-                return if (slow) answer.setHeadersDelay(2, TimeUnit.SECONDS) else answer
+                return if (stalled) answer.setSocketPolicy(SocketPolicy.NO_RESPONSE) else answer
             }
         }
         server.start()
@@ -71,7 +75,9 @@ internal class FakeCouncil {
 
     private val base: HttpUrl get() = server.url("/")
 
-    fun takeRequest(): RecordedRequest = checkNotNull(server.takeRequest(5, TimeUnit.SECONDS))
+    fun takeRequest(): RecordedRequest = checkNotNull(takeRequestOrNull(5_000))
+
+    fun takeRequestOrNull(waitMillis: Long = 500): RecordedRequest? = server.takeRequest(waitMillis, TimeUnit.MILLISECONDS)
 
     private var stopped = false
 
