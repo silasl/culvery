@@ -54,6 +54,7 @@ import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
+import uk.co.siland.culvery.core.ui.BinInks
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HalloweenNight
@@ -120,6 +121,14 @@ class CardsTest {
         assertThat(barBand { 2.dp }).isEqualTo(sam)
         assertThat(barBand { it - 2.dp }).isEqualTo(mia)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aBinsTodayRowHasOneStripePerBinAndSaysBins() {
+        show { TodayCard(listOf(SampleUi.bins("food", "waste"))) }
+        compose.onNodeWithText("All day · Bins").assertExists()
+        assertThat(barBand { 2.dp }).isEqualTo(BinInks.byId("green")!!.night.toArgb())
+        assertThat(barBand { it - 2.dp }).isEqualTo(BinInks.byId("black")!!.night.toArgb())
     }
 
     /** Sam's and Mia's colours at 75 % over the card's dark background. */

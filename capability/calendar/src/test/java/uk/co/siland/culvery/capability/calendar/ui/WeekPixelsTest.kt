@@ -11,7 +11,12 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -22,6 +27,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
+import uk.co.siland.culvery.core.ui.BinInks
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -85,6 +91,28 @@ class WeekPixelsTest {
         // 10 dp in: the chip's 12 dp corner arc clips the edge away above 7 dp.
         assertThat(pixelAt(chip, 1.dp, 10.dp)).isEqualTo(SampleUi.sam.color.toInt())
         assertThat(pixelAt(chip, 1.dp, height - 10.dp)).isEqualTo(SampleUi.mia.color.toInt())
+    }
+
+    private fun binsMonday() = compose.onNode(hasContentDescription("Bins: Food, Garden, Recycling, Waste, Bins, Monday", substring = true))
+
+    /** The four bins' night inks at the middle of each quarter of the edge, in Food, Garden, Recycling, Waste order. */
+    @Test
+    fun aBinsChipIsNeutralWithAStripePerBin() {
+        drawn(dark = true, SampleUi.weekWithBins)
+        val chip = binsMonday()
+        val height = chip.getUnclippedBoundsInRoot().height
+        assertThat(pixelAt(chip, 30.dp, 4.dp)).isEqualTo(DarkColors.surf2.toArgb())
+        val inks = listOf("green", "brown", "blue", "black").map { BinInks.byId(it)!!.night.toArgb() }
+        inks.forEachIndexed { i, ink -> assertThat(pixelAt(chip, 2.dp, height * (2 * i + 1) / 8)).isEqualTo(ink) }
+    }
+
+    @Test
+    fun aBinsChipNeverSaysFamily() {
+        drawn(dark = true, SampleUi.weekWithBins)
+        val chip = hasContentDescription("Bins: Food, Garden, Recycling, Waste, Bins, Monday", substring = true)
+        compose.onNode(chip).assert(!hasContentDescription("Family", substring = true))
+        compose.onAllNodes(hasText("Family", substring = true) and hasAnyAncestor(chip), useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodes(hasText("Bins", substring = true) and hasAnyAncestor(chip), useUnmergedTree = true).assertCountEquals(2)
     }
 
     /** Pin: one person's chip is still their tint, with nothing along its edge. */

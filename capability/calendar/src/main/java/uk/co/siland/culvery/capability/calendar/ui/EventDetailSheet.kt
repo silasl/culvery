@@ -222,7 +222,7 @@ private fun Header(e: EventUi, onClose: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(Modifier.weight(1f).height(IntrinsicSize.Min)) {
-            StripedBar(e.people, width = CalendarDimens.sheetTitleBar)
+            StripedBar(e.stripes(), width = CalendarDimens.sheetTitleBar)
             Spacer(Modifier.width(CalendarDimens.sheetTitleBarGap))
             Column {
                 if (e.syncing) {
@@ -267,8 +267,8 @@ private fun InfoCard(detail: EventDetailUi, onChangeWho: (() -> Unit)?) {
         Divider()
         InfoRow(Icons.PERSON, "For", Modifier.testTag("detail_for"), onClick = onChangeWho, clickLabel = CHANGE_WHO) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.infoDotGap)) {
-                PersonDots(e.people, CalendarDimens.infoDot, ring = Culvery.colors.surf, dotTag = "for_dot")
-                Value(whoLine(e.people))
+                if (e.bins == null) PersonDots(e.people, CalendarDimens.infoDot, ring = Culvery.colors.surf, dotTag = "for_dot")
+                Value(e.whoLine())
             }
         }
         Divider()

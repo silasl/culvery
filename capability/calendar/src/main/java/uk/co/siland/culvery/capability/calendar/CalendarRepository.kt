@@ -9,6 +9,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -34,6 +35,7 @@ class CalendarRepository @Inject constructor(
     writers: Set<@JvmSuppressWildcards CalendarWriter>,
     settings: CalendarSettings,
     private val clock: WallClock = WallClock(System::currentTimeMillis),
+    binColours: BinColours? = null,
 ) {
     private val writerIds = writers.map { it.providerId }.toSet()
     private val serviceNames = providers.associate { it.descriptor.id to it.descriptor.displayName }
@@ -46,6 +48,9 @@ class CalendarRepository @Inject constructor(
 
     /** How many weeks the Calendar tab shows; the sync reads 12 whatever it is (15a §2.3). */
     val shown: StateFlow<WeeksShown> = settings.current
+
+    /** The ink the family chose for each kind of bin (kind to ink id); kinds not in it are in their defaults. */
+    internal val binInks: StateFlow<Map<String, String>> = binColours?.current ?: MutableStateFlow(emptyMap())
 
     /** Titles remembered from visible calendars, matched as a new event's title is typed (9c §4). */
     val suggestions = TitleSuggestions(store)

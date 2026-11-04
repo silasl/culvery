@@ -8,6 +8,7 @@ import uk.co.siland.culvery.capability.calendar.DaySpan
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
+import uk.co.siland.culvery.capability.calendar.binsTitle
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.capability.calendar.WeekUi
@@ -149,6 +150,22 @@ object SampleUi {
             d.copy(events = d.events.map { if (it.title == "Half term") it.copy(people = listOf(sam, mia)) else it })
         },
     ).let { it.copy(spans = laneRows(weekSpans(it.days))) }
+
+    /** A bin collection day: all-day, for nobody in particular, drawn as one stripe per bin. */
+    fun bins(vararg kinds: String) = allDay(binsTitle(kinds.toList()), family).copy(
+        bins = kinds.toList(), readOnlyReason = ReadOnlyReason.OtherCalendar, sourceName = "Bins", createdBy = "Bins",
+    )
+
+    /** [week] with all four bins on its Monday and the food caddy alone on Saturday. */
+    val weekWithBins: WeekUi = week.copy(
+        days = week.days.mapIndexed { i, d ->
+            when (i) {
+                5 -> d.copy(events = listOf(bins("food", "garden", "recycling", "waste")) + d.events)
+                3 -> d.copy(events = listOf(bins("waste")) + d.events)
+                else -> d
+            }
+        },
+    )
 
     /** Cinema's detail sheet, added by Alex. */
     val detailShared = EventDetailUi(

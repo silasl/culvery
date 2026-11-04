@@ -88,6 +88,9 @@ class WeekScreenshotTest {
     /** Cinema, for Sam and Mia, on Friday: the neutral chip with a striped edge and two dots. */
     @Test fun weekSharedDark() = snap("week_shared_dark", true, fresh, SampleUi.weekWithShared, canAdd = true)
     @Test fun weekSharedLight() = snap("week_shared_light", false, fresh, SampleUi.weekWithShared, canAdd = true)
+    /** Four bins on Monday and one on Saturday: a stripe per bin, the neutral chip, the wastebasket. */
+    @Test fun weekBinsDay() = snap("week_bins_day", false, fresh, SampleUi.weekWithBins, canAdd = true)
+    @Test fun weekBinsNight() = snap("week_bins_night", true, fresh, SampleUi.weekWithBins, canAdd = true)
     /** Half term for Sam and Mia: the lane bar's edge is striped. */
     @Test fun weekMultiDaySharedDark() = snap("week_multiday_shared_dark", true, fresh, SampleUi.weekWithSharedSpan, canAdd = true)
     @Test fun weekMultiDayLight() = snap("week_multiday_light", false, fresh, SampleUi.weekWithOneLaneRow, canAdd = true)

@@ -19,4 +19,11 @@ fun orderedBins(keys: Collection<String>): List<String> {
     return known + distinct.filter { binKindOf(it) == null }.sorted()
 }
 
+/** What a bin day says in place of who it is for. */
+const val BINS_WHO = "Bins"
+
+internal fun EventUi.whoLine(): String = if (bins != null) BINS_WHO else whoLine(people)
+
+internal fun EventUi.spokenWho(): String = if (bins != null) BINS_WHO else spokenWho(people)
+
 fun binsTitle(keys: Collection<String>): String = "Bins: " + orderedBins(keys).joinToString(", ") { binLabel(it) }

@@ -60,53 +60,55 @@ internal fun EventDetailHost(
     var shown by remember(detail) { mutableStateOf<List<PersonId>?>(null) }
     var saving by remember(detail) { mutableStateOf<PersonId?>(null) }
 
-    EventDetailSheet(
-        detail = detail,
-        people = people,
-        mode = mode,
-        busy = action.busy,
-        onClose = onClose,
-        onDelete = { action.run { if (editor.mayDelete(ref)) mode = DetailMode.ConfirmingDelete } },
-        onKeep = { mode = DetailMode.Idle },
-        onConfirmDelete = {
-            action.run {
-                when (editor.delete(ref)) {
-                    EditResult.Done, EditResult.Queued -> onClose()
-                    is EditResult.Rejected -> mode = DetailMode.Idle
-                    EditResult.Cancelled -> Unit
-                    EditResult.NotEditable -> onClose()
-                }
-            }
-        },
-        onChoosePerson = { mode = DetailMode.ChoosingPerson },
-        onAssign = { person ->
-            val current = shown ?: chosenFor(detail.event)
-            val next = toggled(current, person.id)
-            if (next.toSet() == current.toSet()) {
-                if (person.id in current) editor.needsAPerson()
-            } else {
-                shown = next
-                saving = person.id
+    WithBinInks(repo) {
+        EventDetailSheet(
+            detail = detail,
+            people = people,
+            mode = mode,
+            busy = action.busy,
+            onClose = onClose,
+            onDelete = { action.run { if (editor.mayDelete(ref)) mode = DetailMode.ConfirmingDelete } },
+            onKeep = { mode = DetailMode.Idle },
+            onConfirmDelete = {
                 action.run {
-                    var kept = false
-                    try {
-                        when (editor.assign(ref, next)) {
-                            EditResult.Done, EditResult.Queued -> kept = true
-                            is EditResult.Rejected, EditResult.Cancelled -> Unit
-                            EditResult.NotEditable -> onClose()
-                        }
-                    } finally {
-                        saving = null
-                        if (!kept) shown = null
+                    when (editor.delete(ref)) {
+                        EditResult.Done, EditResult.Queued -> onClose()
+                        is EditResult.Rejected -> mode = DetailMode.Idle
+                        EditResult.Cancelled -> Unit
+                        EditResult.NotEditable -> onClose()
                     }
                 }
-            }
-        },
-        chosen = shown ?: chosenFor(detail.event),
-        saving = saving,
-        onEdit = { action.run { onEdit() } },
-        onChangeWho = { action.run { onChangeWho() } },
-    )
+            },
+            onChoosePerson = { mode = DetailMode.ChoosingPerson },
+            onAssign = { person ->
+                val current = shown ?: chosenFor(detail.event)
+                val next = toggled(current, person.id)
+                if (next.toSet() == current.toSet()) {
+                    if (person.id in current) editor.needsAPerson()
+                } else {
+                    shown = next
+                    saving = person.id
+                    action.run {
+                        var kept = false
+                        try {
+                            when (editor.assign(ref, next)) {
+                                EditResult.Done, EditResult.Queued -> kept = true
+                                is EditResult.Rejected, EditResult.Cancelled -> Unit
+                                EditResult.NotEditable -> onClose()
+                            }
+                        } finally {
+                            saving = null
+                            if (!kept) shown = null
+                        }
+                    }
+                }
+            },
+            chosen = shown ?: chosenFor(detail.event),
+            saving = saving,
+            onEdit = { action.run { onEdit() } },
+            onChangeWho = { action.run { onChangeWho() } },
+        )
+    }
 }
 
 /** Opens an event's detail sheet through the shell's overlay host; its Change swaps to the editor. */

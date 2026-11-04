@@ -59,6 +59,9 @@ class CardScreenshotTest {
     @Test fun todayEmptyDark() = snap("today_empty_dark", true, TODAY_W, TODAY_H) { TodayCard(emptyList()) }
     @Test fun todaySharedDark() = snap("today_shared_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.shared, onAdd = {}, tomorrow = DayUi(SampleUi.TODAY.plusDays(1), SampleUi.shared)) }
     @Test fun todaySharedLight() = snap("today_shared_light", false, TODAY_W, TODAY_H) { TodayCard(SampleUi.shared, onAdd = {}, tomorrow = DayUi(SampleUi.TODAY.plusDays(1), SampleUi.shared)) }
+    @Test fun todayBinsNight() = snap("today_bins_night", true, TODAY_W, TODAY_H) {
+        TodayCard(listOf(SampleUi.bins("food", "garden", "recycling", "waste")) + SampleUi.today.take(2), onAdd = {}, tomorrow = DayUi(SampleUi.TODAY.plusDays(1), listOf(SampleUi.bins("waste"))))
+    }
     @Test fun comingUpSharedDark() = snap("coming_up_shared_dark", true, WIDE_W, WIDE_H) { ComingUpCard(listOf(DayUi(SampleUi.TODAY.plusDays(1), SampleUi.shared))) }
 
     @Test fun todayScrollDark() = snap("today_scroll_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.todayBusy, onAdd = {}) }

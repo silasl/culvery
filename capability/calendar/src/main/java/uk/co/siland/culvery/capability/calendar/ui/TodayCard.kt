@@ -253,7 +253,7 @@ private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, showDayO
                 vertical = if (outlined) CalendarDimens.tomorrowRowPaddingV else CalendarDimens.todayRowPaddingV,
             ),
     ) {
-        val bars = event.people.map { Color(it.color).let { bar -> if (outlined) bar.copy(alpha = CalendarDimens.TOMORROW_BAR_ALPHA) else bar } }
+        val bars = event.stripes().map { bar -> if (outlined) bar.copy(alpha = CalendarDimens.TOMORROW_BAR_ALPHA) else bar }
         StripedBar(bars, width = CalendarDimens.todayBarWidth)
         Spacer(Modifier.width(CalendarDimens.todayBarGap))
         Column(Modifier.weight(1f).shownNotSpoken()) {
@@ -268,7 +268,7 @@ private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, showDayO
             val span = event.span
             val whenLabel = if (showDayOf && span != null) dayOf(span) else event.timeLabel
             Text(
-                "$whenLabel · ${whoLine(event.people)}",
+                "$whenLabel · ${event.whoLine()}",
                 style = if (outlined) CalendarType.tomorrowTime else CalendarType.todayTime,
                 color = c.mute,
                 maxLines = 1,

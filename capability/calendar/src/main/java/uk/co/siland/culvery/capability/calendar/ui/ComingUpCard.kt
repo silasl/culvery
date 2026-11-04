@@ -112,12 +112,12 @@ private fun CompactRow(event: EventUi, day: LocalDate) {
             .background(c.surf2)
             .padding(horizontal = CalendarDimens.compactRowPaddingH, vertical = CalendarDimens.compactRowPaddingV),
     ) {
-        StripedBar(event.people, width = CalendarDimens.compactBarWidth)
+        StripedBar(event.stripes(), width = CalendarDimens.compactBarWidth)
         Spacer(Modifier.width(CalendarDimens.compactBarGap))
         Column(Modifier.shownNotSpoken()) {
             Text(event.title, style = CalendarType.strong14, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${event.timeLabel} · ${whoLine(event.people)}",
+                "${event.timeLabel} · ${event.whoLine()}",
                 style = CalendarType.small12,
                 color = c.mute,
                 maxLines = 1,
