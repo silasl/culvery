@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
+import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.SourceMapping
 import uk.co.siland.culvery.core.access.PinManager
 import uk.co.siland.culvery.core.household.HomeLocation
@@ -15,6 +16,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.setup.SampleHousehold
 import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.ui.PersonPalette
@@ -90,11 +92,14 @@ class DebugSampleHousehold(
 }
 
 /**
- * Debug builds only (3a design D5, §3.9): once any other connection exists, the sample connection goes, with its events,
- * sync state and queue, so sample and real events never mix.
+ * Debug builds only (3a design D5, §3.9): once a connection whose provider can write exists, the sample connection
+ * goes, with its events, sync state and queue, so sample and real events never mix. A read-only one, the bins, keeps it.
  */
-suspend fun removeSampleWhenReplaced(calendar: CalendarSetup) {
-    calendar.connectionIds().collect { ids ->
-        if (DEBUG_CONNECTION_ID in ids && ids.any { it != DEBUG_CONNECTION_ID }) calendar.removeConnection(DEBUG_CONNECTION_ID)
+suspend fun removeSampleWhenReplaced(store: CalendarStore, providers: Set<CalendarProvider>) {
+    val writing = providers.filter { Feature.WRITE in it.descriptor.features }.map { it.descriptor.id }.toSet()
+    store.connections().collect { stored ->
+        val ids = stored.map { it.connection.id }
+        val replaced = stored.any { it.connection.id != DEBUG_CONNECTION_ID && it.connection.providerId in writing }
+        if (DEBUG_CONNECTION_ID in ids && replaced) store.removeConnection(DEBUG_CONNECTION_ID)
     }
 }

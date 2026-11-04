@@ -1,5 +1,6 @@
 package uk.co.siland.culvery
 
+import androidx.compose.runtime.Composable
 import androidx.room.Room
 import androidx.room.useReaderConnection
 import androidx.test.core.app.ApplicationProvider
@@ -32,6 +33,8 @@ import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.ChangeKind
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.PendingChange
+import uk.co.siland.culvery.capability.calendar.SyncCursor
+import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.PinHasher
@@ -42,6 +45,8 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.Feature
+import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -52,6 +57,18 @@ import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
 
 private object NoToasts : Toaster {
     override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) = Unit
+}
+
+private class StubProvider(id: String, features: Set<Feature>) : CalendarProvider {
+    override val descriptor = ProviderDescriptor(id, id, "calendar_month", features)
+
+    @Composable
+    override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) = Unit
+
+    override suspend fun sources(conn: Connection): List<CalendarSource> = emptyList()
+
+    override suspend fun sync(conn: Connection, source: CalendarSource, range: DateRange, cursor: SyncCursor?): SyncResult =
+        SyncResult(emptyList(), emptyList(), cursor = null, fullReplace = true)
 }
 
 @RunWith(AndroidJUnit4::class)
@@ -65,6 +82,8 @@ class DebugSeedTest {
     private lateinit var pins: PinManager
     private lateinit var store: CalendarStore
     private val fake = FakeCalendarProvider()
+    private val google = StubProvider("calendar.google", setOf(Feature.READ, Feature.WRITE))
+    private val bins = StubProvider("calendar.midsussex", setOf(Feature.READ))
     private var syncs = 0
 
     @Before
@@ -187,13 +206,29 @@ class DebugSeedTest {
         store.enqueue(PendingChange(0, DEBUG_CONNECTION_ID, family.id, "e1", ChangeKind.DELETE, null, 0, 0L, 0L))
         assertThat(sampleRows()).containsExactly("event", true, "outbox", true, "sync_state", true)
         store.addConnection(Connection("g1", "calendar.google", "Google", emptyMap()), emptyList(), emptyMap())
-        val watcher = launch { removeSampleWhenReplaced(setupFor(fake)) }
+        val watcher = launch { removeSampleWhenReplaced(store, setOf(fake, google)) }
         withContext(Dispatchers.Default) {
             withTimeout(5_000) { while (store.connectionsNow().any { it.connection.id == DEBUG_CONNECTION_ID }) delay(10) }
         }
         watcher.cancel()
         assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("g1")
         assertThat(sampleRows()).containsExactly("event", false, "outbox", false, "sync_state", false)
+    }
+
+    @Test
+    fun aBinsConnectionKeepsTheSample() = runTest {
+        sampleHousehold()
+        store.addConnection(Connection("b1", bins.descriptor.id, "Mid Sussex bins", emptyMap()), emptyList(), emptyMap())
+        val watcher = launch { removeSampleWhenReplaced(store, setOf(fake, google, bins)) }
+        // The collector has seen both connections once the bins one is replaced by a writing one.
+        delay(200)
+        assertThat(store.connectionsNow().map { it.connection.id }).containsExactly(DEBUG_CONNECTION_ID, "b1")
+        store.addConnection(Connection("g1", google.descriptor.id, "Google", emptyMap()), emptyList(), emptyMap())
+        withContext(Dispatchers.Default) {
+            withTimeout(5_000) { while (store.connectionsNow().any { it.connection.id == DEBUG_CONNECTION_ID }) delay(10) }
+        }
+        watcher.cancel()
+        assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("b1", "g1")
     }
 
     /** Whether each table still holds a row of the sample's, counted directly. */
