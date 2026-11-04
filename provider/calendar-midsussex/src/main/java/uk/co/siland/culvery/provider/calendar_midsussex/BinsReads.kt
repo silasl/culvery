@@ -21,8 +21,9 @@ private const val FILE = "bins_reads"
 
 /**
  * A connection's last read and how today's attempts went. [addressKey] tells the connection's address from an earlier
- * one's without holding it. [failure] is the last read's failure, null once a read works; [failuresToday] counts the failed
- * attempts on the day of [lastAttemptMillis], unreachable ones included.
+ * one's without holding it. [failure] is the last page-shape failure and [unreached] the last attempt that didn't get the
+ * council's pages; a good read clears both. [failuresToday] counts the failed attempts on the day of [lastAttemptMillis],
+ * unreachable ones included.
  */
 @Serializable
 internal data class BinsRead(
@@ -31,8 +32,11 @@ internal data class BinsRead(
     val lastGoodMillis: Long? = null,
     val failuresToday: Int = 0,
     val failure: BinsFailure? = null,
+    val unreached: Unreached? = null,
     val collections: List<BinDay> = emptyList(),
 )
+
+internal enum class Unreached { UNREACHABLE, OFFLINE }
 
 /** Each bins connection's last read, in a DataStore file of its own, so a restart answers without asking the council. */
 @Singleton

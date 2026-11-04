@@ -7,7 +7,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -16,6 +15,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.OfflineException
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.SyncResult
@@ -72,8 +72,8 @@ class MidSussexBinsProvider internal constructor(
         BINS_LABEL,
         Icons.DELETE,
         setOf(Feature.READ),
-        // The connect screen shows its own hint, on the search step only.
         carriesBins = true,
+        // No connectHint: the connect screen shows its own, on the search step only.
     )
 
     private val lock = Mutex()
@@ -91,6 +91,11 @@ class MidSussexBinsProvider internal constructor(
     override suspend fun sync(conn: Connection, source: CalendarSource, range: DateRange, cursor: SyncCursor?): SyncResult {
         val read = lock.withLock { latest(conn, range.zone) }
         read.failure?.let { throw UnreadableException(BINS_UNREADABLE, it.name) }
+        when (read.unreached) {
+            Unreached.OFFLINE -> throw OfflineException("No network to the council’s site")
+            Unreached.UNREACHABLE -> throw UnreachableException("The council’s site couldn’t be reached")
+            null -> Unit
+        }
         val goodMillis = read.lastGoodMillis ?: throw UnreachableException("The council’s site hasn’t been read yet")
         val stamp = SyncCursor("$goodMillis:${range.start}:${range.endExclusive}")
         if (cursor == stamp) return SyncResult(emptyList(), emptyList(), stamp, fullReplace = false)
@@ -112,11 +117,12 @@ class MidSussexBinsProvider internal constructor(
             keep(conn.id, BinsRead(key, now, lastGoodMillis = now, collections = collections))
         } catch (failed: BinsReadFailed) {
             Log.w(TAG, "Bins read failed: ${failed.kind.name}")
-            keep(conn.id, attempted(stored, key, now, today, householdZone).copy(failure = failed.kind))
+            keep(conn.id, attempted(stored, key, now, today, householdZone).copy(failure = failed.kind, unreached = null))
         } catch (e: Exception) {
-            // A CancellationException is the engine's timeout: an attempt like any unreachable one.
-            if (e !is UnreachableException && e !is CancellationException) throw e
-            keep(conn.id, attempted(stored, key, now, today, householdZone))
+            // A CancellationException is the engine's timeout, and anything unexpected is kept as unreachable too, so
+            // either still waits for the next retry.
+            val unreached = if (e is OfflineException) Unreached.OFFLINE else Unreached.UNREACHABLE
+            keep(conn.id, attempted(stored, key, now, today, householdZone).copy(unreached = unreached))
             throw e
         }
     }

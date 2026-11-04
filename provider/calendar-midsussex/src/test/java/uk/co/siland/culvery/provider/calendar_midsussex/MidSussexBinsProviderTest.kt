@@ -2,6 +2,7 @@ package uk.co.siland.culvery.provider.calendar_midsussex
 
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import java.net.UnknownHostException
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.Dispatchers
@@ -9,6 +10,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import okhttp3.Interceptor
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -18,6 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.OfflineException
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.UnreadableException
@@ -280,15 +283,80 @@ class MidSussexBinsProviderTest {
     }
 
     @Test
-    fun anUnreachableReReadKeepsTheGoodRead() = runTest {
+    fun anUnreachableCouncilKeepsSayingSoUntilAGoodRead() = runTest {
+        val good = subject.read()
+        council.status = 503
+        wall.at(today.plusDays(1), LocalTime.of(0, 5))
+        assertThat(subject.failure()).isInstanceOf(UnreachableException::class.java)
+
+        wall.plusMinutes(5)
+        val cached = runCatching { subject.sync(binsConnection(), SOURCE_BINS, range, good.cursor) }.exceptionOrNull()
+        assertThat(cached).isInstanceOf(UnreachableException::class.java)
+        assertThat(cached).isNotInstanceOf(OfflineException::class.java)
+        assertThat(provider().failure()).isInstanceOf(UnreachableException::class.java)
+        assertThat(council.requests).isEqualTo(4)
+
+        repeat(3) {
+            wall.plusMinutes(60)
+            assertThat(subject.failure()).isInstanceOf(UnreachableException::class.java)
+        }
+        assertThat(council.requests).isEqualTo(7)
+        wall.plusMinutes(120)
+        assertThat(subject.failure()).isInstanceOf(UnreachableException::class.java)
+        assertThat(council.requests).isEqualTo(7)
+
+        council.status = null
+        wall.at(today.plusDays(2), LocalTime.of(0, 5))
+        assertThat(subject.read().upserts).isNotEmpty()
+        assertThat(council.requests).isEqualTo(10)
+    }
+
+    @Test
+    fun aGoodReadClearsTheStoredUnreachable() = runTest {
         subject.read()
         council.status = 503
         wall.at(today.plusDays(1), LocalTime.of(0, 5))
-
         assertThat(subject.failure()).isInstanceOf(UnreachableException::class.java)
+
+        council.status = null
+        wall.plusMinutes(60)
+        assertThat(subject.read().upserts).hasSize(3)
         wall.plusMinutes(5)
         assertThat(subject.read().upserts).hasSize(3)
-        assertThat(council.requests).isEqualTo(4)
+        assertThat(provider().read().upserts).hasSize(3)
+        assertThat(council.requests).isEqualTo(7)
+    }
+
+    @Test
+    fun anOfflineAttemptKeepsSayingOffline() = runTest {
+        var offline = false
+        val noNetwork = Interceptor { chain -> if (offline) throw UnknownHostException("council") else chain.proceed(chain.request()) }
+        val subject = MidSussexBinsProvider(CouncilClient(base, lazy { councilHttpClient("test", setOf(noNetwork)) }), reads, wall, updates) { LONDON }
+        subject.read()
+        offline = true
+        wall.at(today.plusDays(1), LocalTime.of(0, 5))
+        assertThat(subject.failure()).isInstanceOf(OfflineException::class.java)
+
+        wall.plusMinutes(5)
+        assertThat(subject.failure()).isInstanceOf(OfflineException::class.java)
+        assertThat(provider().failure()).isInstanceOf(OfflineException::class.java)
+
+        offline = false
+        wall.plusMinutes(60)
+        assertThat(subject.read().upserts).hasSize(3)
+    }
+
+    @Test
+    fun anUnexpectedFailureCountsAsAnAttempt() = runTest {
+        val broken = MidSussexBinsProvider(CouncilClient(base, lazy { error("no client") }), reads, wall, updates) { LONDON }
+        assertThat(broken.failure()).isInstanceOf(IllegalStateException::class.java)
+
+        wall.plusMinutes(5)
+        assertThat(subject.failure()).isInstanceOf(UnreachableException::class.java)
+        assertThat(council.requests).isEqualTo(0)
+
+        wall.plusMinutes(60)
+        assertThat(subject.read().upserts).hasSize(3)
     }
 
     @Test
