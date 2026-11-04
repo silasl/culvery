@@ -4,6 +4,13 @@ import java.time.DateTimeException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
@@ -20,7 +27,18 @@ class BinsReadFailed(val kind: BinsFailure) : Exception(kind.name)
 data class Address(val line: String, val url: HttpUrl)
 
 /** [kinds] are keys (food, garden, recycling, waste) or the council's own words for a bin we don't know. */
-data class Collection(val date: LocalDate, val kinds: List<String>)
+@Serializable
+data class Collection(@Serializable(with = IsoDate::class) val date: LocalDate, val kinds: List<String>)
+
+internal object IsoDate : KSerializer<LocalDate> {
+    override val descriptor = PrimitiveSerialDescriptor("IsoDate", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: LocalDate) = encoder.encodeString(value.toString())
+    override fun deserialize(decoder: Decoder): LocalDate = try {
+        LocalDate.parse(decoder.decodeString())
+    } catch (_: DateTimeException) {
+        throw SerializationException("Not an ISO date")
+    }
+}
 
 private val KNOWN_KINDS = listOf("food" to "food", "garden" to "garden", "recycling" to "recycling", "refuse" to "waste")
 private val DATE = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)
@@ -65,7 +83,9 @@ private fun row(ul: Element): Pair<LocalDate, String>? {
     } catch (_: DateTimeException) {
         throw BinsReadFailed(BinsFailure.BAD_DATE)
     }
-    return date to kindOf(cells[2].text().trim())
+    val name = cells[2].text().trim()
+    if (name.isEmpty()) return null
+    return date to kindOf(name)
 }
 
 private fun kindOf(name: String): String =

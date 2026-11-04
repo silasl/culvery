@@ -97,4 +97,16 @@ class CouncilPagesTest {
         assertThat(failure { collections(page("waste_hint.html")) })
             .isEqualTo(BinsFailure.NO_SERVICES)
     }
+
+    @Test
+    fun aRowWithNoNameIsSkipped() {
+        val html = """
+            <section id="scheduled-collections">
+            <ul class="displayinlineblock"><li><img/></li><li><p>09/11/2026</p></li><li><p> </p></li></ul>
+            <ul class="displayinlineblock"><li><img/></li><li><p>16/11/2026</p></li><li><p>Domestic Food Waste Service</p></li></ul>
+            </section>
+        """.trimIndent()
+
+        assertThat(collections(html)).containsExactly(Collection(LocalDate.of(2026, 11, 16), listOf("food")))
+    }
 }

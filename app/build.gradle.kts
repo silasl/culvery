@@ -88,6 +88,7 @@ dependencies {
     implementation(project(":provider:hoover-homeassistant"))
     implementation(project(":provider:heating-homeassistant"))
     implementation(project(":provider:calendar-google"))
+    implementation(project(":provider:calendar-midsussex"))
     implementation(project(":provider:shopping-google-tasks"))
     implementation(project(":provider:weather-openmeteo"))
     // Sample data only, in debug builds.

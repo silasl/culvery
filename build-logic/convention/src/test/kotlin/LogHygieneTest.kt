@@ -56,6 +56,7 @@ class LogHygieneTest {
         assertThat(sources.map { it.name }).contains("PlugsHouse.kt")
         assertThat(sources.map { it.name }).contains("PlugActions.kt")
         assertThat(sources.map { it.name }).contains("PlugsSection.kt")
+        assertThat(sources.map { it.name }).contains("MidSussexBinsProvider.kt")
         // 77 calls when written; a floor well below that still fails if the scan stops finding them.
         assertThat(sources.sumOf { LogHygiene.callCount(it.readText()) }).isAtLeast(50)
     }
@@ -88,6 +89,13 @@ class LogHygieneTest {
     fun anInfoLineIsChecked() {
         assertThat(LogHygiene.problems("""Log.i(TAG, "x ${'$'}name")""")).hasSize(1)
         assertThat(LogHygiene.problems("""Log.i(TAG, "Birthday look on, people: ${'$'}{names.size}")""")).isEmpty()
+    }
+
+    @Test
+    fun theBinsLinesPass() {
+        assertThat(LogHygiene.problems("""Log.i(TAG, "Bins read: ${'$'}{collections.size} collections")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.w(TAG, "Bins read failed: ${'$'}{kind.name}")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.i(TAG, "Bins read for ${'$'}{conn.config}")""")).hasSize(1)
     }
 
     @Test
@@ -136,6 +144,8 @@ internal object LogHygiene {
      * `after.screen.name` is the screen's fixed state (`DisplayState`); `names.size` is how many people have a birthday today, never who (`SeasonalThemes`, 16 §3.2).
      *
      * `sound.name` is a doorbell sound's fixed name, CLASSIC or ORGAN (`DoorSound`).
+     *
+     * `collections.size` is how many collection days a bins read found, never the address or a date (17 §3.7).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
@@ -143,6 +153,7 @@ internal object LogHygiene {
         "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
         "step.name", "own.logName", "sound.name", "after.screen.name", "names.size",
+        "collections.size",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|i|wtf|println)\(""")
