@@ -67,6 +67,13 @@ class DebugCouncilTest {
     }
 
     @Test
+    fun aRealTrackGoesOnToTheCouncil() {
+        val house = "${COUNCIL_BASE_URL}mop.php?Track=2026/11/04/ABCDEF123&serviceID=A&seq=3&pIndex=1".toHttpUrl()
+        client.newCall(Request.Builder().url(house).build()).execute().close()
+        assertThat(wentOn.map { it.url }).containsExactly(house)
+    }
+
+    @Test
     fun theBroadcastPageSwitchesTheCollections() = runTest {
         council.page = CouncilPage.MISSING
         val failure = assertThrows(BinsReadFailed::class.java) { runBlocking { subject.read("1", "ZZ99 9ZZ", LINE_ONE) } }

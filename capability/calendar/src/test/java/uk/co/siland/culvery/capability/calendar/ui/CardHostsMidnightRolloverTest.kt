@@ -42,6 +42,7 @@ import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.stubEditor
+import uk.co.siland.culvery.capability.calendar.testBinColours
 import uk.co.siland.culvery.capability.calendar.testCalendarSettings
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -83,7 +84,7 @@ class CardHostsMidnightRolloverTest {
         val store = CalendarStore(calendar)
         val household = HouseholdRepository(householdDb)
         zone = HouseholdZone(household)
-        repo = CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings())
+        repo = CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings(), testBinColours())
         editor = stubEditor(store, zone)
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         store.addConnection(

@@ -6,6 +6,7 @@ import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -42,14 +43,16 @@ class WeekPixelsTest {
 
     private var accent = 0
 
-    private fun drawn(dark: Boolean, week: WeekUi = SampleUi.week): Bitmap {
+    private fun drawn(dark: Boolean, week: WeekUi = SampleUi.week, inks: Map<String, String> = emptyMap()): Bitmap {
         lateinit var window: View
         compose.setContent {
             window = LocalView.current.rootView
             CulveryTheme(dark = dark) {
                 accent = Culvery.colors.accent.toArgb()
                 Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
-                    WeekView(WeekViewState(week, SampleUi.TODAY, SyncStatusUi(SampleUi.NOW - 120_000, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false), SampleUi.NOW))
+                    CompositionLocalProvider(LocalBinInks provides inks) {
+                        WeekView(WeekViewState(week, SampleUi.TODAY, SyncStatusUi(SampleUi.NOW - 120_000, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false), SampleUi.NOW))
+                    }
                 }
             }
         }
@@ -104,6 +107,27 @@ class WeekPixelsTest {
         assertThat(pixelAt(chip, 30.dp, 4.dp)).isEqualTo(DarkColors.surf2.toArgb())
         val inks = listOf("green", "brown", "blue", "black").map { BinInks.byId(it)!!.night.toArgb() }
         inks.forEachIndexed { i, ink -> assertThat(pixelAt(chip, 2.dp, height * (2 * i + 1) / 8)).isEqualTo(ink) }
+    }
+
+    @Test
+    fun aChosenInkReachesTheChipsStripe() {
+        drawn(dark = true, SampleUi.weekWithBins, inks = mapOf("waste" to "purple"))
+        val chip = compose.onNode(hasContentDescription("Bins: Waste, Bins, Saturday", substring = true))
+        val height = chip.getUnclippedBoundsInRoot().height
+        assertThat(pixelAt(chip, 2.dp, height / 2)).isEqualTo(BinInks.byId("purple")!!.night.toArgb())
+    }
+
+    /** Food in its ink on the top half of the edge, the bin we don't know in mute below it. */
+    @Test
+    fun anUnknownBinDrawsTheMuteStripe() {
+        val week = SampleUi.week.copy(
+            days = SampleUi.week.days.mapIndexed { i, d -> if (i == 4) d.copy(events = listOf(SampleUi.bins("food", "Glass")) + d.events) else d },
+        )
+        drawn(dark = true, week)
+        val chip = compose.onNode(hasContentDescription("Bins: Food, Glass, Bins, Sunday", substring = true))
+        val height = chip.getUnclippedBoundsInRoot().height
+        assertThat(pixelAt(chip, 2.dp, height / 4)).isEqualTo(BinInks.byId("green")!!.night.toArgb())
+        assertThat(pixelAt(chip, 2.dp, height * 3 / 4)).isEqualTo(DarkColors.mute.toArgb())
     }
 
     @Test

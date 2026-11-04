@@ -37,7 +37,7 @@ class CalendarCapabilityTest {
         val household = HouseholdRepository(householdDb)
         val zone = HouseholdZone(household)
         capability = CalendarCapability(
-            CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings()), HouseholdClock(zone.zone, WallClock { 0L }, clockScope),
+            CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings(), testBinColours()), HouseholdClock(zone.zone, WallClock { 0L }, clockScope),
             stubEditor(store, zone), stubConnections(store),
             stubReview(store, household), WeekFocus(),
         )

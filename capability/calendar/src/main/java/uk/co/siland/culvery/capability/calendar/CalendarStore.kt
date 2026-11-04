@@ -154,7 +154,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     /** The kinds of bin each connection's stored events carry, by connection id; a connection with no bin days is absent. */
     fun binsHeld(): Flow<Map<String, List<String>>> = dao.binsHeld().map { rows ->
-        rows.groupBy({ it.connectionId }, { it.bins.split('\n') }).mapValues { (_, kinds) -> kinds.flatten().distinct() }
+        rows.groupBy({ it.connectionId }, { binsOf(it.bins) }).mapValues { (_, kinds) -> kinds.flatten().distinct() }
     }
 
     fun master(): Flow<StoredSource?> = dao.master().map { it?.toStored() }
@@ -628,6 +628,8 @@ private fun RemoteEvent.toEntity(connectionId: String, sourceId: String, zone: Z
     bins = bins?.joinToString("\n"),
 )
 
+private fun binsOf(column: String): List<String> = if (column.isEmpty()) emptyList() else column.split('\n')
+
 private fun timeOf(instant: Long?, date: String?): EventTime =
     if (instant != null) EventTime.Timed(Instant.ofEpochMilli(instant)) else EventTime.AllDay(LocalDate.parse(requireNotNull(date)))
 
@@ -646,7 +648,7 @@ private fun EventRow.toStored() = StoredEvent(
     endSort = event.endSort,
     recurrenceRule = event.recurrenceRule,
     seriesId = event.seriesId,
-    bins = event.bins?.split('\n'),
+    bins = event.bins?.let(::binsOf),
 )
 
 private fun PendingChange.toEntity() = OutboxEntity(

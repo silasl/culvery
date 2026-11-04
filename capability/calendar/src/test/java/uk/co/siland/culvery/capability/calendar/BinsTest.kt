@@ -10,6 +10,16 @@ class BinsTest {
     }
 
     @Test
+    fun unknownNamesSortWhateverTheirCase() {
+        assertThat(orderedBins(listOf("glass", "Clinical Waste", "batteries"))).containsExactly("batteries", "Clinical Waste", "glass").inOrder()
+    }
+
+    @Test
+    fun eachBinIsListedOnce() {
+        assertThat(orderedBins(listOf("waste", "Glass", "waste", "Glass", "food"))).containsExactly("food", "waste", "Glass").inOrder()
+    }
+
+    @Test
     fun oneBinStillSaysBins() {
         assertThat(binsTitle(listOf("garden"))).isEqualTo("Bins: Garden")
     }

@@ -50,7 +50,7 @@ class CalendarRepositoryTest {
         householdDb = householdDb()
         store = CalendarStore(calendar)
         household = HouseholdRepository(householdDb)
-        repo = CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings())
+        repo = CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings(), testBinColours())
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
         sam = household.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
@@ -300,7 +300,7 @@ class CalendarRepositoryTest {
     fun hasConnectionsFollowsTheStore() = runTest {
         val emptyDb = calendarDb()
         val emptyStore = CalendarStore(emptyDb)
-        val emptyRepo = CalendarRepository(emptyStore, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings())
+        val emptyRepo = CalendarRepository(emptyStore, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings(), testBinColours())
         assertThat(emptyRepo.hasConnections.first()).isFalse()
         emptyStore.addConnection(Connection("c9", "calendar.test", "Other", emptyMap()), emptyList(), emptyMap())
         assertThat(emptyRepo.hasConnections.first()).isTrue()
@@ -355,6 +355,14 @@ class CalendarRepositoryTest {
         assertThat(repo.syncStatus.first().problem).isEqualTo(SyncProblem.Unreadable("Can’t read the bin dates."))
         store.setHealth("c2", ConnectionHealth.Offline, 0L)
         assertThat(repo.syncStatus.first().problem).isEqualTo(SyncProblem.Offline)
+    }
+
+    @Test
+    fun noAnswerOutranksUnreadable() = runTest {
+        store.addConnection(Connection("c2", "calendar.test", "School", emptyMap()), emptyList(), emptyMap())
+        store.setHealth("c2", ConnectionHealth.Unreadable("Can’t read the bin dates."), 0L)
+        store.setHealth("c1", ConnectionHealth.Unreachable, 0L)
+        assertThat(repo.syncStatus.first().problem).isEqualTo(SyncProblem.NoAnswer("Google"))
     }
 
     private fun ref(id: String, source: String = "s-family") = EventRef("c1", source, id)
@@ -417,7 +425,7 @@ class CalendarRepositoryTest {
 
     @Test
     fun aMasterWhoseProviderHasNoWriterIsReadOnly() = runTest {
-        val noWriter = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings())
+        val noWriter = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings(), testBinColours())
         put("s-family", timed("Boiler service", 23, 10, 0, 60))
         assertThat(noWriter.day(sept(23)).first().single().readOnlyReason).isEqualTo(ReadOnlyReason.OtherCalendar)
     }
@@ -553,14 +561,14 @@ class CalendarRepositoryTest {
 
     @Test
     fun thereIsNowhereToAddWithoutAWriterForTheMaster() = runTest {
-        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings())
+        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings(), testBinColours())
         assertThat(readOnly.masterService.first()).isNull()
     }
 
     @Test
     fun theMasterCalendarNameIsTheCalendarNewEventsGoTo() = runTest {
         assertThat(repo.masterCalendarName.first()).isEqualTo("Family")
-        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings())
+        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet(), testCalendarSettings(), testBinColours())
         assertThat(readOnly.masterCalendarName.first()).isNull()
     }
 
@@ -617,7 +625,7 @@ class CalendarRepositoryTest {
     @Test
     fun eventsNameTheirServiceAndSayHowTheyRepeat() = runTest {
         val google = ScriptedProvider("calendar.test", displayName = "Google Calendar")
-        val named = CalendarRepository(store, household, HouseholdZone(household), setOf(google), setOf(ScriptedWriter("calendar.test")), testCalendarSettings())
+        val named = CalendarRepository(store, household, HouseholdZone(household), setOf(google), setOf(ScriptedWriter("calendar.test")), testCalendarSettings(), testBinColours())
         put("s-family", timed("Piano", 23, 15, 30, 60).copy(recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY"))
         val piano = named.day(LocalDate.of(2026, 9, 23)).first().single { it.title == "Piano" }
         assertThat(piano.serviceName).isEqualTo("Google Calendar")
@@ -633,7 +641,7 @@ class CalendarRepositoryTest {
     private val wideWindow = DateRange(LocalDate.of(2026, 9, 1), LocalDate.of(2027, 1, 1), london)
 
     private fun heldRepo(nowMillis: Long = noonOn(sept(23)), shown: WeeksShown = WeeksShown.EIGHT) =
-        CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings(shown), WallClock { nowMillis })
+        CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), testCalendarSettings(shown), testBinColours(), WallClock { nowMillis })
 
     private fun onDay(title: String, date: LocalDate, forPerson: String? = null): RemoteEvent {
         val start = date.atTime(10, 0).atZone(london).toInstant()

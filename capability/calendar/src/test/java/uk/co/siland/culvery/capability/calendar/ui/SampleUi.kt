@@ -156,7 +156,7 @@ object SampleUi {
         bins = kinds.toList(), readOnlyReason = ReadOnlyReason.OtherCalendar, sourceName = "Bins", createdBy = "Bins",
     )
 
-    /** [week] with all four bins on its Monday and the food caddy alone on Saturday. */
+    /** [week] with all four bins on its Monday and the waste bin alone on Saturday. */
     val weekWithBins: WeekUi = week.copy(
         days = week.days.mapIndexed { i, d ->
             when (i) {

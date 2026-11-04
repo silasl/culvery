@@ -81,6 +81,7 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.testAccess
 import uk.co.siland.culvery.capability.calendar.testEditor
+import uk.co.siland.culvery.capability.calendar.testBinColours
 import uk.co.siland.culvery.capability.calendar.testCalendarSettings
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.household.HomeLocation
@@ -161,7 +162,7 @@ class EventEditorHostTest {
             ),
             TEST_TODAY,
         )
-        repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer), testCalendarSettings())
+        repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer), testCalendarSettings(), testBinColours())
         editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { now }, scope)
     }
 

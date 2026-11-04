@@ -424,7 +424,13 @@ class CalendarStoreRememberedTest {
         connect()
         sync("s1", full(binsDay("b1", sept(24), listOf("food", "recycling"))))
         assertThat(store.eventNow(EventRef("c1", "s1", "b1"))!!.bins).containsExactly("food", "recycling").inOrder()
-        assertThat(store.eventNow(EventRef("c1", "s1", "b2"))).isNull()
+    }
+
+    @Test
+    fun noBinsRoundTripAsNoBins() = runTest {
+        connect()
+        sync("s1", full(binsDay("b1", sept(24), emptyList())))
+        assertThat(store.eventNow(EventRef("c1", "s1", "b1"))!!.bins).isEmpty()
     }
 
     @Test

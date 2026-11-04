@@ -16,7 +16,7 @@ fun binLabel(key: String): String = binKindOf(key)?.label ?: key
 fun orderedBins(keys: Collection<String>): List<String> {
     val distinct = keys.distinct()
     val known = BinKind.entries.map { it.key }.filter { it in distinct }
-    return known + distinct.filter { binKindOf(it) == null }.sorted()
+    return known + distinct.filter { binKindOf(it) == null }.sortedWith(String.CASE_INSENSITIVE_ORDER)
 }
 
 /** What a bin day says in place of who it is for. */

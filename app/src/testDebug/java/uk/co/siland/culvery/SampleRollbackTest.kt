@@ -14,6 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
+import uk.co.siland.culvery.capability.calendar.BinColours
 import uk.co.siland.culvery.capability.calendar.CalendarSettings
 import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.CalendarSync
@@ -83,7 +84,7 @@ class SampleRollbackTest {
             store, setOf(fake), setOf(fake), toasts, zone, WallClock { System.currentTimeMillis() }, CalendarWriteLock(),
             SourceRefresher(store, household, WallClock { System.currentTimeMillis() }, toasts), UndoneKeys(),
         )
-        val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake), CalendarSettings(ApplicationProvider.getApplicationContext(), backgroundScope))
+        val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake), CalendarSettings(ApplicationProvider.getApplicationContext(), backgroundScope), BinColours(ApplicationProvider.getApplicationContext(), backgroundScope))
         sync.syncAll()
         val today = LocalDate.now(london)
         val boiler = repo.day(today).first().single { it.title == "Boiler service" }

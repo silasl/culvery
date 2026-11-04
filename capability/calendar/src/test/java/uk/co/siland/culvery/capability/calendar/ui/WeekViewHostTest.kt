@@ -37,6 +37,7 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.EventRow
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.stubEditor
+import uk.co.siland.culvery.capability.calendar.testBinColours
 import uk.co.siland.culvery.capability.calendar.testCalendarSettings
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -105,7 +106,7 @@ class WeekViewHostTest {
         val household = HouseholdRepository(householdDb)
         val zone = HouseholdZone(household)
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
-        val repo = CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings(shown))
+        val repo = CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings(shown), testBinColours())
         val editor = stubEditor(store, zone)
         val now = LocalDateTime.of(2026, 9, 23, 12, 0).atZone(london).toInstant().toEpochMilli()
         val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, MutableStateFlow(now))

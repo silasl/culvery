@@ -280,6 +280,19 @@ class CalendarSyncTest {
     }
 
     @Test
+    fun aGoodSyncAfterAnUnreadableOneClearsIt() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = engine()
+        a.failWith = UnreadableException("Can’t read the bin dates.")
+        sync.syncAll()
+        a.failWith = null
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+        assertThat(store.connectionsNow().single().lastSyncMillis).isNotNull()
+    }
+
+    @Test
     fun missingProviderMarksTheConnectionError() = runTest {
         connect("c1", "calendar.gone", s1)
         engine().syncAll()
