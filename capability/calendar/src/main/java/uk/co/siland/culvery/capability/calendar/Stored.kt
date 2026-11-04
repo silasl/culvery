@@ -59,6 +59,8 @@ data class StoredEvent(
     val recurrenceRule: String? = null,
     /** The series this occurrence belongs to, what a repeating event's Choose who it’s for changes (4e); null otherwise. */
     val seriesId: String? = null,
+    /** Bin kinds for a bin collection day; null for every other event. */
+    val bins: List<String>? = null,
 ) {
     val ref: EventRef get() = EventRef(connectionId, sourceId, remoteId)
 }

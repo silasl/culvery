@@ -43,7 +43,7 @@ private data class Supplier(val connectionId: String, val sourceId: String, val 
  */
 internal fun rememberedFrom(rows: List<EventRow>, zone: ZoneId, today: LocalDate, keyOf: (String) -> String = ::titleKey): List<RememberedTitleEntity> {
     val cutoff = rememberedCutoff(today).toString()
-    return rows.mapNotNull { runCatching { it.remembered(zone, keyOf) }.getOrNull() }
+    return rows.filter { it.event.bins == null }.mapNotNull { runCatching { it.remembered(zone, keyOf) }.getOrNull() }
         .groupBy { Supplier(it.connectionId, it.sourceId, it.sourceEventId, it.titleKey) }
         .values
         .map { supplied -> supplied.reduce { a, b -> if (isBetter(b.date(), a.date(), today)) b else a } }

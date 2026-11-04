@@ -418,4 +418,22 @@ class CalendarStoreRememberedTest {
     private fun row(title: String, id: String, date: LocalDate) = RememberedTitleEntity(
         "c1", titleKey(title), title, "s1", id, "family", false, 540, 60, null, null, null, date.toString(),
     )
+
+    @Test
+    fun binsRoundTripThroughTheStore() = runTest {
+        connect()
+        sync("s1", full(binsDay("b1", sept(24), listOf("food", "recycling"))))
+        assertThat(store.eventNow(EventRef("c1", "s1", "b1"))!!.bins).containsExactly("food", "recycling").inOrder()
+        assertThat(store.eventNow(EventRef("c1", "s1", "b2"))).isNull()
+    }
+
+    @Test
+    fun binEventsAreNotRemembered() = runTest {
+        connect()
+        sync("s1", full(binsDay("b1", sept(24), listOf("food", "recycling")), allDay("bins", "Bin day", sept(25), sept(26))))
+        assertThat(store.rememberedTitles().map { it.title }).containsExactly("Bin day")
+    }
+
+    private fun binsDay(id: String, day: LocalDate, kinds: List<String>) =
+        RemoteEvent(id, binsTitle(kinds), EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), recurring = false, bins = kinds)
 }

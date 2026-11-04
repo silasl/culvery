@@ -51,6 +51,8 @@ data class EventUi(
     val assignable: Boolean = readOnlyReason == null,
     /** Which day of a multi-day event this slice is; null for an event within one day, overnight ones included. */
     val span: DaySpan? = null,
+    /** Bin kinds when this is a bin collection day: drawn as bin-coloured stripes rather than people. */
+    val bins: List<String>? = null,
 ) {
     val editable: Boolean get() = readOnlyReason == null
     val shared: Boolean get() = people.size > 1
@@ -387,5 +389,6 @@ internal fun StoredEvent.toUi(
         createdBy = createdByLabel(createdBy, reason, people, serviceName, sourceName),
         assignable = mayAssign(this, reason),
         span = dayOfSpan(date, zone),
+        bins = bins,
     )
 }

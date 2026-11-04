@@ -78,6 +78,8 @@ data class EventEntity(
     val recurrenceRule: String? = null,
     /** v7: the series this occurrence belongs to; null for a one-off, or until the first full read after the upgrade. */
     val seriesId: String? = null,
+    /** v9: bin kinds, newline-joined; null for every event that is not a bin collection day. */
+    val bins: String? = null,
 )
 
 /**
@@ -455,7 +457,7 @@ interface CalendarDao {
         ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class,
         RememberedTitleEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class CalendarDatabase : RoomDatabase() {

@@ -614,6 +614,7 @@ private fun RemoteEvent.toEntity(connectionId: String, sourceId: String, zone: Z
     endSort = end.instantIn(zone).toEpochMilli(),
     recurrenceRule = recurrenceRule,
     seriesId = seriesId,
+    bins = bins?.joinToString("\n"),
 )
 
 private fun timeOf(instant: Long?, date: String?): EventTime =
@@ -634,6 +635,7 @@ private fun EventRow.toStored() = StoredEvent(
     endSort = event.endSort,
     recurrenceRule = event.recurrenceRule,
     seriesId = event.seriesId,
+    bins = event.bins?.split('\n'),
 )
 
 private fun PendingChange.toEntity() = OutboxEntity(

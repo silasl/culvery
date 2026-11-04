@@ -27,6 +27,7 @@ import uk.co.siland.culvery.capability.calendar.db.MIGRATION_4_5
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_5_6
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_6_7
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_7_8
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_8_9
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -460,6 +461,38 @@ class CalendarMigrationTest {
             assertThat(scalar(v8, "SELECT COUNT(*) FROM remembered_titles")).isEqualTo("1")
         } finally {
             v8.close()
+        }
+    }
+
+    @Test
+    fun migrate8To9KeepsEventsAndAddsBins() = runTest {
+        file.parentFile?.mkdirs()
+        file.delete()
+
+        val v8 = helper.createDatabase(8)
+        v8.execSQL(
+            "INSERT INTO connection (id, providerId, label, configJson, health, healthMessage, lastSyncMillis, sourcesCheckedMillis, " +
+                "needsSignInSinceMillis) VALUES ('c1', 'calendar.test', 'Google', '{}', 'OK', NULL, 1234, 1000, NULL)",
+        )
+        v8.execSQL(
+            "INSERT INTO source (connectionId, sourceId, name, writable, visible, personId, isMaster, shownInService, readProblem) " +
+                "VALUES ('c1', 's1', 'Family', 1, 1, 'family', 1, 1, NULL)",
+        )
+        v8.execSQL(
+            "INSERT INTO event (connectionId, sourceId, remoteId, title, startInstant, startDate, endInstant, endDate, " +
+                "recurring, forPerson, createdBy, startSort, endSort, recurrenceRule, seriesId) " +
+                "VALUES ('c1', 's1', 'piano_1', 'Piano', 1000, NULL, 2000, NULL, 1, 'alex-id', 'sam-id', 1000, 2000, 'RRULE:FREQ=WEEKLY', 'piano')",
+        )
+        v8.close()
+
+        val v9 = helper.runMigrationsAndValidate(9, listOf(MIGRATION_8_9))
+        try {
+            assertThat(scalar(v9, "SELECT title FROM event WHERE remoteId = 'piano_1'")).isEqualTo("Piano")
+            assertThat(scalar(v9, "SELECT bins IS NULL FROM event WHERE remoteId = 'piano_1'")).isEqualTo("1")
+            v9.execSQL("UPDATE event SET bins = 'food' || char(10) || 'waste' WHERE remoteId = 'piano_1'")
+            assertThat(scalar(v9, "SELECT length(bins) FROM event WHERE remoteId = 'piano_1'")).isEqualTo("10")
+        } finally {
+            v9.close()
         }
     }
 

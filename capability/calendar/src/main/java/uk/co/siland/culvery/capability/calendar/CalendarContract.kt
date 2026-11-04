@@ -51,6 +51,7 @@ const val CONFIG_ACCOUNT = "account"
  * [recurrenceRule] is the series' RRULE line (e.g. "RRULE:FREQ=WEEKLY") when the provider knows it, after a line with
  * the series' first date ("DTSTART:20260926", [withSeriesStart]) when it knows that too. [seriesId] is the
  * series an occurrence belongs to (Google: recurringEventId), what [CalendarWriter.assignSeries] takes; null otherwise.
+ * [bins] is set for a bin collection day: a kind key (food, garden, recycling, waste) or the council's own name for a kind it does not know.
  */
 data class RemoteEvent(
     val remoteId: String,
@@ -62,6 +63,7 @@ data class RemoteEvent(
     val createdBy: String? = null,
     val recurrenceRule: String? = null,
     val seriesId: String? = null,
+    val bins: List<String>? = null,
 )
 
 /** Local dates in the household's [zone]; [endExclusive] is the first day not included. */
