@@ -12,6 +12,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
@@ -37,6 +40,8 @@ import uk.co.siland.culvery.core.ui.HhType
 internal const val BINS_LABEL = "Mid Sussex bins"
 internal const val NO_ADDRESS = "No address found. Check the house name and postcode."
 internal const val COUNCIL_UNREADABLE = "Can’t read the council’s site."
+internal const val SEARCH_HINT = "Enter the house name or number and the postcode, as on the council’s site."
+internal const val WHICH_ADDRESS = "Which address?"
 
 private val GAP = 12.dp
 
@@ -139,26 +144,32 @@ internal fun MidSussexConnectScreen(
             HhButton("Add calendar", { connecting.add(existing, onConnected) }, tone = ButtonTone.Primary, on = ButtonSurface.Surf)
         } else {
             val working = step is Step.Working
+            val canFind = house.isNotBlank() && postcode.isNotBlank() && !working
+            val find = { if (canFind) connecting.search(house.trim(), postcode.trim()) }
+            if (step !is Step.Pick) Text(SEARCH_HINT, style = HhType.secondary, color = Culvery.colors.mute, modifier = Modifier.testTag("bins_hint"))
             HhTextField(
                 house, { house = it }, placeholder = "House name or number", label = "House name or number", tag = "bins_house",
-                capitalization = KeyboardCapitalization.Words, fill = Culvery.colors.surf2,
+                capitalization = KeyboardCapitalization.Words, fill = Culvery.colors.surf2, imeAction = ImeAction.Next,
             )
             HhTextField(
                 postcode, { postcode = it }, placeholder = "Postcode", label = "Postcode", tag = "bins_postcode",
-                capitalization = KeyboardCapitalization.Characters, fill = Culvery.colors.surf2,
+                capitalization = KeyboardCapitalization.Characters, fill = Culvery.colors.surf2, imeAction = ImeAction.Search, onDone = find,
             )
             HhButton(
                 "Find the address",
-                { connecting.search(house.trim(), postcode.trim()) },
+                find,
                 tone = ButtonTone.Primary,
-                enabled = house.isNotBlank() && postcode.isNotBlank() && !working,
+                enabled = canFind,
                 busy = working,
                 on = ButtonSurface.Surf,
             )
             when (step) {
                 Step.NoAddress -> Text(NO_ADDRESS, style = HhType.secondary, color = Culvery.colors.danger)
-                is Step.Pick -> step.found.addresses.forEach { address ->
-                    HhListRow(address.line, onClick = { connecting.pick(step, address) })
+                is Step.Pick -> {
+                    Text(WHICH_ADDRESS, style = HhType.label, color = Culvery.colors.ink, modifier = Modifier.semantics { heading() })
+                    step.found.addresses.forEach { address ->
+                        HhListRow(address.line, onClick = { connecting.pick(step, address) })
+                    }
                 }
                 Step.Failed -> {
                     Text(COUNCIL_UNREADABLE, style = HhType.secondary, color = Culvery.colors.danger)

@@ -1,6 +1,13 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -380,6 +387,24 @@ class CalendarConnectHostTest {
             assertThat(store.connectionsNow().associate { it.connection.id to it.health })
                 .containsExactly("a0", ConnectionHealth.Ok, "g1", ConnectionHealth.Ok)
         }
+    }
+
+    /** `WindowInsets.ime` is zero under Robolectric, so the keyboard is passed in. */
+    @Test
+    fun theConnectingCardStaysAboveTheKeyboard() {
+        val keyboard = 300.dp
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Box(Modifier.size(800.dp, 700.dp).testTag("screen")) {
+                    ConnectingCard("Mid Sussex bins", onCancel = {}, keyboard = WindowInsets(bottom = keyboard)) {
+                        Box(Modifier.size(100.dp, 100.dp).testTag("form"))
+                    }
+                }
+            }
+        }
+        val screen = compose.onNodeWithTag("screen").getBoundsInRoot()
+        compose.onNodeWithTag("connecting_cancel").assertIsDisplayed()
+        assertThat(compose.onNodeWithTag("connecting_card").getBoundsInRoot().bottom).isAtMost(screen.bottom - keyboard)
     }
 
     @Test

@@ -4,8 +4,15 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -89,19 +96,33 @@ internal fun CalendarConnectHost(request: ConnectRequest, connections: CalendarC
     }
 }
 
-/** 3a design §4.4: centred over the scrim; [content] is the provider's connect screen. */
+/**
+ * 3a design §4.4: centred over the scrim, and above the keyboard while a field has it, scrolling when it is taller than
+ * the space; [content] is the provider's connect screen. [keyboard] is the keyboard's inset, passed in by tests.
+ */
 @Composable
-internal fun ConnectingCard(service: String, onCancel: () -> Unit, hint: String? = null, content: @Composable () -> Unit = {}) {
+internal fun ConnectingCard(
+    service: String,
+    onCancel: () -> Unit,
+    hint: String? = null,
+    keyboard: WindowInsets = WindowInsets.ime,
+    content: @Composable () -> Unit = {},
+) {
     val c = Culvery.colors
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        PickerCard(CalendarDimens.connectingWidth, CalendarDimens.connectingGap, "connecting_card", paneTitle = connectingPane(service)) {
-            HhIcon(Icons.CALENDAR_MONTH, size = CalendarDimens.connectingIcon, tint = c.accent)
-            Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.connectingTextGap)) {
-                Text(connectingTitle(service), style = CalendarType.blockTitle, color = c.ink)
-                if (hint != null) Text(hint, style = CalendarType.subtitle, color = c.mute)
+    Box(
+        Modifier.fillMaxSize().windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.verticalScroll(rememberScrollState())) {
+            PickerCard(CalendarDimens.connectingWidth, CalendarDimens.connectingGap, "connecting_card", paneTitle = connectingPane(service)) {
+                HhIcon(Icons.CALENDAR_MONTH, size = CalendarDimens.connectingIcon, tint = c.accent)
+                Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.connectingTextGap)) {
+                    Text(connectingTitle(service), style = CalendarType.blockTitle, color = c.ink)
+                    if (hint != null) Text(hint, style = CalendarType.subtitle, color = c.mute)
+                }
+                content()
+                HhButton("Cancel", onCancel, Modifier.fillMaxWidth().testTag("connecting_cancel"), size = ButtonSize.Large, on = ButtonSurface.Surf)
             }
-            content()
-            HhButton("Cancel", onCancel, Modifier.fillMaxWidth().testTag("connecting_cancel"), size = ButtonSize.Large, on = ButtonSurface.Surf)
         }
     }
 }

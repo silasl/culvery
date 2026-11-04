@@ -24,6 +24,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActionScope
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -294,8 +295,9 @@ const val CHOSEN = "chosen"
 const val NOT_CHOSEN = "not chosen"
 
 /**
- * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves, and
- * leaves the field's focus unless [clearsFocusOnDone] is false (a field for the next entry). [fill] is `surf2` for a field
+ * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done (or Search, as [imeAction]) calls
+ * [onDone] and never saves, and leaves the field's focus unless [clearsFocusOnDone] is false (a field for the next entry);
+ * Next moves on to the next field. [fill] is `surf2` for a field
  * on a `surf` card, where `surf` would vanish.
  * [label] is its name for TalkBack once text hides the placeholder. While [error] is set the field has a `danger` ring in
  * place of its focus ring, and the error shows 8 dp under it as `{tag}_error`; TalkBack reads it with the field, once.
@@ -317,6 +319,7 @@ fun HhTextField(
     clearsFocusOnDone: Boolean = true,
     fill: Color? = null,
     secret: Boolean = false,
+    imeAction: ImeAction = ImeAction.Done,
 ) {
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current
@@ -333,13 +336,16 @@ fun HhTextField(
             readOnly = readOnly,
             textStyle = ControlType.field.copy(color = c.ink),
             cursorBrush = SolidColor(c.accent),
-            keyboardOptions = if (secret) SecretKeyboardOptions else KeyboardOptions(capitalization = capitalization, imeAction = ImeAction.Done),
+            keyboardOptions = if (secret) SecretKeyboardOptions else KeyboardOptions(capitalization = capitalization, imeAction = imeAction),
             visualTransformation = if (secret) SecretTransformation else VisualTransformation.None,
-            // Leaving the field closes the keyboard: a KeyboardActions onDone replaces Compose's own closing.
-            keyboardActions = KeyboardActions(onDone = {
-                onDone()
-                if (clearsFocusOnDone) focusManager.clearFocus()
-            }),
+            // Leaving the field closes the keyboard: a KeyboardActions onDone replaces Compose's own closing. Next keeps Compose's move.
+            keyboardActions = run {
+                val done: KeyboardActionScope.() -> Unit = {
+                    onDone()
+                    if (clearsFocusOnDone) focusManager.clearFocus()
+                }
+                KeyboardActions(onDone = done, onSearch = done)
+            },
             modifier = modifier
                 .testTag(tag)
                 .semantics {

@@ -72,7 +72,7 @@ class MidSussexBinsProvider internal constructor(
         BINS_LABEL,
         Icons.DELETE,
         setOf(Feature.READ),
-        connectHint = "Enter the house name or number and the postcode, as on the council’s site.",
+        // The connect screen shows its own hint, on the search step only.
         carriesBins = true,
     )
 

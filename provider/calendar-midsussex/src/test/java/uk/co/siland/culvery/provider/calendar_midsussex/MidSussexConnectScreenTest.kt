@@ -1,11 +1,15 @@
 package uk.co.siland.culvery.provider.calendar_midsussex
 
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import com.google.common.truth.Truth.assertThat
@@ -103,6 +107,46 @@ class MidSussexConnectScreenTest {
         compose.onNodeWithText("Try again").performClick()
         waitFor("Next: ")
         assertThat(council.requests - before).isEqualTo(3)
+    }
+
+    @Test
+    fun theHintShowsOnlyWhileSearching() {
+        show()
+        compose.onNodeWithText(SEARCH_HINT).assertExists()
+        find()
+        waitFor("2 EXAMPLE ROAD")
+        compose.onNodeWithText(SEARCH_HINT).assertDoesNotExist()
+        compose.onNodeWithText("Which address?").assert(isHeading())
+        compose.onNodeWithText("2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX").performClick()
+        waitFor("Next: ")
+        compose.onNodeWithText(SEARCH_HINT).assertDoesNotExist()
+        compose.onNodeWithText("Which address?").assertDoesNotExist()
+    }
+
+    @Test
+    fun theHousesNextMovesToThePostcode() {
+        show()
+        compose.onNodeWithTag("bins_house").performTextInput(HOUSE)
+        compose.onNodeWithTag("bins_house").performImeAction()
+        compose.onNodeWithTag("bins_postcode").assertIsFocused()
+    }
+
+    @Test
+    fun thePostcodesSearchFinds() {
+        show()
+        compose.onNodeWithTag("bins_house").performTextInput(HOUSE)
+        compose.onNodeWithTag("bins_postcode").performTextInput(POSTCODE)
+        compose.onNodeWithTag("bins_postcode").performImeAction()
+        waitFor("2 EXAMPLE ROAD")
+    }
+
+    @Test
+    fun searchWithoutAHouseFindsNothing() {
+        show()
+        compose.onNodeWithTag("bins_postcode").performTextInput(POSTCODE)
+        compose.onNodeWithTag("bins_postcode").performImeAction()
+        compose.waitForIdle()
+        assertThat(council.takeRequestOrNull()).isNull()
     }
 
     @Test

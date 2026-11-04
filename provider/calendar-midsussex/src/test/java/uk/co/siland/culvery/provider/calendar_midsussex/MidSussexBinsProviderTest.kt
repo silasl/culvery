@@ -382,6 +382,6 @@ class MidSussexBinsProviderTest {
         assertThat(d.id).isEqualTo("calendar.midsussex")
         assertThat(d.displayName).isEqualTo("Mid Sussex bins")
         assertThat(d.features).containsExactly(Feature.READ)
-        assertThat(d.connectHint).isEqualTo("Enter the house name or number and the postcode, as on the council’s site.")
+        assertThat(d.connectHint).isNull()
     }
 }
