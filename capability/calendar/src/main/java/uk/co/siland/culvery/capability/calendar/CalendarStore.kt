@@ -152,6 +152,11 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     suspend fun source(connectionId: String, sourceId: String): StoredSource? = dao.source(connectionId, sourceId)?.toStored()
 
+    /** The kinds of bin each connection's stored events carry, by connection id; a connection with no bin days is absent. */
+    fun binsHeld(): Flow<Map<String, List<String>>> = dao.binsHeld().map { rows ->
+        rows.groupBy({ it.connectionId }, { it.bins.split('\n') }).mapValues { (_, kinds) -> kinds.flatten().distinct() }
+    }
+
     fun master(): Flow<StoredSource?> = dao.master().map { it?.toStored() }
 
     /**

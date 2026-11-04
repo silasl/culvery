@@ -182,4 +182,35 @@ class ReviewScreenshotTest {
     @Test fun settingsCalendarsPageDark() = settings("settings_calendars_page_dark", true)
     @Test fun settingsCalendarsPageLight() = settings("settings_calendars_page_light", false)
     @Test fun calendarsEmptyDark() = settings("settings_calendars_empty_dark", true, connected = false)
+
+    /** Settings › Calendars with the bins calendar: the four known kinds and one the council named, waste's inks open. */
+    @Test
+    fun settingsCalendarsBins() {
+        val bins = Connection("b1", "calendar.midsussex", "Mid Sussex bins", emptyMap())
+        val binsRow = CalendarRow(bins, "Mid Sussex bins", "delete", ConnectionHealth.Ok, now - 2 * 60_000)
+        val binsSource = StoredSource("b1", CalendarSource("bins", "Bins", writable = false, shown = true, primary = true), SourceMapping(PersonId.FAMILY, visible = true))
+        val pages = listOf(
+            StillPage("app", "App settings", 0) {},
+            StillPage("calendars", "Calendars", 400) {
+                ReviewCalendars(
+                    title = "Calendars",
+                    connections = listOf(
+                        ReviewConnection(binsRow, listOf(binsSource), listOf("food", "garden", "recycling", "waste", "Glass")),
+                    ),
+                    people = listOf(Person.Family, sam, mia),
+                    nowMillis = now,
+                    busy = false,
+                    picking = binKey("b1", "waste"),
+                    confirming = null,
+                    connectable = emptyList(),
+                    binInks = mapOf("recycling" to "yellow"),
+                    actions = ReviewActions(),
+                )
+            },
+            StillPage("shopping", "Shopping", 420) {},
+        )
+        snap("settings_calendars_bins", true, before = { compose.onNodeWithTag("settings_page_calendars").performClick() }) {
+            SettingsScreen(pages, onClose = {})
+        }
+    }
 }

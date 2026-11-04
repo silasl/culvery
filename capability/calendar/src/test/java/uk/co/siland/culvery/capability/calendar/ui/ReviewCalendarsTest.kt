@@ -39,6 +39,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
@@ -66,6 +67,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
+import uk.co.siland.culvery.core.ui.BinInks
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.HhPageTitle
@@ -639,7 +641,7 @@ class ReviewCalendarsTest {
                 )
             }
         }
-        compose.onNodeWithText("Connect your family’s Google Calendar to see it on Home.").assertExists()
+        compose.onNodeWithText("Connect your family’s calendar to see it on Home.").assertExists()
     }
 
     @Test
@@ -660,5 +662,72 @@ class ReviewCalendarsTest {
     fun hideNamesItsCalendar() {
         showSources(family, swim.copy(readProblem = READ_REFUSED))
         compose.onNodeWithContentDescription("Hide this calendar, Mia's swimming").assertExists()
+    }
+
+    private val bins = Connection(
+        "b1", "calendar.midsussex", "Mid Sussex bins",
+        mapOf("house" to "1 Example Road", "postcode" to "ZZ99 9ZZ", "address" to "1 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX"),
+    )
+    private val binsSource = StoredSource("b1", CalendarSource("bins", "Bins", writable = false, shown = true, primary = true), SourceMapping(PersonId.FAMILY, visible = true))
+    private var inked: Pair<String, String>? = null
+
+    private fun showBins(kinds: List<String>?, picking: String? = null, inks: Map<String, String> = emptyMap()) = compose.setContent {
+        CulveryTheme(dark = true) {
+            ReviewCalendars(
+                title = "Calendars",
+                connections = listOf(ReviewConnection(CalendarRow(bins, "Mid Sussex bins", "delete", ConnectionHealth.Ok, now - 2 * 60_000), listOf(binsSource), kinds)),
+                people = listOf(Person.Family, mia),
+                nowMillis = now,
+                busy = false,
+                picking = picking,
+                confirming = null,
+                connectable = emptyList(),
+                binInks = inks,
+                actions = ReviewActions(onPick = { picked = it }, onBinInk = { kind, ink -> inked = kind to ink.id }),
+            )
+        }
+    }
+
+    @Test
+    fun binColourRowsListKnownAndSeenKinds() {
+        showBins(listOf("food", "garden", "recycling", "waste", "Glass"), inks = mapOf("waste" to "grey"))
+        compose.onNodeWithContentDescription("Bin colours").assertExists()
+        listOf("food", "garden", "recycling", "waste", "Glass").forEach { compose.onNodeWithTag("bin_row_$it").assertExists() }
+        compose.onNodeWithText("Food").assertExists()
+        compose.onNodeWithText("Glass").assertExists()
+        compose.onNodeWithTag("bin_swatch_waste", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun aConnectionWithoutBinDaysHasNoColourRows() {
+        showBins(null)
+        compose.onAllNodes(hasTestTag("bin_row_food")).assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("Bin colours").assertCountEquals(0)
+    }
+
+    @Test
+    fun tappingARowOpensItsInks() {
+        showBins(listOf("food"))
+        compose.onNodeWithText("Food").performClick()
+        assertThat(picked).isEqualTo(binKey("b1", "food"))
+    }
+
+    @Test
+    fun choosingAnInkSavesIt() {
+        showBins(listOf("food", "waste"), picking = binKey("b1", "waste"))
+        BinInks.all.forEach { compose.onNodeWithTag("bin_ink_waste_${it.id}").assertExists() }
+        compose.onAllNodes(hasTestTag("bin_ink_food_grey")).assertCountEquals(0)
+        compose.onNodeWithTag("bin_ink_waste_black").assertIsSelected()
+        compose.onNodeWithTag("bin_ink_waste_grey").performClick()
+        assertThat(inked).isEqualTo("waste" to "grey")
+    }
+
+    @Test
+    fun theRowNeverShowsTheAddress() {
+        showBins(listOf("food"))
+        compose.onNodeWithText("Mid Sussex bins").assertExists()
+        listOf("1 Example Road", "ZZ99 9ZZ", "EXAMPLE ROAD").forEach {
+            compose.onAllNodes(hasText(it, substring = true, ignoreCase = true)).assertCountEquals(0)
+        }
     }
 }

@@ -145,6 +145,9 @@ data class EventRow(
     val sourcePersonId: String,
 )
 
+/** One distinct `bins` value among a connection's events: kinds, one to a line. */
+data class BinsHeld(val connectionId: String, val bins: String)
+
 data class SeriesInstance(val remoteId: String, val recurrenceRule: String?)
 
 /** What a removed or retitled event says about the remembered titles: its id, its series and its title. */
@@ -241,6 +244,9 @@ interface CalendarDao {
     /** Dates are ISO, so text order is date order. */
     @Query("DELETE FROM remembered_titles WHERE rememberedDate < :cutoff")
     suspend fun pruneRemembered(cutoff: String)
+
+    @Query("SELECT DISTINCT connectionId, bins FROM event WHERE bins IS NOT NULL")
+    fun binsHeld(): Flow<List<BinsHeld>>
 
     @Query("SELECT remoteId, recurrenceRule FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND recurring = 1")
     suspend fun seriesInstances(connectionId: String, sourceId: String): List<SeriesInstance>

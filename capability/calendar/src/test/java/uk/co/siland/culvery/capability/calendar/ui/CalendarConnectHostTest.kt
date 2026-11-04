@@ -27,6 +27,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
+import uk.co.siland.culvery.capability.calendar.testBinColours
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.CalendarReview
@@ -103,7 +104,7 @@ class CalendarConnectHostTest {
         access = testAccess(household, scope, clock, scope)
         val setup = CalendarSetup(store, setOf(google), { household.people.first() }, access.toasts, clock, EmptyCoroutineContext, PROVIDER_TIMEOUT_MS)
         connections = CalendarConnections(store, setup, access.control, setOf(google), scope)
-        review = CalendarReview(store, setup, connections, household, access.control, access.toasts, HouseholdZone(household), clock, testCalendarSettings())
+        review = CalendarReview(store, setup, connections, household, access.control, access.toasts, HouseholdZone(household), clock, testCalendarSettings(), testBinColours())
     }
 
     @After

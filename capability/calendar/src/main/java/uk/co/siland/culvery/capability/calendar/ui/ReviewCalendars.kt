@@ -44,6 +44,8 @@ import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.StoredSource
 import uk.co.siland.culvery.capability.calendar.WeeksShown
+import uk.co.siland.culvery.capability.calendar.binInkFor
+import uk.co.siland.culvery.capability.calendar.binLabel
 import uk.co.siland.culvery.capability.calendar.disconnectQuestion
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Connection
@@ -52,6 +54,8 @@ import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
+import uk.co.siland.culvery.core.ui.BinInk
+import uk.co.siland.culvery.core.ui.BinInks
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
@@ -88,6 +92,7 @@ internal const val ALWAYS_SHOWN_LABEL = "Always shown"
 internal const val MAIN_NEW_EVENTS_GO_HERE = "Main · new events go here"
 internal const val USE_FOR_NEW_EVENTS = "Use for new events"
 internal const val HIDE_THIS_CALENDAR = "Hide this calendar"
+internal const val BIN_COLOURS = "Bin colours"
 
 /** The read problem's sentence (9 §4.12); screen text only, never a toast or a log. */
 internal fun cantRead(account: String?, main: Boolean): String {
@@ -116,6 +121,9 @@ internal fun serviceAndAccount(row: CalendarRow): String = row.connection.config
 
 /** Which calendar's person chips are open; NUL never appears in a provider id. */
 internal fun sourceKey(source: StoredSource): String = "${source.connectionId}\u0000${source.source.id}"
+
+/** Which bin's ink chips are open; the prefix keeps it apart from a [sourceKey]. */
+internal fun binKey(connectionId: String, kind: String): String = "bin\u0000$connectionId\u0000$kind"
 
 /** The disconnect being confirmed, with the queued changes it would drop and whether Shopping uses the account. */
 internal data class Confirming(val row: CalendarRow, val queued: Int, val shoppingUses: Boolean = false)
@@ -158,6 +166,7 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
     val connectable by connections.connectable.collectAsStateWithLifecycle<List<CalendarProvider>?>(null)
     val descriptors = remember(connectable, offerConnect) { if (offerConnect) connectable.orEmpty().map { it.descriptor } else emptyList() }
     val weeks by review.weeksShown.collectAsStateWithLifecycle<WeeksShown?>(null)
+    val binInks by review.binInks.collectAsStateWithLifecycle(emptyMap())
     val connector = rememberConnector(connections)
     var picking by remember { mutableStateOf<String?>(null) }
     var confirming by remember { mutableStateOf<Confirming?>(null) }
@@ -173,6 +182,7 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
         connectable = descriptors,
         line = line,
         weeks = weeks.takeIf { offerWeeks },
+        binInks = binInks,
         actions = ReviewActions(
             onConnect = { connector.connect(it.id) },
             onReconnect = connector::reconnect,
@@ -183,6 +193,10 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
             },
             onShown = { source, shown -> action.run { review.setShown(source, shown) } },
             onWeeks = { weeks -> action.run { review.setShown(weeks) } },
+            onBinInk = { kind, ink ->
+                picking = null
+                action.run { review.setBinInk(kind, ink) }
+            },
             onMakeMaster = { source -> action.run { review.makeMaster(source) } },
             onDisconnect = { row -> action.run { confirming = Confirming(row, review.queuedChanges(row.connection.id), review.shoppingUses(row)) } },
             onKeep = { confirming = null },
@@ -199,6 +213,7 @@ internal class ReviewActions(
     val onPerson: (StoredSource, Person) -> Unit = { _, _ -> },
     val onShown: (StoredSource, Boolean) -> Unit = { _, _ -> },
     val onWeeks: (WeeksShown) -> Unit = {},
+    val onBinInk: (String, BinInk) -> Unit = { _, _ -> },
     val onMakeMaster: (StoredSource) -> Unit = {},
     val onDisconnect: (CalendarRow) -> Unit = {},
     val onKeep: () -> Unit = {},
@@ -224,13 +239,14 @@ internal fun ReviewCalendars(
     actions: ReviewActions,
     line: String? = null,
     weeks: WeeksShown? = null,
+    binInks: Map<String, String> = emptyMap(),
 ) {
     if (connections == null || people == null) return
     Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("review_calendars")) {
         HhPageTitle(title, line)
         if (connections.isEmpty()) {
             Text(
-                "Connect your family’s Google Calendar to see it on Home.",
+                "Connect your family’s calendar to see it on Home.",
                 style = CalendarType.subtitle,
                 color = Culvery.colors.mute,
                 modifier = Modifier.testTag("review_none"),
@@ -250,6 +266,9 @@ internal fun ReviewCalendars(
             connection.sources.forEach { source ->
                 CalendarRowCard(source, connection.row, people, busy, picking == sourceKey(source), actions.onPick, actions.onPerson, actions.onShown, actions.onMakeMaster)
             }
+            connection.binKinds?.let { kinds ->
+                BinColourRows(connection.row.connection.id, kinds, binInks, busy, picking, actions.onPick, actions.onBinInk)
+            }
         }
         if (weeks != null && connections.isNotEmpty()) WeeksAheadRows(weeks, actions.onWeeks)
         connectable.forEach { d ->
@@ -259,6 +278,70 @@ internal fun ReviewCalendars(
             )
         }
     }
+}
+
+/** One row a kind of bin, its ink beside it; a tap opens the ink set (spec 4.4). */
+@Composable
+private fun BinColourRows(
+    connectionId: String,
+    kinds: List<String>,
+    inks: Map<String, String>,
+    busy: Boolean,
+    picking: String?,
+    onPick: (String) -> Unit,
+    onInk: (String, BinInk) -> Unit,
+) {
+    val c = Culvery.colors
+    HhSectionLabel(BIN_COLOURS)
+    kinds.forEach { kind ->
+        val key = binKey(connectionId, kind)
+        val open = picking == key
+        val chosen = binInkFor(inks, kind)
+        val label = binLabel(kind)
+        Column(Modifier.testTag("bin_row_$kind").fillMaxWidth().listRowCard(c)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = ListRowTokens.minHeight)
+                    .semantics { stateDescription = if (open) EXPANDED else COLLAPSED }
+                    .hhClickable({ onPick(key) }, label = changeColourFor(label), role = Role.Button)
+                    .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd),
+            ) {
+                Text(label, style = ListRowTokens.titleStyle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Swatch(chosen, Modifier.testTag("bin_swatch_$kind"))
+                Spacer(Modifier.width(CalendarDimens.reviewItemGap))
+                HhIcon(Icons.EXPAND_MORE, size = CalendarDimens.pillChevron, tint = c.mute)
+            }
+            if (open) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+                    verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectableGroup()
+                        .padding(start = CalendarDimens.belowPaddingStart, end = CalendarDimens.belowPaddingEnd, bottom = CalendarDimens.belowPaddingBottom),
+                ) {
+                    BinInks.all.forEach { ink ->
+                        HhChoiceChip(
+                            ink.name,
+                            selected = ink.id == chosen?.id,
+                            tag = "bin_ink_${kind}_${ink.id}",
+                            onClick = { onInk(kind, ink) },
+                            enabled = !busy,
+                            leading = { Swatch(ink, Modifier) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** An ink as it looks in the current theme; a kind with no ink is the quiet grey that stands for unknown. */
+@Composable
+private fun Swatch(ink: BinInk?, modifier: Modifier) {
+    Box(modifier.size(CalendarDimens.binSwatch).clip(CircleShape).background(BinInks.colour(ink, Culvery.colors)))
 }
 
 @Composable

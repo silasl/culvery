@@ -62,7 +62,7 @@ class MidSussexBinsProvider @Inject constructor(
 ) : CalendarProvider {
     override val descriptor = ProviderDescriptor(
         MIDSUSSEX_PROVIDER_ID,
-        "Mid Sussex bins",
+        BINS_LABEL,
         Icons.DELETE,
         setOf(Feature.READ),
         connectHint = "Enter the house name or number and the postcode, as on the council’s site.",
@@ -73,7 +73,8 @@ class MidSussexBinsProvider @Inject constructor(
     private var held: BinsRead? = null
 
     @Composable
-    override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) = Unit
+    override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) =
+        MidSussexConnectScreen(council, clock, existing, onConnected, onCancel)
 
     override suspend fun sources(conn: Connection): List<CalendarSource> = listOf(SOURCE_BINS)
 

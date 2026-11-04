@@ -64,4 +64,5 @@ internal fun stubReview(store: CalendarStore, household: HouseholdRepository): C
     HouseholdZone(household),
     WallClock { 0L },
     testCalendarSettings(),
+    testBinColours(),
 )

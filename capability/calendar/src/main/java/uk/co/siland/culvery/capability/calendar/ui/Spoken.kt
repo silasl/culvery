@@ -24,6 +24,8 @@ internal const val COLLAPSED = "collapsed"
 
 internal fun changeWhoFor(calendar: String): String = "change who $calendar is for"
 
+internal fun changeColourFor(bin: String): String = "change the colour of $bin bins"
+
 /** A repeated action's spoken name: its visible words first, then what it acts on ("Hide this calendar, School terms"). */
 internal fun withSubject(action: String, subject: String): String = "$action, $subject"
 

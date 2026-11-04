@@ -18,9 +18,13 @@ import uk.co.siland.culvery.core.plugin.AccountUse
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.BinInk
 
-/** One connection as Review calendars shows it (4a design §4.5): its row, and its calendars. */
-data class ReviewConnection(val row: CalendarRow, val sources: List<StoredSource>)
+/**
+ * One connection as Review calendars shows it (4a design §4.5): its row, and its calendars. [binKinds] is set for a
+ * connection whose events are bin days: the four known kinds, then any other the council has named.
+ */
+data class ReviewConnection(val row: CalendarRow, val sources: List<StoredSource>, val binKinds: List<String>? = null)
 
 // 4a design §4.5.
 fun nowShowsAs(calendar: String, person: String): String = "$calendar now shows as $person."
@@ -57,11 +61,22 @@ class CalendarReview @Inject constructor(
     private val zone: HouseholdZone,
     private val clock: WallClock,
     private val settings: CalendarSettings,
+    private val binColours: BinColours,
     private val accountUses: Set<@JvmSuppressWildcards AccountUse> = emptySet(),
 ) {
-    val connections: Flow<List<ReviewConnection>> = combine(calendarConnections.rows, store.sources()) { rows, sources ->
-        rows.map { row -> ReviewConnection(row, sources.filter { it.connectionId == row.connection.id }) }
+    val connections: Flow<List<ReviewConnection>> = combine(calendarConnections.rows, store.sources(), store.binsHeld()) { rows, sources, bins ->
+        rows.map { row ->
+            val seen = bins[row.connection.id]
+            ReviewConnection(
+                row,
+                sources.filter { it.connectionId == row.connection.id },
+                binKinds = seen?.let { orderedBins(BinKind.entries.map(BinKind::key) + it) },
+            )
+        }
     }
+
+    /** The ink chosen for each kind of bin (kind to ink id); a kind not in it shows in its default. */
+    internal val binInks: Flow<Map<String, String>> = binColours.current
 
     /** How many weeks the Calendar tab shows (15a §2.3). */
     val weeksShown: Flow<WeeksShown> = settings.shown
@@ -92,6 +107,11 @@ class CalendarReview @Inject constructor(
     /** The weeks ahead the Calendar tab steps through; the sync reads 12 whatever is chosen, so nothing is requested. */
     suspend fun setShown(shown: WeeksShown): Boolean = change {
         settings.setShown(shown)
+    }
+
+    suspend fun setBinInk(kind: String, ink: BinInk): Boolean = change {
+        binColours.set(kind, ink.id)
+        toaster.show(nowShowsAs(binLabel(kind), ink.name))
     }
 
     /** For the disconnect confirmation; changes nothing, so it asks for no PIN. */

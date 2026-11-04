@@ -500,6 +500,7 @@ internal object CalendarDimens {
     val pillGap = 6.dp
     val personPillMaxWidth = 140.dp
     val pillDot = 9.dp
+    val binSwatch = 24.dp
     val pillChevron = 17.dp
 
     // Show: its label 8 from the switch; the group at least 127 wide so the switches line up down the page.

@@ -36,6 +36,9 @@ internal class FakeCouncil {
     /** The third page's fixture. */
     @Volatile var collections = "collections.html"
 
+    /** The second page's fixture. */
+    @Volatile var addresses = "addresses_two.html"
+
     /** When set, every page takes two seconds to start answering. */
     @Volatile var slow = false
 
@@ -53,7 +56,7 @@ internal class FakeCouncil {
                 val failing = status
                 val answer = when {
                     failing != null -> MockResponse().setResponseCode(failing)
-                    request.method == "POST" -> MockResponse().setBody(fixture("addresses_two.html"))
+                    request.method == "POST" -> MockResponse().setBody(fixture(addresses))
                     url.queryParameter("seq") == "3" -> MockResponse().setBody(fixture(collections))
                     else -> MockResponse()
                         .setHeader("Set-Cookie", "session=${++sessions}; Path=/")

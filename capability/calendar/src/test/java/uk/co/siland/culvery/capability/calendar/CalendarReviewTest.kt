@@ -28,6 +28,7 @@ import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.BinInks
 
 // Robolectric for Room and android.util.Log.
 @RunWith(AndroidJUnit4::class)
@@ -61,13 +62,14 @@ class CalendarReviewTest {
     }
 
     private val settings = testCalendarSettings()
+    private val binColours = testBinColours()
 
     private suspend fun TestScope.review(uses: Set<AccountUse> = emptySet()): Pair<CalendarReview, TestAccess> {
         val access = testAccess(household)
         val setup = CalendarSetup(store, setOf(google), { household.people.first() }, toaster, WallClock { 0L }, EmptyCoroutineContext)
         val connections = CalendarConnections(store, setup, access.control, setOf(google), backgroundScope)
         store.addConnection(connection, google.sourceList, emptyMap(), masterSourceId = family.id)
-        return CalendarReview(store, setup, connections, household, access.control, toaster, HouseholdZone(household), WallClock { 0L }, settings, uses) to access
+        return CalendarReview(store, setup, connections, household, access.control, toaster, HouseholdZone(household), WallClock { 0L }, settings, binColours, uses) to access
     }
 
     private suspend fun source(id: String): StoredSource = store.source("g1", id)!!
@@ -229,6 +231,43 @@ class CalendarReviewTest {
         withContext(Dispatchers.Default) { withTimeout(5_000) { while (toaster.messages.size < 2) delay(10) } }
         assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("g1")
         assertThat(toaster.messages).containsExactly("Google Calendar connected.", "Google Calendar reconnected.").inOrder()
+    }
+
+    private suspend fun binDay(kinds: List<String>) {
+        val day = TEST_TODAY.plusDays(1)
+        val event = RemoteEvent("bins-$day", binsTitle(kinds), EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), recurring = false, bins = kinds)
+        store.applySync("g1", family.id, DateRange(TEST_TODAY, TEST_TODAY.plusDays(30), TEST_ZONE), SyncResult(listOf(event), emptyList(), null, fullReplace = true), TEST_TODAY)
+    }
+
+    @Test
+    fun aConnectionWithoutBinDaysHasNoBinKinds() = runTest {
+        val (review, _) = review()
+        assertThat(review.connections.first().single().binKinds).isNull()
+    }
+
+    @Test
+    fun binKindsAreTheFourKnownAndTheOnesSeen() = runTest {
+        val (review, _) = review()
+        binDay(listOf("waste", "Glass"))
+        assertThat(review.connections.first().single().binKinds).containsExactly("food", "garden", "recycling", "waste", "Glass").inOrder()
+    }
+
+    @Test
+    fun choosingAnInkSavesItAndSaysSo() = runTest {
+        val (review, access) = review()
+        access.answer(TestAccess.ALEX)
+        assertThat(review.setBinInk("waste", BinInks.byId("grey")!!)).isTrue()
+        assertThat(binColours.inkFor("waste")?.id).isEqualTo("grey")
+        assertThat(review.binInks.first()["waste"]).isEqualTo("grey")
+        assertThat(toaster.messages).containsExactly("Waste now shows as Grey.")
+    }
+
+    @Test
+    fun aCancelledPinKeepsTheInk() = runTest {
+        val (review, access) = review()
+        access.answer(null)
+        assertThat(review.setBinInk("waste", BinInks.byId("grey")!!)).isFalse()
+        assertThat(binColours.inkFor("waste")?.id).isEqualTo("black")
     }
 
     @Test
