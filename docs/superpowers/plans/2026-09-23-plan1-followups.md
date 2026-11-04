@@ -930,6 +930,30 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
   - The music card's volume pill shows a stripe in the accent colour (hide it while nothing plays, or make it a mute button).
 - **Simplify, not done:** the wake as Display state; the birthday-or-seasonal choice in one place; the greeting width measured in the header's layout.
 
+## Plan 17 (bins): emulator walk-through
+- All seven checks passed on `culvery-5` with the debug sample household and the sample council (made-up address and postcode).
+  - Setup lists two addresses, shows the next collection, and adds "Mid Sussex bins"; the sample calendar stays.
+  - One chip per day with a stripe per bin, by day and by night; a four-bin day has four stripes in the order Food, Garden, Recycling, Waste.
+  - A colour chosen in Settings reaches the chips at once.
+  - An unknown bin name shows as the council wrote it, with a neutral stripe, and is listed in Bin colours.
+  - A page with no collections section shows "Can't read the bin dates." on the Settings row and the Calendar tab, the last dates stay, and a good page clears it.
+  - Update now reads at once; a timer pass after a good read reads nothing.
+  - No address, postcode, Track value or council URL in logcat.
+- **Fixed from the walk-through (the user said fix all):**
+  - The setup card moves above the keyboard; the keyboard's key moves from house to postcode and then searches.
+  - The bin icon is the size of the chip's meta line; a four-bin title shows in full.
+  - Grey is out of the ink set (the neutral stripe means unknown); night Black is a dark grey with a lighter edge.
+  - Update now on the bins calendar's card in Settings.
+  - The setup hint shows only on the search step; the address list has a "Which address?" heading.
+  - Unknown bin names stay in Bin colours once seen.
+  - The music card's volume is hidden while nothing plays (the 2026-11-03 fault below), brought in from `music-idle-volume`.
+- **For the end-of-v1 design review:**
+  - The setup card's address lines cut off at the end ("…, WEST…").
+  - Night Black's edge is close to the neutral stripe (about 1.4:1); the fill is clearly darker.
+  - The setup hint is drawn by the provider now, 14 sp, a little further from the title.
+- **Left as is:** opening App settings shows "No town chosen yet" and no people for a moment before they load (not bins).
+- **Design note for later:** the calendar engine treats every answer as fresh, so the bins provider keeps its own copy and re-reports a stored failure; the engine owning read timing (and Update now as a flag on the sync request) would remove that.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
