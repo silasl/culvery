@@ -32,8 +32,8 @@ import uk.co.siland.culvery.core.ui.ShellTokens
 
 /**
  * The REGULAR Home card (9 §4.2): the room Home follows and what it plays, then one row: Play/Pause, Next and the
- * group's volume pill. Shuffle everything takes Next's place only when nothing plays, so a tap mid-song can't replace
- * the queue. With a problem, the §6 line and no controls; before the first check, that it is looking.
+ * group's volume pill. When nothing plays, Shuffle everything takes Next's place, so a tap mid-song can't replace
+ * the queue, and the volume pill goes. With a problem, the §6 line and no controls; before the first check, that it is looking.
  */
 @Composable
 fun MusicCard(pick: HomePick?, status: String?, line: String?, actions: GroupActions, modifier: Modifier = Modifier) {
@@ -58,7 +58,7 @@ fun MusicCard(pick: HomePick?, status: String?, line: String?, actions: GroupAct
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.cardControlsGap)) {
             PlayPauseButton(group, "music_card", actions, playing = group.isPlaying && !pick.nothingPlaying)
             if (pick.nothingPlaying) ShuffleButton(group, "music_card", ButtonSurface.Surf, actions, compact = true) else NextButton(group, "music_card", actions)
-            VolumePill(group.name, group.volume, "music_card_volume", { actions.onGroupVolume(group, it) }, Modifier.weight(1f))
+            if (!pick.nothingPlaying) VolumePill(group.name, group.volume, "music_card_volume", { actions.onGroupVolume(group, it) }, Modifier.weight(1f))
         }
         if (line != null) Text(line, style = HhType.secondary, color = c.danger, maxLines = 2, modifier = Modifier.testTag("music_card_line"))
     }

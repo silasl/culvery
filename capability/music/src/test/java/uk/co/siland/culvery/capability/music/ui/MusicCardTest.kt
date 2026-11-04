@@ -162,6 +162,12 @@ class MusicCardTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    @Test
+    fun nothingPlayingHidesTheVolume() {
+        show(HomePick(group("k", "Kitchen", state = PlayState.PAUSED, nowPlaying = SONG), nothingPlaying = true))
+        compose.onNodeWithTag("music_card_volume").assertDoesNotExist()
+    }
+
     /** 6 §5.1: an idle input reports PLAYING; beside "Nothing playing" the round button is Play, not Pause. */
     @Test
     fun nothingPlayingOverAnIdleInputOffersPlay() {
