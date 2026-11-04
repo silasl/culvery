@@ -1,0 +1,77 @@
+package uk.co.siland.culvery.provider.calendar_midsussex
+
+import java.time.DateTimeException
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.ResolverStyle
+import okhttp3.HttpUrl
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
+
+internal const val FIELD_HOUSE = "address_name_number"
+internal const val FIELD_POSTCODE = "address_postcode"
+
+private const val START_LINK_TEXT = "View my collections"
+
+enum class BinsFailure { NO_START_LINK, NO_ADDRESS_LIST, ADDRESS_GONE, NO_COLLECTIONS, BAD_DATE, NO_SERVICES }
+
+class BinsReadFailed(val kind: BinsFailure) : Exception(kind.name)
+
+data class Address(val line: String, val url: HttpUrl)
+
+/** [kinds] are keys (food, garden, recycling, waste) or the council's own words for a bin we don't know. */
+data class Collection(val date: LocalDate, val kinds: List<String>)
+
+private val KNOWN_KINDS = listOf("food" to "food", "garden" to "garden", "recycling" to "recycling", "refuse" to "waste")
+private val DATE = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)
+
+fun searchUrl(startHtml: String, baseUrl: HttpUrl): HttpUrl {
+    val href = Jsoup.parse(startHtml).select("a[href]")
+        .firstOrNull { it.text().contains(START_LINK_TEXT, ignoreCase = true) }
+        ?.attr("href")
+    val link = href?.let(baseUrl::resolve) ?: throw BinsReadFailed(BinsFailure.NO_START_LINK)
+    return link.newBuilder().setQueryParameter("seq", "2").build()
+}
+
+fun addresses(listHtml: String, baseUrl: HttpUrl): List<Address> {
+    val list = Jsoup.parse(listHtml).selectFirst("div#property_list")
+        ?: throw BinsReadFailed(BinsFailure.NO_ADDRESS_LIST)
+    return list.select("a[href]").mapNotNull { link ->
+        baseUrl.resolve(link.attr("href"))?.let { Address(link.text().trim(), it) }
+    }
+}
+
+fun pick(addresses: List<Address>, line: String): Address =
+    addresses.firstOrNull { it.line == line } ?: throw BinsReadFailed(BinsFailure.ADDRESS_GONE)
+
+fun collections(houseHtml: String): List<Collection> {
+    val page = Jsoup.parse(houseHtml)
+    if (page.selectFirst("span#waste-hint") != null) throw BinsReadFailed(BinsFailure.NO_SERVICES)
+    val section = page.selectFirst("section#scheduled-collections")
+        ?: page.selectFirst("h2#upcoming-scheduled-collections")?.parent()
+        ?: throw BinsReadFailed(BinsFailure.NO_COLLECTIONS)
+    val rows = section.select("ul.displayinlineblock").mapNotNull(::row)
+    if (rows.isEmpty()) throw BinsReadFailed(BinsFailure.NO_COLLECTIONS)
+    return rows.groupBy({ it.first }, { it.second })
+        .toSortedMap()
+        .map { (date, kinds) -> Collection(date, kinds.distinct().sortedWith(KIND_ORDER)) }
+}
+
+private fun row(ul: Element): Pair<LocalDate, String>? {
+    val cells = ul.children().filter { it.tagName() == "li" }
+    if (cells.size < 3) return null
+    val date = try {
+        LocalDate.parse(cells[1].text().trim(), DATE)
+    } catch (_: DateTimeException) {
+        throw BinsReadFailed(BinsFailure.BAD_DATE)
+    }
+    return date to kindOf(cells[2].text().trim())
+}
+
+private fun kindOf(name: String): String =
+    KNOWN_KINDS.firstOrNull { (word, _) -> name.contains(word, ignoreCase = true) }?.second ?: name
+
+private val KIND_ORDER = compareBy<String>(
+    { kind -> KNOWN_KINDS.indexOfFirst { it.second == kind }.takeIf { it >= 0 } ?: KNOWN_KINDS.size },
+    { it },
+)
