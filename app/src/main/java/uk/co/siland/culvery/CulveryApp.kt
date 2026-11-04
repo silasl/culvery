@@ -9,7 +9,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
-import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Startable
@@ -19,7 +18,6 @@ class CulveryApp : Application() {
     // Lazy and read on the application scope (Dispatchers.Default): the loops and the providers are built off Main (4c §4.1).
     @Inject lateinit var household: Lazy<HouseholdRepository>
     @Inject lateinit var calendarSetup: Lazy<CalendarSetup>
-    @Inject lateinit var calendarStore: Lazy<CalendarStore>
     @Inject lateinit var calendarProviders: Lazy<Set<@JvmSuppressWildcards CalendarProvider>>
     @Inject lateinit var startables: Lazy<Set<@JvmSuppressWildcards Startable>>
     @Inject @ApplicationScope lateinit var appScope: CoroutineScope
@@ -30,7 +28,7 @@ class CulveryApp : Application() {
             startAll(startables.get()) { startable, e -> Log.e(TAG, "${startable::class.simpleName} failed to start (${e::class.simpleName})") }
         }
         appScope.launch { seedDebugData(household.get(), calendarSetup.get(), calendarProviders.get()) }
-        appScope.launch { removeSampleWhenReplaced(calendarStore.get(), calendarProviders.get()) }
+        appScope.launch { removeSampleWhenReplaced(calendarSetup.get(), calendarProviders.get()) }
     }
 
     private companion object {

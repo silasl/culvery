@@ -206,7 +206,7 @@ class DebugSeedTest {
         store.enqueue(PendingChange(0, DEBUG_CONNECTION_ID, family.id, "e1", ChangeKind.DELETE, null, 0, 0L, 0L))
         assertThat(sampleRows()).containsExactly("event", true, "outbox", true, "sync_state", true)
         store.addConnection(Connection("g1", "calendar.google", "Google", emptyMap()), emptyList(), emptyMap())
-        val watcher = launch { removeSampleWhenReplaced(store, setOf(fake, google)) }
+        val watcher = launch { removeSampleWhenReplaced(setupFor(fake), setOf(fake, google)) }
         withContext(Dispatchers.Default) {
             withTimeout(5_000) { while (store.connectionsNow().any { it.connection.id == DEBUG_CONNECTION_ID }) delay(10) }
         }
@@ -219,7 +219,7 @@ class DebugSeedTest {
     fun aBinsConnectionKeepsTheSample() = runTest {
         sampleHousehold()
         store.addConnection(Connection("b1", bins.descriptor.id, "Mid Sussex bins", emptyMap()), emptyList(), emptyMap())
-        val watcher = launch { removeSampleWhenReplaced(store, setOf(fake, google, bins)) }
+        val watcher = launch { removeSampleWhenReplaced(setupFor(fake), setOf(fake, google, bins)) }
         // The collector has seen both connections once the bins one is replaced by a writing one.
         delay(200)
         assertThat(store.connectionsNow().map { it.connection.id }).containsExactly(DEBUG_CONNECTION_ID, "b1")

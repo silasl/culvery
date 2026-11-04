@@ -31,6 +31,7 @@ import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.backoffMillis
+import uk.co.siland.culvery.core.plugin.today
 
 /** How long the editor tries the provider before queueing the change instead (2b-1 design D3). */
 const val WRITE_ATTEMPT_MS = 10_000L
@@ -148,7 +149,7 @@ class CalendarEditor internal constructor(
     /** Who is signed in now: the add/edit sheet's Who default and its disabled chips (2b-2 design D2). */
     internal val session: StateFlow<Identified?> get() = access.session
 
-    private suspend fun today(): LocalDate = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current()).toLocalDate()
+    private suspend fun today(): LocalDate = clock.today(zone.current())
 
     /** Now, in the household zone: the add sheet's "today" and its default time. */
     internal suspend fun openedAt(): ZonedDateTime = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current())

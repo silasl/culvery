@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 
 /** A bin lid colour as a stripe ink, with a value for each theme. */
 data class BinInk(val id: String, val name: String, val day: Color, val night: Color)
@@ -23,7 +22,7 @@ object BinInks {
     /** [HhColors.mute] stands for an unknown colour. */
     fun colour(ink: BinInk?, c: HhColors): Color = when {
         ink == null -> c.mute
-        c.bg.luminance() < 0.5f -> ink.night
-        else -> ink.day
+        c.isLight -> ink.day
+        else -> ink.night
     }
 }

@@ -8,7 +8,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
-import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.SourceMapping
 import uk.co.siland.culvery.core.access.PinManager
 import uk.co.siland.culvery.core.household.HomeLocation
@@ -95,11 +94,10 @@ class DebugSampleHousehold(
  * Debug builds only (3a design D5, §3.9): once a connection whose provider can write exists, the sample connection
  * goes, with its events, sync state and queue, so sample and real events never mix. A read-only one, the bins, keeps it.
  */
-suspend fun removeSampleWhenReplaced(store: CalendarStore, providers: Set<CalendarProvider>) {
+suspend fun removeSampleWhenReplaced(calendar: CalendarSetup, providers: Set<CalendarProvider>) {
     val writing = providers.filter { Feature.WRITE in it.descriptor.features }.map { it.descriptor.id }.toSet()
-    store.connections().collect { stored ->
-        val ids = stored.map { it.connection.id }
-        val replaced = stored.any { it.connection.id != DEBUG_CONNECTION_ID && it.connection.providerId in writing }
-        if (DEBUG_CONNECTION_ID in ids && replaced) store.removeConnection(DEBUG_CONNECTION_ID)
+    calendar.connections().collect { connections ->
+        val replaced = connections.any { it.id != DEBUG_CONNECTION_ID && it.providerId in writing }
+        if (replaced && connections.any { it.id == DEBUG_CONNECTION_ID }) calendar.removeConnection(DEBUG_CONNECTION_ID)
     }
 }

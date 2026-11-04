@@ -9,7 +9,9 @@ import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -58,6 +60,9 @@ class CalendarSetup(
 
     /** Every connection's id, as it changes. */
     fun connectionIds(): Flow<List<String>> = store.connectionIds()
+
+    /** Every connection, as the list changes. */
+    fun connections(): Flow<List<Connection>> = store.connections().map { all -> all.map { it.connection } }.distinctUntilChanged()
 
     /** A connection with everything it holds (3a design D5: the debug sample once a real calendar is connected). */
     suspend fun removeConnection(connectionId: String) = store.removeConnection(connectionId)

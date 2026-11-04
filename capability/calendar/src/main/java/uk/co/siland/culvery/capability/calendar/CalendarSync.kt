@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -17,6 +16,7 @@ import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.backoffMillis
+import uk.co.siland.culvery.core.plugin.today
 
 const val SYNC_PAST_DAYS = 1L
 
@@ -94,7 +94,7 @@ class CalendarSync internal constructor(
         return DateRange(today.minusDays(SYNC_PAST_DAYS), today.plusDays(SYNC_FUTURE_DAYS + 1), z)
     }
 
-    private fun todayIn(z: ZoneId): LocalDate = Instant.ofEpochMilli(clock.nowMillis()).atZone(z).toLocalDate()
+    private fun todayIn(z: ZoneId): LocalDate = clock.today(z)
 
     /**
      * Delivers queued changes in the order they were made. An event's later changes wait while an earlier one is

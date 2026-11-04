@@ -289,7 +289,7 @@ class CalendarSyncTest {
         a.failWith = null
         sync.syncAll()
         assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
-        assertThat(store.connectionsNow().single().lastSyncMillis).isNotNull()
+        assertThat(store.connectionsNow().single().lastSyncMillis).isEqualTo(now.toEpochMilli())
     }
 
     @Test

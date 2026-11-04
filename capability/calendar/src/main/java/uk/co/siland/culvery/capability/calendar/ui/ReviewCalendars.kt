@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -314,12 +315,9 @@ private fun BinColourRows(
                 HhIcon(Icons.EXPAND_MORE, size = CalendarDimens.pillChevron, tint = c.mute)
             }
             if (open) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
-                    verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
-                    modifier = Modifier
+                ChipChoices(
+                    Modifier
                         .fillMaxWidth()
-                        .selectableGroup()
                         .padding(start = CalendarDimens.belowPaddingStart, end = CalendarDimens.belowPaddingEnd, bottom = CalendarDimens.belowPaddingBottom),
                 ) {
                     BinInks.all.forEach { ink ->
@@ -336,6 +334,17 @@ private fun BinColourRows(
             }
         }
     }
+}
+
+/** A wrapping row of choice chips, one selectable group. */
+@Composable
+private fun ChipChoices(modifier: Modifier = Modifier, content: @Composable FlowRowScope.() -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+        verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+        modifier = modifier.selectableGroup(),
+        content = content,
+    )
 }
 
 /** An ink as it looks in the current theme; a kind with no ink is the quiet grey that stands for unknown. */
@@ -439,11 +448,7 @@ private fun CalendarRowCard(
                     .padding(start = CalendarDimens.belowPaddingStart, end = CalendarDimens.belowPaddingEnd, bottom = CalendarDimens.belowPaddingBottom),
             ) {
                 if (picking) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
-                        verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
-                        modifier = Modifier.selectableGroup(),
-                    ) {
+                    ChipChoices {
                         people.forEach { p ->
                             val selected = p.id == source.mapping.person
                             HhChoiceChip(

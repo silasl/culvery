@@ -1,13 +1,13 @@
 package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
-import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
@@ -18,6 +18,7 @@ import uk.co.siland.culvery.core.plugin.AccountUse
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.today
 import uk.co.siland.culvery.core.ui.BinInk
 
 /**
@@ -64,7 +65,7 @@ class CalendarReview @Inject constructor(
     private val binColours: BinColours,
     private val accountUses: Set<@JvmSuppressWildcards AccountUse> = emptySet(),
 ) {
-    val connections: Flow<List<ReviewConnection>> = combine(calendarConnections.rows, store.sources(), store.binsHeld()) { rows, sources, bins ->
+    val connections: Flow<List<ReviewConnection>> = combine(calendarConnections.rows, store.sources(), store.binsHeld().distinctUntilChanged()) { rows, sources, bins ->
         rows.map { row ->
             val seen = bins[row.connection.id].orEmpty()
             ReviewConnection(
@@ -84,7 +85,7 @@ class CalendarReview @Inject constructor(
     /** Family first, then the household: the person chips. */
     val people: Flow<List<Person>> = household.peopleWithFamily
 
-    private suspend fun today(): LocalDate = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current()).toLocalDate()
+    private suspend fun today(): LocalDate = clock.today(zone.current())
 
     /** A person removed since the chips were drawn is Family: the store doesn't check that the person exists. */
     suspend fun setPerson(source: StoredSource, person: Person): Boolean = change {

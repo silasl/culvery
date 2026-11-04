@@ -7,7 +7,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -22,18 +21,20 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.today
 import uk.co.siland.culvery.provider.calendar_midsussex.COUNCIL_BASE_URL
+import uk.co.siland.culvery.provider.calendar_midsussex.COUNCIL_DATE_PATTERN
 import uk.co.siland.culvery.provider.calendar_midsussex.di.CouncilInterceptors
 
 /** What the sample council's collections page shows. */
-enum class CouncilPage(val key: String) {
-    GOOD("good"),
-    MISSING("missing"),
-    UNKNOWN("unknown"),
+enum class CouncilPage {
+    GOOD,
+    MISSING,
+    UNKNOWN,
     ;
 
     companion object {
-        fun of(key: String?): CouncilPage? = entries.firstOrNull { it.key == key }
+        fun of(raw: String?): CouncilPage? = entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
     }
 }
 
@@ -43,24 +44,22 @@ private const val SAMPLE_TRACK = "SAMPLE"
 private const val UNKNOWN_BIN = "Domestic Glass Collection Service"
 private const val UNKNOWN_DAY = 5L
 
-private val SERVICES = mapOf(
-    "food" to "Domestic Food Waste Service",
-    "garden" to "Domestic Garden Waste Service",
-    "recycling" to "Domestic Recycling Waste Collection Service",
-    "refuse" to "Domestic Refuse Waste Collection Service",
-)
+private const val FOOD = "Domestic Food Waste Service"
+private const val GARDEN = "Domestic Garden Waste Service"
+private const val RECYCLING = "Domestic Recycling Waste Collection Service"
+private const val REFUSE = "Domestic Refuse Waste Collection Service"
 
-/** Days from today and the bins out that day; day 3 has all four. */
+/** Days from today and the council's names for the bins out that day; day 3 has all four. */
 private val SCHEDULE = listOf(
-    1L to listOf("food"),
-    3L to listOf("food", "garden", "recycling", "refuse"),
-    8L to listOf("food", "recycling"),
-    10L to listOf("garden", "refuse"),
-    15L to listOf("food"),
-    17L to listOf("recycling", "refuse"),
+    1L to listOf(FOOD),
+    3L to listOf(FOOD, GARDEN, RECYCLING, REFUSE),
+    8L to listOf(FOOD, RECYCLING),
+    10L to listOf(GARDEN, REFUSE),
+    15L to listOf(FOOD),
+    17L to listOf(RECYCLING, REFUSE),
 )
 
-private val COUNCIL_DATE = DateTimeFormatter.ofPattern("dd/MM/uuuu")
+private val COUNCIL_DATE = DateTimeFormatter.ofPattern(COUNCIL_DATE_PATTERN)
 
 /**
  * Debug builds only: answers the council's pages for the postcode ZZ99 9ZZ without touching the network, so the
@@ -120,8 +119,8 @@ class DebugCouncil internal constructor(
 
     private fun collections(): String {
         if (page == CouncilPage.MISSING) return asset("collections_missing.html")
-        val today = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone).toLocalDate()
-        val days = SCHEDULE.flatMap { (offset, kinds) -> kinds.map { today.plusDays(offset) to checkNotNull(SERVICES[it]) } }
+        val today = clock.today(zone)
+        val days = SCHEDULE.flatMap { (offset, names) -> names.map { today.plusDays(offset) to it } }
         val rows = if (page == CouncilPage.UNKNOWN) days + (today.plusDays(UNKNOWN_DAY) to UNKNOWN_BIN) else days
         val row = asset("collections_row.html")
         return asset("collections_page.html").replace("{{rows}}", rows.joinToString("") { (date, name) -> rowOf(row, date, name) })
