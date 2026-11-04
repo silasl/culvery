@@ -69,7 +69,7 @@ fun birthdayLook(colour: Long): SeasonalLook? = Looks[colour]
 object BirthdayInks {
     /** Cream: visible on the cake's tiers in both themes and on the greeting pill, where an `accentSoft` icing would vanish. */
     val ICING = Color(0xFFFFF4E8)
-    const val BALLOON_ALPHA = 0.85f
+    const val BALLOON_ALPHA = 0.5f
 
     fun balloon(colour: Color, c: HhColors): Color = colour.copy(alpha = BALLOON_ALPHA).compositeOver(c.bg)
     fun balloon(argb: Long, c: HhColors): Color = balloon(Color(argb), c)
