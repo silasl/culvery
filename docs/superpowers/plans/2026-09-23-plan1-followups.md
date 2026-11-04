@@ -910,6 +910,22 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 ## Plan 16 (birthdays): on the tablet (2026-11-03)
 - The next family birthday's event was checked as yearly, all-day and tagged; nothing needed changing. Its untagged duplicate is on Family, so it gets no look.
 
+## Plan 16 (birthdays): emulator walk-through
+- All eight checks passed on `culvery-5` with the debug sample household; no faults.
+  - A tagged yearly all-day birthday gives the person's look by night and by day, on every tab, a sheet, the PIN pad, a toast, Settings and the door card.
+  - Two events for one person give one greeting; two people give one line in the first person's colour.
+  - A one-off, a Family event and a timed yearly party give no look.
+  - On a Halloween date the birthday look wins. The doorbell's Follow the theme reads only the seasonal theme: checked in the code and its test, not heard (the emulator has no sound out).
+  - The preview shows the first person's look and line, and off clears it; Halloween's preview turns it off; past midnight it ends and both switches read off.
+  - Waking from the dark screen drops confetti, gone in about 3 s; coming back to Culvery and a night-clock tap give none.
+  - Animations off: no confetti and still balloons. Culvery reads Android's animation setting when it comes back to the front, which is when the setting has just been changed.
+  - A ring as the screen wakes shows the door card with no confetti.
+- **Changed from the walk-through (the user's call):** balloons at 50% opacity, down from 85%. Starting each an eighth of a lap in was tried and undone: the band is too short for four evenly spaced balloons, so it only moved which ones were clipped.
+- **For the end-of-v1 design review:**
+  - With animations off, one balloon sits below the band and one behind the bunting.
+  - The music card's volume pill shows a stripe in the accent colour (hide it while nothing plays, or make it a mute button).
+- **Simplify, not done:** the wake as Display state; the birthday-or-seasonal choice in one place; the greeting width measured in the header's layout.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
