@@ -690,7 +690,7 @@ class ReviewCalendarsTest {
 
     @Test
     fun binColourRowsListKnownAndSeenKinds() {
-        showBins(listOf("food", "garden", "recycling", "waste", "Glass"), inks = mapOf("waste" to "grey"))
+        showBins(listOf("food", "garden", "recycling", "waste", "Glass"), inks = mapOf("waste" to "purple"))
         compose.onNodeWithContentDescription("Bin colours").assertExists()
         listOf("food", "garden", "recycling", "waste", "Glass").forEach { compose.onNodeWithTag("bin_row_$it").assertExists() }
         compose.onNodeWithText("Food").assertExists()
@@ -722,10 +722,10 @@ class ReviewCalendarsTest {
     fun choosingAnInkSavesIt() {
         showBins(listOf("food", "waste"), picking = binKey("b1", "waste"))
         BinInks.all.forEach { compose.onNodeWithTag("bin_ink_waste_${it.id}").assertExists() }
-        compose.onAllNodes(hasTestTag("bin_ink_food_grey")).assertCountEquals(0)
+        compose.onAllNodes(hasTestTag("bin_ink_food_purple")).assertCountEquals(0)
         compose.onNodeWithTag("bin_ink_waste_black").assertIsSelected()
-        compose.onNodeWithTag("bin_ink_waste_grey").performClick()
-        assertThat(inked).isEqualTo("waste" to "grey")
+        compose.onNodeWithTag("bin_ink_waste_purple").performClick()
+        assertThat(inked).isEqualTo("waste" to "purple")
     }
 
     @Test

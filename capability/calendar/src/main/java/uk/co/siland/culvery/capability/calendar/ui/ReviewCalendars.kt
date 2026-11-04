@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -347,10 +348,12 @@ private fun ChipChoices(modifier: Modifier = Modifier, content: @Composable Flow
     )
 }
 
-/** An ink as it looks in the current theme; a kind with no ink is the quiet grey that stands for unknown. */
+/** An ink as it looks in the current theme, with its edge; a kind with no ink is the quiet grey that stands for unknown. */
 @Composable
 private fun Swatch(ink: BinInk?, modifier: Modifier) {
-    Box(modifier.size(CalendarDimens.binSwatch).clip(CircleShape).background(BinInks.colour(ink, Culvery.colors)))
+    val c = Culvery.colors
+    val dot = modifier.size(CalendarDimens.binSwatch).clip(CircleShape).background(BinInks.colour(ink, c))
+    Box(BinInks.edge(ink, c)?.let { dot.border(CalendarDimens.binSwatchEdge, it, CircleShape) } ?: dot)
 }
 
 @Composable

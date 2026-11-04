@@ -31,6 +31,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventUi
+import uk.co.siland.culvery.capability.calendar.titleLines
 import uk.co.siland.culvery.capability.calendar.whoLine
 import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.Culvery
@@ -115,7 +116,7 @@ private fun CompactRow(event: EventUi, day: LocalDate) {
         StripedBar(event.stripes(), width = CalendarDimens.compactBarWidth)
         Spacer(Modifier.width(CalendarDimens.compactBarGap))
         Column(Modifier.shownNotSpoken()) {
-            Text(event.title, style = CalendarType.strong14, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(event.title, style = CalendarType.strong14, color = c.ink, maxLines = event.titleLines(1), overflow = TextOverflow.Ellipsis)
             Text(
                 "${event.timeLabel} · ${event.whoLine()}",
                 style = CalendarType.small12,

@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 
@@ -245,13 +246,26 @@ class ContrastTest {
         }
     }
 
+    /** An outlined stripe's boundary is its edge. */
     @Test
     fun everyBinInkStandsOffTheChip() {
         themes.forEach { (name, set) ->
             BinInks.all.forEach { ink ->
-                check("$name ${ink.id} on surf2", BinInks.colour(ink, set), set.surf2, NON_TEXT)
-                check("$name ${ink.id} on surf", BinInks.colour(ink, set), set.surf, NON_TEXT)
+                val visible = BinInks.edge(ink, set) ?: BinInks.colour(ink, set)
+                check("$name ${ink.id} on surf2", visible, set.surf2, NON_TEXT)
+                check("$name ${ink.id} on surf", visible, set.surf, NON_TEXT)
             }
+        }
+    }
+
+    /** Night black is a dark grey, so it can't be taken for the `mute` stripe of a bin we don't know. */
+    @Test
+    fun nightBlackIsDarkerThanTheUnknownStripe() {
+        val black = BinInks.byId("black")!!
+        themes.filter { !it.second.isLight }.forEach { (name, set) ->
+            val fill = BinInks.colour(black, set)
+            assertWithMessage("$name black is darker than mute").that(fill.luminance()).isLessThan(set.mute.luminance())
+            check("$name black against mute", fill, set.mute, NON_TEXT)
         }
     }
 }

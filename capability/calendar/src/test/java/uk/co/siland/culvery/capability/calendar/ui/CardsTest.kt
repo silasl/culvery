@@ -108,9 +108,9 @@ class CardsTest {
     private val mia = 0xFFE07BA8.toInt()
     private val alex = 0xFF4CB387.toInt()
 
-    private fun barBand(dy: (Dp) -> Dp): Int {
+    private fun barBand(x: Dp = 1.dp, dy: (Dp) -> Dp): Int {
         val bar = compose.onNodeWithTag("event_bar", useUnmergedTree = true)
-        return pixelAt(bar, 1.dp, dy(bar.getUnclippedBoundsInRoot().height))
+        return pixelAt(bar, x, dy(bar.getUnclippedBoundsInRoot().height))
     }
 
     @Test
@@ -128,7 +128,9 @@ class CardsTest {
         show { TodayCard(listOf(SampleUi.bins("food", "waste"))) }
         compose.onNodeWithText("All day · Bins").assertExists()
         assertThat(barBand { 2.dp }).isEqualTo(BinInks.byId("green")!!.night.toArgb())
-        assertThat(barBand { it - 2.dp }).isEqualTo(BinInks.byId("black")!!.night.toArgb())
+        val black = BinInks.byId("black")!!
+        assertThat(barBand(x = CalendarDimens.todayBarWidth / 2) { it - 3.dp }).isEqualTo(black.night.toArgb())
+        assertThat(barBand(x = 0.dp) { it - 3.dp }).isEqualTo(black.nightEdge!!.toArgb())
     }
 
     /** Sam's and Mia's colours at 75 % over the card's dark background. */

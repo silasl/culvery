@@ -263,17 +263,17 @@ class CalendarReviewTest {
     fun choosingAnInkSavesItAndSaysSo() = runTest {
         val (review, access) = review()
         access.answer(TestAccess.ALEX)
-        assertThat(review.setBinInk("waste", BinInks.byId("grey")!!)).isTrue()
-        assertThat(binColours.inkFor("waste")?.id).isEqualTo("grey")
-        assertThat(review.binInks.first()["waste"]).isEqualTo("grey")
-        assertThat(toaster.messages).containsExactly("Waste now shows as Grey.")
+        assertThat(review.setBinInk("waste", BinInks.byId("purple")!!)).isTrue()
+        assertThat(binColours.inkFor("waste")?.id).isEqualTo("purple")
+        assertThat(review.binInks.first()["waste"]).isEqualTo("purple")
+        assertThat(toaster.messages).containsExactly("Waste now shows as Purple.")
     }
 
     @Test
     fun aCancelledPinKeepsTheInk() = runTest {
         val (review, access) = review()
         access.answer(null)
-        assertThat(review.setBinInk("waste", BinInks.byId("grey")!!)).isFalse()
+        assertThat(review.setBinInk("waste", BinInks.byId("purple")!!)).isFalse()
         assertThat(binColours.inkFor("waste")?.id).isEqualTo("black")
     }
 

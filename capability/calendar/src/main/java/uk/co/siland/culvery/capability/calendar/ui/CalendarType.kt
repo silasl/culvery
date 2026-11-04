@@ -369,6 +369,8 @@ internal object CalendarDimens {
     // A shared event's chip (9 §3.3): `surf2`, a 4 dp striped edge, content 12 from the chip's left, overlapping
     // 8 dp dots 2 dp over each other with a 1 dp ring in the surface behind; the detail sheet's For row uses the same overlap.
     val sharedChipEdge = 4.dp
+    /** The outline of a stripe whose ink is too dark to see on the chip (night black). */
+    val stripeEdge = 1.dp
     val sharedChipPaddingStart = 12.dp
     val sharedDot = 8.dp
     val sharedDotOverlap = 2.dp
@@ -501,6 +503,7 @@ internal object CalendarDimens {
     val personPillMaxWidth = 140.dp
     val pillDot = 9.dp
     val binSwatch = 24.dp
+    val binSwatchEdge = 2.dp
     val pillChevron = 17.dp
 
     // Show: its label 8 from the switch; the group at least 127 wide so the switches line up down the page.

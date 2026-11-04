@@ -6,9 +6,9 @@ import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.core.ui.BinInks
 import uk.co.siland.culvery.core.ui.Culvery
 
-/** The edge colours of an event's row: a stripe per bin in the current theme's shade of its ink, else one per person. */
+/** The edge bands of an event's row: a stripe per bin in the current theme's shade of its ink, else one per person. */
 @Composable
-internal fun EventUi.stripes(): List<Color> {
+internal fun EventUi.stripes(): List<Stripe> {
     val colours = Culvery.colors
-    return bins?.map { BinInks.colour(it.ink, colours) } ?: people.map { Color(it.color) }
+    return bins?.map { Stripe(BinInks.colour(it.ink, colours), BinInks.edge(it.ink, colours)) } ?: people.map { Stripe(Color(it.color)) }
 }

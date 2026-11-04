@@ -17,9 +17,19 @@ class BinColoursTest {
     @Test
     fun aChoiceOverridesTheDefault() = runTest {
         val colours = colours()
-        colours.set("waste", "grey")
-        assertThat(colours.inkFor("waste")?.id).isEqualTo("grey")
+        colours.set("waste", "purple")
+        assertThat(colours.inkFor("waste")?.id).isEqualTo("purple")
         assertThat(colours.inkFor("food")?.id).isEqualTo("green")
+    }
+
+    /** Grey was an ink until 2026-11-04; the neutral stripe now means unknown. */
+    @Test
+    fun aStoredGreyFallsBackToTheKindsDefault() = runTest {
+        val colours = colours()
+        colours.set("waste", "grey")
+        colours.set("Glass", "grey")
+        assertThat(colours.inkFor("waste")?.id).isEqualTo("black")
+        assertThat(colours.inkFor("Glass")).isNull()
     }
 
     @Test

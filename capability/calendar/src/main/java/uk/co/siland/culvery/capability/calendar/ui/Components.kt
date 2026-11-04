@@ -25,9 +25,13 @@ import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.Icons
 
-/** An event's colour bar: [colors] in equal bands along its length, the first at the top (9 §3.4); fills the row's intrinsic height. */
+/** One band of a [StripedBar]: [fill], outlined in [edge] when it has one. */
+internal data class Stripe(val fill: Color, val edge: Color? = null)
+
+/** An event's colour bar: [stripes] in equal bands along its length, the first at the top (9 §3.4); fills the row's intrinsic height. */
+@JvmName("StripedBarOfStripes")
 @Composable
-internal fun StripedBar(colors: List<Color>, width: Dp, modifier: Modifier = Modifier, radius: Dp = width / 2) {
+internal fun StripedBar(stripes: List<Stripe>, width: Dp, modifier: Modifier = Modifier, radius: Dp = width / 2) {
     Column(
         modifier
             .width(width)
@@ -35,9 +39,17 @@ internal fun StripedBar(colors: List<Color>, width: Dp, modifier: Modifier = Mod
             .clip(RoundedCornerShape(radius))
             .testTag("event_bar"),
     ) {
-        colors.forEach { Box(Modifier.fillMaxWidth().weight(1f).background(it)) }
+        stripes.forEach { stripe ->
+            val band = Modifier.fillMaxWidth().weight(1f).background(stripe.fill)
+            Box(stripe.edge?.let { band.border(CalendarDimens.stripeEdge, it) } ?: band)
+        }
     }
 }
+
+/** [StripedBar] in plain [colors]. */
+@Composable
+internal fun StripedBar(colors: List<Color>, width: Dp, modifier: Modifier = Modifier, radius: Dp = width / 2) =
+    StripedBar(colors.map { Stripe(it) }, width, modifier, radius)
 
 /** [StripedBar] in [people]'s colours. */
 @JvmName("StripedBarOf")

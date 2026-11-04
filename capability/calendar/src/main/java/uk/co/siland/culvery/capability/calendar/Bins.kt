@@ -24,6 +24,12 @@ fun orderedBins(keys: Collection<String>): List<String> {
     return known + (given - known.toSet()).sortedWith(String.CASE_INSENSITIVE_ORDER)
 }
 
+/** A bin day's title may wrap far enough that four bins show in full; [usual] is every other event's limit. */
+internal fun EventUi.titleLines(usual: Int): Int = if (bins != null) maxOf(usual, BINS_TITLE_LINES) else usual
+
+// "Bins: Food, / Garden, / Recycling, / Waste" in the tablet's week column: "Recycling, Waste" is wider than one line.
+private const val BINS_TITLE_LINES = 4
+
 /** What a bin day says in place of who it is for. */
 const val BINS_WHO = "Bins"
 

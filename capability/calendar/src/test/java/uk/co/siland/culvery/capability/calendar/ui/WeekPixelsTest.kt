@@ -6,9 +6,15 @@ import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertCountEquals
@@ -93,7 +99,9 @@ class WeekPixelsTest {
         assertThat(pixelAt(chip, 1.dp, height - 10.dp)).isEqualTo(SampleUi.mia.color.toInt())
     }
 
-    private fun binsMonday() = compose.onNode(hasContentDescription("Bins: Food, Garden, Recycling, Waste, Bins, Monday", substring = true))
+    private val binsMondayMatcher = hasContentDescription("Bins: Food, Garden, Recycling, Waste, Bins, Monday", substring = true)
+
+    private fun binsMonday() = compose.onNode(binsMondayMatcher)
 
     /** The four bins' night inks at the middle of each quarter of the edge, in Food, Garden, Recycling, Waste order. */
     @Test
@@ -137,6 +145,24 @@ class WeekPixelsTest {
         compose.onNode(chip).assert(!hasContentDescription("Family", substring = true))
         compose.onAllNodes(hasText("Family", substring = true) and hasAnyAncestor(chip), useUnmergedTree = true).assertCountEquals(0)
         compose.onAllNodes(hasText("Bins", substring = true) and hasAnyAncestor(chip), useUnmergedTree = true).assertCountEquals(2)
+    }
+
+    /** At the tablet's tab size (1116 × 724 dp), four bins wrap in full and the wastebasket matches the lock beside it. */
+    @Test
+    fun fourBinsShowInFullBesideAReadableIcon() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Box(Modifier.size(1116.dp, 724.dp)) {
+                    WeekView(WeekViewState(SampleUi.weekWithBins, SampleUi.TODAY, SyncStatusUi(SampleUi.NOW - 120_000, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false), SampleUi.NOW))
+                }
+            }
+        }
+        val title = compose.onNode(hasText("Bins: Food, Garden, Recycling, Waste") and hasAnyAncestor(binsMondayMatcher), useUnmergedTree = true)
+        val layouts = mutableListOf<TextLayoutResult>()
+        title.fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+        assertThat(layouts.single().hasVisualOverflow).isFalse()
+        compose.onAllNodes(hasTestTag("chip_bins_icon") and hasAnyAncestor(binsMondayMatcher), useUnmergedTree = true)
+            .onFirst().assertWidthIsEqualTo(CalendarDimens.chipBadge)
     }
 
     /** Pin: one person's chip is still their tint, with nothing along its edge. */

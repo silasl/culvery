@@ -45,6 +45,7 @@ import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.dayOf
+import uk.co.siland.culvery.capability.calendar.titleLines
 import uk.co.siland.culvery.capability.calendar.whoLine
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -253,7 +254,9 @@ private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, showDayO
                 vertical = if (outlined) CalendarDimens.tomorrowRowPaddingV else CalendarDimens.todayRowPaddingV,
             ),
     ) {
-        val bars = event.stripes().map { bar -> if (outlined) bar.copy(alpha = CalendarDimens.TOMORROW_BAR_ALPHA) else bar }
+        val bars = event.stripes().map { bar ->
+            if (outlined) Stripe(bar.fill.copy(alpha = CalendarDimens.TOMORROW_BAR_ALPHA), bar.edge?.copy(alpha = CalendarDimens.TOMORROW_BAR_ALPHA)) else bar
+        }
         StripedBar(bars, width = CalendarDimens.todayBarWidth)
         Spacer(Modifier.width(CalendarDimens.todayBarGap))
         Column(Modifier.weight(1f).shownNotSpoken()) {
@@ -261,7 +264,7 @@ private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, showDayO
                 event.title,
                 style = if (outlined) CalendarType.tomorrowTitle else CalendarType.todayTitle,
                 color = c.ink,
-                maxLines = if (outlined) 1 else 2,
+                maxLines = event.titleLines(if (outlined) 1 else 2),
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(CalendarDimens.todayTimeTop))

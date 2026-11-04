@@ -79,6 +79,7 @@ import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.capability.calendar.WeeksShown
+import uk.co.siland.culvery.capability.calendar.titleLines
 import uk.co.siland.culvery.capability.calendar.whoLineForms
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.ui.Culvery
@@ -409,7 +410,7 @@ internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Un
                 modifier = Modifier.shownNotSpoken(),
             ) {
                 if (event.bins != null) {
-                    HhIcon(Icons.DELETE, size = CalendarDimens.chipDot, tint = c.mute, modifier = Modifier.testTag("chip_bins_icon"))
+                    HhIcon(Icons.DELETE, size = CalendarDimens.chipBadge, tint = c.mute, modifier = Modifier.testTag("chip_bins_icon"))
                 } else if (shared) {
                     PersonDots(event.people, CalendarDimens.sharedDot, ring = c.surf2, dotTag = "chip_dot", modifier = Modifier.testTag("chip_dots"))
                 } else {
@@ -426,7 +427,7 @@ internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Un
             }
             Spacer(Modifier.height(CalendarDimens.chipTitleTop))
             Text(
-                event.title, style = CalendarType.chipTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                event.title, style = CalendarType.chipTitle, color = c.ink, maxLines = event.titleLines(2), overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.shownNotSpoken(),
             )
         }
