@@ -298,7 +298,7 @@ interface DoorQuiet {
     /** True while the ring card shows. */
     val ringShowing: Flow<Boolean>
 
-    /** True in the door's quiet hours, read on the household's clock. */
+    /** True in the door's quiet hours, read on the household's clock, once the door is set up. */
     suspend fun quietNow(): Boolean
 
     /** The doorbell's volume, 0 to 1. */

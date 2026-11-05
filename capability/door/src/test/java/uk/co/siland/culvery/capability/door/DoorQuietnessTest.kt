@@ -46,14 +46,23 @@ class DoorQuietnessTest {
         assertThat(seen).containsExactly(false, true, false).inOrder()
     }
 
+    private val local = Instant.ofEpochMilli(NOW).atZone(ZoneId.systemDefault()).toLocalTime().withSecond(0).withNano(0)
+
     @Test
     fun quietNowReadsQuietHours() = runTest {
-        val local = Instant.ofEpochMilli(NOW).atZone(ZoneId.systemDefault()).toLocalTime().withSecond(0).withNano(0)
+        settings.setConnected(true)
         settings.setQuietHours(on = true, from = local.minusHours(1), until = local.plusHours(1))
         settings.current.first { it.quietOn && it.quietFrom == local.minusHours(1) }
         assertThat(quiet.quietNow()).isTrue()
         settings.setQuietHours(on = false, from = local.minusHours(1), until = local.plusHours(1))
         settings.current.first { !it.quietOn }
+        assertThat(quiet.quietNow()).isFalse()
+    }
+
+    @Test
+    fun quietHoursNeedTheDoorSetUp() = runTest {
+        settings.setQuietHours(on = true, from = local.minusHours(1), until = local.plusHours(1))
+        settings.current.first { it.quietOn && it.quietFrom == local.minusHours(1) }
         assertThat(quiet.quietNow()).isFalse()
     }
 

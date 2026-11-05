@@ -18,7 +18,7 @@ class DoorQuietness @Inject constructor(
 ) : DoorQuiet {
     override val ringShowing: Flow<Boolean> = alerts.showing.map { it != null }
 
-    override suspend fun quietNow() = quietAt(clock.nowMillis(), zone.current(), settings.current.value)
+    override suspend fun quietNow() = settings.current.value.let { it.connected && quietAt(clock.nowMillis(), zone.current(), it) }
 
     override val volume get() = settings.current.value.volume
 }
