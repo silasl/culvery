@@ -155,7 +155,7 @@ class SoundPlayer internal constructor(
         const val PAD_CAP_MS = 8_000L
         const val DOORBELL_CAP_MS = 10_000L
         private const val TAG = "SoundPlayer"
-        private val CLASSIC = BuiltInSound.CLASSIC.let { Sound(it.id, it.label, SoundSource.BuiltIn(it), it.theme) }
+        private val CLASSIC = BuiltInSound.CLASSIC.asSound()
 
         private fun openFile(path: String): MediaPlayer? {
             val player = MediaPlayer()

@@ -13,3 +13,5 @@ enum class BuiltInSound(val key: String, val label: String, @RawRes val res: Int
 }
 
 val BuiltInSound.id: String get() = "builtin:$key"
+
+fun BuiltInSound.asSound(): Sound = Sound(id, label, SoundSource.BuiltIn(this), theme)

@@ -23,6 +23,7 @@ import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundSource
+import uk.co.siland.culvery.core.sound.asSound
 import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -37,7 +38,7 @@ class DoorSettingsScreenshotTest {
 
     private val actions = DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {})
 
-    private val sounds = BuiltInSound.entries.filter { it != BuiltInSound.HAPPY_BIRTHDAY }.map { Sound(it.id, it.label, SoundSource.BuiltIn(it), it.theme) } +
+    private val sounds = BuiltInSound.entries.filter { it != BuiltInSound.HAPPY_BIRTHDAY }.map { it.asSound() } +
         Sound("file:Test Honk.wav", "Test Honk", SoundSource.OnTablet(File("Test Honk.wav")), null)
 
     private val connected = DoorSettingsUi(

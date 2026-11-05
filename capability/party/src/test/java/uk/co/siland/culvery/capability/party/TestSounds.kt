@@ -9,17 +9,15 @@ import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundSource
-import uk.co.siland.culvery.core.sound.id
+import uk.co.siland.culvery.core.sound.asSound
 
-internal fun builtIn(sound: BuiltInSound) = Sound(sound.id, sound.label, SoundSource.BuiltIn(sound), sound.theme)
-
-internal val TROMBONE = builtIn(BuiltInSound.SAD_TROMBONE)
-internal val ORGAN = builtIn(BuiltInSound.ORGAN)
-internal val BIRTHDAY_SONG = builtIn(BuiltInSound.HAPPY_BIRTHDAY)
+internal val TROMBONE = BuiltInSound.SAD_TROMBONE.asSound()
+internal val ORGAN = BuiltInSound.ORGAN.asSound()
+internal val BIRTHDAY_SONG = BuiltInSound.HAPPY_BIRTHDAY.asSound()
 internal val HONK = Sound("file:Test Honk.wav", "Test Honk", SoundSource.OnTablet(File("Test Honk.wav")), null)
 
 /** What the library holds in these tests: every built-in sound and Test Honk. */
-internal val LIBRARY = BuiltInSound.entries.map(::builtIn) + HONK
+internal val LIBRARY = BuiltInSound.entries.map { it.asSound() } + HONK
 
 internal fun inLibrary(id: String?): Sound? = LIBRARY.firstOrNull { it.id == id }
 

@@ -25,7 +25,7 @@ class SoundLibrary internal constructor(private val root: () -> File?, private v
     constructor(@ApplicationContext context: Context) :
         this({ context.getExternalFilesDir(null)?.resolve("sounds") }, Dispatchers.IO)
 
-    private val builtIns = BuiltInSound.entries.map { Sound(it.id, it.label, SoundSource.BuiltIn(it), it.theme) }
+    private val builtIns = BuiltInSound.entries.map { it.asSound() }
     private val state = MutableStateFlow(builtIns)
 
     val sounds: StateFlow<List<Sound>> = state.asStateFlow()

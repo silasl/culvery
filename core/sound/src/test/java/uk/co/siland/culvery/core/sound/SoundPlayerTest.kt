@@ -26,12 +26,10 @@ class SoundPlayerTest {
 
     private enum class Player { STARTS, WONT_START }
 
-    private fun builtIn(sound: BuiltInSound) = Sound(sound.id, sound.label, SoundSource.BuiltIn(sound), sound.theme)
-
     private fun tablet(name: String) = Sound("file:$name.wav", name, SoundSource.OnTablet(File("$name.wav")), null)
 
-    private val classic = builtIn(BuiltInSound.CLASSIC)
-    private val organ = builtIn(BuiltInSound.ORGAN)
+    private val classic = BuiltInSound.CLASSIC.asSound()
+    private val organ = BuiltInSound.ORGAN.asSound()
     private val honk = tablet("Test Honk")
     private val howl = tablet("Test Howl")
 

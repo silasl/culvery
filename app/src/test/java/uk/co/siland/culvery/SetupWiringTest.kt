@@ -64,9 +64,7 @@ import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrations
 import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrationsUi
 import uk.co.siland.culvery.core.setup.SettingsScreen
 import uk.co.siland.culvery.core.sound.BuiltInSound
-import uk.co.siland.culvery.core.sound.Sound
-import uk.co.siland.culvery.core.sound.SoundSource
-import uk.co.siland.culvery.core.sound.id
+import uk.co.siland.culvery.core.sound.asSound
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.test.waitFor
@@ -109,7 +107,7 @@ private class WithSetup(private val steps: List<SetupStep>, private val pages: L
     override fun TabContent() = Unit
 }
 
-private val CLASSIC = BuiltInSound.CLASSIC.let { Sound(it.id, it.label, SoundSource.BuiltIn(it), it.theme) }
+private val CLASSIC = BuiltInSound.CLASSIC.asSound()
 private val DOOR_UI =
     DoorSettingsUi("Ring", null, 0.5f, FOLLOW_THEME_ID, listOf(CLASSIC), false, LocalTime.of(22, 0), LocalTime.of(7, 0), null, "never", true, true, false, KeepDays.TWO)
 private val DOOR_ACTIONS = DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {})
