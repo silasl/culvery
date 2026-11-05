@@ -51,6 +51,9 @@ class SeasonalLook(
 interface ShowingTheme {
     /** Null while no theme shows. */
     val showing: StateFlow<SeasonalTheme?>
+
+    /** Whether the wall wears a birthday, preview included; it never changes [showing] (18 §4.3). */
+    val birthdayShowing: StateFlow<Boolean>
 }
 
 fun colorsOf(look: SeasonalLook?, dark: Boolean): HhColors = when {

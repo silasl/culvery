@@ -34,16 +34,15 @@ class ModesCapabilityTest {
         assertThat(capability.icon).isEqualTo(Icons.CELEBRATION)
     }
 
-    /** 15b decision 3: fails if a shown mode has no half-width button after Holiday's place, or a hidden one has one. */
+    /** 15b decision 3, 18 §4.1: fails if a shown mode has no half-width button after Holiday's, or a hidden one or one past the two spots has one. */
     @Test
     fun eachShownModeIsAHalfButtonByPlace() = runTest {
         val rig = HouseRig(backgroundScope)
-        rig.choose(PARTY_MODE, FILM_NIGHT, FILM_NIGHT.copy(id = "modeb", showOnHome = false))
+        rig.choose(FILM_NIGHT.copy(id = "modeb", showOnHome = false), PARTY_MODE, FILM_NIGHT)
 
         val buttons = capability(rig).trayButtons().first()
 
-        assertThat(buttons.map { Triple(it.id, it.order, it.width) })
-            .containsExactly(Triple("mode.party", 11, TrayWidth.HALF), Triple("mode.$FILM_ID", 12, TrayWidth.HALF)).inOrder()
+        assertThat(buttons.map { Triple(it.id, it.order, it.width) }).containsExactly(Triple("mode.party", 11, TrayWidth.HALF))
     }
 
     /** 15b §4.1: Settings › Modes alone sits between Lights (470) and Door (500); Party mode's old page is gone. */

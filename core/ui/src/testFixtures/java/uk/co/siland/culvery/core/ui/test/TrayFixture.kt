@@ -15,12 +15,11 @@ const val TRAY_WIDTH_DP = 333
 const val TRAY_HEIGHT_DP = 359
 
 /**
- * One [cell] in the One-tap tray at its home-screen size, beside an empty neighbour cell or (with [neighbour] false) across
- * the full width, with its [line] under the row tagged [lineTag].
+ * One [cell] in the One-tap tray at its home-screen size, left of [neighbours] empty cells (none: across the full width),
+ * with its [line] under the row tagged [lineTag].
  */
 @Composable
-fun OneTapTray(id: String, neighbour: Boolean = true, line: String? = null, lineTag: String = "${id}_line", cell: @Composable () -> Unit) {
-    val own = TrayCell(id, line, lineTag, cell)
-    val row = if (neighbour) listOf(own, TrayCell("neighbour") { Spacer(Modifier.fillMaxSize()) }) else listOf(own)
+fun OneTapTray(id: String, neighbours: Int = 1, line: String? = null, lineTag: String = "${id}_line", cell: @Composable () -> Unit) {
+    val row = listOf(TrayCell(id, line, lineTag, cell)) + List(neighbours) { TrayCell("neighbour$it") { Spacer(Modifier.fillMaxSize()) } }
     HhTrayGrid("One-tap", listOf(row), Modifier.width(TRAY_WIDTH_DP.dp).height(TRAY_HEIGHT_DP.dp))
 }

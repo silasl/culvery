@@ -5,10 +5,11 @@ import javax.inject.Provider
 import uk.co.siland.culvery.capability.taekwondo.Speaker
 import uk.co.siland.culvery.capability.taekwondo.TaekwondoSettings
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.ui.HouseModeDimens
 import uk.co.siland.culvery.core.ui.HouseModeTile
 import uk.co.siland.culvery.core.ui.Icons
 
-/** Taekwondo's half-width tray button: it has no on state, and a tap opens the practice screen. [speaker] is built when the screen first opens. */
+/** Taekwondo's third-width tray button: it has no on state, and a tap opens the practice screen. [speaker] is built when the screen first opens. */
 @Composable
 fun TaekwondoTile(settings: TaekwondoSettings, speaker: Provider<Speaker>) {
     val overlay = LocalOverlayHost.current
@@ -22,6 +23,7 @@ fun TaekwondoTile(settings: TaekwondoSettings, speaker: Provider<Speaker>) {
         spoken = TaekwondoWords.TITLE,
         enabled = true,
         clickLabel = TaekwondoWords.OPEN,
+        labelStyle = HouseModeDimens.thirdLabel,
         onTap = { overlay.showFullScreen { TaekwondoScreen(settings, speaker.get(), onClose = overlay::dismiss) } },
     )
 }

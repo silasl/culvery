@@ -72,14 +72,16 @@ class HouseGraphTest {
         assertThat(probe.bridges().connectable?.descriptor?.id).isEqualTo(HUE_PROVIDER_ID)
     }
 
-    /** 15b decision 3: Home has room for four modes less the bound half-width buttons that aren't modes (Taekwondo's is one). */
+    /** 18 §4.1: Home has room for two modes less the other half-width buttons, and three pads less the other thirds (Taekwondo's is one). */
     @Test
-    fun theRoomIsFourLessTheOtherHalfButtons() = runBlocking {
-        val halves = withTimeout(10_000) {
-            probe.capabilities().filter { it.id != "holiday" && it.id != "party" }
-                .sumOf { cap -> cap.trayButtons().first().count { it.width == TrayWidth.HALF && !it.id.startsWith("mode.") && it.id != "holiday.mode" } }
+    fun theRoomsAreTwoAndThreeLessTheOtherButtons() = runBlocking {
+        val others = withTimeout(10_000) {
+            probe.capabilities().filter { it.id != "holiday" && it.id != "party" }.flatMap { it.trayButtons().first() }
         }
-        assertThat(withTimeout(10_000) { probe.modesShelf().room.first() }).isEqualTo(4 - halves)
+        val halves = others.count { it.width == TrayWidth.HALF }
+        val thirds = others.count { it.width == TrayWidth.THIRD }
+        assertThat(withTimeout(10_000) { probe.modesShelf().room.first() }).isEqualTo(2 - halves)
+        assertThat(withTimeout(10_000) { probe.modesShelf().soundRoom.first() }).isEqualTo(3 - thirds)
     }
 
     @Test

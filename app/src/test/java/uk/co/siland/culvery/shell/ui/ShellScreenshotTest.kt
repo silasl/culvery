@@ -121,6 +121,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.HouseModeDimens
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.WithFontScale
@@ -276,12 +277,15 @@ class ShellScreenshotTest {
         HhCard(Modifier.fillMaxWidth().height(68.dp)) { Text("Tray row", style = HhType.cardTitle, color = Culvery.colors.ink) }
     }
 
-    /** The modes' tiles' places, two to a row round the hoover's (15b Ruling 11). */
-    private fun trayMode(id: String, order: Int, label: String) = TrayButton(id, order, TrayWidth.HALF) {
+    /** A tile's place in the tray: the modes' two above the hoover's row, the sounds' three below it (18 §4.1). */
+    private fun trayMode(id: String, order: Int, label: String, width: TrayWidth = TrayWidth.HALF) = TrayButton(id, order, width) {
         Box(
             Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(17.dp)).background(Culvery.colors.surf2).padding(horizontal = 12.dp),
             contentAlignment = Alignment.CenterStart,
-        ) { Text(label, style = HhType.cardTitle, color = Culvery.colors.ink, maxLines = 1) }
+        ) {
+            val style = if (width == TrayWidth.THIRD) HouseModeDimens.thirdLabel else HhType.cardTitle
+            Text(label, style = style, color = Culvery.colors.ink, maxLines = 1)
+        }
     }
 
     private val trayModes = listOf(
@@ -291,11 +295,17 @@ class ShellScreenshotTest {
         trayMode("mode.modeb", 13, "Bedtime"),
     )
 
-    /** Taekwondo's half-width button after the modes (15b §8), which leaves room for three of them. */
-    private val trayTaekwondo = trayMode("taekwondo", 90, "Taekwondo")
+    private val trayPads = listOf(
+        trayMode("pad.1", 81, "Honk", TrayWidth.THIRD),
+        trayMode("pad.2", 82, "Howl", TrayWidth.THIRD),
+        trayMode("pad.3", 83, "Bell", TrayWidth.THIRD),
+    )
+
+    /** Taekwondo's third right of the pads (18 Ruling 3), which leaves room for two of them. */
+    private val trayTaekwondo = trayMode("taekwondo", 90, "Taekwondo", TrayWidth.THIRD)
 
     private fun trayHome(
-        dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true, modes: Int = 2, taekwondo: Boolean = false,
+        dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true, modes: Int = 2, pads: Int = 0, taekwondo: Boolean = false,
     ) = calendarHome(dark).copy(
         tabs = allTabs,
         homeCards = HomeCardPlacer.place(
@@ -305,7 +315,7 @@ class ShellScreenshotTest {
                         HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
                     }.takeIf { shopping },
                 ),
-            listOf(trayRow) + trayModes.take(modes) + listOfNotNull(trayTaekwondo.takeIf { taekwondo }),
+            listOf(trayRow) + trayModes.take(modes) + trayPads.take(pads) + listOfNotNull(trayTaekwondo.takeIf { taekwondo }),
         ),
     )
 
@@ -619,7 +629,7 @@ class ShellScreenshotTest {
     @Test
     fun homeTrayAloneLight() = snap("home_tray_alone_light", dark = false, state = trayHome(dark = false, shopping = false, lights = false, music = false))
 
-    /** One mode, and four round the hoover's row (15b decision 3). */
+    /** One mode, and a full tray: two modes, the hoover's row and three sounds (18 §4.1). */
     @Test
     fun homeTrayOneModeDark() = snap("home_tray_one_mode_dark", dark = true, state = trayHome(dark = true, shopping = true, modes = 1))
 
@@ -627,17 +637,17 @@ class ShellScreenshotTest {
     fun homeTrayOneModeLight() = snap("home_tray_one_mode_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 1))
 
     @Test
-    fun homeTrayFourModesDark() = snap("home_tray_four_modes_dark", dark = true, state = trayHome(dark = true, shopping = true, modes = 4))
+    fun homeTrayFullDark() = snap("home_tray_full_dark", dark = true, state = trayHome(dark = true, shopping = true, modes = 4, pads = 3))
 
     @Test
-    fun homeTrayFourModesLight() = snap("home_tray_four_modes_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 4))
+    fun homeTrayFullLight() = snap("home_tray_full_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 4, pads = 3))
 
-    /** Three modes and Taekwondo's button round the hoover's row (15b §8). */
+    /** Two pads and Taekwondo's third under the hoover's row (18 §4.1). */
     @Test
-    fun homeTrayTaekwondoDark() = snap("home_tray_taekwondo_dark", dark = true, state = trayHome(dark = true, shopping = true, modes = 3, taekwondo = true))
+    fun homeTrayTaekwondoDark() = snap("home_tray_taekwondo_dark", dark = true, state = trayHome(dark = true, shopping = true, pads = 2, taekwondo = true))
 
     @Test
-    fun homeTrayTaekwondoLight() = snap("home_tray_taekwondo_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 3, taekwondo = true))
+    fun homeTrayTaekwondoLight() = snap("home_tray_taekwondo_light", dark = false, state = trayHome(dark = false, shopping = true, pads = 2, taekwondo = true))
 
     /** The capability's own card: Milk, Bread and Eggs over the sample provider (10 §4.9). */
     @Test

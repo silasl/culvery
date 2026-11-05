@@ -135,6 +135,7 @@ internal fun testSounds() = SoundLibrary(ApplicationProvider.getApplicationConte
 
 internal class FakeShowing(theme: SeasonalTheme? = null) : ShowingTheme {
     override val showing = MutableStateFlow(theme)
+    override val birthdayShowing = MutableStateFlow(false)
 }
 
 /** A PIN pad answered by someone with [role] (null: cancelled) over the Door permissions. */

@@ -24,7 +24,7 @@ class HooverRowScreenshotTest {
 
     private fun snap(name: String, dark: Boolean, state: HooverState, line: String? = null, starting: Boolean = false) =
         compose.snap(name, dark, Modifier.padding(16.dp)) {
-            OneTapTray("hoover", neighbour = false) { HooverRow(state, line, starting) {} }
+            OneTapTray("hoover", neighbours = 0) { HooverRow(state, line, starting) {} }
         }
 
     private val docked = HooverState(HooverActivity.DOCKED, 86, null)

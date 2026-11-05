@@ -127,6 +127,9 @@ class SeasonalThemes internal constructor(
             .onEach { logBirthday(it.birthday) }
             .stateIn(scope, SharingStarted.Eagerly, WallDress())
 
+    override val birthdayShowing: StateFlow<Boolean> =
+        dress.map { it.birthday != null }.stateIn(scope, SharingStarted.Eagerly, false)
+
     private var logged = 0
 
     private fun logBirthday(birthday: Birthday?) {

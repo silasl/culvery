@@ -65,7 +65,7 @@ class HooverRowTest {
             CulveryTheme(dark = true) {
                 Box(Modifier.background(Culvery.colors.bg)) {
                     if (shown) {
-                        OneTapTray("hoover", neighbour = false) { HooverRowHost(system, HooverActions(access, setOf(system))) }
+                        OneTapTray("hoover", neighbours = 0) { HooverRowHost(system, HooverActions(access, setOf(system))) }
                     }
                 }
             }

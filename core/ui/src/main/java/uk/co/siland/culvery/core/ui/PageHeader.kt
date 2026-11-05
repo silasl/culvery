@@ -147,7 +147,7 @@ const val TRAY_ROWS = 3
 
 /**
  * [HhTray]'s Home form: the [label] on top, not spoken, then the rows of [rows] that hold a cell, at the top and a gap apart.
- * A row holds one cell at full width or two side by side, with its cells' lines under it. Each cell is tagged `tray_row_{id}`.
+ * A row holds one cell at full width, or two or three side by side, with its cells' lines under it. Each cell is tagged `tray_row_{id}`.
  */
 @Composable
 fun HhTrayGrid(label: String, rows: List<List<TrayCell>>, modifier: Modifier = Modifier) {

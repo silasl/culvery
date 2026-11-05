@@ -199,27 +199,29 @@ class HomeGridTest {
         assertThat(row.width.value).isWithin(1f).of(tray.width.value - 2 * padding)
     }
 
-    /** 15b decision 3: fails if four modes aren't equal halves two to a row, round a full-width hoover row. */
+    /** Spec 18 §4.1: fails if two modes aren't equal halves over a full-width hoover row, with three equal thirds under it. */
     @Test
-    fun fourModesAndTheHoover() {
-        val modes = (0 until 4).map { i -> TrayButton("mode.m$i", 10 + i, TrayWidth.HALF) { Box(Modifier.fillMaxWidth().height(56.dp)) } }
+    fun twoModesTheHooverAndThreeThirds() {
+        val modes = (0 until 2).map { i -> TrayButton("mode.m$i", 10 + i, TrayWidth.HALF) { Box(Modifier.fillMaxWidth().height(56.dp)) } }
         val hoover = TrayButton("hoover.start", 20) { Box(Modifier.fillMaxWidth().height(68.dp)) }
-        show(today, shopping, lights, music, tray = modes + hoover)
+        val thirds = (0 until 3).map { i -> TrayButton("pad.p$i", 81 + i, TrayWidth.THIRD) { Box(Modifier.fillMaxWidth().height(56.dp)) } }
+        show(today, shopping, lights, music, tray = modes + hoover + thirds)
         val tray = bounds("home_tray")
-        val cells = (0 until 4).map { bounds("tray_row_mode.m$it") }
+        val halves = (0 until 2).map { bounds("tray_row_mode.m$it") }
+        val pads = (0 until 3).map { bounds("tray_row_pad.p$it") }
         val row = bounds("tray_row_hoover.start")
         val padding = TrayTokens.padding.value
         val gap = TrayTokens.gap.value
-        val half = (tray.width.value - 2 * padding - gap) / 2
-        for (cell in cells) {
-            assertThat(cell.width.value).isWithin(1f).of(half)
-            assertThat(cell.height.value).isWithin(1f).of(cells[0].height.value)
+        val inner = tray.width.value - 2 * padding
+        for (cell in halves) assertThat(cell.width.value).isWithin(1f).of((inner - gap) / 2)
+        for (cell in pads) {
+            assertThat(cell.width.value).isWithin(1f).of((inner - 2 * gap) / 3)
+            assertThat(cell.top).isEqualTo(pads[0].top)
         }
-        assertThat(cells[0].top).isEqualTo(cells[1].top)
-        assertThat(cells[2].top).isEqualTo(cells[3].top)
-        assertThat(row.width.value).isWithin(1f).of(tray.width.value - 2 * padding)
-        assertThat(row.top.value).isWithin(0.5f).of(cells[0].bottom.value + gap)
-        assertThat(cells[2].top.value).isWithin(0.5f).of(row.bottom.value + gap)
+        assertThat(halves[0].top).isEqualTo(halves[1].top)
+        assertThat(row.width.value).isWithin(1f).of(inner)
+        assertThat(row.top.value).isWithin(0.5f).of(halves[0].bottom.value + gap)
+        assertThat(pads[0].top.value).isWithin(0.5f).of(row.bottom.value + gap)
     }
 
     /** Fails if a tray button's line isn't drawn under its row with its own tag, or stays once the flow clears it. */

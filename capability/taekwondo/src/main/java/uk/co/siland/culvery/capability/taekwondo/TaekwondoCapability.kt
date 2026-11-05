@@ -15,9 +15,10 @@ import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.ui.Icons
 
 /**
- * A throwaway practice screen for the son's Choong-Moo (15b §8): one half-width button after the modes in Home's tray, no tab
- * and no card. To delete it: remove `capability/taekwondo/`, its `include` in settings.gradle.kts, the app's
- * `implementation` line, and its `capability/taekwondo` lines in core/ui/src/test/resources/copy-scan-allow.txt.
+ * A throwaway practice screen for the son's Choong-Moo (15b §8): one third-width button right of the sound pads in Home's
+ * tray (18 Ruling 3), no tab and no card. To delete it: remove `capability/taekwondo/`, its `include` in
+ * settings.gradle.kts, the app's `implementation` line, and its `capability/taekwondo` lines in
+ * core/ui/src/test/resources/copy-scan-allow.txt.
  */
 @Singleton
 class TaekwondoCapability @Inject constructor(
@@ -36,5 +37,5 @@ class TaekwondoCapability @Inject constructor(
     override fun TabContent() = Unit
 
     override fun trayButtons(): Flow<List<TrayButton>> =
-        flowOf(listOf(TrayButton("taekwondo", 90, TrayWidth.HALF) { TaekwondoTile(settings, speaker) }))
+        flowOf(listOf(TrayButton("taekwondo", 90, TrayWidth.THIRD) { TaekwondoTile(settings, speaker) }))
 }

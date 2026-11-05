@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -35,6 +36,9 @@ object HouseModeDimens {
     val gap = 6.dp
     val icon = 24.dp
     val secondStyle = HhType.secondary.copy(fontSize = 12.sp)
+
+    /** A label in a third of the tray, at the sound row's size (redesign note 13). */
+    val thirdLabel = HhType.buttonLabel.copy(fontSize = 13.sp)
     val lineGap = 6.dp
     val pillHeight = 24.dp
     val pillPaddingH = 10.dp
@@ -76,7 +80,7 @@ fun HouseModeOnPill(tag: String) {
  * A mode's tray tile, narrow enough for half the tray: [icon] with [trailing] on its right, then [label] and [second]
  * under them, all spoken as [spoken]; what didn't happen is its tray cell's line, under the whole row. A tap does nothing
  * unless [enabled]. Its tags start with [tag]; [second]'s is [secondTag]. [clickLabel] is what TalkBack offers for a tap,
- * where "Turn on" and "Turn off" would be wrong.
+ * where "Turn on" and "Turn off" would be wrong. In a third of the tray, [labelStyle] is [HouseModeDimens.thirdLabel].
  */
 @Composable
 fun HouseModeTile(
@@ -90,6 +94,7 @@ fun HouseModeTile(
     enabled: Boolean,
     onTap: () -> Unit,
     clickLabel: String? = null,
+    labelStyle: TextStyle = HhType.buttonLabel,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val colors = Culvery.colors
@@ -110,7 +115,7 @@ fun HouseModeTile(
             trailing()
         }
         Column(Modifier.shownNotSpoken()) {
-            Text(label, style = HhType.buttonLabel, color = ink, maxLines = 1)
+            Text(label, style = labelStyle, color = ink, maxLines = 1)
             if (second != null) {
                 Text(
                     second,

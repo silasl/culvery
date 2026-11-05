@@ -41,14 +41,14 @@ class TaekwondoCapabilityTest {
         scope.cancel()
     }
 
-    /** Fails if the button isn't half width at order 90, after the modes at 10–13 and Hoover at 20. */
+    /** Fails if the button isn't a third at order 90, right of the sound pads at 81–83 (18 Ruling 3). */
     @Test
-    fun aHalfButtonAfterTheModes() = runTest {
+    fun aThirdAfterThePads() = runTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         val buttons = capability(scope).trayButtons().first()
 
-        assertThat(buttons.map { Triple(it.id, it.order, it.width) }).containsExactly(Triple("taekwondo", 90, TrayWidth.HALF))
+        assertThat(buttons.map { Triple(it.id, it.order, it.width) }).containsExactly(Triple("taekwondo", 90, TrayWidth.THIRD))
         scope.cancel()
     }
 

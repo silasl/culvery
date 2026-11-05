@@ -283,6 +283,19 @@ class SeasonalThemesTest {
         assertThat(themes.showing.value).isNull()
     }
 
+    /** Ruling 4: fails if the pads don't hear of a birthday the wall shows by preview, or still hear of it once the preview ends. */
+    @Test
+    fun aBirthdayPreviewShowsABirthday() = runTest {
+        val themes = dressed(MutableStateFlow(at(3, 12, 12, 0)))
+        assertThat(themes.birthdayShowing.value).isFalse()
+        themes.previewBirthday(true)
+        runCurrent()
+        assertThat(themes.birthdayShowing.value).isTrue()
+        themes.preview(SeasonalTheme.HALLOWEEN, true)
+        runCurrent()
+        assertThat(themes.birthdayShowing.value).isFalse()
+    }
+
     /** Fails if the preview dresses the wall for nobody. */
     @Test
     fun noPreviewWithNobody() = runTest {

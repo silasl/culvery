@@ -53,14 +53,14 @@ class TaekwondoScreenshotTest {
     @Test
     fun tileDark() = compose.snap("taekwondo_tile_dark", dark = true, Modifier.padding(16.dp)) {
         CompositionLocalProvider(LocalOverlayHost provides TestOverlay()) {
-            OneTapTray("taekwondo") { TaekwondoTile(settings, Provider { FakeSpeaker() }) }
+            OneTapTray("taekwondo", neighbours = 2) { TaekwondoTile(settings, Provider { FakeSpeaker() }) }
         }
     }
 
     @Test
     fun tileLight() = compose.snap("taekwondo_tile_light", dark = false, Modifier.padding(16.dp)) {
         CompositionLocalProvider(LocalOverlayHost provides TestOverlay()) {
-            OneTapTray("taekwondo") { TaekwondoTile(settings, Provider { FakeSpeaker() }) }
+            OneTapTray("taekwondo", neighbours = 2) { TaekwondoTile(settings, Provider { FakeSpeaker() }) }
         }
     }
 
