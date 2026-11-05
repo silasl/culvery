@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.door
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.runtime.Composable
@@ -21,6 +22,8 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.AlertHost
+import uk.co.siland.culvery.core.sound.Sound
+import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.ShowingTheme
 
@@ -94,18 +97,39 @@ internal class FakeAlertHost(inFront: Boolean = true) : AlertHost {
     }
 }
 
+/** Records each play as the sound's id and the volume. */
 internal class FakeChime : Chime {
-    val plays = mutableListOf<Pair<DoorSound, Float>>()
+    val plays = mutableListOf<Pair<String, Float>>()
     val volumes: List<Float> get() = plays.map { it.second }
+    var hushes = 0
 
     /** What [play] reports: false for a chime that couldn't start. */
     var starts = true
 
-    override fun play(sound: DoorSound, volume: Float): Boolean {
-        plays += sound to volume
+    override fun play(sound: Sound, volume: Float): Boolean {
+        plays += sound.id to volume
         return starts
     }
+
+    override fun hushPads() {
+        hushes++
+    }
 }
+
+/** The tablet's sounds folder under Robolectric; [tabletSound] puts a made-up file in it, [clearTabletSounds] empties it. */
+private fun soundsFolder(): File = ApplicationProvider.getApplicationContext<Context>().getExternalFilesDir(null)!!.resolve("sounds")
+
+internal fun tabletSound(path: String) = soundsFolder().resolve(path).apply {
+    parentFile!!.mkdirs()
+    writeBytes(byteArrayOf(0))
+}
+
+internal fun clearTabletSounds() {
+    soundsFolder().deleteRecursively()
+}
+
+/** The real store over Robolectric's folder: write any [tabletSound] before making it. */
+internal fun testSounds() = SoundLibrary(ApplicationProvider.getApplicationContext())
 
 internal class FakeShowing(theme: SeasonalTheme? = null) : ShowingTheme {
     override val showing = MutableStateFlow(theme)

@@ -18,12 +18,13 @@ import uk.co.siland.culvery.capability.door.DoorPermissionSource
 import uk.co.siland.culvery.capability.door.DoorProvider
 import uk.co.siland.culvery.capability.door.DoorPruneLoop
 import uk.co.siland.culvery.capability.door.DoorRecorder
-import uk.co.siland.culvery.capability.door.MediaPlayerChime
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
 import uk.co.siland.culvery.capability.door.db.SecureDelete
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
+import uk.co.siland.culvery.core.sound.Sound
+import uk.co.siland.culvery.core.sound.SoundPlayer
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -44,13 +45,17 @@ abstract class DoorModule {
     abstract fun sink(impl: DoorRecorder): DoorEventSink
 
     @Binds
-    abstract fun chime(impl: MediaPlayerChime): Chime
-
-    @Binds
     @IntoSet
     abstract fun pruneLoop(impl: DoorPruneLoop): Startable
 
     companion object {
+        @Provides
+        fun chime(player: SoundPlayer): Chime = object : Chime {
+            override fun play(sound: Sound, volume: Float) = player.playDoorbell(sound, volume)
+
+            override fun hushPads() = player.stopPads()
+        }
+
         @Provides
         @Singleton
         fun database(@ApplicationContext context: Context): DoorDatabase =

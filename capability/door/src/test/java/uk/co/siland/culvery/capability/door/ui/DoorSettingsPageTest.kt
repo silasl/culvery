@@ -42,9 +42,8 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.door.CAPTURE_MS
 import uk.co.siland.culvery.capability.door.DoorHealth
-import uk.co.siland.culvery.capability.door.DoorSound
-import uk.co.siland.culvery.capability.door.DoorbellChoice
 import uk.co.siland.culvery.capability.door.DoorPrefs
+import uk.co.siland.culvery.capability.door.FOLLOW_THEME_ID
 import uk.co.siland.culvery.capability.door.FakeChime
 import uk.co.siland.culvery.capability.door.FakeDoorProvider
 import uk.co.siland.culvery.capability.door.KeepDays
@@ -52,13 +51,18 @@ import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
 import uk.co.siland.culvery.capability.door.NOW
 import uk.co.siland.culvery.capability.door.RecordingToaster
 import uk.co.siland.culvery.capability.door.TestAccess
+import uk.co.siland.culvery.capability.door.clearTabletSounds
 import uk.co.siland.culvery.capability.door.doorSettings
+import uk.co.siland.culvery.capability.door.tabletSound
+import uk.co.siland.culvery.capability.door.testSounds
 import uk.co.siland.culvery.core.access.test.signedIn
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
+import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.SETTINGS_HOLD_MS
@@ -81,7 +85,10 @@ class DoorSettingsPageTest {
     private val clock = HouseholdClock(flowOf(london), WallClock { NOW }, io, flowOf(NOW))
 
     @After
-    fun tearDown() = io.cancel()
+    fun tearDown() {
+        io.cancel()
+        clearTabletSounds()
+    }
 
     /** Robolectric's main looper runs only when the test idles it, so each check lets the UI and its effects run first. */
     private fun waitFor(condition: () -> Boolean) = compose.waitUntil(5_000) {
@@ -98,7 +105,7 @@ class DoorSettingsPageTest {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
                 CulveryTheme(dark = true) {
-                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, clock, flowOf(london), toaster, MutableStateFlow(showing), access) }
+                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, testSounds(), clock, flowOf(london), toaster, MutableStateFlow(showing), access) }
                 }
             }
         }
@@ -151,18 +158,51 @@ class DoorSettingsPageTest {
         assertThat(sound.top).isLessThan(chimeSection.top)
         compose.onNodeWithTag("door_doorbell_follow").assertIsSelected().assertTextContains("Follow the theme")
         compose.onNodeWithTag("door_doorbell_follow_note", useUnmergedTree = true)
-            .assertTextEquals("The haunted organ while Halloween shows, the classic chime otherwise.")
-        compose.onNodeWithTag("door_doorbell_classic").assertIsNotSelected().assertTextContains("Classic chime")
-        compose.onNodeWithTag("door_doorbell_organ").assertIsNotSelected().assertTextContains("Haunted organ")
+            .assertTextEquals("The season’s sound while a seasonal theme shows, the classic chime otherwise.")
+        compose.onNodeWithTag("door_doorbell_builtin:classic").assertIsNotSelected().assertTextContains("Classic chime")
+        compose.onNodeWithTag("door_doorbell_builtin:organ").assertIsNotSelected().assertTextContains("Haunted organ")
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 18 §6.1: Follow the theme first, then every sound but Happy Birthday, the tablet's marked as such. */
+    @Test
+    fun everyChoiceIsOffered() {
+        tabletSound("Test Honk.wav")
+        showHost()
+        waitFor { shows("door_doorbell_file:Test Honk.wav") }
+        val follow = compose.onNodeWithTag("door_doorbell_follow").getBoundsInRoot().top
+        val offered = listOf(BuiltInSound.CLASSIC, BuiltInSound.ORGAN, BuiltInSound.SAD_TROMBONE, BuiltInSound.CHRISTMAS_BELLS).map { sound ->
+            compose.onNodeWithTag("door_doorbell_${sound.id}").assertIsNotSelected().assertTextContains(sound.label)
+            compose.onNodeWithTag("door_doorbell_${sound.id}_note", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithTag("door_doorbell_${sound.id}").getBoundsInRoot().top
+        }
+        val honk = compose.onNodeWithTag("door_doorbell_file:Test Honk.wav").getBoundsInRoot().top
+        assertThat(listOf(follow) + offered + honk).isInStrictOrder()
+        compose.onNodeWithTag("door_doorbell_file:Test Honk.wav").assertTextContains("Test Honk")
+        compose.onNodeWithTag("door_doorbell_file:Test Honk.wav_note", useUnmergedTree = true).assertTextEquals("On this tablet")
+        assertThat(shows("door_doorbell_${BuiltInSound.HAPPY_BIRTHDAY.id}")).isFalse()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 18 §6.1: a chosen file that has gone stays chosen, named from its file, says so, and plays the classic chime. */
+    @Test
+    fun aGoneChoiceSaysSo() {
+        runBlocking { settings.setDoorbell("file:halloween/Gone Howl.ogg") }
+        showHost()
+        waitFor { shows("door_doorbell_file:halloween/Gone Howl.ogg") }
+        compose.onNodeWithTag("door_doorbell_file:halloween/Gone Howl.ogg").assertIsSelected().assertTextContains("Gone Howl")
+        compose.onNodeWithTag("door_doorbell_file:halloween/Gone Howl.ogg_note", useUnmergedTree = true).assertTextEquals("Not on this tablet any more")
+        compose.onNodeWithTag("door_doorbell_follow").assertIsNotSelected()
+        compose.onNodeWithTag("door_play_chime").performClick()
+        assertThat(chime.plays).containsExactly(BuiltInSound.CLASSIC.id to 1.0f)
     }
 
     @Test
     fun choosingASoundSavesIt() {
         showHost()
-        compose.onNodeWithTag("door_doorbell_organ").performClick()
-        waitFor { prefs().doorbell == DoorbellChoice.ORGAN }
-        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_organ").assertIsSelected() }.isSuccess }
+        compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
+        waitFor { prefs().doorbell == BuiltInSound.ORGAN.id }
+        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:organ").assertIsSelected() }.isSuccess }
     }
 
     /** The preview button plays what a ring would: the showing theme's sound under Follow the theme, else the choice. */
@@ -170,12 +210,12 @@ class DoorSettingsPageTest {
     fun playChimePlaysWhatARingWould() {
         showHost(SeasonalTheme.HALLOWEEN)
         compose.onNodeWithTag("door_play_chime").performClick()
-        assertThat(chime.plays).containsExactly(DoorSound.ORGAN to 1.0f)
-        compose.onNodeWithTag("door_doorbell_classic").performClick()
-        waitFor { prefs().doorbell == DoorbellChoice.CLASSIC }
-        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_classic").assertIsSelected() }.isSuccess }
+        assertThat(chime.plays).containsExactly(BuiltInSound.ORGAN.id to 1.0f)
+        compose.onNodeWithTag("door_doorbell_builtin:classic").performClick()
+        waitFor { prefs().doorbell == BuiltInSound.CLASSIC.id }
+        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:classic").assertIsSelected() }.isSuccess }
         compose.onNodeWithTag("door_play_chime").performClick()
-        assertThat(chime.plays.last()).isEqualTo(DoorSound.CLASSIC to 1.0f)
+        assertThat(chime.plays.last()).isEqualTo(BuiltInSound.CLASSIC.id to 1.0f)
     }
 
     private fun spokenVolume(): String {
@@ -192,7 +232,7 @@ class DoorSettingsPageTest {
             CulveryTheme(dark = true) {
                 InSettingsPane {
                     DoorSettingsScreen(
-                        DoorSettingsUi("Ring", null, stored, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(21, 0), LocalTime.of(7, 0), null, "", true, true, false, KeepDays.TWO),
+                        DoorSettingsUi("Ring", null, stored, FOLLOW_THEME_ID, emptyList(), false, LocalTime.of(21, 0), LocalTime.of(7, 0), null, "", true, true, false, KeepDays.TWO),
                         DoorSettingsActions(onVolume, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {}),
                     )
                 }

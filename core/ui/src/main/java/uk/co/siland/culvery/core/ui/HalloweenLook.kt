@@ -50,7 +50,6 @@ val HalloweenLook = SeasonalLook(
     mark = { width -> PumpkinMark(width) },
     cardCorner = { colors -> drawCobweb(HalloweenInks.web(colors), HalloweenDimens.webSpan) },
     sky = { drifting, modifier -> HalloweenSky(drifting, modifier) },
-    sound = SeasonalSound.HAUNTED_ORGAN,
 )
 
 /** The drawings' colours, here so ContrastTest checks what can sit over them (14 §4.3). */

@@ -12,10 +12,11 @@ dependencies {
     testImplementation(testFixtures(project(":core:access")))
     // Capability, RailBadge, AlertHost, ProviderDescriptor and Startable appear in this module's public API.
     api(project(":core:plugin"))
+    // Chime and DoorSettingsUi take a Sound.
+    api(project(":core:sound"))
     implementation(project(":core:access"))
     implementation(project(":core:house"))
     implementation(project(":core:household"))
-    implementation(project(":core:sound"))
     implementation(project(":core:ui"))
     implementation(libs.androidx.datastore.preferences)
     testImplementation(libs.roborazzi.core)

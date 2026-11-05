@@ -23,6 +23,7 @@ import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShowingTheme
 
@@ -38,6 +39,7 @@ class DoorCapability @Inject constructor(
     private val zone: HouseholdZone,
     private val health: DoorHealth,
     private val chime: Chime,
+    private val library: SoundLibrary,
     private val toaster: Toaster,
     private val showing: ShowingTheme,
     private val access: AccessControl,
@@ -63,7 +65,7 @@ class DoorCapability @Inject constructor(
         .distinctUntilChanged()
 
     private val pages: List<SettingsPage> = listOfNotNull(
-        provider?.let { p -> DoorPage { DoorSettingsHost(settings, health, p, chime, clock, zone.zone, toaster, showing.showing, access) } },
+        provider?.let { p -> DoorPage { DoorSettingsHost(settings, health, p, chime, library, clock, zone.zone, toaster, showing.showing, access) } },
     )
 
     override fun settingsPages(): List<SettingsPage> = pages

@@ -25,6 +25,8 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.settingsDataStore
+import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 @RunWith(AndroidJUnit4::class)
@@ -52,7 +54,7 @@ class DoorSettingsTest {
         settings.setQuietHours(on = false, from = LocalTime.of(22, 30), until = LocalTime.of(6, 30))
         settings.setCapture(untilMillis = NOW + CAPTURE_MS)
         settings.heard(NOW)
-        val expected = DoorPrefs(true, 0.4f, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(22, 30), LocalTime.of(6, 30), NOW + CAPTURE_MS, NOW, 0)
+        val expected = DoorPrefs(true, 0.4f, FOLLOW_THEME_ID, false, LocalTime.of(22, 30), LocalTime.of(6, 30), NOW + CAPTURE_MS, NOW, 0)
         assertThat(settings.prefs.first()).isEqualTo(expected)
         // The last write's value reaching current is the signal; then all of it must match.
         settings.current.first { it.lastHeardMillis != null }
@@ -88,31 +90,45 @@ class DoorSettingsTest {
     /** 14 §4.6: Follow the theme until the family picks a sound. */
     @Test
     fun theDoorbellFollowsTheThemeByDefault() = runTest {
-        assertThat(settings.prefs.first().doorbell).isEqualTo(DoorbellChoice.FOLLOW_THEME)
+        assertThat(settings.prefs.first().doorbell).isEqualTo(FOLLOW_THEME_ID)
     }
 
     @Test
     fun theDoorbellChoiceIsKept() = runTest {
         val writer = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        doorSettings(folder.root, writer).setDoorbell(DoorbellChoice.ORGAN)
+        doorSettings(folder.root, writer).setDoorbell("file:Test Honk.wav")
         writer.coroutineContext[Job]!!.cancelAndJoin()
-        assertThat(settings.prefs.first().doorbell).isEqualTo(DoorbellChoice.ORGAN)
+        assertThat(settings.prefs.first().doorbell).isEqualTo("file:Test Honk.wav")
+    }
+
+    private suspend fun storedAs(value: String): String {
+        val store = settingsDataStore(scope) { File(folder.root, "door_settings_$value.preferences_pb") }
+        store.edit { it[stringPreferencesKey("doorbell_sound")] = value }
+        return DoorSettings(store, scope).prefs.first().doorbell
     }
 
     /** 14 §4.6: an unknown stored value reads as Follow the theme. */
     @Test
     fun anUnknownDoorbellValueReadsAsFollowTheTheme() = runTest {
-        val store = settingsDataStore(scope) { File(folder.root, "door_settings.preferences_pb") }
-        store.edit { it[stringPreferencesKey("doorbell_sound")] = "KAZOO" }
-        assertThat(DoorSettings(store, scope).prefs.first().doorbell).isEqualTo(DoorbellChoice.FOLLOW_THEME)
+        assertThat(storedAs("KAZOO")).isEqualTo(FOLLOW_THEME_ID)
     }
 
+    /** 18 §6.1: the choices Plan 14 stored keep meaning what they did. */
     @Test
-    fun soundForFollowsTheLook() {
-        assertThat(DoorbellChoice.FOLLOW_THEME.soundFor(SeasonalTheme.HALLOWEEN)).isEqualTo(DoorSound.ORGAN)
-        assertThat(DoorbellChoice.FOLLOW_THEME.soundFor(null)).isEqualTo(DoorSound.CLASSIC)
-        assertThat(DoorbellChoice.CLASSIC.soundFor(SeasonalTheme.HALLOWEEN)).isEqualTo(DoorSound.CLASSIC)
-        assertThat(DoorbellChoice.ORGAN.soundFor(null)).isEqualTo(DoorSound.ORGAN)
+    fun oldStoredChoicesKeepTheirMeaning() = runTest {
+        assertThat(storedAs("FOLLOW_THEME")).isEqualTo("follow")
+        assertThat(storedAs("CLASSIC")).isEqualTo("builtin:classic")
+        assertThat(storedAs("ORGAN")).isEqualTo("builtin:organ")
+    }
+
+    /** 18 §6.2: with no Halloween file on the tablet, the theme's built-in sound. */
+    @Test
+    fun followTheThemeAtHalloweenIsTheOrgan() {
+        val library = testSounds()
+        assertThat(DoorPrefs().doorbellSound(library, SeasonalTheme.HALLOWEEN).id).isEqualTo(BuiltInSound.ORGAN.id)
+        assertThat(DoorPrefs().doorbellSound(library, null).id).isEqualTo(BuiltInSound.CLASSIC.id)
+        assertThat(DoorPrefs(doorbell = BuiltInSound.SAD_TROMBONE.id).doorbellSound(library, SeasonalTheme.HALLOWEEN).id)
+            .isEqualTo(BuiltInSound.SAD_TROMBONE.id)
     }
 
     /** 15a §3.1: two days until the family picks more. */

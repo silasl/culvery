@@ -9,6 +9,7 @@ import org.junit.Test
 class SeasonalSourceTest {
     private val repo = File("../..")
 
+    /** A theme's built-in sound is named beside the sound (18, ruling 5). */
     @Test
     fun onlyTheLookNamesATheme() {
         val main = "${File.separator}src${File.separator}main${File.separator}"
@@ -18,6 +19,6 @@ class SeasonalSourceTest {
             .toList()
         assertThat(sources).isNotEmpty()
         val naming = sources.filter { "HALLOWEEN" in it.readText() }.map { it.name }.sorted()
-        assertWithMessage("Files naming HALLOWEEN").that(naming - setOf("HalloweenLook.kt", "Seasonal.kt")).isEmpty()
+        assertWithMessage("Files naming HALLOWEEN").that(naming - setOf("HalloweenLook.kt", "Seasonal.kt", "BuiltInSound.kt")).isEmpty()
     }
 }

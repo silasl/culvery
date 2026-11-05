@@ -34,8 +34,6 @@ data class SeasonDates(val start: MonthDay, val end: MonthDay) {
 
 fun defaultSeasonDates(): Map<SeasonalTheme, SeasonDates> = SeasonalTheme.entries.associateWith { it.defaultDates }
 
-enum class SeasonalSound { HAUNTED_ORGAN }
-
 /** What a theme changes (14 §3): its colours, and each optional touch; null leaves the normal look. */
 class SeasonalLook(
     val night: HhColors,
@@ -48,7 +46,6 @@ class SeasonalLook(
     val cardCorner: (DrawScope.(HhColors) -> Unit)? = null,
     /** Drawn behind Home's content; moves only while [drifting]. */
     val sky: (@Composable (drifting: Boolean, modifier: Modifier) -> Unit)? = null,
-    val sound: SeasonalSound? = null,
 )
 
 interface ShowingTheme {

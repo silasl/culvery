@@ -27,7 +27,6 @@ import uk.co.siland.culvery.capability.door.CAPTURE_LINE
 import uk.co.siland.culvery.capability.door.CAPTURE_MS
 import uk.co.siland.culvery.capability.door.CHIME
 import uk.co.siland.culvery.capability.door.CHIME_VOLUME
-import uk.co.siland.culvery.capability.door.CLASSIC_CHIME
 import uk.co.siland.culvery.capability.door.Chime
 import uk.co.siland.culvery.capability.door.DONE
 import uk.co.siland.culvery.capability.door.DELETE
@@ -38,24 +37,25 @@ import uk.co.siland.culvery.capability.door.DoorPermissions
 import uk.co.siland.culvery.capability.door.DoorProvider
 import uk.co.siland.culvery.capability.door.DOORBELL_SOUND
 import uk.co.siland.culvery.capability.door.DoorSettings
-import uk.co.siland.culvery.capability.door.DoorbellChoice
+import uk.co.siland.culvery.capability.door.FOLLOW_THEME_ID
 import uk.co.siland.culvery.capability.door.FOLLOW_THE_THEME
 import uk.co.siland.culvery.capability.door.FOLLOW_THE_THEME_LINE
-import uk.co.siland.culvery.capability.door.HAUNTED_ORGAN
 import uk.co.siland.culvery.capability.door.KEEP_HISTORY_FOR
 import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
+import uk.co.siland.culvery.capability.door.NOT_ON_THIS_TABLET
 import uk.co.siland.culvery.capability.door.NOT_DONE_YET
+import uk.co.siland.culvery.capability.door.ON_THIS_TABLET
 import uk.co.siland.culvery.capability.door.OPEN_NOTIFICATION_ACCESS
 import uk.co.siland.culvery.capability.door.PLAY_CHIME
 import uk.co.siland.culvery.capability.door.QUIET_HOURS
 import uk.co.siland.culvery.capability.door.appStep
 import uk.co.siland.culvery.capability.door.checkNotifications
+import uk.co.siland.culvery.capability.door.doorbellSound
 import uk.co.siland.culvery.capability.door.keepLabel
 import uk.co.siland.culvery.capability.door.lastHeard
 import uk.co.siland.culvery.capability.door.quietHoursLine
 import uk.co.siland.culvery.capability.door.shortenQuestion
-import uk.co.siland.culvery.capability.door.soundFor
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.KEEP
@@ -65,6 +65,9 @@ import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.plugin.save
 import uk.co.siland.culvery.core.plugin.saving
+import uk.co.siland.culvery.core.sound.Sound
+import uk.co.siland.culvery.core.sound.SoundLibrary
+import uk.co.siland.culvery.core.sound.onTablet
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.FROM
@@ -105,7 +108,10 @@ data class DoorSettingsUi(
     val service: String,
     val hint: String?,
     val volume: Float,
-    val doorbell: DoorbellChoice,
+    /** [FOLLOW_THEME_ID] or a sound's id. */
+    val doorbell: String,
+    /** Every sound the doorbell can play, in the store's order. */
+    val sounds: List<Sound>,
     val quietOn: Boolean,
     val quietFrom: LocalTime,
     val quietUntil: LocalTime,
@@ -122,7 +128,7 @@ data class DoorSettingsUi(
 
 class DoorSettingsActions(
     val onVolume: (Float) -> Unit,
-    val onDoorbell: (DoorbellChoice) -> Unit,
+    val onDoorbell: (String) -> Unit,
     val onPlayChime: () -> Unit,
     val onQuietHours: (on: Boolean, from: LocalTime, until: LocalTime) -> Unit,
     val onAllowAccess: () -> Unit,
@@ -142,9 +148,13 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
         HhPageTitle(DOOR)
         HhSectionLabel(DOORBELL_SOUND)
         HhRadioGroup {
-            HhRadioRow(FOLLOW_THE_THEME, FOLLOW_THE_THEME_LINE, ui.doorbell == DoorbellChoice.FOLLOW_THEME, "door_doorbell_follow") { actions.onDoorbell(DoorbellChoice.FOLLOW_THEME) }
-            HhRadioRow(CLASSIC_CHIME, null, ui.doorbell == DoorbellChoice.CLASSIC, "door_doorbell_classic") { actions.onDoorbell(DoorbellChoice.CLASSIC) }
-            HhRadioRow(HAUNTED_ORGAN, null, ui.doorbell == DoorbellChoice.ORGAN, "door_doorbell_organ") { actions.onDoorbell(DoorbellChoice.ORGAN) }
+            HhRadioRow(FOLLOW_THE_THEME, FOLLOW_THE_THEME_LINE, ui.doorbell == FOLLOW_THEME_ID, "door_doorbell_$FOLLOW_THEME_ID") { actions.onDoorbell(FOLLOW_THEME_ID) }
+            ui.sounds.forEach { sound ->
+                HhRadioRow(sound.name, ON_THIS_TABLET.takeIf { sound.onTablet }, ui.doorbell == sound.id, "door_doorbell_${sound.id}") { actions.onDoorbell(sound.id) }
+            }
+            goneFileName(ui.doorbell, ui.sounds)?.let { name ->
+                HhRadioRow(name, NOT_ON_THIS_TABLET, selected = true, "door_doorbell_${ui.doorbell}") {}
+            }
         }
         HhSectionLabel(CHIME)
         HhSliderRow(
@@ -179,6 +189,11 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
     }
 }
 
+/** The chosen tablet file's name when it is no longer in [sounds], as the store would have named it. */
+private fun goneFileName(doorbell: String, sounds: List<Sound>): String? =
+    if (!doorbell.startsWith("file:") || sounds.any { it.id == doorbell }) null
+    else doorbell.removePrefix("file:").substringAfterLast('/').substringBeforeLast('.')
+
 /** A connect step (5 §5.5), ticked when done. */
 @Composable
 private fun StepRow(title: String, line: String?, done: Boolean, tag: String, onClick: (() -> Unit)? = null) {
@@ -207,6 +222,7 @@ internal fun DoorSettingsHost(
     health: DoorHealth,
     provider: DoorProvider,
     chime: Chime,
+    library: SoundLibrary,
     clock: HouseholdClock,
     zone: Flow<ZoneId>,
     toaster: Toaster,
@@ -214,6 +230,7 @@ internal fun DoorSettingsHost(
     access: AccessControl,
 ) {
     val prefs by settings.prefs.collectAsStateWithLifecycle(null)
+    val sounds by library.choices.collectAsStateWithLifecycle(null)
     val checks by health.checks.collectAsStateWithLifecycle()
     val status by health.status.collectAsStateWithLifecycle(null)
     val householdZone by zone.collectAsStateWithLifecycle(null)
@@ -221,7 +238,9 @@ internal fun DoorSettingsHost(
     val navigator = LocalShellNavigator.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { health.refresh() }
+    LaunchedEffect(Unit) { library.refresh() }
     val p = prefs ?: return
+    val choices = sounds ?: return
     val z = householdZone ?: return
     var shortenTo by remember { mutableStateOf<KeepDays?>(null) }
     val logSave: (Exception) -> Unit = { Log.w(TAG, "Couldn't save a door setting (${it::class.simpleName})") }
@@ -234,6 +253,7 @@ internal fun DoorSettingsHost(
             hint = provider.descriptor.connectHint,
             volume = p.volume,
             doorbell = p.doorbell,
+            sounds = choices,
             quietOn = p.quietOn,
             quietFrom = p.quietFrom,
             quietUntil = p.quietUntil,
@@ -249,7 +269,7 @@ internal fun DoorSettingsHost(
         DoorSettingsActions(
             onVolume = { v -> change { settings.setVolume(v) } },
             onDoorbell = { choice -> change { settings.setDoorbell(choice) } },
-            onPlayChime = { chime.play(p.doorbell.soundFor(showing.value), p.volume) },
+            onPlayChime = { chime.play(p.doorbellSound(library, showing.value), p.volume) },
             onQuietHours = { on, from, until -> change { settings.setQuietHours(on, from, until) } },
             onAllowAccess = { navigator.openSystemScreen(provider.accessScreens(), NOTIFICATION_ACCESS_MISSING) },
             onCapture = { on -> change { settings.setCapture(if (on) clock.nowMillis() + CAPTURE_MS else 0L) } },

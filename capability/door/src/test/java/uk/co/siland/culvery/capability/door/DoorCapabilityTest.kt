@@ -44,12 +44,12 @@ class DoorCapabilityTest {
     private val clock by lazy { HouseholdClock(flowOf(ZoneId.of("Europe/London")), WallClock { NOW }, scope, flowOf(NOW)) }
 
     private fun alerts() = DoorAlerts(
-        FakeAlertHost(), {}, { DoorPrefs() }, FakeChime(), { ZoneId.of("Europe/London") }, WallClock { NOW }, scope, NightHours { false }, { null }, { null },
+        FakeAlertHost(), {}, { DoorPrefs() }, FakeChime(), { ZoneId.of("Europe/London") }, WallClock { NOW }, scope, NightHours { false }, { null }, { null }, testSounds(),
     )
 
     private fun capability(providers: Set<DoorProvider>) = DoorCapability(
         store, settings, providers, clock, householdZone(),
-        DoorHealth(providers.firstOrNull(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), RecordingToaster(), FakeShowing(),
+        DoorHealth(providers.firstOrNull(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), testSounds(), RecordingToaster(), FakeShowing(),
         TestAccess(Role.ADMIN), alerts(), scope,
     )
 
@@ -87,7 +87,7 @@ class DoorCapabilityTest {
         thirty.record(ring(key = "old", at = threeDaysAgo, whenMillis = threeDaysAgo))
         val door = DoorCapability(
             thirty, settings, setOf(FakeDoorProvider()), clock, householdZone(),
-            DoorHealth(FakeDoorProvider(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), RecordingToaster(), FakeShowing(),
+            DoorHealth(FakeDoorProvider(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), testSounds(), RecordingToaster(), FakeShowing(),
             TestAccess(Role.ADMIN), alerts(), scope,
         )
         assertThat(door.badge.first()).isNull()

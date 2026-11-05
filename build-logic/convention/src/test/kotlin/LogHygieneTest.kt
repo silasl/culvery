@@ -143,7 +143,7 @@ internal object LogHygiene {
      *
      * `after.screen.name` is the screen's fixed state (`DisplayState`); `names.size` is how many people have a birthday today, never who (`SeasonalThemes`, 16 §3.2).
      *
-     * `sound.name` is a doorbell sound's fixed name, CLASSIC or ORGAN (`DoorSound`).
+     * `source.sound.key` is a built-in sound's fixed key (`BuiltInSound`); a tablet sound is logged as "a tablet sound" (18).
      *
      * `collections.size` is how many collection days a bins read found, never the address or a date (17 §3.7); `failed.kind.name`
      * is the step a bins read or connect failed at (`BinsReadFailed.kind`).
@@ -153,7 +153,7 @@ internal object LogHygiene {
         "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
         "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
-        "step.name", "own.logName", "sound.name", "after.screen.name", "names.size",
+        "step.name", "own.logName", "source.sound.key", "after.screen.name", "names.size",
         "collections.size", "failed.kind.name",
     )
 

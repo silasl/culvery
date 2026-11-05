@@ -39,7 +39,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import uk.co.siland.culvery.capability.door.DoorbellChoice
+import uk.co.siland.culvery.capability.door.FOLLOW_THEME_ID
 import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.ui.DoorSettingsActions
 import uk.co.siland.culvery.capability.door.ui.DoorSettingsScreen
@@ -63,6 +63,10 @@ import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrations
 import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrationsUi
 import uk.co.siland.culvery.core.setup.SettingsScreen
+import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.Sound
+import uk.co.siland.culvery.core.sound.SoundSource
+import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.test.waitFor
@@ -105,8 +109,9 @@ private class WithSetup(private val steps: List<SetupStep>, private val pages: L
     override fun TabContent() = Unit
 }
 
+private val CLASSIC = BuiltInSound.CLASSIC.let { Sound(it.id, it.label, SoundSource.BuiltIn(it), it.theme) }
 private val DOOR_UI =
-    DoorSettingsUi("Ring", null, 0.5f, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(22, 0), LocalTime.of(7, 0), null, "never", true, true, false, KeepDays.TWO)
+    DoorSettingsUi("Ring", null, 0.5f, FOLLOW_THEME_ID, listOf(CLASSIC), false, LocalTime.of(22, 0), LocalTime.of(7, 0), null, "never", true, true, false, KeepDays.TWO)
 private val DOOR_ACTIONS = DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {})
 private val LIGHTS_UI = LightsSettingsUi(true, null, null, false, emptyList(), null, emptySet(), 0)
 private val MUSIC_UI = MusicSettingsUi(true, null, null, false, emptyList(), null, 50)
@@ -276,7 +281,7 @@ class SetupWiringTest {
         val cases = listOf(
             Gaps(rig.page, "Display", "app_display_display", "app_display_seasonal"),
             Gaps(Wrapped("door") { DoorSettingsScreen(DOOR_UI, DOOR_ACTIONS) }, "Doorbell sound", "door_from", "door_until"),
-            Gaps(Wrapped("door") { DoorSettingsScreen(DOOR_UI, DOOR_ACTIONS) }, "Doorbell sound", "door_doorbell_follow", "door_doorbell_classic"),
+            Gaps(Wrapped("door") { DoorSettingsScreen(DOOR_UI, DOOR_ACTIONS) }, "Doorbell sound", "door_doorbell_follow", "door_doorbell_builtin:classic"),
             Gaps(Wrapped("lights") { LightsSettingsPage(LIGHTS_UI, {}, {}, {}, {}) }, "Hue Bridge", "lights_connection", "lights_find"),
             Gaps(Wrapped("music") { MusicSettingsScreen(MUSIC_UI, MUSIC_ACTIONS) }, "Sonos", "music_connection", "music_find"),
             Gaps(Wrapped("modes") { ModesList(MODE_ROWS, onOpen = {}, onAdd = {}) }, null, "mode_row_holiday", "mode_row_party"),

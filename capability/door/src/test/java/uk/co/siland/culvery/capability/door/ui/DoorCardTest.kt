@@ -40,6 +40,7 @@ import uk.co.siland.culvery.capability.door.NOW
 import uk.co.siland.culvery.capability.door.Recorded
 import uk.co.siland.culvery.capability.door.cardLine
 import uk.co.siland.culvery.capability.door.picture
+import uk.co.siland.culvery.capability.door.testSounds
 import uk.co.siland.culvery.core.plugin.LocalAlertHost
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
@@ -149,7 +150,7 @@ class DoorCardTest {
         val host = FakeAlertHost()
         val seen = mutableListOf<Long>()
         val alerts = DoorAlerts(
-            host, { seen += it }, { DoorPrefs() }, FakeChime(), { ZoneId.of("Europe/London") }, WallClock { NOW }, scope.backgroundScope, NightHours { false }, { null }, { null },
+            host, { seen += it }, { DoorPrefs() }, FakeChime(), { ZoneId.of("Europe/London") }, WallClock { NOW }, scope.backgroundScope, NightHours { false }, { null }, { null }, testSounds(),
         )
         scope.launch { alerts.onRecorded(Recorded(DoorEvent(1, NOW, DoorKind.RING, "Front Door", false, null, seen = false), isNew = true)) }
         scope.runCurrent()

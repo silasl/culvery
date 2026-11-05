@@ -17,6 +17,8 @@ import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.door.ui.DoorCardUi
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 /** 5 §4.6–4.7: card and chime for a new ring in front; record only otherwise; 60 seconds, Got it, quiet hours, 10 seconds. */
@@ -34,9 +36,10 @@ class DoorAlertsTest {
     private var night: Boolean? = false
     private var holiday: Boolean? = null
     private var theme: SeasonalTheme? = null
+    private val library = testSounds()
 
     private fun TestScope.alerts() =
-        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { night }, { holiday }, { theme })
+        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { night }, { holiday }, { theme }, library)
 
     private fun TestScope.rung(id: Long, isNew: Boolean = true, device: String = "Front Door", unrecognised: Boolean = false, snapshot: File? = null) =
         Recorded(DoorEvent(id, start + testScheduler.currentTime, DoorKind.RING, device, unrecognised, snapshot, seen = false), isNew)
@@ -49,7 +52,7 @@ class DoorAlertsTest {
         assertThat(host.shown).isEqualTo(1)
         assertThat(alerts.showing.value).isEqualTo(ShowingRing(1, DoorCardUi(false, "Front Door", "14:02", null)))
         assertThat(chime.volumes).containsExactly(0.4f)
-        assertThat(chime.plays.single().first).isEqualTo(DoorSound.CLASSIC)
+        assertThat(chime.plays.single().first).isEqualTo(BuiltInSound.CLASSIC.id)
     }
 
     @Test
@@ -133,7 +136,7 @@ class DoorAlertsTest {
     @Test
     fun aRingHoldingTheLockAsTheSixtySecondsEndKeepsItsCard() = runTest {
         var gate: CompletableDeferred<Unit>? = null
-        val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { false }, { null }, { null })
+        val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { false }, { null }, { null }, library)
         alerts.onRecorded(rung(1))
         advanceTimeBy(CARD_MS - 1_000)
         gate = CompletableDeferred()
@@ -222,7 +225,15 @@ class DoorAlertsTest {
         prefs = DoorPrefs(volume = 0.6f)
         theme = SeasonalTheme.HALLOWEEN
         alerts().onRecorded(rung(1))
-        assertThat(chime.plays).containsExactly(DoorSound.ORGAN to 0.6f)
+        assertThat(chime.plays).containsExactly(BuiltInSound.ORGAN.id to 0.6f)
+    }
+
+    /** 18 §6.1: a chosen tablet file that has gone rings the classic chime. */
+    @Test
+    fun aGoneFileRingsTheClassicChime() = runTest {
+        prefs = DoorPrefs(doorbell = "file:Test Honk.wav")
+        alerts().onRecorded(rung(1))
+        assertThat(chime.plays.map { it.first }).containsExactly(BuiltInSound.CLASSIC.id)
     }
 
     /** The theme is read at the ring, so a preview that ended between two rings changes the second. */
@@ -234,14 +245,14 @@ class DoorAlertsTest {
         advanceTimeBy(CHIME_GAP_MS + 1_000)
         theme = null
         alerts.onRecorded(rung(2))
-        assertThat(chime.plays.map { it.first }).containsExactly(DoorSound.ORGAN, DoorSound.CLASSIC).inOrder()
+        assertThat(chime.plays.map { it.first }).containsExactly(BuiltInSound.ORGAN.id, BuiltInSound.CLASSIC.id).inOrder()
     }
 
     /** **pin** (14 §4.6): the organ is a chime, so quiet hours silence it as they do the classic one. 22:00 BST. */
     @Test
     fun quietHoursStillSilenceTheOrgan() = runTest {
         start = NOW + 8 * 60 * 60_000L - 2 * 60_000L
-        prefs = DoorPrefs(doorbell = DoorbellChoice.ORGAN)
+        prefs = DoorPrefs(doorbell = BuiltInSound.ORGAN.id)
         alerts().onRecorded(rung(1))
         assertThat(chime.plays).isEmpty()
     }

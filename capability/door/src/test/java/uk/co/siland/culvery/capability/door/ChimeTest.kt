@@ -10,6 +10,7 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.CHIME_ATTRIBUTES
 
 @RunWith(AndroidJUnit4::class)
@@ -23,7 +24,7 @@ class ChimeTest {
         }
     }
 
-    private fun wav(sound: DoorSound): Wav {
+    private fun wav(sound: BuiltInSound): Wav {
         val bytes = ApplicationProvider.getApplicationContext<android.content.Context>().resources.openRawResource(sound.res).use { it.readBytes() }
         assertThat(String(bytes, 0, 4, Charsets.US_ASCII)).isEqualTo("RIFF")
         assertThat(String(bytes, 8, 4, Charsets.US_ASCII)).isEqualTo("WAVE")
@@ -55,18 +56,18 @@ class ChimeTest {
 
     @Test
     fun bothSoundsAreBundledWavs() {
-        for (sound in DoorSound.entries) {
+        for (sound in listOf(BuiltInSound.CLASSIC, BuiltInSound.ORGAN)) {
             val w = wav(sound)
             assertThat(listOf(w.format, w.channels, w.rate, w.bits)).containsExactly(1, 1, 22_050, 16).inOrder()
         }
-        assertThat(wav(DoorSound.ORGAN).seconds).isIn(com.google.common.collect.Range.closed(3.4, 4.1))
-        assertThat(wav(DoorSound.CLASSIC).seconds).isWithin(0.01).of(3.2)
+        assertThat(wav(BuiltInSound.ORGAN).seconds).isIn(com.google.common.collect.Range.closed(3.4, 4.1))
+        assertThat(wav(BuiltInSound.CLASSIC).seconds).isWithin(0.01).of(3.2)
     }
 
     @Test
     fun theOrganIsAboutAsLoudAsTheChime() {
-        val organ = wav(DoorSound.ORGAN)
-        val ratio = organ.rms(0.0, 3.5) / wav(DoorSound.CLASSIC).rms(0.0, 3.0)
+        val organ = wav(BuiltInSound.ORGAN)
+        val ratio = organ.rms(0.0, 3.5) / wav(BuiltInSound.CLASSIC).rms(0.0, 3.0)
         assertThat(ratio).isAtLeast(1.0)
         assertThat(ratio).isAtMost(1.5)
         assertThat(organ.peak()).isAtMost((0.95 * 32_767).toInt() + 1)
@@ -74,7 +75,7 @@ class ChimeTest {
 
     @Test
     fun theOrganDoesNotSwellAsItFades() {
-        val organ = wav(DoorSound.ORGAN)
+        val organ = wav(BuiltInSound.ORGAN)
         fun peak(from: Double, to: Double) = organ.samples.copyOfRange((from * organ.rate).toInt(), (to * organ.rate).toInt()).maxOf { abs(it.toInt()) }
         val before = peak(3.0, 3.5)
         val window = organ.rate / 100
@@ -86,7 +87,7 @@ class ChimeTest {
 
     @Test
     fun theOrganPlaysOnceAndFades() {
-        val organ = wav(DoorSound.ORGAN)
+        val organ = wav(BuiltInSound.ORGAN)
         val quiet = (0.01 * 32_767).toInt()
         val run = organ.rate / 2
         var silent = 0

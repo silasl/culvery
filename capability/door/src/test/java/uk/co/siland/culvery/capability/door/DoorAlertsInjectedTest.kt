@@ -44,6 +44,7 @@ class DoorAlertsInjectedTest {
         NightHours { night },
         object : HouseMode { override val holiday = MutableStateFlow<Boolean?>(null) },
         FakeShowing(),
+        testSounds(),
     )
 
     /** Fails if a ring just after a restart, when the night hours aren't known yet, raises a card or a chime. */

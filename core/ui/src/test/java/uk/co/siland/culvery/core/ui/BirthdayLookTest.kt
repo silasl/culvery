@@ -30,10 +30,9 @@ class BirthdayLookTest {
     }
 
     @Test
-    fun theLookHasNoCornerAndNoSound() {
+    fun theLookHasNoCorner() {
         PersonPalette.colors.forEach { colour ->
             assertThat(birthdayLook(colour)!!.cardCorner).isNull()
-            assertThat(birthdayLook(colour)!!.sound).isNull()
         }
     }
 

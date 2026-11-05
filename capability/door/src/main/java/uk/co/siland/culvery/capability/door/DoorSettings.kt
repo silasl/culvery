@@ -33,9 +33,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.settingsDataStore
-import uk.co.siland.culvery.core.ui.SeasonalSound
+import uk.co.siland.culvery.core.sound.Sound
+import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.ui.SeasonalTheme
-import uk.co.siland.culvery.core.ui.look
 
 private const val FILE = "door_settings"
 private const val KEEP_NAME = "keep_days"
@@ -49,17 +49,16 @@ private const val SECONDS_PER_MINUTE = 60
 /** Check Ring's notifications runs this long at most (5 §5.4). */
 const val CAPTURE_MS = 30 * 60 * 1_000L
 
-/** What Settings › Door lets the family pick; Follow the theme plays whatever the showing theme's look names (14 §4.6). */
-enum class DoorbellChoice { FOLLOW_THEME, CLASSIC, ORGAN }
+/** The doorbell choice that plays the showing theme's sound (18 §6.2); any other choice is a sound's id. */
+const val FOLLOW_THEME_ID = "follow"
 
-fun DoorbellChoice.soundFor(showing: SeasonalTheme?): DoorSound = when (this) {
-    DoorbellChoice.FOLLOW_THEME -> when (showing?.look?.sound) {
-        SeasonalSound.HAUNTED_ORGAN -> DoorSound.ORGAN
-        null -> DoorSound.CLASSIC
-    }
-    DoorbellChoice.CLASSIC -> DoorSound.CLASSIC
-    DoorbellChoice.ORGAN -> DoorSound.ORGAN
-}
+/** What Plan 14 stored, before choices were sound ids (18 §6.1). */
+private val OLD_DOORBELL_CHOICES = mapOf("FOLLOW_THEME" to FOLLOW_THEME_ID, "CLASSIC" to "builtin:classic", "ORGAN" to "builtin:organ")
+private val SOUND_ID = Regex("(builtin|file):.+")
+
+/** What a ring plays now: a chosen file that has gone plays the classic chime. */
+fun DoorPrefs.doorbellSound(library: SoundLibrary, showing: SeasonalTheme?): Sound =
+    if (doorbell == FOLLOW_THEME_ID) library.forTheme(showing) else library.byId(doorbell) ?: library.forTheme(null)
 
 /** How many days of door history are kept, today included (15a §3.1). */
 enum class KeepDays(val days: Int) { TWO(2), SEVEN(7), THIRTY(30) }
@@ -69,7 +68,8 @@ data class DoorPrefs(
     /** Both connect steps were done: the Door tab shows (5 §5.5). */
     val connected: Boolean = false,
     val volume: Float = 1.0f,
-    val doorbell: DoorbellChoice = DoorbellChoice.FOLLOW_THEME,
+    /** [FOLLOW_THEME_ID] or a sound's id. */
+    val doorbell: String = FOLLOW_THEME_ID,
     val quietOn: Boolean = true,
     val quietFrom: LocalTime = LocalTime.of(21, 0),
     val quietUntil: LocalTime = LocalTime.of(7, 0),
@@ -112,7 +112,7 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
 
     suspend fun setVolume(volume: Float) = edit { it[VOLUME] = volume.coerceIn(0f, 1f) }
 
-    suspend fun setDoorbell(choice: DoorbellChoice) = edit { it[DOORBELL] = choice.name }
+    suspend fun setDoorbell(choice: String) = edit { it[DOORBELL] = choice }
 
     suspend fun setQuietHours(on: Boolean, from: LocalTime, until: LocalTime) = edit {
         it[QUIET_ON] = on
@@ -150,7 +150,7 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
         return DoorPrefs(
             connected = this[CONNECTED] ?: defaults.connected,
             volume = this[VOLUME] ?: defaults.volume,
-            doorbell = this[DOORBELL]?.let { name -> DoorbellChoice.entries.firstOrNull { it.name == name } } ?: defaults.doorbell,
+            doorbell = this[DOORBELL]?.let { OLD_DOORBELL_CHOICES[it] ?: it.takeIf(SOUND_ID::matches) } ?: defaults.doorbell,
             quietOn = this[QUIET_ON] ?: defaults.quietOn,
             quietFrom = this[QUIET_FROM]?.let { LocalTime.ofSecondOfDay(it * SECONDS_PER_MINUTE.toLong()) } ?: defaults.quietFrom,
             quietUntil = this[QUIET_UNTIL]?.let { LocalTime.ofSecondOfDay(it * SECONDS_PER_MINUTE.toLong()) } ?: defaults.quietUntil,

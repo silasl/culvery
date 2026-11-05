@@ -72,6 +72,7 @@ import uk.co.siland.culvery.capability.door.doorDb
 import uk.co.siland.culvery.capability.door.motion
 import uk.co.siland.culvery.capability.door.ring
 import uk.co.siland.culvery.capability.door.startOfYesterday
+import uk.co.siland.culvery.capability.door.testSounds
 import uk.co.siland.culvery.core.access.test.settled
 import uk.co.siland.culvery.core.access.test.signedIn
 import uk.co.siland.culvery.core.household.Role
@@ -98,7 +99,7 @@ class DoorTabTest {
     private var access = TestAccess(Role.ADULT)
     private val alertHost = FakeAlertHost()
     private val alerts by lazy {
-        DoorAlerts(alertHost, {}, { DoorPrefs() }, FakeChime(), { london }, WallClock { NOW }, appScope, NightHours { false }, { null }, { null })
+        DoorAlerts(alertHost, {}, { DoorPrefs() }, FakeChime(), { london }, WallClock { NOW }, appScope, NightHours { false }, { null }, { null }, testSounds())
     }
     private val opened = mutableListOf<DoorEvent>()
 
