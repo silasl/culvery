@@ -1019,3 +1019,4 @@ The open faults after the redesign phase. Details are in the plan sections above
   - Tests: door module tests and StoredModePageTest are flaky under full-project load; some fixtures (`testSounds()` IO reads, `DoorQuietnessTest` waits) want timeouts; `home_tray_full` passes 4 modes and is silently cut to 2; small style nits (import order, a fully-qualified Context, a long lock comment).
   - `culvery-notes/sounds/prepare.sh`: hard-coded chime path, a silent abort on an empty source, single-pass loudnorm (±0.5 LU).
 
+- **A shorter pause after ticking off a shopping item (the user, 2026-11-05):** a ticked item stays on the list, struck through, for a bit too long before it goes. It lasts as long as its Undo toast, `TOAST_WITH_ACTION_MS` (8 s, `core/plugin/.../Overlays.kt`), which every toast with an action shares, so shortening it for Shopping alone needs its own value (10 ruling 10 ties the row to the Undo).
