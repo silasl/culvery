@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.annotation.VisibleForTesting
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
@@ -33,7 +32,8 @@ class SoundLibrary @VisibleForTesting constructor(
 
     private val builtIns = BuiltInSound.entries.map { it.asSound() }
     private val state = MutableStateFlow(builtIns)
-    private val reads = AtomicLong()
+    // Guarded by state.
+    private var reads = 0L
     private var shown = 0L
 
     val sounds: StateFlow<List<Sound>> = state.asStateFlow()
@@ -44,7 +44,7 @@ class SoundLibrary @VisibleForTesting constructor(
 
     /** When reads overlap, the one that began last wins. */
     suspend fun refresh() {
-        val read = reads.incrementAndGet()
+        val read = synchronized(state) { ++reads }
         val found = withContext(io) { readSoundsFolder(root()) }
         synchronized(state) {
             if (read > shown) {
