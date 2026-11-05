@@ -21,6 +21,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -121,7 +122,6 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
-import uk.co.siland.culvery.core.ui.HouseModeDimens
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.WithFontScale
@@ -283,7 +283,7 @@ class ShellScreenshotTest {
             Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(17.dp)).background(Culvery.colors.surf2).padding(horizontal = 12.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
-            val style = if (width == TrayWidth.THIRD) HouseModeDimens.thirdLabel else HhType.cardTitle
+            val style = if (width == TrayWidth.THIRD) HhType.buttonLabel.copy(fontSize = 13.sp) else HhType.cardTitle
             Text(label, style = style, color = Culvery.colors.ink, maxLines = 1)
         }
     }

@@ -20,11 +20,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -37,8 +38,11 @@ object HouseModeDimens {
     val icon = 24.dp
     val secondStyle = HhType.secondary.copy(fontSize = 12.sp)
 
-    /** A label in a third of the tray, at the sound row's size (redesign note 13). */
-    val thirdLabel = HhType.buttonLabel.copy(fontSize = 13.sp)
+    /** What a third of the tray shows in place of a label (18 walk-through): an icon, or a sound pad's number and waves. */
+    val thirdIcon = 36.dp
+    val thirdNumber = HhType.buttonLabel.copy(fontSize = 34.sp, lineHeight = 34.sp)
+    val thirdWavesWidth = 18.dp
+    val thirdWavesHeight = 30.dp
     val lineGap = 6.dp
     val pillHeight = 24.dp
     val pillPaddingH = 10.dp
@@ -80,7 +84,7 @@ fun HouseModeOnPill(tag: String) {
  * A mode's tray tile, narrow enough for half the tray: [icon] with [trailing] on its right, then [label] and [second]
  * under them, all spoken as [spoken]; what didn't happen is its tray cell's line, under the whole row. A tap does nothing
  * unless [enabled]. Its tags start with [tag]; [second]'s is [secondTag]. [clickLabel] is what TalkBack offers for a tap,
- * where "Turn on" and "Turn off" would be wrong. In a third of the tray, [labelStyle] is [HouseModeDimens.thirdLabel].
+ * where "Turn on" and "Turn off" would be wrong.
  */
 @Composable
 fun HouseModeTile(
@@ -94,7 +98,6 @@ fun HouseModeTile(
     enabled: Boolean,
     onTap: () -> Unit,
     clickLabel: String? = null,
-    labelStyle: TextStyle = HhType.buttonLabel,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val colors = Culvery.colors
@@ -115,7 +118,7 @@ fun HouseModeTile(
             trailing()
         }
         Column(Modifier.shownNotSpoken()) {
-            Text(label, style = labelStyle, color = ink, maxLines = 1)
+            Text(label, style = HhType.buttonLabel, color = ink, maxLines = 1)
             if (second != null) {
                 Text(
                     second,
@@ -126,6 +129,34 @@ fun HouseModeTile(
                 )
             }
         }
+    }
+}
+
+/**
+ * A button in a third of the tray with no label (18 walk-through): [content] centred on [background], spoken as [spoken],
+ * tagged [tag]. A tap does nothing unless [enabled], and the tile fades while it isn't.
+ */
+@Composable
+fun HouseModeThirdTile(
+    tag: String,
+    spoken: String,
+    clickLabel: String,
+    enabled: Boolean,
+    onTap: () -> Unit,
+    background: Color = Culvery.colors.surf2,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(tag)
+            .then(if (enabled) Modifier else Modifier.alpha(ControlTokens.DISABLED_ALPHA))
+            .clip(RoundedCornerShape(HouseModeDimens.radius))
+            .background(background)
+            .hhClickable(onTap, label = clickLabel, enabled = enabled, spoken = spoken),
+    ) {
+        Box(Modifier.shownNotSpoken()) { content() }
     }
 }
 

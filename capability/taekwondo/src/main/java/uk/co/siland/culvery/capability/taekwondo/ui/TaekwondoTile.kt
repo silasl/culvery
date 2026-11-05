@@ -5,25 +5,23 @@ import javax.inject.Provider
 import uk.co.siland.culvery.capability.taekwondo.Speaker
 import uk.co.siland.culvery.capability.taekwondo.TaekwondoSettings
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HouseModeDimens
-import uk.co.siland.culvery.core.ui.HouseModeTile
+import uk.co.siland.culvery.core.ui.HouseModeThirdTile
 import uk.co.siland.culvery.core.ui.Icons
 
-/** Taekwondo's third-width tray button: it has no on state, and a tap opens the practice screen. [speaker] is built when the screen first opens. */
+/** Taekwondo's third-width tray button, its icon alone like the sound pads beside it; a tap opens the practice screen. [speaker] is built when the screen first opens. */
 @Composable
 fun TaekwondoTile(settings: TaekwondoSettings, speaker: Provider<Speaker>) {
     val overlay = LocalOverlayHost.current
-    HouseModeTile(
+    HouseModeThirdTile(
         tag = "taekwondo_tile",
-        icon = Icons.SPORTS_MARTIAL_ARTS,
-        label = TaekwondoWords.TITLE,
-        on = false,
-        second = null,
-        secondTag = "taekwondo_tile_state",
         spoken = TaekwondoWords.TITLE,
-        enabled = true,
         clickLabel = TaekwondoWords.OPEN,
-        labelStyle = HouseModeDimens.thirdLabel,
+        enabled = true,
         onTap = { overlay.showFullScreen { TaekwondoScreen(settings, speaker.get(), onClose = overlay::dismiss) } },
-    )
+    ) {
+        HhIcon(Icons.SPORTS_MARTIAL_ARTS, size = HouseModeDimens.thirdIcon, filled = true, tint = Culvery.colors.accent)
+    }
 }
