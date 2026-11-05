@@ -110,7 +110,7 @@ private class WithSetup(private val steps: List<SetupStep>, private val pages: L
 private val CLASSIC = BuiltInSound.CLASSIC.asSound()
 private val DOOR_UI =
     DoorSettingsUi("Ring", null, 0.5f, FOLLOW_THEME_ID, listOf(CLASSIC), false, LocalTime.of(22, 0), LocalTime.of(7, 0), null, "never", true, true, false, KeepDays.TWO)
-private val DOOR_ACTIONS = DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {})
+private val DOOR_ACTIONS = DoorSettingsActions({}, {}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {})
 private val LIGHTS_UI = LightsSettingsUi(true, null, null, false, emptyList(), null, emptySet(), 0)
 private val MUSIC_UI = MusicSettingsUi(true, null, null, false, emptyList(), null, 50)
 private val MUSIC_ACTIONS = MusicSettingsActions({}, {}, {}, {})
