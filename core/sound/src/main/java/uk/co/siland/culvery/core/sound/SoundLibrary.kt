@@ -54,7 +54,7 @@ class SoundLibrary @VisibleForTesting constructor(
         }
     }
 
-    fun byId(id: String?): Sound? = id?.let { wanted -> sounds.value.firstOrNull { it.id == wanted } }
+    fun byId(id: String?): Sound? = sounds.value.soundFor(id)
 
     /** Happy Birthday plays on the birthday pad only. */
     val choices: Flow<List<Sound>> = sounds.map { all -> all.filter { it.id != BuiltInSound.HAPPY_BIRTHDAY.id } }

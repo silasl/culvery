@@ -12,14 +12,14 @@ class BuiltInSoundTest {
     @Test
     fun idsAreBuiltinKeys() {
         assertThat(BuiltInSound.entries.map { it.id }).containsExactly(
-            "builtin:classic", "builtin:organ", "builtin:sad_trombone", "builtin:happy_birthday", "builtin:christmas_bells",
+            "builtin:classic", "builtin:organ", "builtin:happy_birthday", "builtin:christmas_music_box",
         ).inOrder()
     }
 
     @Test
     fun onlyTheOrganHasATheme() {
         assertThat(BuiltInSound.ORGAN.theme).isEqualTo(SeasonalTheme.HALLOWEEN)
-        assertThat(BuiltInSound.entries.filter { it != BuiltInSound.ORGAN }.map { it.theme }).containsExactly(null, null, null, null)
+        assertThat(BuiltInSound.entries.filter { it != BuiltInSound.ORGAN }.map { it.theme }).containsExactly(null, null, null)
     }
 
     @Test

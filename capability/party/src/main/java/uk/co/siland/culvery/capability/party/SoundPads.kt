@@ -19,7 +19,9 @@ import uk.co.siland.culvery.core.plugin.settingsDataStore
 import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
+import uk.co.siland.culvery.core.sound.SAD_TROMBONE_ID
 import uk.co.siland.culvery.core.sound.id
+import uk.co.siland.culvery.core.sound.soundFor
 import uk.co.siland.culvery.core.ui.ShowingTheme
 
 private const val FILE = "sound_pads"
@@ -29,7 +31,7 @@ private const val NONE = "none"
 const val PAD_COUNT = 3
 
 private val KEYS = (1..PAD_COUNT).map { stringPreferencesKey("pad_$it") }
-private val DEFAULTS = listOf(BuiltInSound.SAD_TROMBONE.id, BuiltInSound.ORGAN.id, null)
+private val DEFAULTS = listOf(SAD_TROMBONE_ID, BuiltInSound.ORGAN.id, null)
 
 /** Which sound each pad plays, by sound id, in a small DataStore file of its own (18 §4.2). Writes throw `IOException`. */
 @Singleton
@@ -79,6 +81,6 @@ class SoundPads internal constructor(stored: Flow<List<String?>>, room: Flow<Int
         this(store.pads, shelf.soundRoom, library.sounds, showing.birthdayShowing)
 
     val shown: Flow<List<PadUi>> = combine(stored, room, sounds, birthday) { ids, spots, all, isBirthday ->
-        shownPads(ids, spots, { id -> all.firstOrNull { it.id == id } }, isBirthday)
+        shownPads(ids, spots, all::soundFor, isBirthday)
     }.distinctUntilChanged()
 }

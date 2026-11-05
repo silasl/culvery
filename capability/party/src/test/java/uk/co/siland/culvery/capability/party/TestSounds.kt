@@ -10,16 +10,18 @@ import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundSource
 import uk.co.siland.culvery.core.sound.asSound
+import uk.co.siland.culvery.core.sound.soundFor
 
-internal val TROMBONE = BuiltInSound.SAD_TROMBONE.asSound()
+/** The clip the family keeps on the tablet; pad 1 defaults to it. */
+internal val TROMBONE = Sound("file:Sad trombone.wav", "Sad trombone", SoundSource.OnTablet(File("Sad trombone.wav")), null)
 internal val ORGAN = BuiltInSound.ORGAN.asSound()
 internal val BIRTHDAY_SONG = BuiltInSound.HAPPY_BIRTHDAY.asSound()
 internal val HONK = Sound("file:Test Honk.wav", "Test Honk", SoundSource.OnTablet(File("Test Honk.wav")), null)
 
-/** What the library holds in these tests: every built-in sound and Test Honk. */
-internal val LIBRARY = BuiltInSound.entries.map { it.asSound() } + HONK
+/** What the library holds in these tests: every built-in sound, Sad trombone and Test Honk. */
+internal val LIBRARY = BuiltInSound.entries.map { it.asSound() } + TROMBONE + HONK
 
-internal fun inLibrary(id: String?): Sound? = LIBRARY.firstOrNull { it.id == id }
+internal fun inLibrary(id: String?): Sound? = LIBRARY.soundFor(id)
 
 internal class FakeDoor : DoorQuiet {
     val ring = MutableStateFlow(false)

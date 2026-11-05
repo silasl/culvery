@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.sound.SAD_TROMBONE_ID
+import uk.co.siland.culvery.core.sound.soundFor
 
 /** 18 §4.2, §4.3: what each pad holds, and which pads show. */
 @RunWith(AndroidJUnit4::class)
@@ -18,10 +20,17 @@ class SoundPadsTest {
     private fun shown(stored: List<String?>, room: Int = 3, birthday: Boolean = false) =
         shownPads(stored, room, ::inLibrary, birthday).map { it.pad to it.sound.id }
 
-    /** Fails if a fresh file reads anything but Sad trombone, Haunted organ and None. */
+    /** Fails if a fresh file reads anything but the Sad trombone default, Haunted organ and None. */
     @Test
     fun defaultsAreTromboneOrganNone() = runTest {
-        assertThat(store.pads.first()).containsExactly(TROMBONE.id, ORGAN.id, null).inOrder()
+        assertThat(store.pads.first()).containsExactly(SAD_TROMBONE_ID, ORGAN.id, null).inOrder()
+    }
+
+    /** Fails if the default, or a stored built-in Sad trombone, doesn't find the tablet's clip, or shows a pad when the folder has none. */
+    @Test
+    fun theTromboneDefaultIsTheTabletsClipIfAny() {
+        assertThat(shown(listOf(SAD_TROMBONE_ID, null, null))).containsExactly(1 to TROMBONE.id)
+        assertThat(shownPads(listOf(SAD_TROMBONE_ID, null, null), 3, (LIBRARY - TROMBONE)::soundFor, false)).isEmpty()
     }
 
     /** Fails if None isn't written as "none" under its pad's key, so it reads back as the default, or another pad changes. */

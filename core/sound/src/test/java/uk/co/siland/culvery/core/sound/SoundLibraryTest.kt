@@ -56,7 +56,7 @@ class SoundLibraryTest {
     fun builtInsComeFirst() {
         touch("Test Honk.wav")
         val ids = library().sounds.value.map { it.id }
-        assertThat(ids.take(5)).containsExactlyElementsIn(BuiltInSound.entries.map { it.id }).inOrder()
+        assertThat(ids.take(BuiltInSound.entries.size)).containsExactlyElementsIn(BuiltInSound.entries.map { it.id }).inOrder()
         assertThat(ids.last()).isEqualTo("file:Test Honk.wav")
     }
 
@@ -86,6 +86,13 @@ class SoundLibraryTest {
     @Test
     fun noThemeIsTheClassicChime() {
         assertThat(library().forTheme(null).id).isEqualTo(BuiltInSound.CLASSIC.id)
+    }
+
+    @Test
+    fun theOldBuiltInTromboneIsTheTabletsClip() {
+        assertThat(library().byId(SAD_TROMBONE_ID)).isNull()
+        touch("Sad trombone.mp3")
+        assertThat(library().byId(SAD_TROMBONE_ID)!!.id).isEqualTo("file:Sad trombone.mp3")
     }
 
     @Test
