@@ -1,6 +1,5 @@
 package uk.co.siland.culvery.capability.door
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.runtime.Composable
@@ -118,20 +117,14 @@ internal class FakeChime : Chime {
     }
 }
 
-/** The tablet's sounds folder under Robolectric; [tabletSound] puts a made-up file in it, [clearTabletSounds] empties it. */
-private fun soundsFolder(): File = ApplicationProvider.getApplicationContext<Context>().getExternalFilesDir(null)!!.resolve("sounds")
+/** The real library over [folder] as the tablet's sounds folder, read as it is made; null is a tablet with no sounds folder. */
+internal fun testSounds(folder: File? = null) = SoundLibrary({ folder }, CoroutineScope(Dispatchers.Unconfined), Dispatchers.Unconfined)
 
-internal fun tabletSound(path: String) = soundsFolder().resolve(path).apply {
+/** Puts a made-up file at [path] in [folder]. */
+internal fun tabletSound(folder: File, path: String) = folder.resolve(path).apply {
     parentFile!!.mkdirs()
     writeBytes(byteArrayOf(0))
 }
-
-internal fun clearTabletSounds() {
-    soundsFolder().deleteRecursively()
-}
-
-/** The real store over Robolectric's folder: write any [tabletSound] before making it. */
-internal fun testSounds() = SoundLibrary(ApplicationProvider.getApplicationContext())
 
 internal class FakeShowing(theme: SeasonalTheme? = null) : ShowingTheme {
     override val showing = MutableStateFlow(theme)

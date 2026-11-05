@@ -51,7 +51,6 @@ import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
 import uk.co.siland.culvery.capability.door.NOW
 import uk.co.siland.culvery.capability.door.RecordingToaster
 import uk.co.siland.culvery.capability.door.TestAccess
-import uk.co.siland.culvery.capability.door.clearTabletSounds
 import uk.co.siland.culvery.capability.door.doorSettings
 import uk.co.siland.culvery.capability.door.tabletSound
 import uk.co.siland.culvery.capability.door.testSounds
@@ -74,6 +73,7 @@ import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 class DoorSettingsPageTest {
     @get:Rule val compose = createComposeRule()
     @get:Rule val folder = TemporaryFolder()
+    private val sounds by lazy { folder.root.resolve("sounds") }
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val london = ZoneId.of("Europe/London")
     private val settings by lazy { doorSettings(folder.root, io) }
@@ -87,7 +87,6 @@ class DoorSettingsPageTest {
     @After
     fun tearDown() {
         io.cancel()
-        clearTabletSounds()
     }
 
     /** Robolectric's main looper runs only when the test idles it, so each check lets the UI and its effects run first. */
@@ -105,7 +104,7 @@ class DoorSettingsPageTest {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
                 CulveryTheme(dark = true) {
-                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, testSounds(), clock, flowOf(london), toaster, MutableStateFlow(showing), access) }
+                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, testSounds(sounds), clock, flowOf(london), toaster, MutableStateFlow(showing), access) }
                 }
             }
         }
@@ -167,7 +166,7 @@ class DoorSettingsPageTest {
     /** 18 §6.1: Follow the theme first, then every sound but Happy Birthday, the tablet's marked as such. */
     @Test
     fun everyChoiceIsOffered() {
-        tabletSound("Test Honk.wav")
+        tabletSound(sounds, "Test Honk.wav")
         showHost()
         waitFor { shows("door_doorbell_file:Test Honk.wav") }
         val follow = compose.onNodeWithTag("door_doorbell_follow").getBoundsInRoot().top

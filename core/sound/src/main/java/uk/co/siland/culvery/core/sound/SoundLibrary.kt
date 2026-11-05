@@ -1,14 +1,15 @@
 package uk.co.siland.culvery.core.sound
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,26 +17,41 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 /** The built-in sounds followed by the ones in the tablet's sounds folder. The folder is read at start and on [refresh]. */
 @Singleton
-class SoundLibrary internal constructor(private val root: () -> File?, private val io: CoroutineDispatcher) {
+class SoundLibrary @VisibleForTesting constructor(
+    private val root: () -> File?,
+    scope: CoroutineScope,
+    private val io: CoroutineDispatcher,
+) {
     @Inject
-    constructor(@ApplicationContext context: Context) :
-        this({ context.getExternalFilesDir(null)?.resolve("sounds") }, Dispatchers.IO)
+    constructor(@ApplicationContext context: Context, @ApplicationScope scope: CoroutineScope) :
+        this({ context.getExternalFilesDir(null)?.resolve("sounds") }, scope, Dispatchers.IO)
 
     private val builtIns = BuiltInSound.entries.map { it.asSound() }
     private val state = MutableStateFlow(builtIns)
+    private val reads = AtomicLong()
+    private var shown = 0L
 
     val sounds: StateFlow<List<Sound>> = state.asStateFlow()
 
     init {
-        CoroutineScope(SupervisorJob() + io).launch { state.value = builtIns + readSoundsFolder(root()) }
+        scope.launch { refresh() }
     }
 
+    /** When reads overlap, the one that began last wins. */
     suspend fun refresh() {
-        state.value = builtIns + withContext(io) { readSoundsFolder(root()) }
+        val read = reads.incrementAndGet()
+        val found = withContext(io) { readSoundsFolder(root()) }
+        synchronized(state) {
+            if (read > shown) {
+                shown = read
+                state.value = builtIns + found
+            }
+        }
     }
 
     fun byId(id: String?): Sound? = id?.let { wanted -> sounds.value.firstOrNull { it.id == wanted } }

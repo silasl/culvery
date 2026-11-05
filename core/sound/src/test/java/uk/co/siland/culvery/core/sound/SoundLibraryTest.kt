@@ -2,8 +2,14 @@ package uk.co.siland.culvery.core.sound
 
 import com.google.common.truth.Truth.assertThat
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -21,7 +27,30 @@ class SoundLibraryTest {
         file.writeBytes(byteArrayOf(0))
     }
 
-    private fun library() = SoundLibrary({ folder.root }, UnconfinedTestDispatcher())
+    private fun library() = SoundLibrary({ folder.root }, CoroutineScope(UnconfinedTestDispatcher()), UnconfinedTestDispatcher())
+
+    /** 18 §2.2: the page's re-read wins over a start-up read that was slower to finish. */
+    @Test
+    fun aSlowStartUpReadLeavesARefreshsSounds() = runBlocking {
+        val empty = folder.newFolder("empty")
+        val reading = CountDownLatch(1)
+        val finish = CountDownLatch(1)
+        val first = AtomicBoolean(true)
+        val start = SupervisorJob()
+        val library = SoundLibrary({
+            if (first.getAndSet(false)) {
+                reading.countDown()
+                finish.await()
+                empty
+            } else folder.root
+        }, CoroutineScope(start + Dispatchers.Unconfined), Dispatchers.IO)
+        reading.await()
+        touch("Test Honk.wav")
+        library.refresh()
+        finish.countDown()
+        start.children.forEach { it.join() }
+        assertThat(library.sounds.value.map { it.id }).contains("file:Test Honk.wav")
+    }
 
     @Test
     fun builtInsComeFirst() {

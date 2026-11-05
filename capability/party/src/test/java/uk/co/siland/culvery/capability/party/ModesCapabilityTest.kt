@@ -1,6 +1,5 @@
 package uk.co.siland.culvery.capability.party
 
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.util.Optional
@@ -27,7 +26,7 @@ class ModesCapabilityTest {
         ModesShelf(rig.settings, Provider { emptySet() }, backgroundScope),
         SoundPads(flowOf(listOf(TROMBONE.id, null, HONK.id)), flowOf(padRoom), flowOf(LIBRARY), flowOf(false)),
         PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 1f }, backgroundScope, Dispatchers.Unconfined),
-        SoundPadsStore(MemoryStore()), SoundLibrary(ApplicationProvider.getApplicationContext()),
+        SoundPadsStore(MemoryStore()), SoundLibrary({ null }, backgroundScope, Dispatchers.Unconfined),
         Optional.of(rig.music), Optional.of(rig.lights), Optional.of(rig.plugs), emptySet(), emptySet(), RecordingToaster(),
     )
 
