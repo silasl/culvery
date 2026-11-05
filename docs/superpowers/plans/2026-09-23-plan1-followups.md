@@ -1006,3 +1006,17 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **Recipes into the shopping list (the user, 2026-10-27):** extend Shopping with a curated list of recipes; tapping one has Culvery read the recipe page for its ingredients and add them to the shopping list.
 - **A status tab (the user, 2026-10-28, from the Plan 12 walk-through):** "maybe we need some sort of status tab that's where extended detail like this lives": one place for the fuller story behind the short lines on tiles and rows, such as every Holiday step that failed or was missed, which plugs did not go back, and the Home Assistant link's state. Tiles keep one short line and point there. Its own spec; no detail yet. Would also give the rail redesign a case to weigh.
 - **A Modes settings tab with custom modes (the user, 2026-10-29, from the Plan 13 walk-through):** **Done in Plan 15b (2026-11-03).** one Settings page for Holiday and Party mode, where the family can also add their own modes (each with its own plug, music and lights choices and a tile in the One-tap tray). Its own spec; no detail yet. Would fold the Party mode settings page and the Plugs tab's per-mode columns into one place.
+- **Plan 18 left for later (2026-11-05):**
+  - Pads on Sonos (the user chose the tablet speaker for now).
+  - A Christmas seasonal theme, which would make Christmas music box Follow the theme's sound in December.
+  - A real sleigh-bell recording for Christmas, if the family finds one with a licence that allows it (generated sleigh bells didn't convince).
+  - Birthdays override a doorbell set to one sound? Today only Follow the theme switches to Happy Birthday.
+- **Plan 18 deferred minors (2026-11-05, from the build's reviews):**
+  - Generators: the WAV normalise and write tail is copied across `tools/sound/*.py`; Happy Birthday sits about 92% of the chime's loudness (peak cap beats the RMS target).
+  - SoundLibrary: the first folder read can overwrite a faster refresh; before it lands, a chosen tablet file shows "Not on this tablet any more"; a read failure in the init scope is unhandled; the shared-name check is case-sensitive; a capitalised `Halloween/` folder is ignored; same-named files drop the subfolder one.
+  - SoundPlayer: a tablet doorbell that fails after starting gets no classic fallback; `prepare()` runs on the caller's thread; a stop tap during a pad's open is ignored and the sound then starts (a few ms); a pad tapped during the doorbell's own open relies on the pad gate.
+  - Pads: the block state can be up to 60 s stale (ticker not minute-aligned); pads look playable before the first gate read; no 150 ms press flash anywhere (pads match the other tiles); Settings' Play failure is silent.
+  - A hand-edited `builtin:happy_birthday` would ring at the door; `goneName` duplicates the door's `goneFileName`.
+  - Tests: door module tests and StoredModePageTest are flaky under full-project load; some fixtures (`testSounds()` IO reads, `DoorQuietnessTest` waits) want timeouts; `home_tray_full` passes 4 modes and is silently cut to 2; small style nits (import order, a fully-qualified Context, a long lock comment).
+  - `culvery-notes/sounds/prepare.sh`: hard-coded chime path, a silent abort on an empty source, single-pass loudnorm (±0.5 LU).
+
