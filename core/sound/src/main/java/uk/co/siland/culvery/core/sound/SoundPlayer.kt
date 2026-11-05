@@ -63,10 +63,7 @@ class SoundPlayer internal constructor(
      * A sound that won't open or start gives way to the classic chime. True when a sound started.
      */
     fun playDoorbell(sound: Sound, volume: Float): Boolean {
-        synchronized(lock) {
-            rings++
-            stopPads()
-        }
+        ringStarted()
         if (start(sound, volume, DOORBELL_CAP_MS, null, 0)) return true
         if (sound.id == BuiltInSound.CLASSIC.id) return false
         return start(CLASSIC, volume, DOORBELL_CAP_MS, null, 0)
@@ -79,6 +76,14 @@ class SoundPlayer internal constructor(
             rings
         }
         return start(sound, volume, PAD_CAP_MS, pad, ringsBefore)
+    }
+
+    /** Stops any pad sound, and any pad still opening won't start. */
+    fun ringStarted() {
+        synchronized(lock) {
+            rings++
+            stopPads()
+        }
     }
 
     fun stopPads() {

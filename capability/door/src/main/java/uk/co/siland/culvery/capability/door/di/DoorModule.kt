@@ -58,7 +58,7 @@ abstract class DoorModule {
         fun chime(player: SoundPlayer): Chime = object : Chime {
             override fun play(sound: Sound, volume: Float) = player.playDoorbell(sound, volume)
 
-            override fun hushPads() = player.stopPads()
+            override fun hushPads() = player.ringStarted()
         }
 
         @Provides

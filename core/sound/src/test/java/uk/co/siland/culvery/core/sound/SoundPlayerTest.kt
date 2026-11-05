@@ -240,4 +240,16 @@ class SoundPlayerTest {
         assertThat(player.padPlaying.value).isNull()
         assertThat(playing(classic)).isTrue()
     }
+
+    @Test
+    fun aRingStartingWhileAPadOpensLeavesThePadUnstarted() {
+        lateinit var player: SoundPlayer
+        player = SoundPlayer({ sound ->
+            player.ringStarted()
+            prepared(sound.id).also { made[sound.id] = it }
+        }, scope)
+        assertThat(player.playPad(1, honk, 1f)).isFalse()
+        assertThat(released(honk)).isTrue()
+        assertThat(player.padPlaying.value).isNull()
+    }
 }
