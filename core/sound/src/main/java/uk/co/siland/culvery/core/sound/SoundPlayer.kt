@@ -6,7 +6,6 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.IOException
 import java.util.Collections
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -51,6 +50,8 @@ class SoundPlayer internal constructor(
     }
 
     internal val live: MutableSet<MediaPlayer> = Collections.synchronizedSet(mutableSetOf())
+    // Guards pad and padState: caps finish on the scope's thread, listeners on main, rings off main.
+    private val lock = Any()
     private var pad: Play? = null
     private val padState = MutableStateFlow<Int?>(null)
 
@@ -74,7 +75,7 @@ class SoundPlayer internal constructor(
     }
 
     fun stopPads() {
-        pad?.let(::finish)
+        synchronized(lock) { pad?.let(::finish) }
     }
 
     private fun start(sound: Sound, volume: Float, capMs: Long, padNumber: Int?): Boolean {
@@ -84,34 +85,36 @@ class SoundPlayer internal constructor(
             return false
         }
         val play = Play(player)
-        live += player
-        try {
-            player.setVolume(volume, volume)
-            player.setOnCompletionListener { finish(play) }
-            player.setOnErrorListener { _, _, _ ->
+        synchronized(lock) {
+            live += player
+            try {
+                player.setVolume(volume, volume)
+                player.setOnCompletionListener { finish(play) }
+                player.setOnErrorListener { _, _, _ ->
+                    finish(play)
+                    true
+                }
+                player.start()
+            } catch (_: IllegalStateException) {
+                logFailed(sound)
                 finish(play)
-                true
+                return false
             }
-            player.start()
-        } catch (e: IllegalStateException) {
-            logFailed(sound)
-            finish(play)
-            return false
-        }
-        if (padNumber != null) {
-            pad = play
-            padState.value = padNumber
-        }
-        if (sound.source is SoundSource.OnTablet) {
-            play.cap = scope.launch {
-                delay(capMs)
-                finish(play)
+            if (padNumber != null) {
+                pad = play
+                padState.value = padNumber
+            }
+            if (sound.source is SoundSource.OnTablet) {
+                play.cap = scope.launch {
+                    delay(capMs)
+                    finish(play)
+                }
             }
         }
         return true
     }
 
-    private fun finish(play: Play) {
+    private fun finish(play: Play) = synchronized(lock) {
         if (!live.remove(play.player)) return
         play.cap?.cancel()
         play.player.release()
@@ -140,10 +143,7 @@ class SoundPlayer internal constructor(
                 player.setDataSource(path)
                 player.prepare()
                 player
-            } catch (e: IOException) {
-                player.release()
-                null
-            } catch (e: RuntimeException) {
+            } catch (_: Exception) {
                 player.release()
                 null
             }
