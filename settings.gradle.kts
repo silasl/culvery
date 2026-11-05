@@ -17,6 +17,7 @@ rootProject.name = "Culvery"
 include(":app")
 include(":core:ui")
 include(":core:plugin")
+include(":core:sound")
 include(":core:household")
 include(":core:access")
 include(":core:house")

@@ -3,7 +3,7 @@
 
 Standard library only. Culvery's own sound, under the repository's licence: no third-party audio.
 Usage, from the repo root: python tools/sound/door_chime.py
-Writes: capability/door/src/main/res/raw/door_chime.wav
+Writes: core/sound/src/main/res/raw/door_chime.wav
 """
 import math
 import pathlib
@@ -18,7 +18,7 @@ ATTACK = 0.002  # seconds
 # (frequency in Hz, start in seconds): the ding-dong, then again.
 NOTES = [(659.25, 0.0), (523.25, 0.45), (659.25, 1.7), (523.25, 2.15)]
 HEADROOM = 0.95
-OUT = pathlib.Path(__file__).resolve().parents[2] / "capability" / "door" / "src" / "main" / "res" / "raw" / "door_chime.wav"
+OUT = pathlib.Path(__file__).resolve().parents[2] / "core" / "sound" / "src" / "main" / "res" / "raw" / "door_chime.wav"
 
 
 def sample(t):

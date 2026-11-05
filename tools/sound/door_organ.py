@@ -3,7 +3,7 @@
 
 Standard library only. Culvery's own sound, under the repository's licence: no third-party audio.
 Usage, from the repo root: python tools/sound/door_organ.py
-Writes: capability/door/src/main/res/raw/door_organ.wav
+Writes: core/sound/src/main/res/raw/door_organ.wav
 """
 import math
 import pathlib
@@ -28,7 +28,7 @@ HEADROOM = 0.95
 # Level the door chime reaches over its first 3 s (RMS, 16-bit units) times 1.25: the organ is as loud as the chime, not louder.
 TARGET_RMS = 6970.0
 RMS_SECONDS = 3.5
-OUT = pathlib.Path(__file__).resolve().parents[2] / "capability" / "door" / "src" / "main" / "res" / "raw" / "door_organ.wav"
+OUT = pathlib.Path(__file__).resolve().parents[2] / "core" / "sound" / "src" / "main" / "res" / "raw" / "door_organ.wav"
 
 
 def envelope(u, length, last):

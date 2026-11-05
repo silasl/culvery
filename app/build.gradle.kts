@@ -55,6 +55,7 @@ dependencies {
     implementation(project(":core:access"))
     implementation(project(":core:house"))
     implementation(project(":core:setup"))
+    implementation(project(":core:sound"))
     // Wired by Hilt alone: the Google sign-in the calendar and the shopping list share (10 §4.1).
     implementation(project(":core:google"))
     // Wired by Hilt alone: the Home Assistant link the hoover and the heating share (11 §4.1).

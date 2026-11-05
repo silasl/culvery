@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":core:access"))
     implementation(project(":core:house"))
     implementation(project(":core:household"))
+    implementation(project(":core:sound"))
     implementation(project(":core:ui"))
     implementation(libs.androidx.datastore.preferences)
     testImplementation(libs.roborazzi.core)

@@ -9,10 +9,11 @@ import androidx.annotation.RawRes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Collections
 import javax.inject.Inject
+import uk.co.siland.culvery.core.sound.R as SoundR
 
 enum class DoorSound(@RawRes internal val res: Int) {
-    CLASSIC(R.raw.door_chime),
-    ORGAN(R.raw.door_organ),
+    CLASSIC(SoundR.raw.door_chime),
+    ORGAN(SoundR.raw.door_organ),
 }
 
 fun interface Chime {
