@@ -103,6 +103,7 @@ class DoorAlerts internal constructor(
         }
         val alreadyShowing = _showing.value != null
         _showing.value = ShowingRing(event.id, card)
+        chime.hushPads()
         if (!alreadyShowing) host.show(loud = true) { DoorCardHost(this@DoorAlerts) }
         closing?.cancel()
         closing = scope.launch {

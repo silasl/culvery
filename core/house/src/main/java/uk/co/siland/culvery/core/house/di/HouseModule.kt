@@ -7,6 +7,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
+import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
@@ -38,6 +39,9 @@ abstract class HouseModule {
 
     @BindsOptionalOf
     abstract fun music(): HouseMusic
+
+    @BindsOptionalOf
+    abstract fun doorQuiet(): DoorQuiet
 
     // With none bound, Holiday mode's tile shows first in the tray as before 15b.
     @BindsOptionalOf

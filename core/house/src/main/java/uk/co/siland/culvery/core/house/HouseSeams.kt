@@ -293,6 +293,18 @@ interface HouseMusic {
     suspend fun putBack(before: List<GroupBefore>): HouseStep
 }
 
+/** What the sound pads see of the door (18 §7); absent with no door capability. */
+interface DoorQuiet {
+    /** True while the ring card shows. */
+    val ringShowing: Flow<Boolean>
+
+    /** True in the door's quiet hours, read on the household's clock. */
+    suspend fun quietNow(): Boolean
+
+    /** The doorbell's volume, 0 to 1. */
+    val volume: Float
+}
+
 /** A Hue scene. [toString] leaves out the id and name. */
 data class HouseScene(val id: String, val name: String) {
     override fun toString() = "HouseScene"

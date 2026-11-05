@@ -55,6 +55,44 @@ class DoorAlertsTest {
         assertThat(chime.plays.single().first).isEqualTo(BuiltInSound.CLASSIC.id)
     }
 
+    /** 18 §7: Fails if the pads are hushed after the music is turned down, or not at all for a ring that is too soon for a chime. */
+    @Test
+    fun aNewRingHushesThePadsBeforeQuieting() = runTest {
+        val order = mutableListOf<String>()
+        chime.onHush = { order += "hush(quieted=${host.quietedCalls})" }
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        advanceTimeBy(1)
+        alerts.onRecorded(rung(2))
+        assertThat(order).containsExactly("hush(quieted=0)", "hush(quieted=1)").inOrder()
+        assertThat(chime.volumes).hasSize(1)
+    }
+
+    @Test
+    fun aRingInQuietHoursStillHushesThePads() = runTest {
+        start = NOW + 8 * 60 * 60_000L - 2 * 60_000L
+        alerts().onRecorded(rung(1))
+        assertThat(chime.hushes).isEqualTo(1)
+        assertThat(chime.volumes).isEmpty()
+    }
+
+    @Test
+    fun aStoredRingDoesNotHush() = runTest {
+        val alerts = alerts()
+        night = true
+        alerts.onRecorded(rung(1))
+        night = false
+        holiday = true
+        alerts.onRecorded(rung(2))
+        holiday = null
+        host.inFront.value = false
+        alerts.onRecorded(rung(3))
+        host.inFront.value = true
+        alerts.onRecorded(rung(4, isNew = false))
+        alerts.onRecorded(Recorded(DoorEvent(5, NOW, DoorKind.MOTION, "Front Door", false, null, false), isNew = true))
+        assertThat(chime.hushes).isEqualTo(0)
+    }
+
     @Test
     fun motionNeverAlerts() = runTest {
         val alerts = alerts()

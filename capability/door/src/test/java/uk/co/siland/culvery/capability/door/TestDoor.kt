@@ -102,6 +102,7 @@ internal class FakeChime : Chime {
     val plays = mutableListOf<Pair<String, Float>>()
     val volumes: List<Float> get() = plays.map { it.second }
     var hushes = 0
+    var onHush: () -> Unit = {}
 
     /** What [play] reports: false for a chime that couldn't start. */
     var starts = true
@@ -113,6 +114,7 @@ internal class FakeChime : Chime {
 
     override fun hushPads() {
         hushes++
+        onHush()
     }
 }
 
