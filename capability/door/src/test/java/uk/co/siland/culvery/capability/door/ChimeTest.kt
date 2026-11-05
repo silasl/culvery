@@ -10,6 +10,7 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.sound.CHIME_ATTRIBUTES
 
 @RunWith(AndroidJUnit4::class)
 class ChimeTest {
