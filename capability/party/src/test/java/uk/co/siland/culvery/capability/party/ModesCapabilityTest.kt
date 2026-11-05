@@ -5,6 +5,7 @@ import com.google.common.truth.Truth.assertThat
 import java.util.Optional
 import javax.inject.Provider
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -16,9 +17,13 @@ import uk.co.siland.culvery.core.ui.Icons
 
 @RunWith(AndroidJUnit4::class)
 class ModesCapabilityTest {
-    private fun TestScope.capability(rig: HouseRig = HouseRig(backgroundScope)) = ModesCapability(
+    private val player = FakePlayer()
+
+    private fun TestScope.capability(rig: HouseRig = HouseRig(backgroundScope), padRoom: Int = 3) = ModesCapability(
         StoredModeActions(TestAccess(Role.ADULT), rig.house, rig.settings, emptySet()), rig.house, rig.settings,
         ModesShelf(rig.settings, Provider { emptySet() }, backgroundScope),
+        SoundPads(flowOf(listOf(TROMBONE.id, null, HONK.id)), flowOf(padRoom), flowOf(LIBRARY), flowOf(false)),
+        PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 1f }, backgroundScope),
         Optional.of(rig.music), Optional.of(rig.lights), Optional.of(rig.plugs), emptySet(), emptySet(), RecordingToaster(),
     )
 
@@ -42,7 +47,17 @@ class ModesCapabilityTest {
 
         val buttons = capability(rig).trayButtons().first()
 
-        assertThat(buttons.map { Triple(it.id, it.order, it.width) }).containsExactly(Triple("mode.party", 11, TrayWidth.HALF))
+        assertThat(buttons.filter { it.width == TrayWidth.HALF }.map { Triple(it.id, it.order, it.width) })
+            .containsExactly(Triple("mode.party", 11, TrayWidth.HALF))
+    }
+
+    /** 18 §4.1, Ruling 3: fails if a shown pad isn't a third-width button at 80 plus its number, or one with no room shows. */
+    @Test
+    fun eachShownPadIsAThirdButtonByNumber() = runTest {
+        suspend fun thirds(room: Int) = capability(padRoom = room).trayButtons().first().filter { it.width == TrayWidth.THIRD }.map { it.id to it.order }
+
+        assertThat(thirds(3)).containsExactly("sound.pad1" to 81, "sound.pad3" to 83).inOrder()
+        assertThat(thirds(2)).containsExactly("sound.pad1" to 81)
     }
 
     /** 15b §4.1: Settings › Modes alone sits between Lights (470) and Door (500); Party mode's old page is gone. */

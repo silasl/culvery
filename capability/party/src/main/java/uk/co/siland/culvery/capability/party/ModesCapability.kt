@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.capability.party.ui.ModeControls
 import uk.co.siland.culvery.capability.party.ui.ModesPage
+import uk.co.siland.culvery.capability.party.ui.SoundPadTileHost
 import uk.co.siland.culvery.capability.party.ui.StoredModeTileHost
 import uk.co.siland.culvery.capability.party.ui.storedModeTileLine
 import uk.co.siland.culvery.capability.party.ui.storedModeTileLineTag
@@ -29,13 +30,18 @@ import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.core.ui.Icons
 
-/** The stored modes' tiles in Home's One-tap tray, placed by [ModesShelf] (15b decision 3), and Settings › Modes: no tab and no card. */
+/**
+ * The stored modes' tiles in Home's One-tap tray, placed by [ModesShelf] (15b decision 3), the sound pads beside them
+ * (18 Ruling 1), and Settings › Modes: no tab and no card.
+ */
 @Singleton
 class ModesCapability @Inject constructor(
     private val actions: StoredModeActions,
     private val house: StoredModesHouse,
     private val settings: ModesStore,
     private val shelf: ModesShelf,
+    private val pads: SoundPads,
+    private val taps: PadTaps,
     private val music: Optional<HouseMusic>,
     private val lights: Optional<HouseLights>,
     private val plugs: Optional<HousePlugs>,
@@ -55,7 +61,9 @@ class ModesCapability @Inject constructor(
     override fun TabContent() = Unit
 
     // Mode buttons take orders 10–13 by place (15b Ruling 11). A change to what a mode does leaves the buttons as they are.
-    override fun trayButtons(): Flow<List<TrayButton>> = combine(settings.prefs, shelf.shown) { prefs, shown ->
+    override fun trayButtons(): Flow<List<TrayButton>> = combine(modeButtons(), padButtons(), List<TrayButton>::plus)
+
+    private fun modeButtons(): Flow<List<TrayButton>> = combine(settings.prefs, shelf.shown) { prefs, shown ->
         prefs.modes.mapNotNull { mode ->
             shown.indexOf(mode.id).takeIf { it >= 0 }?.let { place -> TrayMode(mode.id, mode.name, mode.icon, place) }
         }
@@ -64,6 +72,13 @@ class ModesCapability @Inject constructor(
             TrayButton(
                 HouseModes.trayId(m.id), 10 + m.place, TrayWidth.HALF, storedModeTileLine(m.id, actions, house), storedModeTileLineTag(m.id),
             ) { StoredModeTileHost(m.id, m.name, m.icon, actions, house) }
+        }
+    }
+
+    // Pads take orders 81–83 by number (18 Ruling 3).
+    private fun padButtons(): Flow<List<TrayButton>> = pads.shown.map { shown ->
+        shown.mapIndexed { i, pad ->
+            TrayButton("sound.pad${pad.pad}", 80 + pad.pad, TrayWidth.THIRD, taps.line(pad.pad, first = i == 0)) { SoundPadTileHost(pad, taps) }
         }
     }
 

@@ -133,4 +133,11 @@ object ModesWords {
         ModeRun.TURNING_ON -> "$name, turning on."
         ModeRun.TURNING_OFF -> "$name, turning off."
     }
+
+    // The sound pads (18 §4, §7).
+    const val COULDNT_PLAY = "Couldn’t play"
+    const val PAD_PLAY = "play"
+    const val PAD_STOP = "stop"
+
+    fun padSpoken(sound: String, playing: Boolean) = if (playing) "$sound, playing." else sound
 }
