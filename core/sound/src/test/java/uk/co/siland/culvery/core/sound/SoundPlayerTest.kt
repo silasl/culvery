@@ -120,6 +120,28 @@ class SoundPlayerTest {
     }
 
     @Test
+    fun aPreviewNamesItsSoundUntilItStops() {
+        val player = player(honk to Player.STARTS)
+        assertThat(player.playPad(2, honk, 1f)).isTrue()
+        assertThat(player.previewing.value).isNull()
+        assertThat(player.playPad(PREVIEW_PAD, honk, 1f)).isTrue()
+        assertThat(player.previewing.value).isEqualTo(honk.id)
+        player.stopPads()
+        assertThat(player.previewing.value).isNull()
+    }
+
+    @Test
+    fun aPreviewStopsAtTheCapItWasGiven() {
+        val player = player(honk to Player.STARTS)
+        player.playPad(PREVIEW_PAD, honk, 1f, SoundPlayer.DOORBELL_CAP_MS)
+        passTime(SoundPlayer.PAD_CAP_MS + 1)
+        assertThat(playing(honk)).isTrue()
+        passTime(SoundPlayer.DOORBELL_CAP_MS - SoundPlayer.PAD_CAP_MS)
+        assertThat(released(honk)).isTrue()
+        assertThat(player.previewing.value).isNull()
+    }
+
+    @Test
     fun aPadClearsWhenItsSoundEnds() {
         val player = player(honk to Player.STARTS)
         player.playPad(2, honk, 1f)

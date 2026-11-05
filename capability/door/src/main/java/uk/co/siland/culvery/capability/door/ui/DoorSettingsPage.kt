@@ -19,8 +19,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalTime
 import java.time.ZoneId
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.door.ACCESS_STEP
 import uk.co.siland.culvery.capability.door.ACCESS_STEP_LINE
 import uk.co.siland.culvery.capability.door.CAPTURE_LINE
@@ -68,6 +69,7 @@ import uk.co.siland.culvery.core.sound.ON_THIS_TABLET
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.sound.onTablet
+import uk.co.siland.culvery.core.sound.soundFor
 import uk.co.siland.culvery.core.sound.soundNameFromId
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
@@ -79,6 +81,7 @@ import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhRadioGroup
 import uk.co.siland.culvery.core.ui.HhRadioRow
+import uk.co.siland.culvery.core.ui.HhSoundRow
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSliderRow
 import uk.co.siland.culvery.core.ui.HhSwitchRow
@@ -86,7 +89,7 @@ import uk.co.siland.culvery.core.ui.HhTimeStepperRow
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
-import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.ShowingTheme
 import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.UNTIL
 import uk.co.siland.culvery.core.ui.rememberSingleAction
@@ -125,11 +128,15 @@ data class DoorSettingsUi(
     /** The shorter keep waiting on its question, or null when none is. */
     val shortenTo: KeepDays? = null,
     val busy: Boolean = false,
+    /** The id of the sound being previewed, or null. */
+    val previewing: String? = null,
 )
 
 class DoorSettingsActions(
     val onVolume: (Float) -> Unit,
     val onDoorbell: (String) -> Unit,
+    /** A tap on a sound's row: plays it, or stops it while it plays. */
+    val onPreview: (Sound) -> Unit,
     val onPlayChime: () -> Unit,
     val onQuietHours: (on: Boolean, from: LocalTime, until: LocalTime) -> Unit,
     val onAllowAccess: () -> Unit,
@@ -150,8 +157,12 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
         HhSectionLabel(DOORBELL_SOUND)
         HhRadioGroup {
             HhRadioRow(FOLLOW_THE_THEME, FOLLOW_THE_THEME_LINE, ui.doorbell == FOLLOW_THEME_ID, "door_doorbell_$FOLLOW_THEME_ID") { actions.onDoorbell(FOLLOW_THEME_ID) }
+            val chosen = ui.sounds.soundFor(ui.doorbell)?.id
             ui.sounds.forEach { sound ->
-                HhRadioRow(sound.name, ON_THIS_TABLET.takeIf { sound.onTablet }, ui.doorbell == sound.id, "door_doorbell_${sound.id}") { actions.onDoorbell(sound.id) }
+                HhSoundRow(
+                    sound.name, ON_THIS_TABLET.takeIf { sound.onTablet }, ui.previewing == sound.id, chosen == sound.id, "door_doorbell_${sound.id}",
+                    onPlay = { actions.onPreview(sound) }, onChoose = { actions.onDoorbell(sound.id) },
+                )
             }
             soundNameFromId(ui.doorbell)?.takeIf { ui.sounds.none { it.id == ui.doorbell } }?.let { name ->
                 HhRadioRow(name, NOT_ON_THIS_TABLET, selected = true, "door_doorbell_${ui.doorbell}") {}
@@ -222,11 +233,13 @@ internal fun DoorSettingsHost(
     clock: HouseholdClock,
     zone: Flow<ZoneId>,
     toaster: Toaster,
-    showing: StateFlow<SeasonalTheme?>,
+    showing: ShowingTheme,
     access: AccessControl,
 ) {
     val prefs by settings.prefs.collectAsStateWithLifecycle(null)
     val sounds by library.choices.collectAsStateWithLifecycle(null)
+    val previewing by chime.previewing.collectAsStateWithLifecycle()
+    val birthday by showing.birthdayShowing.collectAsStateWithLifecycle()
     val checks by health.checks.collectAsStateWithLifecycle()
     val status by health.status.collectAsStateWithLifecycle(null)
     val householdZone by zone.collectAsStateWithLifecycle(null)
@@ -250,6 +263,7 @@ internal fun DoorSettingsHost(
             volume = p.volume,
             doorbell = p.doorbell,
             sounds = choices,
+            previewing = previewing,
             quietOn = p.quietOn,
             quietFrom = p.quietFrom,
             quietUntil = p.quietUntil,
@@ -265,7 +279,10 @@ internal fun DoorSettingsHost(
         DoorSettingsActions(
             onVolume = { v -> change { settings.setVolume(v) } },
             onDoorbell = { choice -> change { settings.setDoorbell(choice) } },
-            onPlayChime = { chime.play(p.doorbellSound(library, showing.value), p.volume) },
+            onPreview = { sound ->
+                if (previewing == sound.id) chime.stopPreview() else scope.launch(Dispatchers.IO) { chime.preview(sound, p.volume) }
+            },
+            onPlayChime = { chime.play(p.doorbellSound(library, showing.showing.value, birthday), p.volume) },
             onQuietHours = { on, from, until -> change { settings.setQuietHours(on, from, until) } },
             onAllowAccess = { navigator.openSystemScreen(provider.accessScreens(), NOTIFICATION_ACCESS_MISSING) },
             onCapture = { on -> change { settings.setCapture(if (on) clock.nowMillis() + CAPTURE_MS else 0L) } },

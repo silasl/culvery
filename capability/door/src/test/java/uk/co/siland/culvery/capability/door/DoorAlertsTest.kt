@@ -36,10 +36,11 @@ class DoorAlertsTest {
     private var night: Boolean? = false
     private var holiday: Boolean? = null
     private var theme: SeasonalTheme? = null
+    private var birthday = false
     private val library = testSounds()
 
     private fun TestScope.alerts() =
-        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { night }, { holiday }, { theme }, library)
+        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { night }, { holiday }, { theme }, library) { birthday }
 
     private fun TestScope.rung(id: Long, isNew: Boolean = true, device: String = "Front Door", unrecognised: Boolean = false, snapshot: File? = null) =
         Recorded(DoorEvent(id, start + testScheduler.currentTime, DoorKind.RING, device, unrecognised, snapshot, seen = false), isNew)
@@ -264,6 +265,17 @@ class DoorAlertsTest {
         theme = SeasonalTheme.HALLOWEEN
         alerts().onRecorded(rung(1))
         assertThat(chime.plays).containsExactly(BuiltInSound.ORGAN.id to 0.6f)
+    }
+
+    /** Fails if Follow the theme doesn't ring Happy Birthday on a birthday, over the theme's sound too, or a doorbell set to a sound stops ringing it. */
+    @Test
+    fun aBirthdayRingsHappyBirthdayOnlyWhenFollowingTheTheme() = runTest {
+        birthday = true
+        theme = SeasonalTheme.HALLOWEEN
+        alerts().onRecorded(rung(1))
+        prefs = DoorPrefs(doorbell = BuiltInSound.CLASSIC.id)
+        alerts().onRecorded(rung(2))
+        assertThat(chime.plays.map { it.first }).containsExactly(BuiltInSound.HAPPY_BIRTHDAY.id, BuiltInSound.CLASSIC.id).inOrder()
     }
 
     /** 18 §6.1: a chosen tablet file that has gone rings the classic chime. */

@@ -125,10 +125,10 @@ class DoorSettingsTest {
     @Test
     fun followTheThemeAtHalloweenIsTheOrgan() {
         val library = testSounds()
-        assertThat(DoorPrefs().doorbellSound(library, SeasonalTheme.HALLOWEEN).id).isEqualTo(BuiltInSound.ORGAN.id)
-        assertThat(DoorPrefs().doorbellSound(library, null).id).isEqualTo(BuiltInSound.CLASSIC.id)
-        assertThat(DoorPrefs(doorbell = BuiltInSound.SAD_TROMBONE.id).doorbellSound(library, SeasonalTheme.HALLOWEEN).id)
-            .isEqualTo(BuiltInSound.SAD_TROMBONE.id)
+        assertThat(DoorPrefs().doorbellSound(library, SeasonalTheme.HALLOWEEN, birthday = false).id).isEqualTo(BuiltInSound.ORGAN.id)
+        assertThat(DoorPrefs().doorbellSound(library, null, birthday = false).id).isEqualTo(BuiltInSound.CLASSIC.id)
+        assertThat(DoorPrefs(doorbell = BuiltInSound.CHRISTMAS_MUSIC_BOX.id).doorbellSound(library, SeasonalTheme.HALLOWEEN, birthday = true).id)
+            .isEqualTo(BuiltInSound.CHRISTMAS_MUSIC_BOX.id)
     }
 
     /** 15a §3.1: two days until the family picks more. */

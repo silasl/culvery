@@ -47,6 +47,11 @@ class PadTaps internal constructor(
 
     val blocked: StateFlow<PadBlock?> = gate.blocked.stateIn(scope, SharingStarted.Eagerly, null)
 
+    private val previewed = MutableStateFlow<String?>(null)
+
+    /** The id of the sound Settings is previewing, or null. */
+    val previewing: Flow<String?> = combine(playing, previewed) { pad, id -> id.takeIf { pad == PREVIEW_PAD } }
+
     private val failed = MutableStateFlow<Int?>(null)
     private var failedExpiry: Job? = null
 
@@ -68,8 +73,12 @@ class PadTaps internal constructor(
     /** Plays [sound] for Settings at the doorbell's volume, whatever the time or mode. */
     suspend fun preview(sound: Sound) {
         val volume = volume()
+        previewed.value = sound.id
         withContext(io) { play(PREVIEW_PAD, sound, volume) }
     }
+
+    /** Stops the sound [preview] started. */
+    fun stopPreview() = stop()
 
     private fun clearFailed(pad: Int) {
         if (failed.value != pad) return

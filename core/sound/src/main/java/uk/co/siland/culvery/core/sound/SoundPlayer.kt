@@ -50,13 +50,17 @@ class SoundPlayer internal constructor(
     }
 
     internal val live: MutableSet<MediaPlayer> = Collections.synchronizedSet(mutableSetOf())
-    // Guards live membership, listeners, cap setup, pad, padState and rings: caps finish on the scope's thread, listeners on main, rings off main.
+    // Guards live membership, listeners, cap setup, pad, padState, previewState and rings: caps finish on the scope's thread, listeners on main, rings off main.
     private val lock = Any()
     private var pad: Play? = null
     private var rings = 0L
     private val padState = MutableStateFlow<Int?>(null)
+    private val previewState = MutableStateFlow<String?>(null)
 
     val padPlaying: StateFlow<Int?> = padState.asStateFlow()
+
+    /** The id of the sound Settings is previewing, or null. */
+    val previewing: StateFlow<String?> = previewState.asStateFlow()
 
     /**
      * Stops any pad sound first. [volume] 0–1 scales the sound within the tablet's own notification volume.
@@ -69,13 +73,13 @@ class SoundPlayer internal constructor(
         return start(CLASSIC, volume, DOORBELL_CAP_MS, null, 0)
     }
 
-    /** Stops the current pad sound first. False when it won't open or start, or a ring began while it opened. */
-    fun playPad(pad: Int, sound: Sound, volume: Float): Boolean {
+    /** Stops the current pad sound first; a tablet sound stops at [capMs]. False when it won't open or start, or a ring began while it opened. */
+    fun playPad(pad: Int, sound: Sound, volume: Float, capMs: Long = PAD_CAP_MS): Boolean {
         val ringsBefore = synchronized(lock) {
             stopPads()
             rings
         }
-        return start(sound, volume, PAD_CAP_MS, pad, ringsBefore)
+        return start(sound, volume, capMs, pad, ringsBefore)
     }
 
     /** Stops any pad sound, and any pad still opening won't start. */
@@ -122,6 +126,7 @@ class SoundPlayer internal constructor(
             if (padNumber != null) {
                 pad = play
                 padState.value = padNumber
+                previewState.value = sound.id.takeIf { padNumber == PREVIEW_PAD }
             }
             if (sound.source is SoundSource.OnTablet) {
                 play.cap = scope.launch {
@@ -141,6 +146,7 @@ class SoundPlayer internal constructor(
             if (pad === play) {
                 pad = null
                 padState.value = null
+                previewState.value = null
             }
         }
     }

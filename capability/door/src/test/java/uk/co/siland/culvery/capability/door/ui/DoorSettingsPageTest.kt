@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -44,6 +45,7 @@ import uk.co.siland.culvery.capability.door.CAPTURE_MS
 import uk.co.siland.culvery.capability.door.DoorHealth
 import uk.co.siland.culvery.capability.door.DoorPrefs
 import uk.co.siland.culvery.capability.door.FOLLOW_THEME_ID
+import uk.co.siland.culvery.capability.door.FakeShowing
 import uk.co.siland.culvery.capability.door.FakeChime
 import uk.co.siland.culvery.capability.door.FakeDoorProvider
 import uk.co.siland.culvery.capability.door.KeepDays
@@ -99,12 +101,13 @@ class DoorSettingsPageTest {
 
     private fun prefs(): DoorPrefs = runBlocking { settings.prefs.first() }
 
-    private fun showHost(showing: SeasonalTheme? = null) {
+    private fun showHost(showing: SeasonalTheme? = null, birthday: Boolean = false) {
+        val wall = FakeShowing(showing).apply { birthdayShowing.value = birthday }
         val health = DoorHealth(provider, settings, MutableStateFlow(true), MutableStateFlow(true), io)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
                 CulveryTheme(dark = true) {
-                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, testSounds(sounds), clock, flowOf(london), toaster, MutableStateFlow(showing), access) }
+                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, testSounds(sounds), clock, flowOf(london), toaster, wall, access) }
                 }
             }
         }
@@ -158,8 +161,10 @@ class DoorSettingsPageTest {
         compose.onNodeWithTag("door_doorbell_follow").assertIsSelected().assertTextContains("Follow the theme")
         compose.onNodeWithTag("door_doorbell_follow_note", useUnmergedTree = true)
             .assertTextEquals("The season’s sound while a seasonal theme shows, the classic chime otherwise.")
-        compose.onNodeWithTag("door_doorbell_builtin:classic").assertIsNotSelected().assertTextContains("Classic chime")
-        compose.onNodeWithTag("door_doorbell_builtin:organ").assertIsNotSelected().assertTextContains("Haunted organ")
+        compose.onNodeWithTag("door_doorbell_builtin:classic").assertTextContains("Classic chime")
+        compose.onNodeWithTag("door_doorbell_builtin:classic_choose").assertIsNotSelected()
+        compose.onNodeWithTag("door_doorbell_builtin:organ").assertTextContains("Haunted organ")
+        compose.onNodeWithTag("door_doorbell_builtin:organ_choose").assertIsNotSelected()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -170,8 +175,9 @@ class DoorSettingsPageTest {
         showHost()
         waitFor { shows("door_doorbell_file:Test Honk.wav") }
         val follow = compose.onNodeWithTag("door_doorbell_follow").getBoundsInRoot().top
-        val offered = listOf(BuiltInSound.CLASSIC, BuiltInSound.ORGAN, BuiltInSound.SAD_TROMBONE, BuiltInSound.CHRISTMAS_BELLS).map { sound ->
-            compose.onNodeWithTag("door_doorbell_${sound.id}").assertIsNotSelected().assertTextContains(sound.label)
+        val offered = listOf(BuiltInSound.CLASSIC, BuiltInSound.ORGAN, BuiltInSound.CHRISTMAS_MUSIC_BOX).map { sound ->
+            compose.onNodeWithTag("door_doorbell_${sound.id}").assertTextContains(sound.label)
+            compose.onNodeWithTag("door_doorbell_${sound.id}_choose").assertIsNotSelected()
             compose.onNodeWithTag("door_doorbell_${sound.id}_note", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("door_doorbell_${sound.id}").getBoundsInRoot().top
         }
@@ -199,9 +205,10 @@ class DoorSettingsPageTest {
     @Test
     fun choosingASoundSavesIt() {
         showHost()
-        compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
+        compose.onNodeWithTag("door_doorbell_builtin:organ_choose").performClick()
         waitFor { prefs().doorbell == BuiltInSound.ORGAN.id }
-        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:organ").assertIsSelected() }.isSuccess }
+        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:organ_choose").assertIsSelected() }.isSuccess }
+        assertThat(chime.previews).isEmpty()
     }
 
     /** The preview button plays what a ring would: the showing theme's sound under Follow the theme, else the choice. */
@@ -210,11 +217,47 @@ class DoorSettingsPageTest {
         showHost(SeasonalTheme.HALLOWEEN)
         compose.onNodeWithTag("door_play_chime").performClick()
         assertThat(chime.plays).containsExactly(BuiltInSound.ORGAN.id to 1.0f)
-        compose.onNodeWithTag("door_doorbell_builtin:classic").performClick()
+        compose.onNodeWithTag("door_doorbell_builtin:classic_choose").performClick()
         waitFor { prefs().doorbell == BuiltInSound.CLASSIC.id }
-        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:classic").assertIsSelected() }.isSuccess }
+        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:classic_choose").assertIsSelected() }.isSuccess }
         compose.onNodeWithTag("door_play_chime").performClick()
         assertThat(chime.plays.last()).isEqualTo(BuiltInSound.CLASSIC.id to 1.0f)
+    }
+
+    /** Fails if Play chime stops playing what a ring would on a birthday under Follow the theme. */
+    @Test
+    fun playChimePlaysHappyBirthdayOnABirthday() {
+        showHost(SeasonalTheme.HALLOWEEN, birthday = true)
+        waitFor { shows("door_play_chime") }
+        compose.onNodeWithTag("door_play_chime").performClick()
+        assertThat(chime.plays).containsExactly(BuiltInSound.HAPPY_BIRTHDAY.id to 1.0f)
+    }
+
+    /** Fails if a row's tap chooses instead of playing, plays at the wrong volume, shows no pause while it plays, or a second tap doesn't stop it. */
+    @Test
+    fun tappingARowPreviewsAndTappingAgainStops() {
+        runBlocking { settings.setVolume(0.4f) }
+        showHost()
+        waitFor { shows("door_doorbell_builtin:organ") }
+        compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
+        waitFor { chime.previews.isNotEmpty() }
+        assertThat(chime.previews).containsExactly(BuiltInSound.ORGAN.id to 0.4f)
+        assertThat(prefs().doorbell).isEqualTo(FOLLOW_THEME_ID)
+        waitFor { shows("door_doorbell_builtin:organ_pause") }
+        assertThat(shows("door_doorbell_builtin:classic_play")).isTrue()
+
+        compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
+        waitFor { chime.stopPreviews == 1 }
+        waitFor { shows("door_doorbell_builtin:organ_play") }
+    }
+
+    /** Fails if a row's radio isn't named "Choose" and its sound, or any control has no role or name. */
+    @Test
+    fun theRowsAreAccessible() {
+        showHost()
+        waitFor { shows("door_doorbell_builtin:organ_choose") }
+        compose.onNodeWithTag("door_doorbell_builtin:organ_choose").assertContentDescriptionEquals("Choose Haunted organ")
+        compose.assertAccessible()
     }
 
     private fun spokenVolume(): String {
@@ -232,7 +275,7 @@ class DoorSettingsPageTest {
                 InSettingsPane {
                     DoorSettingsScreen(
                         DoorSettingsUi("Ring", null, stored, FOLLOW_THEME_ID, emptyList(), false, LocalTime.of(21, 0), LocalTime.of(7, 0), null, "", true, true, false, KeepDays.TWO),
-                        DoorSettingsActions(onVolume, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {}),
+                        DoorSettingsActions(onVolume, {}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {}),
                     )
                 }
             }

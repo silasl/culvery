@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -39,8 +41,10 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.SAD_TROMBONE_ID
 import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.waitFor
 
 private const val GONE = "file:halloween/Test Howl.ogg"
@@ -77,7 +81,7 @@ class SoundButtonsSectionTest {
         compose.waitFor { exists("sound_pad_3") }
     }
 
-    private fun exists(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+    private fun exists(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     private fun saved() = runBlocking { store.pads.first() }
 
@@ -95,14 +99,25 @@ class SoundButtonsSectionTest {
         assertThat(refreshes).isEqualTo(1)
     }
 
-    /** Fails if a pad past the tray's room shows its sound rather than saying when it shows. */
+    /** Fails if a pad past the tray's room hides its sound behind the message, or loses the message. */
     @Test
-    fun aWaitingPadSaysSo() {
+    fun aWaitingPadShowsItsSoundAndSaysWhenItShows() {
         room.value = 2
         show(TROMBONE.id, ORGAN.id, HONK.id)
 
-        compose.onNodeWithTag("sound_pad_3").assertTextContains("Shows when there’s room in the tray")
+        compose.onNodeWithTag("sound_pad_3").assertTextContains(HONK.name)
+        compose.onNodeWithTag("sound_pad_3_waiting", useUnmergedTree = true).assertTextEquals("Shows when there’s room in the tray")
+        assertThat(exists("sound_pad_2_waiting")).isFalse()
         compose.onNodeWithTag("sound_pad_2").assertTextContains(ORGAN.name)
+    }
+
+    /** Fails if the old built-in Sad trombone, or the default, shows as anything but the tablet's clip. */
+    @Test
+    fun theTromboneDefaultNamesTheTabletsClip() {
+        show(SAD_TROMBONE_ID, ORGAN.id, null)
+
+        compose.onNodeWithTag("sound_pad_1").assertTextContains(TROMBONE.name)
+        assertThat(exists("sound_pad_1_play")).isTrue()
     }
 
     /** Fails if choosing a sound doesn't store it for that pad, close the sheet, or line a tablet sound "On this tablet". */
@@ -113,12 +128,56 @@ class SoundButtonsSectionTest {
         compose.onNodeWithTag("sound_pad_3").performClick()
         compose.onNodeWithTag("sound_choice_${HONK.id}").assertTextContains("On this tablet")
         assertThat(exists("sound_choice_${BuiltInSound.HAPPY_BIRTHDAY.id}")).isFalse()
-        compose.onNodeWithTag("sound_choice_${HONK.id}").performClick()
+        compose.onNodeWithTag("sound_choice_${HONK.id}_choose").performClick()
 
         compose.waitFor { saved()[2] == HONK.id }
         assertThat(saved()).containsExactly(TROMBONE.id, ORGAN.id, HONK.id).inOrder()
         assertThat(exists("sound_pad_sheet")).isFalse()
         compose.waitFor { exists("sound_pad_3_play") }
+    }
+
+    /** Fails if tapping a sound's row chooses it, doesn't preview it at the doorbell's volume, or the row doesn't show pause, then play again on a second tap. */
+    @Test
+    fun tappingARowPlaysAndTappingAgainStops() {
+        show(TROMBONE.id, ORGAN.id, null)
+        compose.onNodeWithTag("sound_pad_3").performClick()
+
+        compose.onNodeWithTag("sound_choice_${HONK.id}").performClick()
+        compose.waitFor { player.plays.isNotEmpty() }
+        assertThat(player.plays).containsExactly(0 to 0.6f)
+        assertThat(saved()[2]).isNull()
+        compose.waitFor { exists("sound_choice_${HONK.id}_pause") }
+        compose.onNodeWithTag("sound_choice_${HONK.id}_choose").assertIsNotSelected()
+
+        compose.onNodeWithTag("sound_choice_${HONK.id}").performClick()
+        assertThat(player.stops).isEqualTo(1)
+        compose.waitFor { exists("sound_choice_${HONK.id}_play") }
+    }
+
+    /** Fails if the radio of the chosen sound doesn't report selected, or None gets a radio of its own. */
+    @Test
+    fun theChosenSoundsRadioIsSelected() {
+        show(TROMBONE.id, ORGAN.id, null)
+        compose.onNodeWithTag("sound_pad_2").performClick()
+
+        compose.onNodeWithTag("sound_choice_${ORGAN.id}_choose").assertIsSelected()
+        compose.onNodeWithTag("sound_choice_${TROMBONE.id}_choose").assertIsNotSelected()
+        compose.onNodeWithTag("sound_choice_none").assertIsNotSelected()
+        assertThat(exists("sound_choice_none_choose")).isFalse()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if closing the sheet leaves a preview playing. */
+    @Test
+    fun closingTheSheetStopsThePreview() {
+        show(TROMBONE.id, ORGAN.id, null)
+        compose.onNodeWithTag("sound_pad_3").performClick()
+        compose.onNodeWithTag("sound_choice_${HONK.id}").performClick()
+        compose.waitFor { player.plays.isNotEmpty() }
+
+        compose.onNodeWithTag("sound_choice_${HONK.id}_choose").performClick()
+
+        compose.waitFor { player.stops > 0 }
     }
 
     /** Fails if choosing None doesn't store None for that pad. */

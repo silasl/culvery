@@ -55,6 +55,7 @@ class DoorAlerts internal constructor(
     private val holiday: () -> Boolean?,
     private val theme: () -> SeasonalTheme?,
     private val library: SoundLibrary,
+    private val birthday: () -> Boolean = { false },
 ) {
     @Inject
     constructor(
@@ -69,7 +70,7 @@ class DoorAlerts internal constructor(
         house: HouseMode,
         showing: ShowingTheme,
         library: SoundLibrary,
-    ) : this(host, store::markSeen, { settings.current.value }, chime, zone::current, clock, scope, night, { house.holiday.value }, { showing.showing.value }, library)
+    ) : this(host, store::markSeen, { settings.current.value }, chime, zone::current, clock, scope, night, { house.holiday.value }, { showing.showing.value }, library) { showing.birthdayShowing.value }
 
     private val lock = Mutex()
     private val _showing = MutableStateFlow<ShowingRing?>(null)
@@ -118,7 +119,7 @@ class DoorAlerts internal constructor(
         if (quietAt(now, z, p) || chimedRecently) return@withLock
         // Music and the like go quieter first, for half a second at most (6 §3.3).
         host.quieted()
-        if (chime.play(p.doorbellSound(library, theme()), p.volume)) lastChimeMillis = now
+        if (chime.play(p.doorbellSound(library, theme(), birthday()), p.volume)) lastChimeMillis = now
     }
 
     /** Got it on [eventId]'s card: that ring counts as seen, and the card goes if it still shows that ring (5 §4.7). */

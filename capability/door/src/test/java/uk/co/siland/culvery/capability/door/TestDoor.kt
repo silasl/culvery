@@ -103,6 +103,10 @@ internal class FakeChime : Chime {
     var hushes = 0
     var onHush: () -> Unit = {}
 
+    override val previewing = MutableStateFlow<String?>(null)
+    val previews = mutableListOf<Pair<String, Float>>()
+    var stopPreviews = 0
+
     /** What [play] reports: false for a chime that couldn't start. */
     var starts = true
 
@@ -114,6 +118,17 @@ internal class FakeChime : Chime {
     override fun hushPads() {
         hushes++
         onHush()
+    }
+
+    override fun preview(sound: Sound, volume: Float): Boolean {
+        previews += sound.id to volume
+        previewing.value = sound.id
+        return true
+    }
+
+    override fun stopPreview() {
+        stopPreviews++
+        previewing.value = null
     }
 }
 

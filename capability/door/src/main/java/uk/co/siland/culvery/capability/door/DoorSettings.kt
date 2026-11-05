@@ -33,8 +33,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.settingsDataStore
+import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
+import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 private const val FILE = "door_settings"
@@ -56,9 +58,15 @@ const val FOLLOW_THEME_ID = "follow"
 private val OLD_DOORBELL_CHOICES = mapOf("FOLLOW_THEME" to FOLLOW_THEME_ID, "CLASSIC" to "builtin:classic", "ORGAN" to "builtin:organ")
 private val SOUND_ID = Regex("(builtin|file):.+")
 
-/** What a ring plays now: a chosen file that has gone plays the classic chime. */
-fun DoorPrefs.doorbellSound(library: SoundLibrary, showing: SeasonalTheme?): Sound =
-    if (doorbell == FOLLOW_THEME_ID) library.forTheme(showing) else library.byId(doorbell) ?: library.forTheme(null)
+/**
+ * What a ring plays now: following the theme, Happy Birthday on a [birthday] and else the [showing] theme's sound; a chosen file that has gone
+ * plays the classic chime.
+ */
+fun DoorPrefs.doorbellSound(library: SoundLibrary, showing: SeasonalTheme?, birthday: Boolean): Sound = when {
+    doorbell != FOLLOW_THEME_ID -> library.byId(doorbell) ?: library.forTheme(null)
+    birthday -> library.byId(BuiltInSound.HAPPY_BIRTHDAY.id) ?: library.forTheme(showing)
+    else -> library.forTheme(showing)
+}
 
 /** How many days of door history are kept, today included (15a §3.1). */
 enum class KeepDays(val days: Int) { TWO(2), SEVEN(7), THIRTY(30) }

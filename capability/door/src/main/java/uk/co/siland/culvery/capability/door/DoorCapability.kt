@@ -65,7 +65,7 @@ class DoorCapability @Inject constructor(
         .distinctUntilChanged()
 
     private val pages: List<SettingsPage> = listOfNotNull(
-        provider?.let { p -> DoorPage { DoorSettingsHost(settings, health, p, chime, library, clock, zone.zone, toaster, showing.showing, access) } },
+        provider?.let { p -> DoorPage { DoorSettingsHost(settings, health, p, chime, library, clock, zone.zone, toaster, showing, access) } },
     )
 
     override fun settingsPages(): List<SettingsPage> = pages

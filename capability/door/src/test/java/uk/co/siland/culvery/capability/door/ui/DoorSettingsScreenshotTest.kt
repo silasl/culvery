@@ -36,7 +36,7 @@ import uk.co.siland.culvery.core.ui.SeasonalTheme
 class DoorSettingsScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private val actions = DoorSettingsActions({}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {})
+    private val actions = DoorSettingsActions({}, {}, {}, {}, { _, _, _ -> }, {}, {}, {}, {}, {})
 
     private val sounds = BuiltInSound.entries.filter { it != BuiltInSound.HAPPY_BIRTHDAY }.map { it.asSound() } +
         Sound("file:Test Honk.wav", "Test Honk", SoundSource.OnTablet(File("Test Honk.wav")), null)

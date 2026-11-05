@@ -144,6 +144,9 @@ object RadioRowTokens {
     val radioGap = 13.dp
     val ring = 2.dp
 
+    /** The touch target around a [HhSoundRow]'s radio. */
+    val chooseTarget = 56.dp
+
     /** The gap between rows in a group. */
     val gap = 8.dp
     val titleStyle = HhType.rowTitle.copy(fontWeight = FontWeight.W700)
@@ -181,6 +184,62 @@ fun HhRadioRow(title: String, line: String? = null, selected: Boolean, tag: Stri
         Column(Modifier.weight(1f)) {
             Text(title, style = RadioRowTokens.titleStyle, color = if (locked) c.mute else c.ink)
             if (line != null) Text(line, style = RadioRowTokens.lineStyle, color = c.mute, modifier = Modifier.testTag("${tag}_note"))
+        }
+    }
+}
+
+/**
+ * A choice that can be heard first: [title] and [line] beside a play or pause icon, in a [HhRadioRow]'s look. Tapping the row
+ * calls [onPlay] (a preview, stopped by a second tap while [playing]); the radio on the right calls [onChoose]. The radio is
+ * `{tag}_choose`, read as "Choose {title}" and selected when [selected]. The icon is `{tag}_pause` while [playing], else `{tag}_play`.
+ */
+@Composable
+fun HhSoundRow(
+    title: String,
+    line: String? = null,
+    playing: Boolean,
+    selected: Boolean,
+    tag: String,
+    onPlay: () -> Unit,
+    onChoose: () -> Unit,
+) {
+    val c = Culvery.colors
+    val shape = RadioRowTokens.shape
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(RadioRowTokens.radioGap),
+        modifier = Modifier
+            .testTag(tag)
+            .hhClickable(onPlay, label = if (playing) "stop $title" else "play $title")
+            .fillMaxWidth()
+            .heightIn(min = RadioRowTokens.minHeight)
+            .clip(shape)
+            .background(if (selected) c.accentSoft else c.surf2)
+            .then(if (selected) Modifier.border(RadioRowTokens.ring, c.accent, shape) else Modifier)
+            .padding(start = RadioRowTokens.paddingH, top = RadioRowTokens.paddingV, bottom = RadioRowTokens.paddingV),
+    ) {
+        HhIcon(
+            if (playing) Icons.PAUSE else Icons.PLAY_ARROW, size = RadioRowTokens.radio, tint = if (playing) c.accent else c.mute,
+            modifier = Modifier.testTag(if (playing) "${tag}_pause" else "${tag}_play"),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(title, style = RadioRowTokens.titleStyle, color = c.ink)
+            if (line != null) Text(line, style = RadioRowTokens.lineStyle, color = c.mute, modifier = Modifier.testTag("${tag}_note"))
+        }
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .testTag("${tag}_choose")
+                .semantics { this.selected = selected }
+                .hhClickable(onChoose, role = Role.RadioButton, spoken = "Choose $title")
+                .size(RadioRowTokens.chooseTarget),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(RadioRowTokens.radio).border(RadioRowTokens.ring, if (selected) c.accent else c.mute, CircleShape),
+            ) {
+                if (selected) Box(Modifier.size(RadioRowTokens.radioDot).clip(CircleShape).background(c.accent))
+            }
         }
     }
 }
