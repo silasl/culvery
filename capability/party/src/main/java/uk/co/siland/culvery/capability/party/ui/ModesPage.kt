@@ -56,6 +56,7 @@ class ModesPage internal constructor(
     private val plugs: HousePlugs?,
     private val toaster: Toaster,
     private val builtIn: Set<BuiltInModePage> = emptySet(),
+    private val sounds: SoundButtons? = null,
 ) : SettingsPage {
     override val id = "modes"
     override val title = ModesWords.PAGE_TITLE
@@ -65,7 +66,7 @@ class ModesPage internal constructor(
     override fun Content() {
         // The mode whose page shows; null shows the list.
         var open by rememberSaveable { mutableStateOf<String?>(null) }
-        ModesHost(store, controls, holidayOn, room, plugs, toaster, builtIn, open) { open = it }
+        ModesHost(store, controls, holidayOn, room, plugs, toaster, builtIn, sounds, open) { open = it }
     }
 }
 
@@ -83,6 +84,7 @@ private fun ModesHost(
     plugs: HousePlugs?,
     toaster: Toaster,
     builtIn: Set<BuiltInModePage>,
+    sounds: SoundButtons?,
     open: String?,
     setOpen: (String?) -> Unit,
 ) {
@@ -120,6 +122,7 @@ private fun ModesHost(
         if (!holidayOpen && opened == null) {
             val rows = modeRows(p, holiday == true, on, plugCounts(plugs, p.modes.map { it.id }))
             ModesList(rows, onOpen = setOpen, onAdd = { overlay.showAddSheet(p, ::add) })
+            sounds?.let { SoundButtonsSection(it, toaster) }
         } else {
             HhBackLink(ModesWords.BACK_TO_MODES, "modes_back") { setOpen(null) }
             if (opened == null) {

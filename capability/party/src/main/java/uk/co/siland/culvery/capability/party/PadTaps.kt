@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.sound.PREVIEW_PAD
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundPlayer
 
@@ -62,6 +63,12 @@ class PadTaps internal constructor(
         val started = withContext(io) { play(pad.pad, pad.sound, volume) }
         // A ring that arrived while the sound opened shows as the Doorbell block, not as a failure.
         if (!started && gate.blockedNow() != PadBlock.DOORBELL) failedNow(pad.pad)
+    }
+
+    /** Plays [sound] for Settings at the doorbell's volume, whatever the time or mode. */
+    suspend fun preview(sound: Sound) {
+        val volume = volume()
+        withContext(io) { play(PREVIEW_PAD, sound, volume) }
     }
 
     private fun clearFailed(pad: Int) {

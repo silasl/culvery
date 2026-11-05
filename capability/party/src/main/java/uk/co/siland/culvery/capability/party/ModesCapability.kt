@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.capability.party.ui.ModeControls
 import uk.co.siland.culvery.capability.party.ui.ModesPage
+import uk.co.siland.culvery.capability.party.ui.SoundButtons
 import uk.co.siland.culvery.capability.party.ui.SoundPadTileHost
 import uk.co.siland.culvery.capability.party.ui.StoredModeTileHost
 import uk.co.siland.culvery.capability.party.ui.storedModeTileLine
@@ -28,6 +29,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.TrayWidth
+import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.ui.Icons
 
 /**
@@ -42,6 +44,8 @@ class ModesCapability @Inject constructor(
     private val shelf: ModesShelf,
     private val pads: SoundPads,
     private val taps: PadTaps,
+    private val padsStore: SoundPadsStore,
+    private val library: SoundLibrary,
     private val music: Optional<HouseMusic>,
     private val lights: Optional<HouseLights>,
     private val plugs: Optional<HousePlugs>,
@@ -87,6 +91,7 @@ class ModesCapability @Inject constructor(
             settings, ModeControls(actions, house, shelf::place, music.orElse(null), lights.orElse(null)),
             switches.firstOrNull { it.modeId == HouseModes.HOLIDAY }?.isOn ?: MutableStateFlow(false),
             shelf.room, plugs.orElse(null), toaster, builtIn,
+            SoundButtons(padsStore, shelf.soundRoom, library.choices, library::refresh, taps),
         ),
     )
 }

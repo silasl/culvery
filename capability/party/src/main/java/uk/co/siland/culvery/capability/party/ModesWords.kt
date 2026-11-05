@@ -140,4 +140,20 @@ object ModesWords {
     const val PAD_STOP = "stop"
 
     fun padSpoken(sound: String, playing: Boolean) = if (playing) "$sound, playing." else sound
+
+    // Settings › Modes › Sound buttons (18 §5).
+    const val SOUND_BUTTONS = "Sound buttons"
+    const val PAD_WAITING = "Shows when there’s room in the tray"
+    const val ON_THIS_TABLET = "On this tablet"
+    const val NOT_ON_THIS_TABLET = "Not on this tablet any more"
+    const val BIRTHDAY_NOTE = "On a birthday, pad 1 plays Happy Birthday."
+    const val PLAY_SOUND = "Play"
+
+    fun padName(pad: Int) = "Pad $pad"
+
+    fun chooseSound(pad: Int) = "choose the sound for ${padName(pad)}"
+
+    fun playSpoken(pad: Int) = "$PLAY_SOUND ${padName(pad)}"
+
+    fun goneSound(name: String) = "$name · $NOT_ON_THIS_TABLET"
 }
