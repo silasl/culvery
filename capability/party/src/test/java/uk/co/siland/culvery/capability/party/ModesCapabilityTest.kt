@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.util.Optional
 import javax.inject.Provider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
@@ -23,7 +24,7 @@ class ModesCapabilityTest {
         StoredModeActions(TestAccess(Role.ADULT), rig.house, rig.settings, emptySet()), rig.house, rig.settings,
         ModesShelf(rig.settings, Provider { emptySet() }, backgroundScope),
         SoundPads(flowOf(listOf(TROMBONE.id, null, HONK.id)), flowOf(padRoom), flowOf(LIBRARY), flowOf(false)),
-        PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 1f }, backgroundScope),
+        PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 1f }, backgroundScope, Dispatchers.Unconfined),
         Optional.of(rig.music), Optional.of(rig.lights), Optional.of(rig.plugs), emptySet(), emptySet(), RecordingToaster(),
     )
 

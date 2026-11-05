@@ -1,8 +1,12 @@
 package uk.co.siland.culvery.capability.party
 
 import com.google.common.truth.Truth.assertThat
+import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -14,8 +18,8 @@ import org.junit.Test
 class PadTapsTest {
     private val player = FakePlayer()
 
-    private fun TestScope.taps(rig: GateRig = GateRig()) =
-        PadTaps(player::play, player::stop, player.playing, rig.gate, { rig.door?.volume ?: 1f }, backgroundScope)
+    private fun TestScope.taps(rig: GateRig = GateRig(), io: CoroutineDispatcher = StandardTestDispatcher(testScheduler)) =
+        PadTaps(player::play, player::stop, player.playing, rig.gate, { rig.door?.volume ?: 1f }, backgroundScope, io)
 
     private val pad1 = PadUi(1, TROMBONE)
     private val pad2 = PadUi(2, HONK)
@@ -57,6 +61,48 @@ class PadTapsTest {
 
         assertThat(taps.line(2, first = false).first()).isNull()
         assertThat(taps.line(1, first = true).first()).isEqualTo("Doorbell")
+    }
+
+    /** Fix round 1: fails if "Couldn’t play" stays under a pad that has since started. */
+    @Test
+    fun aPadThatPlaysAfterFailingLosesItsLine() = runTest {
+        val taps = taps()
+        player.starts = false
+        taps.tap(pad2)
+        player.starts = true
+
+        taps.tap(pad2)
+
+        assertThat(taps.line(2, first = false).first()).isNull()
+        assertThat(player.playing.value).isEqualTo(2)
+    }
+
+    /** Fix round 1: fails if a block that starts while a pad plays keeps it from being stopped, or lets another play. */
+    @Test
+    fun thePlayingPadStopsEvenWhenBlocked() = runTest {
+        val rig = GateRig()
+        val taps = taps(rig)
+        player.playing.value = 1
+        rig.house.holiday.value = true
+
+        taps.tap(pad1)
+        taps.tap(pad2)
+
+        assertThat(player.stops).isEqualTo(1)
+        assertThat(player.plays).isEmpty()
+    }
+
+    /** Fix round 1: fails if a play opens its sound on the tapping thread rather than the io dispatcher. */
+    @Test
+    fun aPlayOpensItsSoundOffTheTappingThread() = runTest {
+        val io = Executors.newSingleThreadExecutor { Thread(it, "pad-io") }.asCoroutineDispatcher()
+        try {
+            taps(io = io).tap(pad1)
+        } finally {
+            io.close()
+        }
+
+        assertThat(player.playThread).isEqualTo("pad-io")
     }
 
     /** Ruling 6: fails if a pad but the first shown carries the block, or the first doesn't. */

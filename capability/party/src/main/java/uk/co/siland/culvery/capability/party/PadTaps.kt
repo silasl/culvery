@@ -3,7 +3,9 @@ package uk.co.siland.culvery.capability.party
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.sound.Sound
@@ -34,25 +37,37 @@ class PadTaps internal constructor(
     private val gate: PadGate,
     private val volume: () -> Float,
     private val scope: CoroutineScope,
+    /** Where a play opens its sound, off the main thread. */
+    private val io: CoroutineDispatcher,
 ) {
     @Inject
     constructor(player: SoundPlayer, gate: PadGate, door: Optional<DoorQuiet>, @ApplicationScope scope: CoroutineScope) :
-        this(player::playPad, player::stopPads, player.padPlaying, gate, { door.map { it.volume }.orElse(1f) }, scope)
+        this(player::playPad, player::stopPads, player.padPlaying, gate, { door.map { it.volume }.orElse(1f) }, scope, Dispatchers.IO)
 
     val blocked: StateFlow<PadBlock?> = gate.blocked.stateIn(scope, SharingStarted.Eagerly, null)
 
     private val failed = MutableStateFlow<Int?>(null)
     private var failedExpiry: Job? = null
 
-    /** Stops [pad] while it plays, else plays it; does nothing while the pads are greyed out. */
+    /** Stops [pad] while it plays, even while the pads are greyed out; else plays it unless they are. */
     suspend fun tap(pad: PadUi) {
-        if (gate.blockedNow() != null) return
         if (playing.value == pad.pad) {
+            clearFailed(pad.pad)
             stop()
             return
         }
+        if (gate.blockedNow() != null) return
+        clearFailed(pad.pad)
+        val volume = volume()
+        val started = withContext(io) { play(pad.pad, pad.sound, volume) }
         // A ring that arrived while the sound opened shows as the Doorbell block, not as a failure.
-        if (!play(pad.pad, pad.sound, volume()) && gate.blockedNow() != PadBlock.DOORBELL) failedNow(pad.pad)
+        if (!started && gate.blockedNow() != PadBlock.DOORBELL) failedNow(pad.pad)
+    }
+
+    private fun clearFailed(pad: Int) {
+        if (failed.value != pad) return
+        failedExpiry?.cancel()
+        failed.value = null
     }
 
     private fun failedNow(pad: Int) {

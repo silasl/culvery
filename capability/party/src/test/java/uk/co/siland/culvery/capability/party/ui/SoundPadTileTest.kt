@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -12,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import org.junit.After
@@ -79,7 +81,7 @@ class SoundPadTileTest {
     private val player = FakePlayer()
 
     private fun host(rig: GateRig, pads: List<PadUi> = three) {
-        val taps = PadTaps(player::play, player::stop, player.playing, rig.gate, { 1f }, scope)
+        val taps = PadTaps(player::play, player::stop, player.playing, rig.gate, { 1f }, scope, Dispatchers.IO)
         compose.setContent {
             CulveryTheme(dark = true) {
                 HhTrayGrid(
@@ -118,6 +120,21 @@ class SoundPadTileTest {
         compose.waitFor { runCatching { compose.onNodeWithTag("sound_pad_1").assertIsNotEnabled() }.isSuccess }
         compose.onNodeWithTag("sound_pad_1").performClick()
         compose.waitForIdle()
+
+        assertThat(player.plays).isEmpty()
+    }
+
+    /** Fix round 1: fails if the playing pad can't be tapped to stop once a block starts, or the others stop being greyed. */
+    @Test
+    fun aPlayingPadStillStopsWhileBlocked() {
+        val rig = GateRig()
+        rig.house.holiday.value = true
+        player.playing.value = 1
+        host(rig)
+
+        compose.waitFor { runCatching { compose.onNodeWithTag("sound_pad_2").assertIsNotEnabled() }.isSuccess }
+        compose.onNodeWithTag("sound_pad_1").assertIsEnabled().performClick()
+        compose.waitFor { player.stops == 1 }
 
         assertThat(player.plays).isEmpty()
     }

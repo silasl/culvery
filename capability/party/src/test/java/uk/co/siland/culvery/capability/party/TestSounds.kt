@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.party
 
 import java.io.File
 import java.util.Optional
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.flow.MutableStateFlow
 import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.house.HouseMode
@@ -44,8 +45,9 @@ internal class GateRig(val door: FakeDoor? = FakeDoor()) {
 /** Stands in for the sound player: records each play and stop, and plays while [playing] says. */
 internal class FakePlayer {
     val playing = MutableStateFlow<Int?>(null)
-    val plays = mutableListOf<Pair<Int, Float>>()
-    var stops = 0
+    val plays: MutableList<Pair<Int, Float>> = CopyOnWriteArrayList()
+    var playThread: String? = null
+    @Volatile var stops = 0
     var starts = true
 
     /** Runs as a play begins, as a ring arriving while the sound opens would. */
@@ -53,6 +55,7 @@ internal class FakePlayer {
 
     fun play(pad: Int, sound: Sound, volume: Float): Boolean {
         plays += pad to volume
+        playThread = Thread.currentThread().name
         whilePlaying()
         if (starts) playing.value = pad
         return starts

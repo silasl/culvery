@@ -33,24 +33,25 @@ private const val BLOCKED_ALPHA = 0.4f
 
 /**
  * A sound pad in the tray's last row (redesign note 13, 18 §4.1), tagged `sound_pad_{pad}`: the `volume_up` icon in
- * accent over the sound's name, the icon `pause` while it plays (the bundled icon font has no `stop`). While [blocked]
- * it is faded and a tap does nothing.
+ * accent over the sound's name on up to two lines, the icon `pause` while it plays (the bundled icon font has no `stop`).
+ * While [blocked] it is faded and a tap does nothing, unless it is [playing], when a tap still stops it.
  */
 @Composable
 internal fun SoundPadTile(pad: PadUi, playing: Boolean, blocked: Boolean, onTap: () -> Unit) {
     val colors = Culvery.colors
+    val enabled = !blocked || playing
     Column(
         verticalArrangement = Arrangement.spacedBy(HouseModeDimens.gap, Alignment.CenterVertically),
         modifier = Modifier
             .fillMaxSize()
             .testTag("sound_pad_${pad.pad}")
-            .alpha(if (blocked) BLOCKED_ALPHA else 1f)
+            .alpha(if (enabled) 1f else BLOCKED_ALPHA)
             .clip(RoundedCornerShape(HouseModeDimens.radius))
             .background(colors.surf2)
             .hhClickable(
                 onTap,
                 label = if (playing) ModesWords.PAD_STOP else ModesWords.PAD_PLAY,
-                enabled = !blocked,
+                enabled = enabled,
                 spoken = ModesWords.padSpoken(pad.sound.name, playing),
             )
             .padding(horizontal = HouseModeDimens.paddingH, vertical = HouseModeDimens.paddingV),
@@ -60,7 +61,7 @@ internal fun SoundPadTile(pad: PadUi, playing: Boolean, blocked: Boolean, onTap:
             pad.sound.name,
             style = HouseModeDimens.thirdLabel,
             color = colors.ink,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.shownNotSpoken(),
         )
