@@ -143,6 +143,14 @@ class SoundButtonsSectionTest {
         assertThat(exists("sound_pad_2_play")).isFalse()
     }
 
+    /** Fails if a pad holding a sound that isn't a tablet file and isn't offered names it as a gone file. */
+    @Test
+    fun anUnknownSoundIsNone() {
+        show(TROMBONE.id, "builtin:test_gone", null)
+
+        compose.onNodeWithTag("sound_pad_2").assertTextContains("None")
+    }
+
     /** Fails if Play doesn't play that pad's sound as the preview, at the doorbell's volume. */
     @Test
     fun playPlaysThePreview() {

@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.party
 
+import uk.co.siland.culvery.core.sound.NOT_ON_THIS_TABLET
 import uk.co.siland.culvery.core.ui.StateWords
 
 /** The change a mode's tile is making, while neither "on" nor "off" is yet true. */
@@ -144,8 +145,6 @@ object ModesWords {
     // Settings › Modes › Sound buttons (18 §5).
     const val SOUND_BUTTONS = "Sound buttons"
     const val PAD_WAITING = "Shows when there’s room in the tray"
-    const val ON_THIS_TABLET = "On this tablet"
-    const val NOT_ON_THIS_TABLET = "Not on this tablet any more"
     const val BIRTHDAY_NOTE = "On a birthday, pad 1 plays Happy Birthday."
     const val PLAY_SOUND = "Play"
 

@@ -43,9 +43,7 @@ import uk.co.siland.culvery.capability.door.FOLLOW_THE_THEME_LINE
 import uk.co.siland.culvery.capability.door.KEEP_HISTORY_FOR
 import uk.co.siland.culvery.capability.door.KeepDays
 import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
-import uk.co.siland.culvery.capability.door.NOT_ON_THIS_TABLET
 import uk.co.siland.culvery.capability.door.NOT_DONE_YET
-import uk.co.siland.culvery.capability.door.ON_THIS_TABLET
 import uk.co.siland.culvery.capability.door.OPEN_NOTIFICATION_ACCESS
 import uk.co.siland.culvery.capability.door.PLAY_CHIME
 import uk.co.siland.culvery.capability.door.QUIET_HOURS
@@ -65,9 +63,12 @@ import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.plugin.save
 import uk.co.siland.culvery.core.plugin.saving
+import uk.co.siland.culvery.core.sound.NOT_ON_THIS_TABLET
+import uk.co.siland.culvery.core.sound.ON_THIS_TABLET
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.sound.onTablet
+import uk.co.siland.culvery.core.sound.soundNameFromId
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.FROM
@@ -152,7 +153,7 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
             ui.sounds.forEach { sound ->
                 HhRadioRow(sound.name, ON_THIS_TABLET.takeIf { sound.onTablet }, ui.doorbell == sound.id, "door_doorbell_${sound.id}") { actions.onDoorbell(sound.id) }
             }
-            goneFileName(ui.doorbell, ui.sounds)?.let { name ->
+            soundNameFromId(ui.doorbell)?.takeIf { ui.sounds.none { it.id == ui.doorbell } }?.let { name ->
                 HhRadioRow(name, NOT_ON_THIS_TABLET, selected = true, "door_doorbell_${ui.doorbell}") {}
             }
         }
@@ -188,11 +189,6 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
         HhSwitchRow(checkNotifications(ui.service), CAPTURE_LINE, ui.capturing, "door_capture", actions.onCapture)
     }
 }
-
-/** The chosen tablet file's name when it is no longer in [sounds], as the store would have named it. */
-private fun goneFileName(doorbell: String, sounds: List<Sound>): String? =
-    if (!doorbell.startsWith("file:") || sounds.any { it.id == doorbell }) null
-    else doorbell.removePrefix("file:").substringAfterLast('/').substringBeforeLast('.')
 
 /** A connect step (5 §5.5), ticked when done. */
 @Composable

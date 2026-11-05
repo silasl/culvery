@@ -38,3 +38,7 @@ fun readSoundsFolder(root: File?): List<Sound> {
         .sortedWith(compareBy<Sound> { it.theme != null }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.id })
         .distinctBy { it.name }
 }
+
+/** The name [readSoundsFolder] gives the file a `file:` [id] names, so a file that has gone can still be named; null for any other id. */
+fun soundNameFromId(id: String): String? =
+    if (id.startsWith("file:")) id.substringAfterLast('/').removePrefix("file:").substringBeforeLast('.') else null

@@ -75,4 +75,13 @@ class SoundsFolderTest {
         touch("Test Honk.wav")
         assertThat(readSoundsFolder(folder.root).single().toString()).doesNotContain("Honk")
     }
+
+    @Test
+    fun aGoneFileIsNamedAsTheFolderNamedIt() {
+        touch("Test Honk.wav")
+        touch("halloween/Test v2.Howl.ogg")
+        readSoundsFolder(folder.root).forEach { assertThat(soundNameFromId(it.id)).isEqualTo(it.name) }
+        assertThat(soundNameFromId(BuiltInSound.CLASSIC.id)).isNull()
+        assertThat(soundNameFromId("Test Honk.wav")).isNull()
+    }
 }

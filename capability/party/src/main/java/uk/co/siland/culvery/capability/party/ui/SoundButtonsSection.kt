@@ -28,8 +28,10 @@ import uk.co.siland.culvery.capability.party.SoundPadsStore
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.saving
+import uk.co.siland.culvery.core.sound.ON_THIS_TABLET
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.onTablet
+import uk.co.siland.culvery.core.sound.soundNameFromId
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
@@ -80,7 +82,7 @@ internal fun SoundButtonsSection(sounds: SoundButtons, toaster: Toaster) {
             room?.let { pad > it } == true -> ModesWords.PAD_WAITING
             id == null -> ModesWords.NONE
             sound != null -> sound.name
-            else -> ModesWords.goneSound(goneName(id))
+            else -> soundNameFromId(id)?.let(ModesWords::goneSound) ?: ModesWords.NONE
         }
         HhListRow(
             ModesWords.padName(pad), Modifier.testTag("sound_pad_$pad").semantics { contentDescription = "${ModesWords.padName(pad)}, $value" },
@@ -111,9 +113,6 @@ internal fun SoundButtonsSection(sounds: SoundButtons, toaster: Toaster) {
     Line(ModesWords.BIRTHDAY_NOTE, "sound_pads_note")
 }
 
-/** A tablet file's name when it is no longer on the tablet, as the library would have named it. */
-private fun goneName(id: String) = id.removePrefix("file:").substringAfterLast('/').substringBeforeLast('.')
-
 /** The sound for [pad]: None first, then each of [sounds]; [chosenId] is shown as chosen, null for None. */
 @Composable
 private fun SoundSheet(pad: Int, sounds: List<Sound>, chosenId: String?, onPick: (Sound?) -> Unit, onClose: () -> Unit) {
@@ -133,7 +132,7 @@ private fun SoundSheet(pad: Int, sounds: List<Sound>, chosenId: String?, onPick:
                 }
                 items(sounds, key = { it.id }) { sound ->
                     HhRadioRow(
-                        sound.name, ModesWords.ON_THIS_TABLET.takeIf { sound.onTablet }, chosenId == sound.id, "sound_choice_${sound.id}",
+                        sound.name, ON_THIS_TABLET.takeIf { sound.onTablet }, chosenId == sound.id, "sound_choice_${sound.id}",
                         onClick = { onPick(sound) },
                     )
                 }
