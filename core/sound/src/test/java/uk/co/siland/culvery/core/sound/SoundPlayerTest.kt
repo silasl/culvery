@@ -223,4 +223,21 @@ class SoundPlayerTest {
         assertThat(playing(howl)).isTrue()
         assertThat(player.padPlaying.value).isEqualTo(2)
     }
+
+    @Test
+    fun aRingWhileAPadOpensLeavesThePadUnstarted() {
+        lateinit var player: SoundPlayer
+        var ringDuringOpen = true
+        player = SoundPlayer({ sound ->
+            if (sound.id == honk.id && ringDuringOpen) {
+                ringDuringOpen = false
+                player.playDoorbell(classic, 1f)
+            }
+            prepared(sound.id).also { made[sound.id] = it }
+        }, scope)
+        assertThat(player.playPad(1, honk, 1f)).isFalse()
+        assertThat(released(honk)).isTrue()
+        assertThat(player.padPlaying.value).isNull()
+        assertThat(playing(classic)).isTrue()
+    }
 }

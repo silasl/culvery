@@ -50,9 +50,10 @@ class SoundPlayer internal constructor(
     }
 
     internal val live: MutableSet<MediaPlayer> = Collections.synchronizedSet(mutableSetOf())
-    // Guards pad and padState: caps finish on the scope's thread, listeners on main, rings off main.
+    // Guards live membership, listeners, cap setup, pad, padState and rings: caps finish on the scope's thread, listeners on main, rings off main.
     private val lock = Any()
     private var pad: Play? = null
+    private var rings = 0L
     private val padState = MutableStateFlow<Int?>(null)
 
     val padPlaying: StateFlow<Int?> = padState.asStateFlow()
@@ -62,23 +63,29 @@ class SoundPlayer internal constructor(
      * A sound that won't open or start gives way to the classic chime. True when a sound started.
      */
     fun playDoorbell(sound: Sound, volume: Float): Boolean {
-        stopPads()
-        if (start(sound, volume, DOORBELL_CAP_MS, null)) return true
+        synchronized(lock) {
+            rings++
+            stopPads()
+        }
+        if (start(sound, volume, DOORBELL_CAP_MS, null, 0)) return true
         if (sound.id == BuiltInSound.CLASSIC.id) return false
-        return start(CLASSIC, volume, DOORBELL_CAP_MS, null)
+        return start(CLASSIC, volume, DOORBELL_CAP_MS, null, 0)
     }
 
-    /** Stops the current pad sound first. True when the sound started. */
+    /** Stops the current pad sound first. False when it won't open or start, or a ring began while it opened. */
     fun playPad(pad: Int, sound: Sound, volume: Float): Boolean {
-        stopPads()
-        return start(sound, volume, PAD_CAP_MS, pad)
+        val ringsBefore = synchronized(lock) {
+            stopPads()
+            rings
+        }
+        return start(sound, volume, PAD_CAP_MS, pad, ringsBefore)
     }
 
     fun stopPads() {
         synchronized(lock) { pad?.let(::finish) }
     }
 
-    private fun start(sound: Sound, volume: Float, capMs: Long, padNumber: Int?): Boolean {
+    private fun start(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, ringsBefore: Long): Boolean {
         val player = open(sound)
         if (player == null) {
             logFailed(sound)
@@ -86,6 +93,13 @@ class SoundPlayer internal constructor(
         }
         val play = Play(player)
         synchronized(lock) {
+            if (padNumber != null) {
+                if (rings != ringsBefore) {
+                    player.release()
+                    return false
+                }
+                stopPads()
+            }
             live += player
             try {
                 player.setVolume(volume, volume)
@@ -114,13 +128,15 @@ class SoundPlayer internal constructor(
         return true
     }
 
-    private fun finish(play: Play) = synchronized(lock) {
-        if (!live.remove(play.player)) return
-        play.cap?.cancel()
-        play.player.release()
-        if (pad === play) {
-            pad = null
-            padState.value = null
+    private fun finish(play: Play) {
+        synchronized(lock) {
+            if (!live.remove(play.player)) return
+            play.cap?.cancel()
+            play.player.release()
+            if (pad === play) {
+                pad = null
+                padState.value = null
+            }
         }
     }
 
