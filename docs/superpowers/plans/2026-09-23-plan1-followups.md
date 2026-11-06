@@ -1026,5 +1026,4 @@ The open faults after the redesign phase. Details are in the plan sections above
     - P2: open the camera at the lowest resolution and frame rate the HAL offers, and log what it got.
     - P9: the camera hits a device error about every 10 minutes some afternoons and evenings, then stays closed for `CAMERA_RETRY_MS` (5 min); log the error code and retry sooner after a device error.
   - **Power findings still to rule on:** P3 (the hidden Home screen keeps drawing; measured small), P4 (no backoff when a device or the internet is down; a log line every 2 s), P5 (bins can miss a day after an overnight internet cut), P6 (Hue full read every 60 s with new TLS handshakes), P8 (the Home Assistant socket stays open around the clock).
-  - **Protect battery** (Samsung's 85 % charge cap): the user wants it on. It's set in Settings › Battery and device care › Battery › More battery settings, not through `adb settings`, so it needs the tablet unpinned.
   - **Security findings to rule on:** October's I1–I3 and M1–M12 re-checked, and N1–N13 new since 9990fee, ranked in the private report.
