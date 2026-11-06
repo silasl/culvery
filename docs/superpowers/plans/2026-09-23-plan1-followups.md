@@ -2,6 +2,49 @@
 
 Items raised while Plan 1 (foundation) was built and reviewed. They were deferred on purpose and are for the plan that first touches the area.
 
+## Open items, numbered (2026-11-06)
+
+The open work, one number each; the details are in the sections below. Numbers never change: a done or dropped item keeps its number and is marked, and a new item takes the next number.
+
+**From the November 2026 review and Plan 18**
+1. Camera wake-up's cost: P1 (polling while the screen is dark), P2 (lowest camera resolution), P9 (repeated camera failures and 5-minute gaps). Ruled: keep camera wake-up on and fix its cost. See "November 2026 review" below.
+2. Rule on the remaining power findings: P3, P4, P5, P6, P8.
+3. Rule on the security findings (October's re-checked, and N1–N13 new), in the private report.
+4. ~~Protect battery~~ (dropped 2026-11-06).
+5. A shorter pause after ticking off a shopping item.
+6. A new name for Settings › Modes, at the end-of-v1 review.
+7. Sound pads played on Sonos.
+8. A Christmas seasonal theme.
+9. A real sleigh-bell recording for Christmas.
+10. Whether birthdays override a doorbell set to one sound.
+11. Plan 18's deferred minors.
+
+**Bugs** (see "Bugs (2026-10-23)")
+12. Calendar M2: an Undo racing a drain create leaves the event on the week; `UndoneKeys` is lost on restart.
+13. Calendar M3: a phone's counted series is expanded in full on every detail update.
+14. Home slow to fill (2.2–2.9 s from a cold start).
+15. Accented letters garbled on the Music card.
+16. The Music card's volume pill squeezed when nothing plays. Waiting on the user: hide it, a mute button, or both.
+17. Not tried yet: "Use for new events" with real calendars, and a new Sonos playlist appearing.
+
+**To check on the tablet** (see "To check when the tablet is next plugged in")
+18. Taps that seemed lost on the emulator.
+19. How long Home and the other screens take to fill.
+
+**Feature ideas** (see "Feature ideas")
+20. Reminders, including bins the night before.
+21. A family slideshow.
+22. Other celebrations beyond birthdays.
+23. Voice control.
+24. Grouping Sonos rooms from the wall.
+25. Recipes into the shopping list.
+26. A status tab.
+27. A small rail redesign.
+28. Plugs in Holiday mode's lights.
+29. The thermostat as an everyday control.
+30. Narrowing the Home Assistant token's reach.
+31. Ring through Home Assistant.
+
 ## From Plan 1 (deferred)
 
 **Later**
