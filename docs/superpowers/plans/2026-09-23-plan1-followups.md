@@ -1020,3 +1020,11 @@ The open faults after the redesign phase. Details are in the plan sections above
   - `culvery-notes/sounds/prepare.sh`: hard-coded chime path, a silent abort on an empty source, single-pass loudnorm (±0.5 LU).
 
 - **A shorter pause after ticking off a shopping item (the user, 2026-11-05):** a ticked item stays on the list, struck through, for a bit too long before it goes. It lasts as long as its Undo toast, `TOAST_WITH_ACTION_MS` (8 s, `core/plugin/.../Overlays.kt`), which every toast with an action shares, so shortening it for Shopping alone needs its own value (10 ruling 10 ties the row to the Undo).
+- **November 2026 review: power, heat, battery and security (2026-11-06):** the full report is private, in `culvery-notes/culvery-review-2026-11.md`; security details stay there, not in this public file.
+  - **Decision 9 measured:** camera wake-up off 4.5 %/h, on 7.6 %/h (people walking past, 6 wakes in 2 h), the night clock 4.2 %/h; no heat (thermal status 0 throughout). The drain test was met (+3.1 %/h), the heat tests weren't. **Ruling (the user): keep camera wake-up on by default and fix its cost** in a later plan:
+    - P1: polling never stops while the screen is dark, at night or on Holiday. Sonos is polled every 2 s on a new connection each time, about 470 MB in and 290 MB out a day on the home network.
+    - P2: open the camera at the lowest resolution and frame rate the HAL offers, and log what it got.
+    - P9: the camera hits a device error about every 10 minutes some afternoons and evenings, then stays closed for `CAMERA_RETRY_MS` (5 min); log the error code and retry sooner after a device error.
+  - **Power findings still to rule on:** P3 (the hidden Home screen keeps drawing; measured small), P4 (no backoff when a device or the internet is down; a log line every 2 s), P5 (bins can miss a day after an overnight internet cut), P6 (Hue full read every 60 s with new TLS handshakes), P8 (the Home Assistant socket stays open around the clock).
+  - **Protect battery** (Samsung's 85 % charge cap): the user wants it on. It's set in Settings › Battery and device care › Battery › More battery settings, not through `adb settings`, so it needs the tablet unpinned.
+  - **Security findings to rule on:** October's I1–I3 and M1–M12 re-checked, and N1–N13 new since 9990fee, ranked in the private report.
