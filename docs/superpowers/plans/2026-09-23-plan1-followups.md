@@ -8,8 +8,8 @@ The open work, one number each; the details are in the sections below. Numbers n
 
 **From the November 2026 review and Plan 18**
 1. Camera wake-up's cost: P1 (polling while the screen is dark), P2 (lowest camera resolution), P9 (repeated camera failures and 5-minute gaps). Ruled: keep camera wake-up on and fix its cost. See "November 2026 review" below.
-2. Rule on the remaining power findings: P3, P4, P5, P6, P8.
-3. Rule on the security findings (October's re-checked, and N1–N13 new), in the private report.
+2. Rule on the remaining power findings: P3, P4, P5, P6, P8. **Ruled 2026-11-06:** P3 dropped (measured small); P4, P5 and P6 fixed and P8 folded into P1, all in Plan 19.
+3. Rule on the security findings (October's re-checked, and N1–N13 new), in the private report. **Ruled 2026-11-06** (N findings and M2; rulings in the private notes): N12 in Plan 19; N1–N10 and M2 in Plan 20; I1, N11 and N13 stay accepted.
 4. ~~Protect battery~~ (dropped 2026-11-06).
 5. A shorter pause after ticking off a shopping item.
 6. A new name for Settings › Modes, at the end-of-v1 review.
@@ -24,7 +24,7 @@ The open work, one number each; the details are in the sections below. Numbers n
 13. Calendar M3: a phone's counted series is expanded in full on every detail update.
 14. Home slow to fill (2.2–2.9 s from a cold start).
 15. Accented letters garbled on the Music card.
-16. The Music card's volume pill squeezed when nothing plays. Waiting on the user: hide it, a mute button, or both.
+16. The Music card's volume pill squeezed when nothing plays. **Ruled 2026-11-06:** hide the pill while nothing plays (no mute button); Plan 21.
 17. Not tried yet: "Use for new events" with real calendars, and a new Sonos playlist appearing.
 
 **To check on the tablet** (see "To check when the tablet is next plugged in")
