@@ -4,11 +4,16 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 
 /**
  * 6 §4.6: each room of each playing group, remembered before it is set; groups in parallel; restore within 1 of what was
@@ -23,7 +28,9 @@ class MusicQuieterTest {
     private val system = TestMusicSystem(listOf(kitchen, lounge, bedroom)).apply { roomVolumes["Dining room-id"] = 25 }
     private var share = 20
 
-    private fun quieter(s: MusicSystem? = system) = MusicQuieter({ s }, { share })
+    private fun quieter(s: MusicSystem? = system, fresh: suspend (MusicSystem) -> Boolean = { false }) = MusicQuieter({ s }, { share }, fresh)
+
+    private fun quieterLines() = ShadowLog.getLogs().filter { it.tag == "MusicQuieter" }.map { it.msg }
 
     private fun sets() = system.calls.filter { it.startsWith("setRoomVolume") }
 
@@ -31,6 +38,58 @@ class MusicQuieterTest {
     fun eachRoomOfEachPlayingGroupDropsToItsShare() = runTest {
         quieter().quiet()
         assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 10", "setRoomVolume Lounge-id 8", "setRoomVolume Dining room-id 5")
+    }
+
+    /** 19 §3.2: the layout is read before the playing groups, so a rearranged system is lowered as it now is. */
+    @Test
+    fun aStaleLayoutIsReadBeforeThePlayingGroups() = runTest {
+        ShadowLog.clear()
+        quieter(fresh = { system.calls += "layout"; true }).quiet()
+        assertThat(system.calls.indexOf("layout")).isAtLeast(0)
+        assertThat(system.calls.indexOf("layout")).isLessThan(system.calls.indexOf("playingNow"))
+        assertThat(quieterLines()).hasSize(1)
+        assertThat(quieterLines().single()).matches("The doorbell's layout read took [0-9]+ ms")
+    }
+
+    @Test
+    fun aFailedLayoutReadStillLowersFromTheLastLayout() = runTest {
+        ShadowLog.clear()
+        quieter(fresh = { throw MusicUnreachableException(MusicProblem.UNREACHABLE) }).quiet()
+        assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 10", "setRoomVolume Lounge-id 8", "setRoomVolume Dining room-id 5")
+        assertThat(quieterLines()).containsExactly("The doorbell used the last layout")
+    }
+
+    @Test
+    fun aSlowLayoutReadFallsBackAtTheBudget() = runTest {
+        ShadowLog.clear()
+        val q = quieter(fresh = { delay(1_000); true })
+        val quieting = launch { q.quiet() }
+        advanceTimeBy(DOORBELL_LAYOUT_MS - 1)
+        runCurrent()
+        assertThat(sets()).isEmpty()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(currentTime).isEqualTo(DOORBELL_LAYOUT_MS)
+        assertThat(sets()).isNotEmpty()
+        quieting.join()
+        assertThat(quieterLines()).containsExactly("The doorbell used the last layout")
+    }
+
+    @Test
+    fun aRecentLayoutLogsNothing() = runTest {
+        ShadowLog.clear()
+        quieter(fresh = { false }).quiet()
+        assertThat(quieterLines()).isEmpty()
+    }
+
+    /** With no music screen on the checks are off, so the doorbell's own read is the only one: once, then the sets. */
+    @Test
+    fun quietWorksWithTheChecksStopped() = runTest {
+        val checks = MusicChecks(MutableStateFlow(system), MutableStateFlow(false), { currentTime }, backgroundScope)
+        MusicQuieter({ system }, { share }, { checks.layoutIfOlderThan(it, LAYOUT_CHECK_MS) }).quiet()
+        assertThat(system.calls.filter { it == "checkLayout" || it.startsWith("setRoomVolume") }).containsExactly(
+            "checkLayout", "setRoomVolume Kitchen-id 10", "setRoomVolume Lounge-id 8", "setRoomVolume Dining room-id 5",
+        ).inOrder()
     }
 
     /** Guard: a group on an idle input still sounds if a track plays later, so its rooms are lowered like any playing group. */

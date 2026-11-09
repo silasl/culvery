@@ -6,12 +6,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.time.TimeSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.AlertQuieter
 import uk.co.siland.culvery.core.plugin.attempt
 
@@ -20,16 +22,27 @@ private const val TAG = "MusicQuieter"
 /** Sonos may round a volume it was given; a room this close to what was set is still ours to put back (6 §4.6). */
 internal const val RESTORE_DRIFT = 1
 
+/** How long the doorbell waits for a fresh layout before lowering from the last one (19 §3.2). */
+internal const val DOORBELL_LAYOUT_MS = 250L
+
 /**
  * Music's [AlertQuieter] (6 §4.6): each room of each group playing as the bell rings drops to [share] percent of its
  * volume, and goes back afterwards unless someone changed it meanwhile; quiet() says whether any room went down (9 §6.3).
- * Room by room, so a group keeps its balance. One lock keeps a restore behind the quiet it undoes. Held in memory only: a
+ * A layout older than [fresh] allows is read first, within [DOORBELL_LAYOUT_MS] (19 §3.2). Room by room, so a group keeps its balance. One lock keeps a restore behind the quiet it undoes. Held in memory only: a
  * restart while lowered leaves those rooms low.
  */
 @Singleton
-class MusicQuieter internal constructor(private val system: () -> MusicSystem?, private val share: () -> Int) : AlertQuieter {
+class MusicQuieter internal constructor(
+    private val system: () -> MusicSystem?,
+    private val share: () -> Int,
+    private val fresh: suspend (MusicSystem) -> Boolean = { false },
+) : AlertQuieter {
     @Inject
-    constructor(speakers: Speakers, settings: MusicSettings) : this({ speakers.system.value }, { settings.current.value.lowerTo })
+    constructor(speakers: Speakers, settings: MusicSettings, checks: MusicChecks) : this(
+        { speakers.system.value },
+        { settings.current.value.lowerTo },
+        { checks.layoutIfOlderThan(it, LAYOUT_CHECK_MS) },
+    )
 
     private class Lowered(val room: SpeakerRoom, val was: Int, val set: Int)
 
@@ -41,6 +54,7 @@ class MusicQuieter internal constructor(private val system: () -> MusicSystem?, 
         if (lowered != null) return@withLock turnedDown
         val s = system() ?: return@withLock false
         val percent = share()
+        refreshLayout(s)
         val playing = tried { s.playingNow() } ?: return@withLock false
         val rooms: MutableList<Lowered> = Collections.synchronizedList(mutableListOf())
         lowered = s to rooms
@@ -57,6 +71,16 @@ class MusicQuieter internal constructor(private val system: () -> MusicSystem?, 
         lowered = null
         coroutineScope {
             rooms.toList().forEach { room -> launch { tried { putBack(s, room) } ?: tried { putBack(s, room) } } }
+        }
+    }
+
+    private suspend fun refreshLayout(s: MusicSystem) {
+        val mark = TimeSource.Monotonic.markNow()
+        val read = attempt({ withTimeoutOrNull(DOORBELL_LAYOUT_MS) { fresh(s) } }) { null }
+        when (read) {
+            true -> Log.w(TAG, "The doorbell's layout read took ${mark.elapsedNow().inWholeMilliseconds} ms")
+            null -> Log.w(TAG, "The doorbell used the last layout")
+            false -> Unit
         }
     }
 
