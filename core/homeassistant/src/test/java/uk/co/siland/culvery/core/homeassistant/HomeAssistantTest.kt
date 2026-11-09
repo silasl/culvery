@@ -20,12 +20,12 @@ import uk.co.siland.culvery.core.homeassistant.test.testHomeAssistant
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.retryDelayMillis
 
-/** 11 §4.3, §6: one cache, one problem, one socket while a screen in front watches; a refused token stops all but Check. */
+/** 11 §4.3, §6: one cache, one problem, one socket while a screen watches and the screen is lit; a refused token stops all but Check. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class HomeAssistantTest {
     private val api = FakeHomeAssistantApi()
-    private val inFront = MutableStateFlow(true)
+    private val lit = MutableStateFlow(true)
     private val hoover = entityState("vacuum.hoover", "docked")
     private val battery = entityState("sensor.hoover_battery", "86")
     private val hall = entityState("climate.hall", "heat", mapOf("friendly_name" to "Hall"))
@@ -34,7 +34,7 @@ class HomeAssistantTest {
     private val clock = WallClock { now }
 
     private fun TestScope.ha(link: Flow<HomeAssistantLink?> = flowOf(TEST_LINK)) =
-        testHomeAssistant(api, link, inFront, backgroundScope, clock).also { runCurrent() }
+        testHomeAssistant(api, link, lit, backgroundScope, clock).also { runCurrent() }
 
     private suspend fun TestScope.after(ms: Long) {
         advanceTimeBy(ms)
@@ -96,7 +96,7 @@ class HomeAssistantTest {
     /** Fails if the saved link isn't found before start() has collected the settings. */
     @Test
     fun savedLinkReadsTheStoreBeforeStart() = runTest {
-        val cold = HomeAssistant(api, flowOf(TEST_LINK), inFront, clock, backgroundScope)
+        val cold = HomeAssistant(api, flowOf(TEST_LINK), lit, clock, backgroundScope)
         assertThat(cold.link.value).isNull()
         assertThat(cold.savedLink()).isEqualTo(TEST_LINK)
     }
@@ -140,21 +140,63 @@ class HomeAssistantTest {
         assertThat(ha.entities.value).containsExactly("vacuum.hoover", hoover, "sensor.hoover_battery", battery, "climate.hall", null)
     }
 
-    /** Fails if the socket stays open behind another app, or doesn't come back in front. */
+    /** Regression guard: fails if the socket stays open while the screen is not lit, or doesn't come back when it is. */
     @Test
-    fun theSocketClosesBehindAnotherApp() = runTest {
+    fun theSocketClosesWhileNotLit() = runTest {
         val ha = ha()
         ha.watch(flowOf(setOf("vacuum.hoover")))
         runCurrent()
         assertThat(api.follows).hasSize(1)
-        inFront.value = false
+        lit.value = false
         runCurrent()
         assertThat(api.cancels).isEqualTo(1)
         after(60_000)
         assertThat(api.follows).hasSize(1)
-        inFront.value = true
+        lit.value = true
         runCurrent()
         assertThat(api.follows).hasSize(2)
+    }
+
+    /** Regression guard: fails if a dark screen leaves the follow running or the socket's liveness set. */
+    @Test
+    fun theSocketClosesWhileTheScreenIsDark() = runTest {
+        val ha = ha()
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        runCurrent()
+        api.socket.emit(mapOf("vacuum.hoover" to hoover))
+        runCurrent()
+        assertThat(ha.liveSince.value).isNotNull()
+        lit.value = false
+        runCurrent()
+        assertThat(api.cancels).isEqualTo(1)
+        assertThat(ha.liveSince.value).isNull()
+    }
+
+    /** Regression guard: fails if waking doesn't open a new follow whose first event fills the cache. */
+    @Test
+    fun wakingReopensTheSocketWithItsFullRead() = runTest {
+        val ha = ha()
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        runCurrent()
+        lit.value = false
+        runCurrent()
+        lit.value = true
+        runCurrent()
+        assertThat(api.follows).hasSize(2)
+        api.socket.emit(mapOf("vacuum.hoover" to hoover))
+        runCurrent()
+        assertThat(ha.entities.value).containsExactly("vacuum.hoover", hoover)
+    }
+
+    /** Regression guard: fails if a command needs the screen lit to reach Home Assistant. */
+    @Test
+    fun aCommandWorksWhileTheScreenIsDark() = runTest {
+        val ha = ha()
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        lit.value = false
+        runCurrent()
+        ha.call("vacuum", "start", "vacuum.hoover")
+        assertThat(api.calls).hasSize(1)
     }
 
     /** Fails if a drop leaves no problem, reopens sooner than the backoff's first wait, or the first event doesn't clear it. */
@@ -189,7 +231,7 @@ class HomeAssistantTest {
             assertThat(refusal { ha.read("vacuum.hoover") }).isEqualTo(problem)
             assertThat(ha.problem.value).isNull()
         }
-        inFront.value = false
+        lit.value = false
         runCurrent()
         api.failNext = HaProblem.UNREACHABLE
         refusal { ha.read("vacuum.hoover") }

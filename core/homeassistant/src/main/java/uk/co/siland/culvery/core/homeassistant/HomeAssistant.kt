@@ -24,8 +24,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
@@ -51,14 +51,14 @@ private data class Follow(val link: HomeAssistantLink, val generation: Int, val 
 
 /**
  * The one way to Home Assistant (11 §4.3): its entities as last read, the link's [problem], and one socket following
- * what screens [watch], open only while a link is saved and Culvery is in front. After a refused token nothing but
+ * what screens [watch], open only while a link is saved and the screen is lit. After a refused token nothing but
  * [check] reaches Home Assistant, which can ban an address after failed logins, until a Check of the saved link succeeds.
  */
 @Singleton
 class HomeAssistant(
     private val api: HomeAssistantApi,
     private val saved: Flow<HomeAssistantLink?>,
-    private val inFront: StateFlow<Boolean>,
+    private val lit: StateFlow<Boolean>,
     private val clock: WallClock,
     private val scope: CoroutineScope,
 ) : Startable {
@@ -66,10 +66,10 @@ class HomeAssistant(
     constructor(
         api: HomeAssistantApi,
         settings: HomeAssistantSettings,
-        host: AlertHost,
+        lit: ScreenLit,
         clock: WallClock,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(api, settings.link, host.inFront, clock, scope)
+    ) : this(api, settings.link, lit.lit, clock, scope)
 
     // Guards the link against the cache and the problem, so nothing read under an old link lands after a new one.
     private val lock = Any()
@@ -208,11 +208,20 @@ class HomeAssistant(
         scope.launch { union.collect { HaCapture.keep = it } }
         scope.launch {
             val refused = _problem.map { it == HaProblem.TOKEN_REFUSED }.distinctUntilChanged()
-            combine(_link, generation, inFront, union, refused) { link, gen, front, ids, isRefused ->
-                link?.takeIf { front && ids.isNotEmpty() && !isRefused }?.let { Follow(it, gen, ids) }
+            combine(_link, generation, lit, union, refused) { link, gen, isLit, ids, isRefused ->
+                link?.takeIf { isLit && ids.isNotEmpty() && !isRefused }?.let { Follow(it, gen, ids) }
             }
                 .distinctUntilChanged()
-                .collectLatest { follow -> if (follow != null) following(follow) }
+                .collectLatest { follow ->
+                    if (follow != null) {
+                        Log.d(TAG, "Polling on")
+                        try {
+                            following(follow)
+                        } finally {
+                            Log.d(TAG, "Polling off")
+                        }
+                    }
+                }
         }
     }
 

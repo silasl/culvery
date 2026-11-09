@@ -24,12 +24,12 @@ class HomeAssistantLinkingTest {
     private val access = TestAccess(Role.ADMIN)
     private val hoover = hoover()
     private val thermostat = thermostat()
-    private val inFront = MutableStateFlow(true)
+    private val lit = MutableStateFlow(true)
     private lateinit var ha: HomeAssistant
 
     private suspend fun TestScope.linking(saved: HomeAssistantLink? = null, vararg devices: FakeDevice = arrayOf(hoover, thermostat)): HomeAssistantLinking {
         if (saved != null) settings.save(saved)
-        ha = testHomeAssistant(api, settings.link, inFront, backgroundScope)
+        ha = testHomeAssistant(api, settings.link, lit, backgroundScope)
         runCurrent()
         return HomeAssistantLinking(ha, settings, access, devices.toSet()) { homeAssistantUrl(it) }
     }

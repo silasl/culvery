@@ -18,10 +18,10 @@ val TEST_LINK = HomeAssistantLink(checkNotNull(homeAssistantUrl("http://192.168.
 fun testHomeAssistant(
     api: HomeAssistantApi,
     link: Flow<HomeAssistantLink?> = flowOf(TEST_LINK),
-    inFront: StateFlow<Boolean> = MutableStateFlow(true),
+    lit: StateFlow<Boolean> = MutableStateFlow(true),
     scope: CoroutineScope,
     clock: WallClock = WallClock { 0L },
-): HomeAssistant = HomeAssistant(api, link, inFront, clock, scope).also { it.start() }
+): HomeAssistant = HomeAssistant(api, link, lit, clock, scope).also { it.start() }
 
 /** An entity as Home Assistant would report it: text and number attributes kept, any other kind dropped (as `HaJson`). */
 fun entityState(id: String, state: String, attributes: Map<String, Any> = emptyMap()): EntityState = EntityState(

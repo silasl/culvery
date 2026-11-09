@@ -46,13 +46,13 @@ class HaPlugSystemTest {
     private val api = FakeHomeAssistantApi()
     private val link = MutableStateFlow<HomeAssistantLink?>(TEST_LINK)
     private val prefs = MutableStateFlow(PlugPrefs(plugs = listOf("switch.lamp", "switch.fan", "switch.fairy_lights")))
-    private val inFront = MutableStateFlow(true)
+    private val lit = MutableStateFlow(true)
     private val unreachable = "Can’t reach Home Assistant. Check the NAS is on."
     private var now = 0L
     private val clock = WallClock { now }
 
     private fun TestScope.ha(over: HomeAssistantApi = api): HomeAssistant =
-        testHomeAssistant(over, link, inFront, backgroundScope, clock).also { runCurrent() }
+        testHomeAssistant(over, link, lit, backgroundScope, clock).also { runCurrent() }
 
     private fun TestScope.system(ha: HomeAssistant = ha()) = HaPlugSystem(ha, prefs, clock, backgroundScope)
 

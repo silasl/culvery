@@ -36,10 +36,10 @@ class HaHooverSystemTest {
     private val api = FakeHomeAssistantApi()
     private val link = MutableStateFlow<HomeAssistantLink?>(TEST_LINK)
     private val prefs = MutableStateFlow(HooverPrefs("vacuum.hoover"))
-    private val inFront = MutableStateFlow(true)
+    private val lit = MutableStateFlow(true)
     private val start = "service vacuum/start vacuum.hoover"
 
-    private fun TestScope.ha(): HomeAssistant = testHomeAssistant(api, link, inFront, backgroundScope).also { runCurrent() }
+    private fun TestScope.ha(): HomeAssistant = testHomeAssistant(api, link, lit, backgroundScope).also { runCurrent() }
 
     private fun TestScope.system(ha: HomeAssistant = ha()) = HaHooverSystem(ha, prefs)
 
@@ -280,7 +280,7 @@ class HaHooverSystemTest {
     @Test
     fun aColdStartFindsTheLink() = runTest {
         api.states["vacuum.hoover"] = vacuum("docked")
-        val cold = HomeAssistant(api, link, inFront, WallClock { 0L }, backgroundScope)
+        val cold = HomeAssistant(api, link, lit, WallClock { 0L }, backgroundScope)
         val result = async { HaHooverSystem(cold, prefs).start() }
         runCurrent()
         assertThat(api.calls).containsExactly("state vacuum.hoover", start).inOrder()
@@ -292,7 +292,7 @@ class HaHooverSystemTest {
     fun aStaleCleaningInTheCacheIsReadAgain() = runTest {
         val system = system()
         live(system, "cleaning")
-        inFront.value = false
+        lit.value = false
         runCurrent()
         api.states["vacuum.hoover"] = vacuum("docked")
         val result = async { system.start() }
