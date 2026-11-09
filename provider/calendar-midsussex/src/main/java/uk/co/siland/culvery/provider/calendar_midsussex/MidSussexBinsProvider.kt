@@ -47,13 +47,16 @@ val SOURCE_BINS = CalendarSource("bins", "Mid Sussex District Council", writable
 
 private const val RETRY_GAP_MS = 60 * 60_000L
 
+/** The least time between two reads asked for by Update now, unless the last read failed. */
+internal const val UPDATE_NOW_GAP_MS = 600_000L
+
 /** One daily attempt plus three retries. */
 private const val ATTEMPTS_A_DAY = 4
 
 /**
  * Mid Sussex District Council's bin collections, read from its site (spec 3.5, 4.2). The engine asks every few minutes;
  * the council is read only on a new day, an hour after a failed attempt (at most four attempts a day), or after
- * Update now. Every other pass answers from the stored read, and a stored failure is thrown until a read works.
+ * Update now (at most every ten minutes, unless the last read failed). Every other pass answers from the stored read, and a stored failure is thrown until a read works.
  */
 @Singleton
 class MidSussexBinsProvider internal constructor(
@@ -129,7 +132,10 @@ class MidSussexBinsProvider internal constructor(
     }
 
     private fun due(read: BinsRead, today: LocalDate, householdZone: ZoneId): Boolean {
-        if ((updates.last.value ?: Long.MIN_VALUE) > read.lastAttemptMillis) return true
+        if ((updates.last.value ?: Long.MIN_VALUE) > read.lastAttemptMillis) {
+            val failed = read.failure != null || read.unreached != null
+            if (failed || !clock.within(read.lastAttemptMillis, UPDATE_NOW_GAP_MS)) return true
+        }
         if (read.lastGoodMillis?.let { dayOf(it, householdZone) } == today) return false
         if (dayOf(read.lastAttemptMillis, householdZone) != today) return true
         return read.failuresToday < ATTEMPTS_A_DAY && !clock.within(read.lastAttemptMillis, RETRY_GAP_MS)

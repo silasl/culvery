@@ -203,7 +203,7 @@ class MidSussexBinsProviderTest {
     @Test
     fun updateNowReadsAtOnce() = runTest {
         subject.read()
-        wall.plusMinutes(5)
+        wall.plusMinutes(15)
         updates.request(wall.nowMillis())
         wall.plusMinutes(1)
         subject.read()
@@ -212,6 +212,67 @@ class MidSussexBinsProviderTest {
         wall.plusMinutes(5)
         subject.read()
         assertThat(council.requests).isEqualTo(6)
+    }
+
+    /** Regression guard: no read yet, so Update now reads. */
+    @Test
+    fun aFirstUpdateNowReads() = runTest {
+        updates.request(wall.nowMillis())
+        assertThat(subject.read().upserts).hasSize(3)
+        assertThat(council.requests).isEqualTo(3)
+    }
+
+    @Test
+    fun twoUpdateNowsAMinuteApartReadTheSiteOnce() = runTest {
+        subject.read()
+        wall.plusMinutes(15)
+        updates.request(wall.nowMillis())
+        wall.plusMinutes(1)
+        subject.read()
+        assertThat(council.requests).isEqualTo(6)
+
+        wall.plusMinutes(1)
+        updates.request(wall.nowMillis())
+        wall.plusMinutes(1)
+        subject.read()
+        assertThat(council.requests).isEqualTo(6)
+    }
+
+    /** Regression guard: a failed read doesn't hold Update now back. */
+    @Test
+    fun anUpdateNowAfterAFailedReadReadsAgain() = runTest {
+        council.collections = "collections_missing.html"
+        subject.unreadable()
+        assertThat(council.requests).isEqualTo(3)
+
+        wall.plusMinutes(1)
+        updates.request(wall.nowMillis())
+        wall.plusMinutes(1)
+        subject.unreadable()
+        assertThat(council.requests).isEqualTo(6)
+
+        wall.plusMinutes(1)
+        updates.request(wall.nowMillis())
+        wall.plusMinutes(1)
+        subject.unreadable()
+        assertThat(council.requests).isEqualTo(9)
+    }
+
+    /** Regression guard. */
+    @Test
+    fun twoUpdateNowsElevenMinutesApartReadTwice() = runTest {
+        subject.read()
+        wall.plusMinutes(15)
+        updates.request(wall.nowMillis())
+        wall.plusMinutes(1)
+        subject.read()
+        assertThat(council.requests).isEqualTo(6)
+
+        wall.plusMinutes(10)
+        updates.request(wall.nowMillis())
+        wall.plusMinutes(1)
+        subject.read()
+        assertThat(council.requests).isEqualTo(9)
     }
 
     @Test
@@ -559,7 +620,7 @@ class MidSussexBinsProviderTest {
     fun theAddressIsNeverLogged() = runTest {
         subject.read()
         council.collections = "collections_missing.html"
-        wall.plusMinutes(1)
+        wall.plusMinutes(11)
         updates.request(wall.nowMillis())
         subject.unreadable()
         council.status = 503
