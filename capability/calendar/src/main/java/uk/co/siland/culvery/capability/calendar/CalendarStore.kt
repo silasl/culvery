@@ -432,22 +432,22 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     /**
      * Puts a write the provider accepted into the mirror and, if it came from the outbox, completes it. Writes nothing
-     * once the source is gone: its queued changes went with it.
+     * once the source is gone: its queued changes went with it, or once Undo dropped the change it came from.
      */
     suspend fun applyAccepted(connectionId: String, sourceId: String, event: RemoteEvent, today: LocalDate, zone: ZoneId, completing: Long? = null) =
         db.withTransaction {
             if (dao.source(connectionId, sourceId) == null) return@withTransaction
+            if (completing != null && dao.deleteOutbox(completing) == 0) return@withTransaction
             val before = dao.eventsByIds(connectionId, sourceId, listOf(event.remoteId)).filter { titleKey(it.title) != titleKey(event.title) }
             dao.upsertEvents(listOf(event.toEntity(connectionId, sourceId, zone)))
-            completing?.let { dao.deleteOutbox(it) }
             forgetUnheld(connectionId, sourceId, before.titled(), today, zone)
         }
 
     /** Shows an accepted series assign on every occurrence of [seriesId] held and, if it came from the outbox, completes it. */
     suspend fun applySeriesAssigned(connectionId: String, sourceId: String, seriesId: String, forPerson: String?, completing: Long? = null) =
         db.withTransaction {
+            if (completing != null && dao.deleteOutbox(completing) == 0) return@withTransaction
             dao.assignSeries(connectionId, sourceId, seriesId, forPerson)
-            completing?.let { dao.deleteOutbox(it) }
         }
 
     /** Removes an accepted delete from the mirror and, if it came from the outbox, completes it. */
@@ -482,7 +482,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     suspend fun reschedule(id: Long, attempts: Int, nextAttemptMillis: Long) = dao.rescheduleOutbox(id, attempts, nextAttemptMillis)
 
-    suspend fun dropChange(id: Long) = dao.deleteOutbox(id)
+    suspend fun dropChange(id: Long): Int = dao.deleteOutbox(id)
 
     suspend fun isQueued(id: Long): Boolean = dao.outboxHas(id)
 

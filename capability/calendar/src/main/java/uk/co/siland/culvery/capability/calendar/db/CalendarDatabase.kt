@@ -459,7 +459,7 @@ interface CalendarDao {
     suspend fun rescheduleOutbox(id: Long, attempts: Int, next: Long)
 
     @Query("DELETE FROM outbox WHERE id = :id")
-    suspend fun deleteOutbox(id: Long)
+    suspend fun deleteOutbox(id: Long): Int
 
     /** A create and every change queued for its event: the create carries the key, the others target it as remoteId. */
     @Query(

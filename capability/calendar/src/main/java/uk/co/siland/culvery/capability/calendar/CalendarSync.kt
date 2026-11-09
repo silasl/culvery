@@ -128,7 +128,7 @@ class CalendarSync internal constructor(
                 if (went == 0) return
                 went
             } else {
-                store.dropChange(change.id)
+                if (store.dropChange(change.id) == 0) return
                 1
             }
             val reasons = dropped.getOrPut(label) { mutableListOf() }

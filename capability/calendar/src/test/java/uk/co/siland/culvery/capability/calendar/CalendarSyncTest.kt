@@ -1319,6 +1319,42 @@ class CalendarSyncTest {
         assertThat(undoCalls).containsExactly("delete" to true)
     }
 
+    /** An update queued behind a create, with Undo tapped as it is sent; the service then refuses it, or [accepts] it. */
+    private suspend fun TestScope.undoingAsTheUpdateIsSent(accepts: Boolean): Pair<TestAccess, CalendarSync> {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        queueSwimCreate()
+        queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("mia-id"))
+        val tapping = object : CalendarWriter by w {
+            override suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft, fields: Set<EventField>): RemoteEvent {
+                val sent = if (accepts) w.update(conn, source, remoteId, draft, fields) else null
+                editor.undoAdd(added(access))
+                return sent ?: throw WriteRejectedException("event is gone")
+            }
+        }
+        return access to undoingEngine(tapping)
+    }
+
+    @Test
+    fun anUndoAfterTheCreateWasStoredIsNotToldAsALostChange() = runTest {
+        val (access, sync) = undoingAsTheUpdateIsSent(accepts = false)
+        sync.syncAll()
+        assertThat(access.toasts.messages).containsExactly(removed("Swim"))
+        assertThat(toaster.messages).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(store.eventNow(swimRef)).isNull()
+    }
+
+    @Test
+    fun anUpdateTheServiceAcceptedAfterUndoDoesNotPutTheEventBack() = runTest {
+        val (access, sync) = undoingAsTheUpdateIsSent(accepts = true)
+        sync.syncAll()
+        assertThat(access.toasts.messages).containsExactly(removed("Swim"))
+        assertThat(store.eventNow(swimRef)).isNull()
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
     /** Regression guard: a stray whose delete fails is deleted on the next pass. */
     @Test
     fun aFailedStrayDeleteIsTriedNextPass() = runTest {
