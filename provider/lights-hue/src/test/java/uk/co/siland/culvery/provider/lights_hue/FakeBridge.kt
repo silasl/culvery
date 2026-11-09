@@ -85,6 +85,9 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
     /** The stream's events come only after this many milliseconds. */
     @Volatile var streamDelayMs = 0L
 
+    /** The stream's body arrives in ten parts, one every [STREAM_TRICKLE_MS], as a bridge that keeps talking. */
+    @Volatile var streamTrickle = false
+
     /** The stream stays open after its events, for [STREAM_HOLD_MS], as a live bridge's does. */
     @Volatile var streamHeld = false
 
@@ -149,6 +152,10 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
         val sent = events + "\n\n"
         val response = MockResponse().setHeader("Content-Type", "text/event-stream")
             .setBodyDelay(streamDelayMs, TimeUnit.MILLISECONDS)
+        if (streamTrickle) {
+            val part = sent.toByteArray().size.toLong() / TRICKLE_PARTS + 1
+            return response.setBody(sent).throttleBody(part, STREAM_TRICKLE_MS, TimeUnit.MILLISECONDS)
+        }
         if (!streamHeld) return response.setBody(sent)
         // The events, then a keep-alive comment only after the hold: the bridge looks open until then.
         val body = sent + ": keep\n"
@@ -159,6 +166,8 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
 
     companion object {
         const val STREAM_HOLD_MS = 2_000L
+        const val STREAM_TRICKLE_MS = 100L
+        private const val TRICKLE_PARTS = 10
         private const val HOLD_LIMIT_S = 5L
 
         private val RESOURCES = mapOf(

@@ -13,15 +13,15 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.retryDelayMillis
 
-/** 7 §4.2: the stream and the full reads only while in front and a lights screen shows; reopened with backoff. */
+/** 7 §4.2: the stream and the full reads only while the screen is lit and a lights screen shows; reopened with backoff. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class LightsFollowTest {
     private val system = TestLightsSystem()
     private val systemFlow = MutableStateFlow<LightsSystem?>(system)
-    private val inFront = MutableStateFlow(true)
+    private val lit = MutableStateFlow(true)
 
-    private fun TestScope.follow() = LightsFollow(systemFlow, inFront, backgroundScope).also { it.start() }
+    private fun TestScope.follow() = LightsFollow(systemFlow, lit, backgroundScope).also { it.start() }
 
     private fun count(call: String) = system.calls.count { it == call }
 
@@ -36,7 +36,7 @@ class LightsFollowTest {
         val follow = follow()
         runCurrent()
         assertThat(system.calls).isEmpty()
-        inFront.value = true
+        lit.value = true
         after(READ_ALL_MS * 2)
         assertThat(system.calls).isEmpty()
         follow.watch()
@@ -44,12 +44,12 @@ class LightsFollowTest {
         assertThat(system.calls).containsExactly("readAll", "stream").inOrder()
     }
 
-    /** Fails at 59 999 ms if the loop is faster, at 60 000 if slower. */
+    /** Fails at 299 999 ms if the loop is faster, at 300 000 if slower. */
     @Test
-    fun aFullReadEverySixtySeconds() = runTest {
+    fun aFullReadEveryFiveMinutes() = runTest {
         follow().watch()
         runCurrent()
-        after(READ_ALL_MS - 1)
+        after(299_999)
         assertThat(count("readAll")).isEqualTo(1)
         after(1)
         assertThat(count("readAll")).isEqualTo(2)
@@ -67,17 +67,17 @@ class LightsFollowTest {
         assertThat(count("readAll")).isEqualTo(1)
     }
 
-    /** Fails if the stream stays open while Culvery is behind another app, or doesn't come back in front. */
+    /** Regression guard: fails if the stream stays open while the screen is dark, or doesn't come back when it lights. */
     @Test
-    fun goingBehindClosesTheStream() = runTest {
+    fun theStreamClosesWhileTheScreenIsDark() = runTest {
         follow().watch()
         runCurrent()
-        inFront.value = false
+        lit.value = false
         runCurrent()
         assertThat(system.calls).containsExactly("readAll", "stream", "stream closed").inOrder()
         after(READ_ALL_MS)
         assertThat(count("readAll")).isEqualTo(1)
-        inFront.value = true
+        lit.value = true
         runCurrent()
         assertThat(system.calls.takeLast(2)).containsExactly("readAll", "stream").inOrder()
     }

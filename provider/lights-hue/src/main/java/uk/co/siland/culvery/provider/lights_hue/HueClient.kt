@@ -28,6 +28,9 @@ internal const val HUE_TIMEOUT_MS = 3_000L
 internal const val IDLE_CONNECTIONS = 2
 internal const val KEEP_ALIVE_MS = 5_000L
 
+/** The event stream is reopened if the bridge sends nothing at all, not even a keep-alive, for this long (7 §7). */
+internal const val STREAM_SILENCE_MS = 600_000L
+
 /** A whole bridge's rooms, lights and scenes run to tens of KB; past this isn't a bridge's answer. */
 internal const val MAX_ANSWER_BYTES = 4L * 1024 * 1024
 
@@ -65,6 +68,7 @@ internal class HueClient(
     private val pacer: HuePacer,
     private val accept: (String, Int) -> Boolean = ::isBridgeAuthority,
     timeoutMs: Long = HUE_TIMEOUT_MS,
+    private val streamSilenceMs: Long = STREAM_SILENCE_MS,
     private val capture: (String, String) -> Unit = HueCapture::log,
 ) {
     // Over HTTP/2 a pool that keeps no idle connection can close one a new call has already taken.
@@ -96,9 +100,9 @@ internal class HueClient(
         base.newBuilder().sslSocketFactory(sockets, manager).build()
     }
 
-    // The stream may be quiet for minutes: it keeps only the connect timeout.
+    // A stream the bridge has silently dropped never errors: the read timeout ends it so LightsFollow reopens it.
     private fun stream(bridgeId: String): OkHttpClient = streams.getOrPut(bridgeId) {
-        named(bridgeId).newBuilder().readTimeout(Duration.ZERO).callTimeout(Duration.ZERO).build()
+        named(bridgeId).newBuilder().readTimeout(Duration.ofMillis(streamSilenceMs)).callTimeout(Duration.ZERO).build()
     }
 
     /**

@@ -2,6 +2,7 @@ package uk.co.siland.culvery.provider.lights_hue
 
 import com.google.common.truth.Truth.assertThat
 import java.io.InterruptedIOException
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
@@ -32,11 +33,13 @@ class HueClientTest {
         accept: (String, Int) -> Boolean = onThisMachine,
         pacer: HuePacer = HuePacer(now = System::currentTimeMillis, groupGapMs = 0, lightGapMs = 0),
         timeoutMs: Long = TIMEOUT_MS,
+        streamSilenceMs: Long = STREAM_SILENCE_MS,
     ) = HueClient(
         HueTrust(TestCerts.testCa()),
         pacer,
         accept = accept,
         timeoutMs = timeoutMs,
+        streamSilenceMs = streamSilenceMs,
         capture = { what, answer -> captured += what to answer },
     )
 
@@ -242,6 +245,29 @@ class HueClientTest {
     fun theStreamWaitsLongerThanTheReadTimeout() = runTest {
         bridge.streamDelayMs = SLOW_ANSWER_MS
         assertThat(client(timeoutMs = SHORT_TIMEOUT_MS).events(call).first()).contains(HueEvent.Scene(HueFixtures.RELAX, true))
+    }
+
+    /** Fails if a stream the bridge has opened and then left silent never times out, so it is never reopened (7 §4.2). */
+    @Test
+    fun aSilentStreamTimesOut() = runTest {
+        bridge.streamDelayMs = SLOW_ANSWER_MS * 5
+        var opened = false
+        throws<SocketTimeoutException> { client(streamSilenceMs = SHORT_TIMEOUT_MS).events(call) { opened = true }.toList() }
+        assertThat(opened).isTrue()
+    }
+
+    /** Fails if a stream that keeps sending is dropped for being slow overall, rather than for being silent. */
+    @Test
+    fun aTalkingStreamStaysOpen() = runTest {
+        bridge.streamTrickle = true
+        val events = client(streamSilenceMs = SHORT_TIMEOUT_MS).events(call).toList()
+        assertThat(events).hasSize(2)
+    }
+
+    /** Fails if the stream gives up on a quiet bridge sooner than ten minutes (7 §4.2). */
+    @Test
+    fun theStreamWaitsTenMinutes() {
+        assertThat(STREAM_SILENCE_MS).isEqualTo(600_000L)
     }
 
     /** Fails if leaving the stream waits for the bridge to send or close, so the stream stays open behind (7 §4.2). */

@@ -16,32 +16,32 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 /** A full read of the rooms and scenes, while the stream is open (7 §4.2). */
-const val READ_ALL_MS = 60_000L
+const val READ_ALL_MS = 300_000L
 
 private const val TAG = "LightsFollow"
 
 private class StreamEnded : Exception("The lights stream ended")
 
 /**
- * Keeps the bridge's event stream open and reads everything every minute (7 §4.2), only while Culvery is in front and a
+ * Keeps the bridge's event stream open and reads everything every five minutes (7 §4.2), only while the screen is lit and a
  * screen that shows lights is on, which [watch] counts. The stream opens with a full read and reopens with backoff
  * when it drops.
  */
 @Singleton
 class LightsFollow internal constructor(
     private val system: StateFlow<LightsSystem?>,
-    private val inFront: StateFlow<Boolean>,
+    private val lit: StateFlow<Boolean>,
     private val scope: CoroutineScope,
 ) : Startable {
     @Inject
-    constructor(bridges: Bridges, host: AlertHost, @ApplicationScope scope: CoroutineScope) : this(bridges.system, host.inFront, scope)
+    constructor(bridges: Bridges, lit: ScreenLit, @ApplicationScope scope: CoroutineScope) : this(bridges.system, lit.lit, scope)
 
     private val watchers = MutableStateFlow(0)
 
@@ -57,9 +57,18 @@ class LightsFollow internal constructor(
 
     override fun start() {
         scope.launch {
-            combine(system, inFront, watchers) { s, front, n -> s.takeIf { front && n > 0 } }
+            combine(system, lit, watchers) { s, isLit, n -> s.takeIf { isLit && n > 0 } }
                 .distinctUntilChanged()
-                .collectLatest { s -> if (s != null) following(s) }
+                .collectLatest { s ->
+                    if (s != null) {
+                        Log.d(TAG, "Polling on")
+                        try {
+                            following(s)
+                        } finally {
+                            Log.d(TAG, "Polling off")
+                        }
+                    }
+                }
         }
     }
 
