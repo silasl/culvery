@@ -27,8 +27,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dagger.hilt.android.EntryPointAccessors
 import com.google.common.truth.Truth.assertThat
+import dagger.hilt.android.EntryPointAccessors
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.flow.Flow
@@ -51,6 +51,8 @@ import uk.co.siland.culvery.capability.music.ui.MusicSettingsScreen
 import uk.co.siland.culvery.capability.music.ui.MusicSettingsUi
 import uk.co.siland.culvery.capability.party.ui.ModeRowUi
 import uk.co.siland.culvery.capability.party.ui.ModesList
+import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrations
+import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrationsUi
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.HomeCard
@@ -60,23 +62,21 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
-import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrations
-import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrationsUi
 import uk.co.siland.culvery.core.setup.SettingsScreen
 import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.asSound
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.test.waitFor
-import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.di.HouseGraphProbe
 import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DisplayPrefs
-import uk.co.siland.culvery.display.ui.DisplaySettingsActions
 import uk.co.siland.culvery.display.ui.BrightnessAndNightScreen
+import uk.co.siland.culvery.display.ui.DisplaySettingsActions
 import uk.co.siland.culvery.display.ui.DisplaySettingsUi
-import uk.co.siland.culvery.shell.FakeAccessControl
 import uk.co.siland.culvery.settings.AppSettingsRig
+import uk.co.siland.culvery.shell.FakeAccessControl
 import uk.co.siland.culvery.shell.FakeCapability
 
 private class Step(override val id: String, override val order: Int) : SetupStep {

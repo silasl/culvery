@@ -507,6 +507,7 @@
 - [ ] **Step 1 (11t):** Give `testSounds()`'s wait for `firstReadDone` and `DoorQuietnessTest`'s `first { }` waits a 5 s timeout (`withTimeout(5_000)`), each failing with a message naming what it waited for.
 - [ ] **Step 2 (11u):** `trayHome` fails with `require` when asked for more modes than fit (2); the `home_tray_full_*` snaps pass `modes = 2`. Write `theTrayFixtureRefusesMoreModesThanFit`. The baselines shouldn't move; if they do, look before accepting.
 - [ ] **Step 3 (11s):** Run `./gradlew test` three times. List each test that failed in any run, under this step. For each, find the cause and fix it: a real-time wait becomes a test-clock wait or a bounded `waitUntil`. No retries, no `@Ignore`. Then three more runs with no failure.
+  Failed in a run: `DoorTabTest` `aRingRecordedWhileClearingLeavesNoCard`, `tappingTheOpenTabAgainMarksEverythingSeen`, `aResumeThenAReselectBackToBackKeepsTheFirstSetsNew`, `aTabLeftOpenBehindAnotherAppMarksNothingUntilItIsBack`; `AppSettingsPageTest.theBackLinkReturns`; `SampleHouseTest.sampleTrueKeepsTheSavedConnectionsAndSampleFalseBringsThemBack`; `DoorRecorderTest.everyNoticeIsHeard`; `StoredModeTileTest.aTapTurnsOnWithNoSheet`; `LightsCapabilityTest.theTabShowsOnceABridgeIsPaired`.
 - [ ] **Step 4 (11v):** `Context` imported in `BuiltInSoundTest` and `ChimeTest`; imports ordered in Plan 18's files.
 - [ ] **Step 5:** Run `./gradlew testDebugUnitTest verifyRoborazziDebug`. Expect PASS.
 - [ ] **Step 6:** Commit: `Steady the door and mode tests, and tidy Plan 18's tests`.

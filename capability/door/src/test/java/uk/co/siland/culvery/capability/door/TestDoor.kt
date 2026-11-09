@@ -13,12 +13,17 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
 import uk.co.siland.culvery.core.access.test.FakeAccess
-import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
+import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.sound.PadStart
@@ -143,8 +148,19 @@ internal class FakeChime : Chime {
     }
 }
 
+/** [block] on a real dispatcher, as DataStore's writes need, failing after 5 s with [what] it waited for. */
+internal suspend fun <T> awaiting(what: String, block: suspend () -> T): T = withContext(Dispatchers.Default) {
+    try {
+        withTimeout(5_000) { block() }
+    } catch (e: TimeoutCancellationException) {
+        throw AssertionError("Waited 5 s for $what", e)
+    }
+}
+
 /** The real library over [folder] as the tablet's sounds folder, read as it is made; null is a tablet with no sounds folder. */
-internal fun testSounds(folder: File? = null) = SoundLibrary({ folder }, CoroutineScope(Dispatchers.Unconfined), Dispatchers.Unconfined)
+internal fun testSounds(folder: File? = null) = SoundLibrary({ folder }, CoroutineScope(Dispatchers.Unconfined), Dispatchers.Unconfined).also {
+    runBlocking { awaiting("the sounds folder's first read") { it.firstReadDone.first { done -> done } } }
+}
 
 /** Puts a made-up file at [path] in [folder]. */
 internal fun tabletSound(folder: File, path: String) = folder.resolve(path).apply {

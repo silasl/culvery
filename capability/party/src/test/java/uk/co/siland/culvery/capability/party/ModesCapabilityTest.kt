@@ -12,8 +12,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.Role
-import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.TrayWidth
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.ui.Icons
 

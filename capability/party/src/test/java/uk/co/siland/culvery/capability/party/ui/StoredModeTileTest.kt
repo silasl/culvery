@@ -22,6 +22,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
@@ -36,6 +37,7 @@ import uk.co.siland.culvery.capability.party.ModeRun
 import uk.co.siland.culvery.capability.party.StoredModeActions
 import uk.co.siland.culvery.capability.party.TestAccess
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.Icons
@@ -151,6 +153,8 @@ class StoredModeTileTest {
         runBlocking {
             rig.choose(FILM_NIGHT)
             rig.loaded()
+            // A tap reads the modes the store has passed on, on its own scope; until Film night is among them it does nothing.
+            soon { rig.settings.prefsNow.first { it?.mode(FILM_ID) != null } }
         }
         val actions = StoredModeActions(TestAccess(Role.CHILD), rig.house, rig.settings, setOf(rig.house))
         compose.setContent {

@@ -23,7 +23,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -58,6 +57,7 @@ import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 
 /**
  * Regression for the hand-off Home cards and week view not rolling over at midnight: [TodayCardHost] and
@@ -65,7 +65,12 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
  */
 @RunWith(AndroidJUnit4::class)
 class CardHostsMidnightRolloverTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen {
+        clockScope.cancel()
+        calendar.close()
+        householdDb.close()
+    }
+    @get:Rule(order = 1) val compose = createComposeRule()
     private val london = ZoneId.of("Europe/London")
     private val d23 = LocalDate.of(2026, 9, 23)
     private val d24 = LocalDate.of(2026, 9, 24)
@@ -104,13 +109,6 @@ class CardHostsMidnightRolloverTest {
             ),
             TEST_TODAY,
         )
-    }
-
-    @After
-    fun tearDown() {
-        clockScope.cancel()
-        calendar.close()
-        householdDb.close()
     }
 
     private fun timed(title: String, date: LocalDate): RemoteEvent {

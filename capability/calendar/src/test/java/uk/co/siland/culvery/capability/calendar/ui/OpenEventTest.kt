@@ -17,7 +17,6 @@ import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -52,10 +51,15 @@ import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 
 @RunWith(AndroidJUnit4::class)
 class OpenEventTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen {
+        calendar.close()
+        householdDb.close()
+    }
+    @get:Rule(order = 1) val compose = createComposeRule()
 
     private val london = ZoneId.of("Europe/London")
     private val today = LocalDate.of(2026, 9, 23)
@@ -92,12 +96,6 @@ class OpenEventTest {
         )
         repo = CalendarRepository(store, household, zone, emptySet(), emptySet(), testCalendarSettings(), testBinColours())
         editor = stubEditor(store, zone)
-    }
-
-    @After
-    fun tearDown() {
-        calendar.close()
-        householdDb.close()
     }
 
     /** The Family calendar as a writable master whose provider has a writer, so the add entry points show. */

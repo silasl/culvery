@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -31,17 +30,16 @@ import uk.co.siland.culvery.core.setup.SettingsScreen
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhPageTitle
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 
 /** Settings with its eight pages (15b §3), on App settings and its sub-pages, at the tablet's 1280 × 800. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SettingsScreenshotTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen { rig.close() }
+    @get:Rule(order = 1) val compose = createComposeRule()
     @get:Rule val folder = TemporaryFolder()
     private val rig by lazy { AppSettingsRig(folder.root) }
-
-    @After
-    fun tearDown() = rig.close()
 
     private class Still(override val id: String, override val title: String, override val order: Int) : SettingsPage {
         @Composable

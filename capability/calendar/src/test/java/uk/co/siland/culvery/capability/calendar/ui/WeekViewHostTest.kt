@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -52,6 +51,7 @@ import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 
 /** The real DAO, with the events query held back on [gate] once it is set. */
 private class HoldingDao(private val real: CalendarDao) : CalendarDao by real {
@@ -68,7 +68,12 @@ private class HoldingDao(private val real: CalendarDao) : CalendarDao by real {
 
 @RunWith(AndroidJUnit4::class)
 class WeekViewHostTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen {
+        clockScope.cancel()
+        calendar.close()
+        householdDb.close()
+    }
+    @get:Rule(order = 1) val compose = createComposeRule()
     private val london = ZoneId.of("Europe/London")
     private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
@@ -80,13 +85,6 @@ class WeekViewHostTest {
     fun setUp() = runTest {
         calendar = calendarDb()
         householdDb = householdDb()
-    }
-
-    @After
-    fun tearDown() {
-        clockScope.cancel()
-        calendar.close()
-        householdDb.close()
     }
 
     private fun subtitle(): String = compose.onNodeWithTag("week_subtitle").fetchSemanticsNode().config

@@ -18,7 +18,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -47,13 +46,19 @@ import uk.co.siland.culvery.core.setup.SetupWizard
 import uk.co.siland.culvery.core.setup.setupStore
 import uk.co.siland.culvery.core.setup.steps.WelcomeStep
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
 import uk.co.siland.culvery.shell.OverlayState
 
 /** Welcome's Use a sample household in the real wizard, whose PIN gate rises as soon as the sample's Admin exists. */
 @RunWith(AndroidJUnit4::class)
 class SampleWizardTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen {
+        scope.cancel()
+        householdDb.close()
+        calendarDb.close()
+    }
+    @get:Rule(order = 1) val compose = createComposeRule()
     @get:Rule val folder = TemporaryFolder()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var householdDb: HouseholdDatabase
@@ -74,13 +79,6 @@ class SampleWizardTest {
         household = HouseholdRepository(householdDb)
         store = CalendarStore(calendarDb)
         state = SetupState(setupStore(scope) { File(folder.root, "setup.preferences_pb") }, household)
-    }
-
-    @After
-    fun tearDown() {
-        scope.cancel()
-        householdDb.close()
-        calendarDb.close()
     }
 
     @Test

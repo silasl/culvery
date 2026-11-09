@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dagger.multibindings.IntoSet
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -31,6 +30,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.display.ui.InSettingsPane
 import uk.co.siland.culvery.settings.di.SettingsModule
@@ -38,13 +38,11 @@ import uk.co.siland.culvery.settings.di.SettingsModule
 /** 15b §3: App settings' four sections, its sub-pages and the way back. */
 @RunWith(AndroidJUnit4::class)
 class AppSettingsPageTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen { rig.close() }
+    @get:Rule(order = 1) val compose = createComposeRule()
     @get:Rule val folder = TemporaryFolder()
     private val rig by lazy { AppSettingsRig(folder.root) }
     private val navigator = RecordingNavigator()
-
-    @After
-    fun tearDown() = rig.close()
 
     private fun show(start: String? = null, town: Boolean = true) {
         rig.household(town)

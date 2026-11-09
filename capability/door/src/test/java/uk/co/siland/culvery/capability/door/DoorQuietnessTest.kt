@@ -52,17 +52,17 @@ class DoorQuietnessTest {
     fun quietNowReadsQuietHours() = runTest {
         settings.setConnected(true)
         settings.setQuietHours(on = true, from = local.minusHours(1), until = local.plusHours(1))
-        settings.current.first { it.quietOn && it.quietFrom == local.minusHours(1) }
+        awaiting("quiet hours to be on") { settings.current.first { it.quietOn && it.quietFrom == local.minusHours(1) } }
         assertThat(quiet.quietNow()).isTrue()
         settings.setQuietHours(on = false, from = local.minusHours(1), until = local.plusHours(1))
-        settings.current.first { !it.quietOn }
+        awaiting("quiet hours to be off") { settings.current.first { !it.quietOn } }
         assertThat(quiet.quietNow()).isFalse()
     }
 
     @Test
     fun quietHoursNeedTheDoorSetUp() = runTest {
         settings.setQuietHours(on = true, from = local.minusHours(1), until = local.plusHours(1))
-        settings.current.first { it.quietOn && it.quietFrom == local.minusHours(1) }
+        awaiting("quiet hours to be on") { settings.current.first { it.quietOn && it.quietFrom == local.minusHours(1) } }
         assertThat(quiet.quietNow()).isFalse()
     }
 
@@ -70,7 +70,7 @@ class DoorQuietnessTest {
     fun volumeIsTheDoorbells() = runTest {
         assertThat(quiet.volume).isEqualTo(1.0f)
         settings.setVolume(0.3f)
-        settings.current.first { it.volume == 0.3f }
+        awaiting("the volume to be 0.3") { settings.current.first { it.volume == 0.3f } }
         assertThat(quiet.volume).isEqualTo(0.3f)
     }
 }

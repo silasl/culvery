@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.sound
 
+import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -24,7 +25,7 @@ class BuiltInSoundTest {
 
     @Test
     fun everySoundOpens() {
-        val resources = ApplicationProvider.getApplicationContext<android.content.Context>().resources
+        val resources = ApplicationProvider.getApplicationContext<Context>().resources
         for (sound in BuiltInSound.entries) {
             resources.openRawResourceFd(sound.res).use { assertThat(it.length).isGreaterThan(0L) }
         }

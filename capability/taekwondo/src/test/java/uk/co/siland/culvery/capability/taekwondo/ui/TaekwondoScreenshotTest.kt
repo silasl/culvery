@@ -2,8 +2,8 @@ package uk.co.siland.culvery.capability.taekwondo.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.Modifier
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -23,8 +23,8 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.taekwondo.CHOONG_MOO
 import uk.co.siland.culvery.capability.taekwondo.FakeSpeaker
 import uk.co.siland.culvery.capability.taekwondo.RunState
-import uk.co.siland.culvery.capability.taekwondo.move
 import uk.co.siland.culvery.capability.taekwondo.TaekwondoSettings
+import uk.co.siland.culvery.capability.taekwondo.move
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.settingsDataStore
 import uk.co.siland.culvery.core.plugin.test.TestOverlay

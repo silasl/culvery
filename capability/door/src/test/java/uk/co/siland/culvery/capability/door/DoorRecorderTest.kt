@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -56,7 +57,8 @@ class DoorRecorderTest {
     @Test
     fun everyNoticeIsHeard() = runTest {
         recorder.heard(NOW)
-        settings.prefs.first { it.lastHeardMillis != null }
+        // Fresh reads, not one collection: DataStore can keep a collection begun during a write from ever seeing it.
+        awaiting("the last heard time to be kept") { while (settings.prefs.first().lastHeardMillis == null) delay(10) }
         assertThat(settings.prefs.first().lastHeardMillis).isEqualTo(NOW)
     }
 

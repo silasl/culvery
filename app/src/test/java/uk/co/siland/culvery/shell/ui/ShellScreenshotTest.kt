@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import org.junit.After
+import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -117,36 +117,38 @@ import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.Birthday
-import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.ConfettiBurst
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.HouseModeThirdTile
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.PersonPalette
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
 import uk.co.siland.culvery.shell.TabItem
 import uk.co.siland.culvery.shell.ToastMessage
 
+/** How many modes the tray's first row draws (18 §4.1). */
+private const val TRAY_MODES = 2
+
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ShellScreenshotTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen {
+        shoppingScope.cancel()
+        shoppingDb?.close()
+    }
+    @get:Rule(order = 1) val compose = createComposeRule()
 
     private val at = LocalDateTime.of(2026, 9, 23, 11, 54)
 
     private val shoppingScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var shoppingDb: ShoppingDatabase? = null
-
-    @After
-    fun closeShopping() {
-        shoppingScope.cancel()
-        shoppingDb?.close()
-    }
 
     private val alex = Person(PersonId("alex"), "Alex", 0xFF4CB387)
     private val sam = Person(PersonId("sam"), "Sam", 0xFF5B9BE0)
@@ -316,20 +318,23 @@ class ShellScreenshotTest {
     private val trayTaekwondo = trayMode("taekwondo", 90, "Taekwondo", TrayWidth.THIRD)
 
     private fun trayHome(
-        dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true, modes: Int = 2, pads: Int = 0, taekwondo: Boolean = false,
+        dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true, modes: Int = TRAY_MODES, pads: Int = 0, taekwondo: Boolean = false,
         unread: Boolean = false,
-    ) = calendarHome(dark).copy(
-        tabs = allTabs,
-        homeCards = HomeCardPlacer.place(
-            homeCardList(lights, music) +
-                listOfNotNull(
-                    HomeCard("shopping.placeholder", HomeCardSize.UTILITY, 40) {
-                        HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
-                    }.takeIf { shopping },
-                ),
-            listOf(trayRow) + trayModes.take(modes) + (if (unread) trayPadsUnread else trayPads).take(pads) + listOfNotNull(trayTaekwondo.takeIf { taekwondo }),
-        ),
-    )
+    ): ShellUiState {
+        require(modes <= TRAY_MODES) { "The tray's first row holds $TRAY_MODES modes, not $modes" }
+        return calendarHome(dark).copy(
+            tabs = allTabs,
+            homeCards = HomeCardPlacer.place(
+                homeCardList(lights, music) +
+                    listOfNotNull(
+                        HomeCard("shopping.placeholder", HomeCardSize.UTILITY, 40) {
+                            HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
+                        }.takeIf { shopping },
+                    ),
+                listOf(trayRow) + trayModes.take(modes) + (if (unread) trayPadsUnread else trayPads).take(pads) + listOfNotNull(trayTaekwondo.takeIf { taekwondo }),
+            ),
+        )
+    }
 
     /**
      * The Shopping capability's own card, over the sample provider and an in-memory list of Milk, Bread and Eggs, in the
@@ -664,10 +669,16 @@ class ShellScreenshotTest {
     fun homeTrayOneModeLight() = snap("home_tray_one_mode_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 1))
 
     @Test
-    fun homeTrayFullDark() = snap("home_tray_full_dark", dark = true, state = trayHome(dark = true, shopping = true, modes = 4, pads = 3))
+    fun homeTrayFullDark() = snap("home_tray_full_dark", dark = true, state = trayHome(dark = true, shopping = true, modes = 2, pads = 3))
 
     @Test
-    fun homeTrayFullLight() = snap("home_tray_full_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 4, pads = 3))
+    fun homeTrayFullLight() = snap("home_tray_full_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 2, pads = 3))
+
+    /** Fails if the fixture takes more modes than the tray's first row draws, so a snap would cut them without saying. */
+    @Test
+    fun theTrayFixtureRefusesMoreModesThanFit() {
+        assertThrows(IllegalArgumentException::class.java) { trayHome(dark = true, shopping = true, modes = TRAY_MODES + 1) }
+    }
 
     /** The pads before the gate's first read (two modes: a tray holds no more with pads). */
     @Test

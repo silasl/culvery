@@ -36,6 +36,7 @@ import uk.co.siland.culvery.core.ui.LocalToastClearance
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.ToastClearance
 import uk.co.siland.culvery.core.ui.WithFontScale
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 import uk.co.siland.culvery.core.ui.test.pixelAt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -78,7 +79,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -105,6 +105,10 @@ import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 @RunWith(AndroidJUnit4::class)
 class PeopleUiTest {
     @get:Rule(order = 0) val touchMode = TouchModeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen {
+        scope.cancel()
+        db.close()
+    }
     @get:Rule(order = 1) val compose = createComposeRule()
     private lateinit var db: HouseholdDatabase
     private lateinit var household: HouseholdRepository
@@ -122,12 +126,6 @@ class PeopleUiTest {
         editor = PeopleEditor(household, access.pins, access.control, access.toasts)
         val alex = runBlocking { access.addAdmin() }
         access.control.beginSetupSession(Identified(alex, Role.ADMIN))
-    }
-
-    @After
-    fun tearDown() {
-        scope.cancel()
-        db.close()
     }
 
     /** The list reads Room: wait for Alex's row before the first check or tap. */

@@ -42,7 +42,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -97,6 +96,7 @@ import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.isButton
@@ -111,6 +111,11 @@ class EventEditorHostTest {
     /** Focus and the keyboard behave as on the tablet only in touch mode, set before the activity launches. */
     @get:Rule(order = 0) val touchMode = TouchModeRule()
 
+    @get:Rule(order = 0) val closing = AfterTheScreen {
+        scope.cancel()
+        calendar.close()
+        householdDb.close()
+    }
     @get:Rule(order = 1) val compose = createComposeRule()
 
     private lateinit var calendar: CalendarDatabase
@@ -164,13 +169,6 @@ class EventEditorHostTest {
         )
         repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer), testCalendarSettings(), testBinColours())
         editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { now }, scope)
-    }
-
-    @After
-    fun tearDown() {
-        scope.cancel()
-        calendar.close()
-        householdDb.close()
     }
 
     private fun showEditor(request: EditorRequest) = showOverlay { open(request) }

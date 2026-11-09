@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +42,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertFitsTheCard
@@ -60,13 +60,12 @@ private const val PERMISSION_LINE = "Allow Google Tasks in Settings › Shopping
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ShoppingCardTest {
     @get:Rule(order = 0) val touchMode = TouchModeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen { rigs.forEach { it.close() } }
     @get:Rule(order = 1) val compose = createComposeRule()
     private val navigator = RecordingNavigator()
     private val overlay = TestOverlay()
     private val rigs = mutableListOf<UiRig>()
     private val ticks = mutableListOf<String>()
-
-    @After fun closeRigs() = rigs.forEach { it.close() }
 
     private fun rig() = UiRig().also { rigs += it }
 

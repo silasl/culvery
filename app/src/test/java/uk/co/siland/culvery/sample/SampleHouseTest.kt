@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -33,6 +34,9 @@ class SampleHouseTest {
     private val lights get() = deps.sampleLights().system
 
     private fun receive(configure: Intent.() -> Unit) = DebugSampleHouseReceiver().onReceive(context, Intent().apply(configure))
+
+    // Fresh reads, not one collection: DataStore can keep a collection begun during a write from ever seeing it.
+    private suspend fun settled(done: suspend () -> Boolean) = withTimeout(10_000) { while (!done()) delay(10) }
 
     private suspend inline fun <reified T : Exception> thrown(block: suspend () -> Unit): T {
         try {
@@ -135,17 +139,13 @@ class SampleHouseTest {
         deps.lightsSettings().connect("lights.hue", bridge)
 
         receive { putExtra("sample", true) }
-        withTimeout(10_000) {
-            deps.musicSettings().prefs.first { it.providerId == "sample.music" }
-            deps.lightsSettings().prefs.first { it.providerId == "sample.lights" }
-        }
+        settled { deps.musicSettings().prefs.first().providerId == "sample.music" && deps.lightsSettings().prefs.first().providerId == "sample.lights" }
         // A second sample true must not replace what was kept with the samples.
         deps.sampleHouse().use(true)
         receive { putExtra("sample", false) }
-        withTimeout(10_000) {
-            assertThat(deps.musicSettings().prefs.first { it.providerId == "music.sonos" }.link).isEqualTo(music)
-            assertThat(deps.lightsSettings().prefs.first { it.providerId == "lights.hue" }.link).isEqualTo(bridge)
-        }
+        settled { deps.musicSettings().prefs.first().providerId == "music.sonos" && deps.lightsSettings().prefs.first().providerId == "lights.hue" }
+        assertThat(deps.musicSettings().prefs.first().link).isEqualTo(music)
+        assertThat(deps.lightsSettings().prefs.first().link).isEqualTo(bridge)
     }
 
     private companion object {

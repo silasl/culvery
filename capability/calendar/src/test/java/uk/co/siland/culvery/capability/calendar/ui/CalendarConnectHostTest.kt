@@ -28,7 +28,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -71,6 +70,7 @@ import uk.co.siland.culvery.core.plugin.couldNotConnect
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 
 /** settings.manage's name on the PIN pad. */
 private const val SETTINGS_LABEL = "Change settings"
@@ -81,7 +81,12 @@ private const val CONNECT_LABEL = "Connect calendars and services"
 /** The connecting card over real access rules, setup and store; PIN pads are answered from a queue. */
 @RunWith(AndroidJUnit4::class)
 class CalendarConnectHostTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val closing = AfterTheScreen {
+        scope.cancel()
+        calendar.close()
+        householdDb.close()
+    }
+    @get:Rule(order = 1) val compose = createComposeRule()
 
     private lateinit var calendar: CalendarDatabase
     private lateinit var householdDb: HouseholdDatabase
@@ -112,13 +117,6 @@ class CalendarConnectHostTest {
         val setup = CalendarSetup(store, setOf(google), { household.people.first() }, access.toasts, clock, EmptyCoroutineContext, PROVIDER_TIMEOUT_MS)
         connections = CalendarConnections(store, setup, access.control, setOf(google), scope)
         review = CalendarReview(store, setup, connections, household, access.control, access.toasts, HouseholdZone(household), clock, testCalendarSettings(), testBinColours())
-    }
-
-    @After
-    fun tearDown() {
-        scope.cancel()
-        calendar.close()
-        householdDb.close()
     }
 
     /** Robolectric's main looper runs only when the test idles it, so each check lets the UI and its effects run first. */

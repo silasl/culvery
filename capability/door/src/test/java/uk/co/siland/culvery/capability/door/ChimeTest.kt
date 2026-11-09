@@ -1,8 +1,10 @@
 package uk.co.siland.culvery.capability.door
 
+import android.content.Context
 import android.media.AudioAttributes
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.collect.Range
 import com.google.common.truth.Truth.assertThat
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -25,7 +27,7 @@ class ChimeTest {
     }
 
     private fun wav(sound: BuiltInSound): Wav {
-        val bytes = ApplicationProvider.getApplicationContext<android.content.Context>().resources.openRawResource(sound.res).use { it.readBytes() }
+        val bytes = ApplicationProvider.getApplicationContext<Context>().resources.openRawResource(sound.res).use { it.readBytes() }
         assertThat(String(bytes, 0, 4, Charsets.US_ASCII)).isEqualTo("RIFF")
         assertThat(String(bytes, 8, 4, Charsets.US_ASCII)).isEqualTo("WAVE")
         val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
@@ -60,7 +62,7 @@ class ChimeTest {
             val w = wav(sound)
             assertThat(listOf(w.format, w.channels, w.rate, w.bits)).containsExactly(1, 1, 22_050, 16).inOrder()
         }
-        assertThat(wav(BuiltInSound.ORGAN).seconds).isIn(com.google.common.collect.Range.closed(3.4, 4.1))
+        assertThat(wav(BuiltInSound.ORGAN).seconds).isIn(Range.closed(3.4, 4.1))
         assertThat(wav(BuiltInSound.CLASSIC).seconds).isWithin(0.01).of(3.2)
     }
 

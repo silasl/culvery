@@ -47,7 +47,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -82,12 +81,17 @@ import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @RunWith(AndroidJUnit4::class)
 class DoorTabTest {
-    @get:Rule val compose = createComposeRule()
-    @get:Rule val folder = TemporaryFolder()
+    @get:Rule(order = 0) val folder = TemporaryFolder()
+    @get:Rule(order = 1) val closing = AfterTheScreen {
+        appScope.cancel()
+        db.close()
+    }
+    @get:Rule(order = 2) val compose = createComposeRule()
     private val london = ZoneId.of("Europe/London")
     private val october14 = LocalDate.of(2026, 10, 14)
     private val db = doorDb()
@@ -102,12 +106,6 @@ class DoorTabTest {
         DoorAlerts(alertHost, {}, { DoorPrefs() }, FakeChime(), { london }, WallClock { NOW }, appScope, NightHours { false }, { null }, { null }, testSounds())
     }
     private val opened = mutableListOf<DoorEvent>()
-
-    @After
-    fun tearDown() {
-        appScope.cancel()
-        db.close()
-    }
 
     /** Robolectric's main looper runs only when the test idles it, so each check lets the UI and its effects run first. */
     private fun waitFor(condition: () -> Boolean) = compose.waitUntil(5_000) {
@@ -528,6 +526,8 @@ class DoorTabTest {
         release.countDown()
         assertThat(gated.held.await(5, TimeUnit.SECONDS)).isTrue()
         waitFor { alerts.showing.value != null }
+        // The new row reads its picture once it shows; on Windows a read still open would stop the clear deleting it.
+        waitFor { compose.onAllNodesWithTag("door_thumb_image", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         gated.release()
         waitFor { toaster.messages.isNotEmpty() }
         assertThat(toaster.messages).containsExactly("Door history cleared")
