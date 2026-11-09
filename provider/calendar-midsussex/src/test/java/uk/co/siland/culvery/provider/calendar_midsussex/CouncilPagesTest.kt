@@ -22,7 +22,7 @@ class CouncilPagesTest {
 
         assertThat(url.host).isEqualTo("waste.services.midsussex.gov.uk")
         assertThat(url.queryParameter("seq")).isEqualTo("2")
-        assertThat(url.queryParameter("Track")).isEqualTo("2026/11/04/ABCDEF123")
+        assertThat(url.queryParameter("Track")).isEqualTo("2031/01/01/ABCDEF123")
         assertThat(url.queryParameter("serviceID")).isEqualTo("A")
     }
 
@@ -41,7 +41,7 @@ class CouncilPagesTest {
             "2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX",
         ).inOrder()
         assertThat(list[1].url.toString()).isEqualTo(
-            "https://waste.services.midsussex.gov.uk/mop.php?Track=2026/11/04/ABCDEF123&serviceID=A&seq=3&pIndex=2",
+            "https://waste.services.midsussex.gov.uk/mop.php?Track=2031/01/01/ABCDEF123&serviceID=A&seq=3&pIndex=2",
         )
     }
 
@@ -72,9 +72,9 @@ class CouncilPagesTest {
         val days = collections(page("collections.html"))
 
         assertThat(days.map { it.date }).containsExactly(
-            LocalDate.of(2026, 11, 9),
-            LocalDate.of(2026, 11, 16),
-            LocalDate.of(2026, 11, 23),
+            LocalDate.of(2031, 1, 2),
+            LocalDate.of(2031, 1, 9),
+            LocalDate.of(2031, 1, 16),
         ).inOrder()
         assertThat(days[0].kinds).containsExactly("food")
         assertThat(days[1].kinds).containsExactly("food", "garden", "recycling", "waste").inOrder()
@@ -102,12 +102,12 @@ class CouncilPagesTest {
     fun aRowWithNoNameIsSkipped() {
         val html = """
             <section id="scheduled-collections">
-            <ul class="displayinlineblock"><li><img/></li><li><p>09/11/2026</p></li><li><p> </p></li></ul>
-            <ul class="displayinlineblock"><li><img/></li><li><p>16/11/2026</p></li><li><p>Domestic Food Waste Service</p></li></ul>
+            <ul class="displayinlineblock"><li><img/></li><li><p>02/01/2031</p></li><li><p> </p></li></ul>
+            <ul class="displayinlineblock"><li><img/></li><li><p>09/01/2031</p></li><li><p>Domestic Food Waste Service</p></li></ul>
             </section>
         """.trimIndent()
 
-        assertThat(collections(html)).containsExactly(BinDay(LocalDate.of(2026, 11, 16), listOf("food")))
+        assertThat(collections(html)).containsExactly(BinDay(LocalDate.of(2031, 1, 9), listOf("food")))
     }
 
     @Test
@@ -115,10 +115,10 @@ class CouncilPagesTest {
         val html = """
             <div>
             <h2 id="upcoming-scheduled-collections">Your upcoming scheduled collections</h2>
-            <ul class="displayinlineblock"><li><img/></li><li><p>16/11/2026</p></li><li><p>Domestic Garden Waste Service</p></li></ul>
+            <ul class="displayinlineblock"><li><img/></li><li><p>09/01/2031</p></li><li><p>Domestic Garden Waste Service</p></li></ul>
             </div>
         """.trimIndent()
 
-        assertThat(collections(html)).containsExactly(BinDay(LocalDate.of(2026, 11, 16), listOf("garden")))
+        assertThat(collections(html)).containsExactly(BinDay(LocalDate.of(2031, 1, 9), listOf("garden")))
     }
 }

@@ -35,7 +35,7 @@ class MidSussexBinsProviderTest {
     @get:Rule
     val dir = TemporaryFolder()
 
-    private val today = LocalDate.of(2026, 11, 4)
+    private val today = LocalDate.of(2031, 1, 1)
     private val council = FakeCouncil()
     private val base = council.start()
     private val wall = FakeWall(today, LocalTime.of(8, 0))
@@ -90,14 +90,14 @@ class MidSussexBinsProviderTest {
         val result = subject.read()
 
         assertThat(result.fullReplace).isTrue()
-        val mixed = result.upserts.single { it.remoteId == "bins-2026-11-16" }
+        val mixed = result.upserts.single { it.remoteId == "bins-2031-01-09" }
         assertThat(mixed.title).isEqualTo("Bins: Food, Garden, Recycling, Waste")
         assertThat(mixed.bins).containsExactly("food", "garden", "recycling", "waste").inOrder()
-        assertThat(mixed.start).isEqualTo(EventTime.AllDay(LocalDate.of(2026, 11, 16)))
-        assertThat(mixed.end).isEqualTo(EventTime.AllDay(LocalDate.of(2026, 11, 17)))
+        assertThat(mixed.start).isEqualTo(EventTime.AllDay(LocalDate.of(2031, 1, 9)))
+        assertThat(mixed.end).isEqualTo(EventTime.AllDay(LocalDate.of(2031, 1, 10)))
         assertThat(mixed.recurring).isFalse()
         assertThat(mixed.forPerson).isEqualTo("family")
-        assertThat(result.upserts.map { it.remoteId }).containsExactly("bins-2026-11-09", "bins-2026-11-16", "bins-2026-11-23")
+        assertThat(result.upserts.map { it.remoteId }).containsExactly("bins-2031-01-02", "bins-2031-01-09", "bins-2031-01-16")
     }
 
     @Test
@@ -134,9 +134,9 @@ class MidSussexBinsProviderTest {
 
     @Test
     fun onlyCollectionsInTheRangeAreReturned() = runTest {
-        val result = subject.read(within = DateRange(LocalDate.of(2026, 11, 10), LocalDate.of(2026, 11, 23), LONDON))
+        val result = subject.read(within = DateRange(LocalDate.of(2031, 1, 3), LocalDate.of(2031, 1, 16), LONDON))
 
-        assertThat(result.days()).containsExactly(LocalDate.of(2026, 11, 16))
+        assertThat(result.days()).containsExactly(LocalDate.of(2031, 1, 9))
     }
 
     @Test
@@ -241,14 +241,14 @@ class MidSussexBinsProviderTest {
 
     @Test
     fun aGoodReadDropsACancelledCollection() = runTest {
-        assertThat(subject.read().days()).contains(LocalDate.of(2026, 11, 16))
+        assertThat(subject.read().days()).contains(LocalDate.of(2031, 1, 9))
 
         council.collections = "collections_cancelled.html"
         wall.at(today.plusDays(1), LocalTime.of(0, 5))
         val next = subject.read()
 
         assertThat(next.fullReplace).isTrue()
-        assertThat(next.days()).containsExactly(LocalDate.of(2026, 11, 9), LocalDate.of(2026, 11, 23)).inOrder()
+        assertThat(next.days()).containsExactly(LocalDate.of(2031, 1, 2), LocalDate.of(2031, 1, 16)).inOrder()
     }
 
     @Test

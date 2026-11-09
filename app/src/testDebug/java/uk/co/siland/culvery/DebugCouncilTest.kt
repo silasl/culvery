@@ -29,7 +29,7 @@ private const val LINE_TWO = "2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX"
 @RunWith(AndroidJUnit4::class)
 class DebugCouncilTest {
     private val zone = ZoneId.of("Europe/London")
-    private val today = LocalDate.of(2026, 11, 4)
+    private val today = LocalDate.of(2031, 1, 1)
     private val clock = WallClock { today.atTime(9, 0).atZone(zone).toInstant().toEpochMilli() }
     private val assets = ApplicationProvider.getApplicationContext<android.content.Context>().assets
     private val council = DebugCouncil(
@@ -68,7 +68,7 @@ class DebugCouncilTest {
 
     @Test
     fun aRealTrackGoesOnToTheCouncil() {
-        val house = "${COUNCIL_BASE_URL}mop.php?Track=2026/11/04/ABCDEF123&serviceID=A&seq=3&pIndex=1".toHttpUrl()
+        val house = "${COUNCIL_BASE_URL}mop.php?Track=2031/01/01/ABCDEF123&serviceID=A&seq=3&pIndex=1".toHttpUrl()
         client.newCall(Request.Builder().url(house).build()).execute().close()
         assertThat(wentOn.map { it.url }).containsExactly(house)
     }

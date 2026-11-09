@@ -20,7 +20,7 @@ class MidSussexBinsProviderContractTest : CalendarProviderContractTest() {
     private val council = FakeCouncil()
     private val base = council.start()
     private val subject by lazy {
-        MidSussexBinsProvider(testCouncil(base), testReads(dir.root), FakeWall(LocalDate.of(2026, 11, 4), LocalTime.NOON), UpdateRequests()) { LONDON }
+        MidSussexBinsProvider(testCouncil(base), testReads(dir.root), FakeWall(LocalDate.of(2031, 1, 1), LocalTime.NOON), UpdateRequests()) { LONDON }
     }
 
     @After
@@ -28,7 +28,7 @@ class MidSussexBinsProviderContractTest : CalendarProviderContractTest() {
 
     override fun provider() = subject
     override fun connection() = binsConnection()
-    override fun range() = DateRange(LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 30), LONDON)
+    override fun range() = DateRange(LocalDate.of(2031, 1, 1), LocalDate.of(2031, 1, 31), LONDON)
     override fun sourceWithEvents() = SOURCE_BINS
     override fun simulateUnreachable() = { council.shutdown() }
 }

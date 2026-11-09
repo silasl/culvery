@@ -36,7 +36,7 @@ class MidSussexConnectScreenTest {
 
     private val council = FakeCouncil()
     private val base = council.start()
-    private val wall = FakeWall(LocalDate.of(2026, 11, 4), LocalTime.of(8, 0))
+    private val wall = FakeWall(LocalDate.of(2031, 1, 1), LocalTime.of(8, 0))
     private val connections = mutableListOf<Connection>()
     private val connected: Connection? get() = connections.lastOrNull()
 
@@ -76,7 +76,7 @@ class MidSussexConnectScreenTest {
         show()
         find()
         waitFor("Next: ")
-        compose.onNodeWithText("Next: Monday 9 November — Food").assertExists()
+        compose.onNodeWithText("Next: Thursday 2 January — Food").assertExists()
         compose.onNodeWithText("Add calendar").assertExists()
         assertThat(council.requests).isEqualTo(3)
     }
@@ -89,7 +89,7 @@ class MidSussexConnectScreenTest {
         compose.onNodeWithText("1 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX").assertExists()
         compose.onNodeWithText("2 EXAMPLE ROAD, SAMPLETOWN, WEST SUSSEX").performClick()
         waitFor("Next: ")
-        compose.onNodeWithText("Next: Monday 9 November — Food").assertExists()
+        compose.onNodeWithText("Next: Thursday 2 January — Food").assertExists()
         assertThat(council.requests).isEqualTo(3)
     }
 
@@ -259,14 +259,14 @@ class MidSussexConnectScreenTest {
         compose.onNodeWithText("Try again").assertExists()
     }
 
-    /** 23:30 in London on the 9th is already the 10th in Tokyo, so the household's next collection is the 16th. */
+    /** 23:30 in London on the 2nd is already the 3rd in Tokyo, so the household’s next collection is the 9th. */
     @Test
     fun theNextCollectionCountsFromTheHouseholdsToday() {
         council.addresses = "addresses_one.html"
-        wall.at(LocalDate.of(2026, 11, 9), LocalTime.of(23, 30))
+        wall.at(LocalDate.of(2031, 1, 2), LocalTime.of(23, 30))
         show(zone = ZoneId.of("Asia/Tokyo"))
         find()
         waitFor("Next: ")
-        compose.onNodeWithText("Next: Monday 16 November — Food, Garden, Recycling, Waste").assertExists()
+        compose.onNodeWithText("Next: Thursday 9 January — Food, Garden, Recycling, Waste").assertExists()
     }
 }
