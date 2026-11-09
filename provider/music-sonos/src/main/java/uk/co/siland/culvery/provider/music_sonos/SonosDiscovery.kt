@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import uk.co.siland.culvery.core.plugin.FailureRun
 
 internal const val SSDP_HOST = "239.255.255.250"
 internal const val SSDP_PORT = 1900
@@ -55,6 +56,8 @@ internal class SonosDiscovery(
     private val listenMillis: Long = SCAN_MS,
     private val accept: (String, Int) -> Boolean = ::isSpeakerAuthority,
 ) {
+    private val failures = FailureRun()
+
     suspend fun scan(): List<String> = withContext(Dispatchers.IO) {
         val answers = mutableListOf<SsdpAnswer>()
         try {
@@ -67,8 +70,11 @@ internal class SonosDiscovery(
                 }
             }
         } catch (e: IOException) {
-            Log.w(TAG, "The speaker scan stopped (${e::class.simpleName})")
+            if (synchronized(failures) { failures.failed() }) Log.w(TAG, "The speaker scan stopped (${e::class.simpleName})")
+            return@withContext ssdpAddresses(answers, accept)
         }
+        val failedInARow = synchronized(failures) { failures.succeeded() }
+        if (failedInARow > 0) Log.i(TAG, "The speaker scan works again after $failedInARow failures")
         ssdpAddresses(answers, accept)
     }
 

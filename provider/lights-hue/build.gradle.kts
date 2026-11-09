@@ -7,6 +7,7 @@ plugins {
 dependencies {
     implementation(project(":capability:lights"))
     implementation(project(":core:net"))
+    implementation(project(":core:plugin"))
     implementation(project(":core:ui"))
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.okhttp.mockwebserver)

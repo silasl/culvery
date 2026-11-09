@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.capability.lights.BridgeFound
+import uk.co.siland.culvery.core.plugin.FailureRun
 
 /** How long a search listens (7 §3.2). */
 internal const val SEARCH_MS = 5_000L
@@ -87,6 +88,33 @@ internal class ResolveQueue(
 }
 
 /**
+ * Logs a search that won't start and a bridge that won't resolve once each until it works again (19 §5). NSD calls
+ * back on its own threads, so each run is used under its own lock.
+ */
+internal class BridgeSearchLog {
+    private val search = FailureRun()
+    private val resolve = FailureRun()
+
+    fun searchDidNotStart() {
+        if (synchronized(search) { search.failed() }) Log.w(TAG, "The bridge search didn't start")
+    }
+
+    fun searchStarted() {
+        val failedInARow = synchronized(search) { search.succeeded() }
+        if (failedInARow > 0) Log.i(TAG, "The bridge search works again after $failedInARow failures")
+    }
+
+    fun resolveFailed() {
+        if (synchronized(resolve) { resolve.failed() }) Log.w(TAG, "A bridge didn't resolve")
+    }
+
+    fun resolved() {
+        val failedInARow = synchronized(resolve) { resolve.succeeded() }
+        if (failedInARow > 0) Log.i(TAG, "Bridges resolve again after $failedInARow failures")
+    }
+}
+
+/**
  * Finds Hue Bridges on the home Wi-Fi by mDNS (7 §3.2), never through Hue's cloud: `_hue._tcp` for [SEARCH_MS] under
  * the multicast [lock], each service resolved for its `bridgeid` record and IPv4 address, ending early once the
  * `wanted` bridge is heard. Finds nothing rather than failing; the caller says nothing answered.
@@ -96,6 +124,8 @@ internal class HueDiscovery(
     private val lock: () -> AutoCloseable,
     private val sdk: Int = Build.VERSION.SDK_INT,
 ) {
+    private val log = BridgeSearchLog()
+
     suspend fun search(wanted: String? = null): List<BridgeFound> = lock().use {
         val callbacks = ConcurrentHashMap.newKeySet<NsdManager.ServiceInfoCallback>()
         val heard = CompletableDeferred<Unit>()
@@ -111,12 +141,12 @@ internal class HueDiscovery(
             override fun onServiceFound(service: NsdServiceInfo) = queue.add(service)
 
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-                Log.w(TAG, "The bridge search didn't start")
+                log.searchDidNotStart()
             }
 
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) = Unit
 
-            override fun onDiscoveryStarted(serviceType: String) = Unit
+            override fun onDiscoveryStarted(serviceType: String) = log.searchStarted()
 
             override fun onDiscoveryStopped(serviceType: String) = Unit
 
@@ -152,7 +182,10 @@ internal class HueDiscovery(
 
             override fun onServiceUpdated(info: NsdServiceInfo) {
                 val host = info.hostAddresses.firstOrNull { it is Inet4Address } ?: return
-                if (unregister(this, callbacks)) onDone(answer(info, host))
+                if (unregister(this, callbacks)) {
+                    log.resolved()
+                    onDone(answer(info, host))
+                }
             }
 
             override fun onServiceLost() {
@@ -186,14 +219,17 @@ internal class HueDiscovery(
                 override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) = failed(errorCode, onDone, onBusy)
 
                 // Below API 34 the resolved address is only here.
-                override fun onServiceResolved(info: NsdServiceInfo) = onDone(answer(info, info.host))
+                override fun onServiceResolved(info: NsdServiceInfo) {
+                    log.resolved()
+                    onDone(answer(info, info.host))
+                }
             },
         )
     }
 
     private fun failed(errorCode: Int, onDone: (MdnsAnswer?) -> Unit, onBusy: () -> Unit) {
         if (errorCode == NsdManager.FAILURE_ALREADY_ACTIVE) return onBusy()
-        Log.w(TAG, "A bridge didn't resolve")
+        log.resolveFailed()
         onDone(null)
     }
 

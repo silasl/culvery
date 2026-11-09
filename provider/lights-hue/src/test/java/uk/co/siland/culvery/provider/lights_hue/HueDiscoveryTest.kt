@@ -1,10 +1,13 @@
 package uk.co.siland.culvery.provider.lights_hue
 
 import android.net.nsd.NsdServiceInfo
+import android.util.Log
 import com.google.common.truth.Truth.assertThat
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.lights.BridgeFound
 
 /** 7 §3.2: each bridge mDNS reports, once, from its own record, only on the home network; resolves one at a time. */
@@ -91,5 +94,52 @@ class HueDiscoveryTest {
 
         asked[2].onDone(MdnsAnswer("001788fffe00a1b2", "192.168.1.30"))
         assertThat(queue.answers()).containsExactly(MdnsAnswer("001788fffe00a1b2", "192.168.1.30"))
+    }
+
+    private fun hueLogs() = ShadowLog.getLogs().filter { it.tag == "HueDiscovery" }.map { it.type to it.msg }
+
+    @Before
+    fun clearLog() = ShadowLog.clear()
+
+    /** 19 §5: three searches that don't start log one warning, and the first that starts logs one line saying how many failed. */
+    @Test
+    fun aSearchThatWontStartLogsOnceUntilItDoes() {
+        val log = BridgeSearchLog()
+
+        repeat(3) { log.searchDidNotStart() }
+        log.searchStarted()
+        log.searchStarted()
+
+        assertThat(hueLogs()).containsExactly(
+            Log.WARN to "The bridge search didn't start",
+            Log.INFO to "The bridge search works again after 3 failures",
+        ).inOrder()
+    }
+
+    /** 19 §5: three bridges that don't resolve log one warning, and the first that resolves logs one line saying how many failed. */
+    @Test
+    fun aBridgeThatWontResolveLogsOnceUntilOneDoes() {
+        val log = BridgeSearchLog()
+
+        repeat(3) { log.resolveFailed() }
+        log.resolved()
+        log.resolved()
+
+        assertThat(hueLogs()).containsExactly(
+            Log.WARN to "A bridge didn't resolve",
+            Log.INFO to "Bridges resolve again after 3 failures",
+        ).inOrder()
+    }
+
+    /** The two runs are separate: a search that starts doesn't end a run of bridges that won't resolve. */
+    @Test
+    fun theSearchAndResolveRunsAreSeparate() {
+        val log = BridgeSearchLog()
+
+        log.resolveFailed()
+        log.searchStarted()
+        log.resolveFailed()
+
+        assertThat(hueLogs()).containsExactly(Log.WARN to "A bridge didn't resolve")
     }
 }
