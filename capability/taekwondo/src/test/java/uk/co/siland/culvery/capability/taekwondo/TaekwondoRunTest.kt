@@ -88,6 +88,23 @@ class TaekwondoRunTest {
     }
 
     @Test
+    fun aMoveWithNoKoreanNameIsReadInEnglish() = runTest {
+        val plain = Rig(this)
+        plain.run.start(pattern("11"), detailed = false)
+        passes(10_000)
+        assertThat(plain.speaker.calls).containsExactly("Walking stance, grab the opponent's head" to false)
+        plain.run.stop()
+
+        val detailed = Rig(this)
+        detailed.run.start(pattern("11"), detailed = true)
+        passes(12_000)
+        assertThat(detailed.speaker.calls).containsExactly(
+            "Walking stance, grab the opponent's head" to false,
+            "Reach up with both hands to seize the head." to false,
+        ).inOrder()
+    }
+
+    @Test
     fun stepSixSpeaksWithoutTheA() = runTest {
         val rig = Rig(this)
 
@@ -141,10 +158,10 @@ class TaekwondoRunTest {
     fun noHangulReadsTheRomanisedInEnglish() = runTest {
         val rig = Rig(this)
 
-        rig.run.start(pattern("11"), detailed = false)
+        rig.run.start(Pattern("Test", listOf(move("1").copy(hangul = null, spokenHangul = null))), detailed = false)
         passes(10_000)
 
-        assertThat(rig.speaker.calls).containsExactly("Gunnun so, mori japgi?" to false)
+        assertThat(rig.speaker.calls).containsExactly("Niunja so sang sonkal makgi" to false)
     }
 
     @Test

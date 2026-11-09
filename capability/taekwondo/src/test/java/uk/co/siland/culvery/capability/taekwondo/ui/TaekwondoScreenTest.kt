@@ -30,8 +30,11 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.taekwondo.FakeAlerts
+import uk.co.siland.culvery.capability.taekwondo.CHOONG_MOO
 import uk.co.siland.culvery.capability.taekwondo.FakeSpeaker
+import uk.co.siland.culvery.capability.taekwondo.RunState
 import uk.co.siland.culvery.capability.taekwondo.TaekwondoSettings
+import uk.co.siland.culvery.capability.taekwondo.move
 import uk.co.siland.culvery.core.plugin.LocalAlertHost
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.settingsDataStore
@@ -128,6 +131,18 @@ class TaekwondoScreenTest {
         tag("move_english").assertTextEquals("Parallel ready stance")
         tag("move_description").assertTextEquals("Feet parallel, shoulder width apart; calm and ready to begin.")
         assertThat(speaker.calls).containsExactly("나란히 준비 서기" to true)
+    }
+
+    @Test
+    fun aMoveWithNoKoreanNameShowsItsEnglishName() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                TaekwondoPanel(RunState.Moving(11, move("11")), CHOONG_MOO, detailed = false, noKorean = false, onDetailed = {}, onPattern = {}, onCancel = {}, onClose = {})
+            }
+        }
+
+        tag("move_korean").assertTextEquals("Walking stance, grab the opponent's head")
+        assertThat(open("move_romanised")).isFalse()
     }
 
     @Test

@@ -189,14 +189,15 @@ private fun MoveView(s: RunState.Moving) {
     val move = s.move
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(move.number, style = HhType.headerValue.copy(fontSize = 48.sp), color = Culvery.colors.accent, modifier = Modifier.testTag("move_number"))
+        val big = move.hangul ?: move.romanised ?: move.english
         Text(
-            move.hangul ?: move.romanised, style = hangulStyle(move.hangul ?: move.romanised), color = Culvery.colors.ink, textAlign = TextAlign.Center,
+            big, style = hangulStyle(big), color = Culvery.colors.ink, textAlign = TextAlign.Center,
             modifier = Modifier.testTag("move_korean"),
         )
-        if (move.hangul != null) {
+        if (move.hangul != null && move.romanised != null) {
             Text(move.romanised, style = HhType.sectionTitle, color = Culvery.colors.mute, textAlign = TextAlign.Center, modifier = Modifier.testTag("move_romanised"))
         }
-        Text(move.english, style = HhType.screenTitle, color = Culvery.colors.ink, textAlign = TextAlign.Center, modifier = Modifier.testTag("move_english"))
+        if (big != move.english) Text(move.english, style = HhType.screenTitle, color = Culvery.colors.ink, textAlign = TextAlign.Center, modifier = Modifier.testTag("move_english"))
         Text(move.description, style = HhType.body.copy(fontSize = 24.sp), color = Culvery.colors.mute, textAlign = TextAlign.Center, modifier = Modifier.testTag("move_description"))
     }
 }

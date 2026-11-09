@@ -1,9 +1,9 @@
 package uk.co.siland.culvery.capability.taekwondo
 
-/** [hangul] null until the instructor fills it in; the English voice reads [romanised] then (15b §8). [toString] leaves out the text. */
+/** [hangul] and [romanised] are null for a move with no Korean name: the screen and the English voice use [english]. [toString] leaves out the text. */
 data class Move(
     val number: String,
-    val romanised: String,
+    val romanised: String?,
     val hangul: String?,
     val english: String,
     val description: String,
@@ -19,8 +19,8 @@ data class Pattern(val name: String, val moves: List<Move>) {
 }
 
 /**
- * The text of `culvery-notes/taekwondo-choong-moo.html`, straight apostrophes included. Every Hangul entry is the plan's
- * transliteration of the romanised ITF term and is unchecked, for the instructor.
+ * The text of `culvery-notes/taekwondo-choong-moo.html` with the instructor's answers, straight apostrophes included. Every Hangul
+ * entry is the plan's transliteration of the romanised ITF term.
  */
 val CHOONG_MOO = Pattern(
     "Choong-Moo",
@@ -47,7 +47,7 @@ val CHOONG_MOO = Pattern(
         "Jump and kick in the air, then land balanced and guard at once."),
     Move("10", "Niunja so palmok najunde yop makgi", "니은자 서 팔목 낮은데 옆 막기", "L-stance, low forearm side block",
         "Sweep a low kick aside with the forearm."),
-    Move("11", "Gunnun so, mori japgi?", null, "Walking stance, grab the opponent's head",
+    Move("11", null, null, "Walking stance, grab the opponent's head",
         "Reach up with both hands to seize the head."),
     Move("12", "Moorup ollyo chagi", "무릎 올려 차기", "Knee upward kick",
         "Pull the head down with both hands and drive the knee up into it."),
@@ -67,7 +67,7 @@ val CHOONG_MOO = Pattern(
         "Jump and spin a full turn, landing on the same spot ready to guard."),
     Move("20", "Gunnun so dwijibun sonkut najunde tulgi", "걷는 서 뒤집은 손끝 낮은데 뚫기", "Walking stance, low upset fingertip thrust",
         "Fingertips thrust up into the lower body, palm facing up."),
-    Move("21", "Niunja so dung joomuk baro yopdwi taerigi wa palmok najunde bandae makgi", "니은자 서 등주먹 바로 옆뒤 때리기 와 팔목 낮은데 반대 막기", "L-stance, side back strike with the back fist and low block",
+    Move("21", "Niunja so dung joomuk baro yopdwi taerigi wa palmok najunde bandae makgi", "니은자 서 등주먹 바로 옆뒤 때리기와 팔목 낮은데 반대 막기", "L-stance, side back strike with the back fist and low block",
         "Strike behind you with the back fist while blocking low in front."),
     Move("22", "Gunnun so sun sonkut kaunde tulgi", "걷는 서 선 손끝 가운데 뚫기", "Walking stance, middle straight fingertip thrust",
         "Straight fingertips thrust into the solar plexus."),
@@ -87,7 +87,7 @@ val CHOONG_MOO = Pattern(
         "Lift the forearm to block a strike to the head."),
     Move("30", "Gunnun so kaunde bandae jirugi", "걷는 서 가운데 반대 지르기", "Walking stance, middle reverse punch",
         "The pattern ends with a left-hand punch, marking Admiral Yi's death in battle."),
-    Move("End", "Baro?", null, "Return to ready posture",
+    Move("End", "Baro", "바로", "Return to ready posture",
         "Bring the left foot back to the ready posture."),
     ),
 )
