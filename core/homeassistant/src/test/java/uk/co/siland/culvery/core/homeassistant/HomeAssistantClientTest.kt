@@ -20,10 +20,12 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.ConscryptMode
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.net.homeHttpClient
 
 @RunWith(AndroidJUnit4::class)
+@ConscryptMode(ConscryptMode.Mode.OFF)
 class HomeAssistantClientTest {
     private val server = MockWebServer()
     private val captured = mutableListOf<Pair<HaCall, String>>()
@@ -206,6 +208,107 @@ class HomeAssistantClientTest {
         logs.forEach { log ->
             val text = "${log.msg} ${log.throwable}"
             listOf("192.168", "127.0.0.1", "test-token", "hoover", "localhost").forEach { assertWithMessage(text).that(text).doesNotContain(it) }
+        }
+    }
+
+    private val bridgePin = pinOf(TestCerts.leaf("bridge"))
+
+    /** A server on [keystore]'s certificate; a link to it pinned to `bridge`'s key. */
+    private fun tlsServer(keystore: String, port: Int = 0): MockWebServer = MockWebServer().apply {
+        useHttps(TestCerts.serverSocketFactory(keystore), false)
+        start(port)
+    }
+
+    private fun MockWebServer.pinned() = HomeAssistantLink(url("/"), "test-token", bridgePin)
+
+    @Test
+    fun everyCallUsesThePinnedClient() = runBlocking<Unit> {
+        tlsServer("bridge").use { tls ->
+            listOf(HaFixtures.API, HaFixtures.STATES, """{"entity_id":"vacuum.hoover","state":"docked","attributes":{}}""", "[]")
+                .forEach { tls.enqueue(MockResponse().setBody(it)) }
+            val pinned = tls.pinned()
+            api.check(pinned)
+            api.states(pinned)
+            assertThat(api.state(pinned, "vacuum.hoover")?.state).isEqualTo("docked")
+            api.callService(pinned, "vacuum", "start", "vacuum.hoover")
+            repeat(4) { assertThat(tls.takeRequest().getHeader("Authorization")).isEqualTo("Bearer test-token") }
+            assertThat(api.pinnedHttp(bridgePin).connectionPool).isNotSameInstanceAs(api.http.connectionPool)
+        }
+    }
+
+    @Test
+    fun aChangedKeyIsCertificateChangedOverRest() = runBlocking<Unit> {
+        ShadowLog.clear()
+        tlsServer("other").use { tls ->
+            val pinned = tls.pinned()
+            assertThat(problemOf { api.check(pinned) }).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
+            assertThat(problemOf { api.states(pinned) }).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
+            assertThat(problemOf { api.state(pinned, "vacuum.hoover") }).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
+            assertThat(problemOf { api.callService(pinned, "vacuum", "start", "vacuum.hoover") }).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
+            assertThat(tls.requestCount).isEqualTo(0)
+        }
+        ShadowLog.getLogs().forEach { assertThat("${it.msg} ${it.throwable}").doesNotContain(bridgePin) }
+    }
+
+    @Test
+    fun aPinnedLinkWithAnHttpBaseSendsNothing() = runBlocking<Unit> {
+        val pinned = HomeAssistantLink(server.url("/"), "test-token", bridgePin)
+        assertThat(problemOf { api.check(pinned) }).isEqualTo(HaProblem.NOT_LINKED)
+        assertThat(problemOf { api.states(pinned) }).isEqualTo(HaProblem.NOT_LINKED)
+        assertThat(problemOf { api.state(pinned, "vacuum.hoover") }).isEqualTo(HaProblem.NOT_LINKED)
+        assertThat(problemOf { api.callService(pinned, "vacuum", "start", "vacuum.hoover") }).isEqualTo(HaProblem.NOT_LINKED)
+        assertThat(problemOf { api.registry(pinned) }).isEqualTo(HaProblem.NOT_LINKED)
+        assertThat(problemOf { api.follow(pinned, setOf("vacuum.hoover")).collect {} }).isEqualTo(HaProblem.NOT_LINKED)
+        assertThat(server.requestCount).isEqualTo(0)
+    }
+
+    @Test
+    fun aPinnedCallNeverReusesTheProbesConnection() = runBlocking<Unit> {
+        val first = tlsServer("bridge")
+        val port = first.port
+        val pinned = first.pinned()
+        first.use { tls ->
+            tls.enqueue(MockResponse().setBody(HaFixtures.AUTH_PROVIDERS))
+            assertThat(api.certificate(tls.url("/"))).isEqualTo(bridgePin)
+            assertThat(api.probeHttp.connectionPool.connectionCount()).isEqualTo(0)
+        }
+        tlsServer("other", port).use { tls ->
+            assertThat(problemOf { api.check(pinned) }).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
+            assertThat(tls.requestCount).isEqualTo(0)
+        }
+        assertThat(api.pinnedHttp(bridgePin).connectionPool).isNotSameInstanceAs(api.probeHttp.connectionPool)
+    }
+
+    @Test
+    fun theCertificateReadSendsNoTokenOrCookie() = runBlocking<Unit> {
+        tlsServer("other").use { tls ->
+            repeat(2) { tls.enqueue(MockResponse().setBody(HaFixtures.AUTH_PROVIDERS).addHeader("Set-Cookie", "session=abc; Path=/")) }
+            repeat(2) { assertThat(api.certificate(tls.url("/"))).isEqualTo(pinOf(TestCerts.leaf("other"))) }
+            repeat(2) {
+                val read = tls.takeRequest()
+                assertThat(read.method).isEqualTo("GET")
+                assertThat(read.path).isEqualTo("/auth/providers")
+                assertThat(read.getHeader("Authorization")).isNull()
+                assertThat(read.getHeader("Cookie")).isNull()
+            }
+        }
+    }
+
+    @Test
+    fun theCertificateReadNeedsHomeAssistantsAnswer() = runBlocking<Unit> {
+        tlsServer("bridge").use { tls ->
+            tls.enqueue(MockResponse().setBody("""[{"name":"Home Assistant Local","id":null,"type":"homeassistant"}]"""))
+            assertThat(api.certificate(tls.url("/"))).isEqualTo(bridgePin)
+            listOf(
+                MockResponse().setBody("""{"message":"API running."}"""),
+                MockResponse().setBody("""{"providers":[]}"""),
+                MockResponse().setBody("[]"),
+                MockResponse().setBody("<html>router</html>"),
+                MockResponse().setResponseCode(404).setBody(HaFixtures.AUTH_PROVIDERS),
+            ).forEach { answer ->
+                tls.enqueue(answer)
+                assertThat(problemOf { api.certificate(tls.url("/")) }).isEqualTo(HaProblem.NOT_HOME_ASSISTANT)
+            }
         }
     }
 }

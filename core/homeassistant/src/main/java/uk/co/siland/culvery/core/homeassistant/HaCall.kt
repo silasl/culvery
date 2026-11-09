@@ -8,4 +8,5 @@ enum class HaCall(val label: String) {
     SERVICE("service"),
     SOCKET("socket"),
     REGISTRY("registry"),
+    CERTIFICATE("certificate"),
 }

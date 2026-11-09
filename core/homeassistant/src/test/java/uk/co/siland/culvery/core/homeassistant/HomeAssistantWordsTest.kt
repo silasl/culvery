@@ -16,6 +16,8 @@ class HomeAssistantWordsTest {
             .isEqualTo("Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Home Assistant.")
         assertThat(problemLine(HaProblem.BLOCKED))
             .isEqualTo("Home Assistant has blocked the tablet. Unblock its address in Home Assistant.")
+        assertThat(problemLine(HaProblem.CERTIFICATE_CHANGED))
+            .isEqualTo("Home Assistant’s certificate has changed. Press Check in Settings › Home Assistant to trust the new one.")
     }
 
     @Test

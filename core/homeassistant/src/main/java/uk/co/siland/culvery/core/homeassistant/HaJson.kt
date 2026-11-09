@@ -103,6 +103,15 @@ internal object HaJson {
         false
     }
 
+    /** Whether [text] is Home Assistant's `GET /auth/providers` answer: a non-empty list of providers, bare or under `providers`. */
+    fun authProviders(text: String): Boolean = try {
+        val answer = Json.parseToJsonElement(text)
+        val providers = (if (answer is JsonObject) answer["providers"] else answer) as JsonArray
+        providers.isNotEmpty() && providers.all { it.jsonObject["type"]?.jsonPrimitive?.isString == true }
+    } catch (_: Exception) {
+        false
+    }
+
     fun states(text: String): List<EntityState> = read { Json.parseToJsonElement(text).jsonArray.map { entity(it.jsonObject) } }
 
     fun state(text: String): EntityState = read { entity(Json.parseToJsonElement(text).jsonObject) }

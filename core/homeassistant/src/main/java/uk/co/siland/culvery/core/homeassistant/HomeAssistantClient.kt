@@ -5,6 +5,7 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -17,6 +18,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import okhttp3.ConnectionPool
+import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -56,12 +59,18 @@ private const val NORMAL_CLOSURE = 1000
 private val JSON_TYPE = "application/json".toMediaType()
 
 /** Why a call to Home Assistant failed (11 §6). */
-enum class HaProblem { UNREACHABLE, OFFLINE, TOKEN_REFUSED, BLOCKED, NOT_HOME_ASSISTANT, REFUSED, NOT_LINKED }
+enum class HaProblem { UNREACHABLE, OFFLINE, TOKEN_REFUSED, BLOCKED, NOT_HOME_ASSISTANT, REFUSED, NOT_LINKED, CERTIFICATE_CHANGED }
 
 /** A failed call. The message is the problem alone and there is never a cause: either could quote the address or the token. */
 class HomeAssistantException(val problem: HaProblem) : Exception("Home Assistant: ${problem.name}")
 
 interface HomeAssistantApi {
+    /**
+     * The pin of the certificate an https [base] presents, read with one `GET /auth/providers` that carries no token or
+     * cookie. [HaProblem.NOT_HOME_ASSISTANT] unless the answer is Home Assistant's list of login providers.
+     */
+    suspend fun certificate(base: HttpUrl): String
+
     /** `GET /api/`: returns when it answers as Home Assistant and takes the token. */
     suspend fun check(link: HomeAssistantLink)
 
@@ -91,7 +100,8 @@ interface HomeAssistantApi {
 
 /**
  * Home Assistant's REST and WebSocket APIs (11 §4.2, §4.3). Every failure is a [HomeAssistantException] and logs the call
- * and its outcome only (11 §6). [http] follows no redirect and retries nothing.
+ * and its outcome only (11 §6). [http] follows no redirect and retries nothing. A link with a pin goes through
+ * [pinnedHttp], which trusts only that key; one with a pin and an http base is refused before anything is sent.
  */
 class HomeAssistantClient internal constructor(
     internal val http: OkHttpClient,
@@ -103,19 +113,65 @@ class HomeAssistantClient internal constructor(
     constructor(@ApplicationContext context: Context) :
         this(homeHttpClient(COMMAND_TIMEOUT_MS), AndroidNetwork(context)::online, capture = HaCapture::log)
 
-    private val socketHttp = http.newBuilder().pingInterval(Duration.ofMillis(PING_MS)).build()
+    /** The base of each certificate read, with a pool of its own that is emptied after every read. */
+    internal val probeHttp: OkHttpClient = http.newBuilder().connectionPool(ConnectionPool()).build()
+
+    private class Clients(val rest: OkHttpClient, val socket: OkHttpClient)
+
+    private fun OkHttpClient.withSocketPing() = newBuilder().pingInterval(Duration.ofMillis(PING_MS)).build()
+
+    private val unpinned = Clients(http, http.withSocketPing())
+
+    private val pinned = ConcurrentHashMap<String, Clients>()
+
+    /** The client for links pinned to [pin]: only that key is trusted, over a pool of its own. */
+    internal fun pinnedHttp(pin: String): OkHttpClient = clientsFor(pin).rest
+
+    private fun clientsFor(pin: String): Clients = pinned.computeIfAbsent(pin) {
+        val trust = HomeAssistantTrust.pinned(pin)
+        val rest = http.newBuilder()
+            .connectionPool(ConnectionPool())
+            .sslSocketFactory(HomeAssistantTrust.socketFactory(trust), trust)
+            .hostnameVerifier(HomeAssistantTrust.anyHostname)
+            .build()
+        Clients(rest, rest.withSocketPing())
+    }
+
+    private fun clientsFor(link: HomeAssistantLink): Clients {
+        val pin = link.pin ?: return unpinned
+        if (!link.baseUrl.isHttps) throw HomeAssistantException(HaProblem.NOT_LINKED)
+        return clientsFor(pin)
+    }
+
+    override suspend fun certificate(base: HttpUrl): String {
+        require(base.isHttps) { "Only an https address has a certificate" }
+        val seen = HomeAssistantTrust.capturing()
+        val probe = probeHttp.newBuilder()
+            .sslSocketFactory(HomeAssistantTrust.socketFactory(seen), seen)
+            .hostnameVerifier(HomeAssistantTrust.anyHostname)
+            .build()
+        val url = base.newBuilder().addPathSegment("auth").addPathSegment("providers").build()
+        try {
+            val answer = send(HaCall.CERTIFICATE, probe, Request.Builder().url(url))
+            val providers = answer.code != HTTP_NOT_FOUND && withContext(Dispatchers.Default) { HaJson.authProviders(answer.text) }
+            if (!providers) refuse(HaCall.CERTIFICATE, answer, HaProblem.NOT_HOME_ASSISTANT)
+        } finally {
+            probeHttp.connectionPool.evictAll()
+        }
+        return seen.pin ?: throw HomeAssistantException(HaProblem.UNREACHABLE)
+    }
 
     override suspend fun check(link: HomeAssistantLink) {
-        val answer = send(HaCall.CHECK, request(link, "api", ""))
+        val answer = send(HaCall.CHECK, link, request(link, "api", ""))
         val running = answer.code != HTTP_NOT_FOUND && withContext(Dispatchers.Default) { HaJson.apiRunning(answer.text) }
         if (!running) refuse(HaCall.CHECK, answer, HaProblem.NOT_HOME_ASSISTANT)
     }
 
     override suspend fun states(link: HomeAssistantLink): List<EntityState> =
-        read(HaCall.STATES, send(HaCall.STATES, request(link, "api", "states")), HaJson::states)
+        read(HaCall.STATES, send(HaCall.STATES, link, request(link, "api", "states")), HaJson::states)
 
     override suspend fun state(link: HomeAssistantLink, entityId: String): EntityState? {
-        val answer = send(HaCall.STATE, request(link, "api", "states", entityId), missingIsNull = true)
+        val answer = send(HaCall.STATE, link, request(link, "api", "states", entityId), missingIsNull = true)
         return if (answer.code == HTTP_NOT_FOUND) null else read(HaCall.STATE, answer, HaJson::state)
     }
 
@@ -124,13 +180,13 @@ class HomeAssistantClient internal constructor(
             put("entity_id", entityId)
             data.forEach { (name, value) -> put(name, value) }
         }
-        send(HaCall.SERVICE, request(link, "api", "services", domain, service).post(body.toString().toRequestBody(JSON_TYPE)))
+        send(HaCall.SERVICE, link, request(link, "api", "services", domain, service).post(body.toString().toRequestBody(JSON_TYPE)))
     }
 
     override suspend fun registry(link: HomeAssistantLink): List<RegistryEntry> {
         val what = HaCall.REGISTRY
         val inbox = Channel<Frame>(SOCKET_QUEUE)
-        val socket = socketHttp.newWebSocket(request(link, "api", "websocket").build(), listener(inbox))
+        val socket = clientsFor(link).socket.newWebSocket(request(link, "api", "websocket").build(), listener(inbox))
         try {
             return withTimeoutOrNull(registryTimeoutMs) {
                 var entries: List<RegistryEntry>? = null
@@ -167,7 +223,7 @@ class HomeAssistantClient internal constructor(
 
     override fun follow(link: HomeAssistantLink, entityIds: Set<String>): Flow<Map<String, EntityState?>> = flow {
         val inbox = Channel<Frame>(SOCKET_QUEUE)
-        val socket = socketHttp.newWebSocket(request(link, "api", "websocket").build(), listener(inbox))
+        val socket = clientsFor(link).socket.newWebSocket(request(link, "api", "websocket").build(), listener(inbox))
         val current = mutableMapOf<String, EntityState>()
         try {
             for (frame in inbox) {
@@ -237,7 +293,7 @@ class HomeAssistantClient internal constructor(
             val problem = when (response?.code) {
                 HTTP_UNAUTHORIZED -> HaProblem.TOKEN_REFUSED
                 HTTP_FORBIDDEN -> HaProblem.BLOCKED
-                else -> unreachableOrOffline()
+                else -> failureProblem(t)
             }
             end(problem, response?.code, t)
         }
@@ -286,6 +342,10 @@ class HomeAssistantClient internal constructor(
 
     private fun unreachableOrOffline() = if (online()) HaProblem.UNREACHABLE else HaProblem.OFFLINE
 
+    /** OkHttp wraps the trust manager's refusal, so it is looked for down the causes. */
+    private fun failureProblem(e: Throwable) =
+        if (generateSequence(e) { it.cause }.any { it is CertificateChanged }) HaProblem.CERTIFICATE_CHANGED else unreachableOrOffline()
+
     /** The URL under the link's base, with the token; an empty last segment is a trailing slash. */
     private fun request(link: HomeAssistantLink, vararg segments: String): Request.Builder {
         // The base's own path is "/", one empty segment, which the first added segment replaces.
@@ -298,19 +358,22 @@ class HomeAssistantClient internal constructor(
         }
     }
 
-    private suspend fun send(what: HaCall, builder: Request.Builder, missingIsNull: Boolean = false): Answer {
+    private suspend fun send(what: HaCall, link: HomeAssistantLink, builder: Request.Builder, missingIsNull: Boolean = false): Answer =
+        send(what, clientsFor(link).rest, builder, missingIsNull)
+
+    private suspend fun send(what: HaCall, client: OkHttpClient, builder: Request.Builder, missingIsNull: Boolean = false): Answer {
         val answer = try {
-            http.newCall(builder.build()).await(MAX_ANSWER_BYTES)
+            client.newCall(builder.build()).await(MAX_ANSWER_BYTES)
         } catch (e: IOException) {
             Log.w(TAG, "${what.label} failed (${e::class.simpleName})")
-            throw HomeAssistantException(unreachableOrOffline())
+            throw HomeAssistantException(failureProblem(e))
         }
         capture(what, answer.text)
         when {
             answer.code in 200..299 -> Unit
             answer.code == HTTP_UNAUTHORIZED -> refuse(what, answer, HaProblem.TOKEN_REFUSED)
             answer.code == HTTP_FORBIDDEN -> refuse(what, answer, HaProblem.BLOCKED)
-            answer.code == HTTP_NOT_FOUND && (missingIsNull || what == HaCall.CHECK) -> Unit
+            answer.code == HTTP_NOT_FOUND && (missingIsNull || what == HaCall.CHECK || what == HaCall.CERTIFICATE) -> Unit
             what == HaCall.SERVICE -> refuse(what, answer, HaProblem.REFUSED)
             else -> refuse(what, answer, HaProblem.UNREACHABLE)
         }

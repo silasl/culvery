@@ -10,6 +10,7 @@ fun problemLine(problem: HaProblem): String = when (problem) {
     HaProblem.TOKEN_REFUSED -> "Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Home Assistant."
     HaProblem.BLOCKED -> "Home Assistant has blocked the tablet. Unblock its address in Home Assistant."
     HaProblem.NOT_LINKED -> NOT_LINKED
+    HaProblem.CERTIFICATE_CHANGED -> "Home Assistant’s certificate has changed. Press Check in Settings › Home Assistant to trust the new one."
 }
 
 /** Settings › Home Assistant' own wording for a refused token: the page is where the new one goes. */

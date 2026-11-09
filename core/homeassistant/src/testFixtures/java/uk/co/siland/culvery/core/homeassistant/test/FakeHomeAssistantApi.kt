@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
+import okhttp3.HttpUrl
 import uk.co.siland.culvery.core.homeassistant.EntityState
 import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantApi
@@ -19,7 +20,7 @@ class FakeHomeAssistantApi : HomeAssistantApi {
 
     private val _calls = mutableListOf<String>()
 
-    /** `"check"`, `"states"`, `"state vacuum.hoover"`, `"service vacuum/start vacuum.hoover"`, `"… preset_mode=eco"`. */
+    /** `"certificate"`, `"check"`, `"states"`, `"state vacuum.hoover"`, `"service vacuum/start vacuum.hoover"`, `"… preset_mode=eco"`. */
     val calls: List<String> get() = _calls
 
     private val _follows = mutableListOf<Set<String>>()
@@ -49,6 +50,9 @@ class FakeHomeAssistantApi : HomeAssistantApi {
     /** What every open follow emits. */
     val socket = MutableSharedFlow<Map<String, EntityState?>>(extraBufferCapacity = 16)
 
+    /** What [certificate] returns: the pin of the certificate Home Assistant presents. */
+    var certificate: String = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+
     /** When set, [check] waits for it. */
     var gate: CompletableDeferred<Unit>? = null
 
@@ -57,6 +61,12 @@ class FakeHomeAssistantApi : HomeAssistantApi {
     /** Ends the open follow with [problem], as a socket that closes or is refused. */
     fun dropSocket(problem: HaProblem) {
         checkNotNull(drop) { "No socket is open" }.complete(problem)
+    }
+
+    override suspend fun certificate(base: HttpUrl): String {
+        _calls += "certificate"
+        failIfAsked()
+        return certificate
     }
 
     override suspend fun check(link: HomeAssistantLink) {

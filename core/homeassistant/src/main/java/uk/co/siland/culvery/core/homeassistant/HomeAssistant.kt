@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.HttpUrl
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
@@ -116,6 +117,9 @@ class HomeAssistant(
             }
         }
     }
+
+    /** The pin of the certificate [base] presents, read without the token; a failure is not the link's problem. */
+    suspend fun certificate(base: HttpUrl): String = api.certificate(base)
 
     /** One entity, null when Home Assistant has none by that id. */
     suspend fun read(entityId: String): EntityState? = calling { link ->

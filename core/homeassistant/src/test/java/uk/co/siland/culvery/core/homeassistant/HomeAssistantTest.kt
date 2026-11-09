@@ -79,6 +79,18 @@ class HomeAssistantTest {
         assertThat(ha.problem.value).isNull()
     }
 
+    /** Fails if the certificate read isn't the API's, or a failed one becomes the link's problem. */
+    @Test
+    fun theCertificateReadRecordsNoProblem() = runTest {
+        val ha = ha()
+        api.certificate = "cGlu"
+        assertThat(ha.certificate(TEST_LINK.baseUrl)).isEqualTo("cGlu")
+        api.failNext = HaProblem.UNREACHABLE
+        assertThat(refusal { ha.certificate(TEST_LINK.baseUrl) }).isEqualTo(HaProblem.UNREACHABLE)
+        assertThat(ha.problem.value).isNull()
+        assertThat(api.calls).containsExactly("certificate", "certificate")
+    }
+
     /** Fails if a call with no link saved is anything but Not linked, calls something, or becomes the link's problem. */
     @Test
     fun noLinkIsNotLinkedNotTokenRefused() = runTest {

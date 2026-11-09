@@ -28,11 +28,13 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.ConscryptMode
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.net.homeHttpClient
 
 /** The test plays Home Assistant's end of the socket: each `after…` says what the server sends next. */
 @RunWith(AndroidJUnit4::class)
+@ConscryptMode(ConscryptMode.Mode.OFF)
 class HomeAssistantSocketTest {
     private val server = MockWebServer()
     private val received = CopyOnWriteArrayList<String>()
@@ -47,29 +49,28 @@ class HomeAssistantSocketTest {
 
     private val ids = linkedSetOf("vacuum.hoover", "sensor.hoover_battery")
 
+    /** Home Assistant's end of one socket, as the `after…` hooks say. */
+    private val homeAssistantEnd = object : WebSocketListener() {
+        override fun onOpen(webSocket: WebSocket, response: Response) = greeting(webSocket)
+
+        override fun onMessage(webSocket: WebSocket, text: String) {
+            received += text
+            when (received.size) {
+                1 -> afterAuth(webSocket)
+                2 -> afterSubscribe(webSocket)
+            }
+        }
+
+        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            serverCloseCode.set(code)
+            serverClosed.countDown()
+            webSocket.close(code, null)
+        }
+    }
+
     @Before
     fun setUp() {
-        server.enqueue(
-            MockResponse().withWebSocketUpgrade(
-                object : WebSocketListener() {
-                    override fun onOpen(webSocket: WebSocket, response: Response) = greeting(webSocket)
-
-                    override fun onMessage(webSocket: WebSocket, text: String) {
-                        received += text
-                        when (received.size) {
-                            1 -> afterAuth(webSocket)
-                            2 -> afterSubscribe(webSocket)
-                        }
-                    }
-
-                    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                        serverCloseCode.set(code)
-                        serverClosed.countDown()
-                        webSocket.close(code, null)
-                    }
-                },
-            ),
-        )
+        server.enqueue(MockResponse().withWebSocketUpgrade(homeAssistantEnd))
         server.start()
         link = HomeAssistantLink(server.url("/"), "test-token", pin = null)
         api = HomeAssistantClient(homeHttpClient(COMMAND_TIMEOUT_MS), { true }) { _, _ -> }
@@ -326,5 +327,32 @@ class HomeAssistantSocketTest {
         afterSubscribe = { it.send(event("x".repeat(1_000_000))) }
         val read = api.follow(link, ids).firstReads(1).single()
         assertThat(read.getValue("vacuum.hoover")?.state).isEqualTo("docked")
+    }
+
+    /** Runs [block] against a socket server on [keystore]'s certificate, with a link pinned to `bridge`'s key. */
+    private fun <T> overTls(keystore: String, block: suspend (HomeAssistantLink, MockWebServer) -> T): T = MockWebServer().use { tls ->
+        tls.useHttps(TestCerts.serverSocketFactory(keystore), false)
+        tls.enqueue(MockResponse().withWebSocketUpgrade(homeAssistantEnd))
+        tls.start()
+        runBlocking { block(HomeAssistantLink(tls.url("/"), "test-token", pinOf(TestCerts.leaf("bridge"))), tls) }
+    }
+
+    @Test
+    fun theSocketUsesThePinnedClient() = overTls("bridge") { pinned, tls ->
+        val read = api.follow(pinned, ids).firstReads(1).single()
+        assertThat(read.getValue("sensor.hoover_battery")?.state).isEqualTo("86")
+        assertThat(tls.takeRequest().path).isEqualTo("/api/websocket")
+        assertThat(received.first()).isEqualTo("""{"type":"auth","access_token":"test-token"}""")
+    }
+
+    @Test
+    fun aChangedKeyIsCertificateChangedOverTheSocket() = overTls("other") { pinned, tls ->
+        ShadowLog.clear()
+        assertThat(failureOf(api.follow(pinned, ids)).problem).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
+        val registry = runCatching { withTimeout(5_000) { api.registry(pinned) } }.exceptionOrNull() as HomeAssistantException
+        assertThat(registry.problem).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
+        assertThat(tls.requestCount).isEqualTo(0)
+        assertThat(received).isEmpty()
+        socketLines().forEach { assertThat(it.msg).doesNotContain(checkNotNull(pinned.pin)) }
     }
 }
