@@ -47,6 +47,7 @@ val checkReleaseSigning by tasks.registering {
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkReleaseSigning) }
 
 dependencies {
+    testImplementation(testFixtures(project(":core:access")))
     testImplementation(testFixtures(project(":core:ui")))
     testImplementation(testFixtures(project(":core:plugin")))
     implementation(project(":core:ui"))

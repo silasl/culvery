@@ -1,6 +1,13 @@
 package uk.co.siland.culvery.display
 
+import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.access.CorePermissions
+
 internal const val CAMERA_PROMPT_MISSING = "Culvery can’t ask for the camera on this tablet. Allow the camera in Android’s Settings › Apps › Culvery › Permissions."
+
+/** Asks a fresh Admin PIN, labelled "Allow the camera", before the tablet is unpinned. */
+internal fun cameraUnpinGate(access: AccessControl): suspend () -> Boolean =
+    { access.authorise(CorePermissions.CONNECTIONS_MANAGE, label = ALLOW_THE_CAMERA) != null }
 
 /** Android's camera prompt, unpinned while it shows as Choose home app's dialog is (8 §4.3). [mayUnpin] asks the PIN first; a refusal leaves Culvery pinned. */
 internal class CameraPrompt(

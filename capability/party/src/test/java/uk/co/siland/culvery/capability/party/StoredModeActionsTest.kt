@@ -50,7 +50,7 @@ class StoredModeActionsTest {
 
             assertThat(access.asked).containsExactly(listOf(CorePermissions.CONNECTIONS_MANAGE))
             assertThat(access.labels).containsExactly(TURN_OFF_NEEDS_A_PIN)
-            assertThat(rig.settings.prefsSoon().mode(FILM_ID)!!.needsPin).isTrue()
+            assertThat(rig.settings.prefs.first().mode(FILM_ID)!!.needsPin).isTrue()
         }
     }
 
@@ -67,7 +67,7 @@ class StoredModeActionsTest {
         runCurrent()
 
         assertThat(access.asked).containsExactly(listOf(CorePermissions.CONNECTIONS_MANAGE))
-        assertThat(rig.settings.prefsSoon().mode(FILM_ID)!!.needsPin).isTrue()
+        assertThat(rig.settings.prefs.first().mode(FILM_ID)!!.needsPin).isTrue()
         assertThat(done).isNull()
         gate.complete(Unit)
         runCurrent()

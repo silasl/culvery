@@ -22,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
@@ -126,6 +127,26 @@ class PlugsSettingsHostTest {
         compose.waitForIdle()
         compose.onNodeWithTag("plugs_pin_0").assertIsOn()
         assertThat(runBlocking { rig.prefs().needsPin }).containsExactly(LAMP)
+    }
+
+    /** Fails if the switch shows off before the Admin PIN is accepted, or the PIN setting isn't cleared by it. */
+    @Test
+    fun needsPinShowsOffOnlyAfterTheAdminPin() {
+        val access = TestAccess(Role.ADMIN)
+        val gate = CompletableDeferred<Unit>()
+        access.padGate = gate
+        actions = PlugActions(access, rig.settings, rig.system, RecordingToaster(), CoroutineScope(Job()))
+        show(found(LAMP_CANDIDATE), shown = listOf(LAMP), needsPin = setOf(LAMP))
+        compose.waitFor { count("plugs_pin_0") == 1 }
+
+        compose.onNodeWithTag("plugs_pin_0").assertIsOn().performClick()
+
+        compose.waitFor { access.asked.isNotEmpty() }
+        compose.onNodeWithTag("plugs_pin_0").assertIsOn()
+        assertThat(runBlocking { rig.prefs().needsPin }).containsExactly(LAMP)
+        gate.complete(Unit)
+        compose.waitFor { runBlocking { rig.prefs().needsPin }.isEmpty() }
+        compose.waitFor { runCatching { compose.onNodeWithTag("plugs_pin_0").assertIsOff() }.isSuccess }
     }
 
     @Test

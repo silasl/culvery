@@ -13,6 +13,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.access.test.FakeAccess
+import uk.co.siland.culvery.core.household.Role
 
 @RunWith(AndroidJUnit4::class)
 class CameraPromptTest {
@@ -47,6 +50,31 @@ class CameraPromptTest {
     @Test
     fun aGrantedPinOpensTheScreenOnce() = runTest {
         prompt(displaySettings(folder.root, scope)) { true }.request { launched++ }
+        assertThat(opened).containsExactly(CAMERA_PROMPT_MISSING)
+        assertThat(launched).isEqualTo(1)
+    }
+
+    /** Fails if the gate MainActivity uses lets an Adult through, or asks for anything but the Admin PIN labelled "Allow the camera". */
+    @Test
+    fun theGateRefusesAnAdultAndAsksForTheAdminPin() = runTest {
+        val access = FakeAccess(Role.ADULT)
+
+        prompt(displaySettings(folder.root, scope), cameraUnpinGate(access)).request { launched++ }
+
+        assertThat(access.asked).containsExactly(listOf(CorePermissions.CONNECTIONS_MANAGE))
+        assertThat(access.labels).containsExactly(ALLOW_THE_CAMERA)
+        assertThat(opened).isEmpty()
+        assertThat(launched).isEqualTo(0)
+    }
+
+    /** Fails if an Admin's PIN through the gate doesn't open Android's dialog once. */
+    @Test
+    fun theGateOpensTheScreenOnceForAnAdmin() = runTest {
+        val access = FakeAccess(Role.ADMIN)
+
+        prompt(displaySettings(folder.root, scope), cameraUnpinGate(access)).request { launched++ }
+
+        assertThat(access.asked).containsExactly(listOf(CorePermissions.CONNECTIONS_MANAGE))
         assertThat(opened).containsExactly(CAMERA_PROMPT_MISSING)
         assertThat(launched).isEqualTo(1)
     }

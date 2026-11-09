@@ -68,7 +68,7 @@ class StoredModeActions @Inject internal constructor(
         }
     }
 
-    /** Turning [modeId]'s PIN off asks a fresh Admin PIN first, before the store is touched; false when it was refused and nothing was written. On never asks. */
+    /** Turning [id]'s PIN off asks a fresh Admin PIN first, before the store is touched; false when it was refused and nothing was written. On never asks. */
     suspend fun setNeedsPin(id: String, on: Boolean): Boolean {
         if (!on && access.authorise(CorePermissions.CONNECTIONS_MANAGE, label = TURN_OFF_NEEDS_A_PIN) == null) return false
         store.setNeedsPin(id, on)

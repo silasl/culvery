@@ -14,7 +14,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -178,10 +180,13 @@ class ShellViewModelTest {
         runCurrent()
         assertThat(access.timeouts).containsExactly(SETTINGS_TIMEOUT_MS, SESSION_TIMEOUT_MS).inOrder()
         assertThat(access.session.value).isNull()
-        val requests = access.requested.size
+        access.result = null
         vm.openSettings()
         runCurrent()
-        assertThat(access.requested.size).isEqualTo(requests + 1)
+        vm.uiState.test { assertThat(expectMostRecentItem().settingsOpen).isFalse() }
+        access.result = admin
+        vm.openSettings()
+        runCurrent()
         access.lock()
         runCurrent()
         assertThat(access.timeouts).containsExactly(SETTINGS_TIMEOUT_MS, SESSION_TIMEOUT_MS, SETTINGS_TIMEOUT_MS, SESSION_TIMEOUT_MS).inOrder()
@@ -387,11 +392,15 @@ class ShellViewModelTest {
     fun chooseHomeAppSignsOutBeforeLeaving() = runTest {
         val vm = vm()
         access.result = admin
-        vm.homeAppRequests.test {
-            vm.chooseHomeApp()
-            assertThat(awaitItem()).isEqualTo(HomeAppRequest.CHOOSE)
-            assertThat(access.session.value).isNull()
+        val locksWhenDelivered = mutableListOf<Int>()
+        val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.homeAppRequests.collect { locksWhenDelivered += access.locks }
         }
+        vm.chooseHomeApp()
+        runCurrent()
+        collector.cancel()
+        assertThat(locksWhenDelivered).containsExactly(1)
+        assertThat(access.session.value).isNull()
         assertThat(access.requested.last()).containsExactly(CorePermissions.SETTINGS_MANAGE)
         assertThat(kioskExit.exited.value).isFalse()
     }

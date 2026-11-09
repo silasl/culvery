@@ -43,7 +43,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.AccessControl
-import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.ui.PinPadHost
 import uk.co.siland.culvery.core.plugin.Capability
@@ -63,7 +62,6 @@ import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.setup.SetupWizard
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.display.ALLOW_THE_CAMERA
 import uk.co.siland.culvery.display.AnimatorsOn
 import uk.co.siland.culvery.display.CameraAccess
 import uk.co.siland.culvery.display.CameraPrompt
@@ -73,6 +71,7 @@ import uk.co.siland.culvery.display.ScreenBrightness
 import uk.co.siland.culvery.display.SeasonalThemes
 import uk.co.siland.culvery.display.applyBrightness
 import uk.co.siland.culvery.display.camera.Presence
+import uk.co.siland.culvery.display.cameraUnpinGate
 import uk.co.siland.culvery.display.ui.ConfettiLayer
 import uk.co.siland.culvery.display.ui.SleepLayer
 import uk.co.siland.culvery.shell.HomeAppRequest
@@ -144,12 +143,9 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private val prompt by lazy { CameraPrompt(
-            camera,
-            mayUnpin = { access.authorise(CorePermissions.CONNECTIONS_MANAGE, label = ALLOW_THE_CAMERA) != null },
-            kiosk::openSystemScreen,
-            kiosk::returnToPinning,
-        ) }
+    private val prompt by lazy {
+        CameraPrompt(camera, cameraUnpinGate(access), kiosk::openSystemScreen, kiosk::returnToPinning)
+    }
 
     private val askCamera = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         lifecycleScope.launch { prompt.answered(granted, shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) }
