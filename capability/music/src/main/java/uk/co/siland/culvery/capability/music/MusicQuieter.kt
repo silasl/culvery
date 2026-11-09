@@ -28,8 +28,9 @@ internal const val DOORBELL_LAYOUT_MS = 250L
 /**
  * Music's [AlertQuieter] (6 §4.6): each room of each group playing as the bell rings drops to [share] percent of its
  * volume, and goes back afterwards unless someone changed it meanwhile; quiet() says whether any room went down (9 §6.3).
- * A layout older than [fresh] allows is read first, within [DOORBELL_LAYOUT_MS] (19 §3.2). Room by room, so a group keeps its balance. One lock keeps a restore behind the quiet it undoes. Held in memory only: a
- * restart while lowered leaves those rooms low.
+ * A layout older than [fresh] allows is read first, within [DOORBELL_LAYOUT_MS] (19 §3.2). Room by room, so a group
+ * keeps its balance. One lock keeps a restore behind the quiet it undoes. Held in memory only: a restart while lowered
+ * leaves those rooms low.
  */
 @Singleton
 class MusicQuieter internal constructor(

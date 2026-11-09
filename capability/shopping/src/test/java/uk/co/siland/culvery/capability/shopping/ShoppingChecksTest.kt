@@ -67,7 +67,6 @@ class ShoppingChecksTest {
         lit.value = true
         runCurrent()
         assertThat(times).containsExactly(currentTime)
-        lit.value = true
         connected.value = false
         runCurrent()
         times.clear()

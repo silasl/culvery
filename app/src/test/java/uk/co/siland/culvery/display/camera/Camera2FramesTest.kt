@@ -89,6 +89,7 @@ class Camera2FramesTest {
         assertThat(listed).containsExactly(QuietMode.NOISE_REDUCTION)
     }
 
+    /** Fails if a mode is left on when the camera lists its off mode, or if any of the three is skipped. */
     @Test
     fun allThreeOffWhenListed() {
         assertThat(quietModes { intArrayOf(it.off) }).containsExactly(

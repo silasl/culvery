@@ -86,6 +86,8 @@ class MusicQuieterTest {
     @Test
     fun quietWorksWithTheChecksStopped() = runTest {
         val checks = MusicChecks(MutableStateFlow(system), MutableStateFlow(false), { currentTime }, backgroundScope)
+        checks.start()
+        runCurrent()
         MusicQuieter({ system }, { share }, { checks.layoutIfOlderThan(it, LAYOUT_CHECK_MS) }).quiet()
         assertThat(system.calls.filter { it == "checkLayout" || it.startsWith("setRoomVolume") }).containsExactly(
             "checkLayout", "setRoomVolume Kitchen-id 10", "setRoomVolume Lounge-id 8", "setRoomVolume Dining room-id 5",

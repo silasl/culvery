@@ -313,13 +313,12 @@ class ShellViewModelTest {
         assertThat(shouldPin(setupComplete = true, kioskExited = kioskExit.exited.value)).isTrue()
     }
 
-    /** 19 §4.3: the exit lives in one place, so a second view model (a new activity's) sees the first's Use other apps. */
+    /** 19 §4.3: the exit lives in the injected KioskExit, not in the view model, so any holder of it sees Use other apps. */
     @Test
-    fun twoViewModelsShareTheExit() = runTest {
-        val first = vm()
-        val second = vm()
+    fun exitKioskRecordsTheExitInTheSharedKioskExit() = runTest {
+        val vm = vm()
         access.result = admin
-        first.exitKiosk()
+        vm.exitKiosk()
         runCurrent()
         assertThat(kioskExit.exited.value).isTrue()
     }

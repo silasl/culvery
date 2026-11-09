@@ -32,7 +32,7 @@ class LightsFollowTest {
 
     /** Fails if anything is read before a screen watches, or while only one of the two conditions holds. */
     @Test
-    fun nothingIsReadUntilAScreenShowsInFront() = runTest {
+    fun nothingIsReadUntilTheScreenIsLit() = runTest {
         val follow = follow()
         runCurrent()
         assertThat(system.calls).isEmpty()
