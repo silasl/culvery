@@ -38,6 +38,15 @@ const val PING_MS = 30_000L
 /** A whole `GET /api/states` runs to some hundreds of KB; past this isn't Home Assistant's answer. */
 const val MAX_ANSWER_BYTES = 4_000_000L
 
+/** Frames the socket may have waiting for the collector; a fuller queue ends the socket. */
+internal const val SOCKET_QUEUE = 256
+
+/** A longer message ends the socket. OkHttp holds a whole message before handing it over, so this bounds the queue and the parsing, not the read. */
+internal const val MAX_SOCKET_MESSAGE_CHARS = 4_000_000
+
+private const val POLICY_VIOLATION = 1008
+private const val MESSAGE_TOO_BIG = 1009
+
 private const val TAG = "HomeAssistantClient"
 private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
@@ -120,7 +129,7 @@ class HomeAssistantClient internal constructor(
 
     override suspend fun registry(link: HomeAssistantLink): List<RegistryEntry> {
         val what = HaCall.REGISTRY
-        val inbox = Channel<Frame>(Channel.UNLIMITED)
+        val inbox = Channel<Frame>(SOCKET_QUEUE)
         val socket = socketHttp.newWebSocket(request(link, "api", "websocket").build(), listener(inbox))
         try {
             return withTimeoutOrNull(registryTimeoutMs) {
@@ -157,7 +166,7 @@ class HomeAssistantClient internal constructor(
     }
 
     override fun follow(link: HomeAssistantLink, entityIds: Set<String>): Flow<Map<String, EntityState?>> = flow {
-        val inbox = Channel<Frame>(Channel.UNLIMITED)
+        val inbox = Channel<Frame>(SOCKET_QUEUE)
         val socket = socketHttp.newWebSocket(request(link, "api", "websocket").build(), listener(inbox))
         val current = mutableMapOf<String, EntityState>()
         try {
@@ -201,7 +210,18 @@ class HomeAssistantClient internal constructor(
     /** Hands the socket's messages and its end to the collector, which owns all the state. */
     private fun listener(inbox: Channel<Frame>) = object : WebSocketListener() {
         override fun onMessage(webSocket: WebSocket, text: String) {
-            inbox.trySend(Frame.Text(text))
+            if (text.length > MAX_SOCKET_MESSAGE_CHARS) {
+                Log.w(TAG, "socket message too large")
+                dropSocket(webSocket, MESSAGE_TOO_BIG)
+            } else if (inbox.trySend(Frame.Text(text)).isFailure) {
+                dropSocket(webSocket, POLICY_VIOLATION)
+            }
+        }
+
+        /** Ends the inbox with an error the collector throws once it has drained what is queued; a socket already closing is cancelled. */
+        private fun dropSocket(webSocket: WebSocket, code: Int) {
+            inbox.close(HomeAssistantException(HaProblem.UNREACHABLE))
+            if (!webSocket.close(code, null)) webSocket.cancel()
         }
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {

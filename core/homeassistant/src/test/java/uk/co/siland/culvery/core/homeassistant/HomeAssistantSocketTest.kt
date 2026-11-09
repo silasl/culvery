@@ -5,10 +5,12 @@ import com.google.common.truth.Truth.assertThat
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
@@ -35,6 +37,7 @@ class HomeAssistantSocketTest {
     private val server = MockWebServer()
     private val received = CopyOnWriteArrayList<String>()
     private val serverClosed = CountDownLatch(1)
+    private val serverCloseCode = AtomicInteger(0)
     private lateinit var link: HomeAssistantLink
     private lateinit var api: HomeAssistantClient
 
@@ -60,6 +63,7 @@ class HomeAssistantSocketTest {
                     }
 
                     override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                        serverCloseCode.set(code)
                         serverClosed.countDown()
                         webSocket.close(code, null)
                     }
@@ -241,5 +245,43 @@ class HomeAssistantSocketTest {
         afterSubscribe = {}
         val failure = runCatching { withTimeout(5_000) { quick.registry(link) } }.exceptionOrNull() as HomeAssistantException
         assertThat(failure.problem).isEqualTo(HaProblem.UNREACHABLE)
+    }
+
+    private fun event(name: String) =
+        """{"id":1,"type":"event","event":{"a":{"vacuum.hoover":{"s":"docked","a":{"friendly_name":"$name"}}}}}"""
+
+    @Test
+    fun aFullQueueClosesTheSocket() = runBlocking<Unit> {
+        val release = CountDownLatch(1)
+        afterSubscribe = {
+            it.send(HaFixtures.ADDED)
+            repeat(300) { _ -> it.send(HaFixtures.ADDED) }
+        }
+        var failure: HomeAssistantException? = null
+        val collecting = CoroutineScope(Dispatchers.Default).launch {
+            api.follow(link, ids).catch { failure = it as HomeAssistantException }.collect { release.await() }
+        }
+        Thread.sleep(500)
+        release.countDown()
+        withTimeout(5_000) { collecting.join() }
+        assertThat(failure?.problem).isEqualTo(HaProblem.UNREACHABLE)
+    }
+
+    @Test
+    fun anOversizedMessageClosesTheSocket() = runBlocking<Unit> {
+        ShadowLog.clear()
+        afterSubscribe = { it.send("x".repeat(MAX_SOCKET_MESSAGE_CHARS + 1)) }
+        assertThat(failureOf(api.follow(link, ids)).problem).isEqualTo(HaProblem.UNREACHABLE)
+        assertThat(serverClosed.await(5, TimeUnit.SECONDS)).isTrue()
+        assertThat(serverCloseCode.get()).isEqualTo(1009)
+        assertThat(socketLines().map { it.msg }).contains("socket message too large")
+    }
+
+    /** Regression guard. */
+    @Test
+    fun aOneMegabyteMessageIsRead() = runBlocking<Unit> {
+        afterSubscribe = { it.send(event("x".repeat(1_000_000))) }
+        val read = api.follow(link, ids).firstReads(1).single()
+        assertThat(read.getValue("vacuum.hoover")?.state).isEqualTo("docked")
     }
 }
