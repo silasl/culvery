@@ -15,7 +15,32 @@ The open work, one number each; the details are in the sections below. Numbers n
 8. A Christmas seasonal theme.
 9. A real sleigh-bell recording for Christmas.
 10. Whether birthdays override a doorbell set to one sound.
-11. Plan 18's deferred minors.
+11. Plan 18's deferred minors (details under "Plan 18 deferred minors"):
+   - 11a. Sound generators: the WAV normalise-and-write code is copied across `tools/sound/*.py`.
+   - 11b. Happy Birthday plays at about 92% of the chime's loudness (the peak cap beats the loudness target).
+   - 11c. Sound library: the first folder read can overwrite a faster refresh.
+   - 11d. Sound library: until that first read lands, a chosen tablet sound shows "Not on this tablet any more".
+   - 11e. Sound library: a read failure while starting up isn't handled.
+   - 11f. Sound library: the shared-name check is case-sensitive.
+   - 11g. Sound library: a capitalised `Halloween/` folder is ignored.
+   - 11h. Sound library: two files with the same name drop the one in the subfolder.
+   - 11i. Sound player: a tablet doorbell sound that fails after starting gets no classic chime instead.
+   - 11j. Sound player: `prepare()` runs on the caller's thread.
+   - 11k. Sound player: a stop tap while a pad is opening is ignored, and the sound then starts (a few ms).
+   - 11l. Sound player: a pad tapped while the doorbell's own sound is opening relies on the pad gate.
+   - 11m. Pads: whether they're blocked can be up to 60 s out of date (the ticker isn't on the minute).
+   - 11n. Pads: they look playable before the first gate read.
+   - 11o. Pads: no 150 ms press flash (they match the other tiles).
+   - 11p. Settings: a sound that fails on Play says nothing.
+   - 11q. A hand-edited `builtin:happy_birthday` would ring at the door.
+   - 11r. `goneName` duplicates the door's `goneFileName`.
+   - 11s. Tests: the door module's tests and StoredModePageTest are flaky under full-project load.
+   - 11t. Tests: some fixtures (`testSounds()` file reads, `DoorQuietnessTest` waits) want timeouts.
+   - 11u. Tests: `home_tray_full` passes 4 modes and is silently cut to 2.
+   - 11v. Tests: small style nits (import order, a fully qualified Context, a long lock comment).
+   - 11w. `prepare.sh` (private sounds folder): hard-coded chime path.
+   - 11x. `prepare.sh`: stops silently on an empty source.
+   - 11y. `prepare.sh`: single-pass loudness normalising (±0.5 LU).
 
 **Bugs** (see "Bugs (2026-10-23)")
 12. Calendar M2: an Undo racing a drain create leaves the event on the week; `UndoneKeys` is lost on restart.
