@@ -191,8 +191,19 @@ class Camera2FramesTest {
         lastCallback().onError(lastDevice(), CameraDevice.StateCallback.ERROR_CAMERA_DEVICE)
 
         assertThrows(IllegalStateException::class.java) { lastDevice().createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW) }
-        assertThat(failures.single()).isInstanceOf(CameraStopped::class.java)
+        assertThat(failures.single()).isInstanceOf(CameraError::class.java)
+        assertThat((failures.single() as CameraError).code).isEqualTo(CameraDevice.StateCallback.ERROR_CAMERA_DEVICE)
         assertThat(handler.post {}).isFalse()
+    }
+
+    /** Fails if the code the camera gave is lost on its way to onFailed. */
+    @Test
+    fun anErrorCarriesItsCode() {
+        openHeld()
+
+        lastCallback().onError(lastDevice(), CameraDevice.StateCallback.ERROR_CAMERA_SERVICE)
+
+        assertThat((failures.single() as CameraError).code).isEqualTo(CameraDevice.StateCallback.ERROR_CAMERA_SERVICE)
     }
 
     /** Fails if a camera taken by another app is left open, or its loss reaches onFailed more than once. */

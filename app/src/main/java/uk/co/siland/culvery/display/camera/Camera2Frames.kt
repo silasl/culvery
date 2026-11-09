@@ -121,9 +121,9 @@ internal class Camera2Frames internal constructor(
                             configure(it, characteristics)
                         }
 
-                        override fun onDisconnected(camera: CameraDevice) = lost(camera)
+                        override fun onDisconnected(camera: CameraDevice) = lost(camera, CameraStopped())
 
-                        override fun onError(camera: CameraDevice, error: Int) = lost(camera)
+                        override fun onError(camera: CameraDevice, error: Int) = lost(camera, CameraError(error))
                     },
                 )
             } catch (e: Exception) {
@@ -148,9 +148,9 @@ internal class Camera2Frames internal constructor(
             failure?.let(::fail)
         }
 
-        private fun lost(what: AutoCloseable) {
+        private fun lost(what: AutoCloseable, why: Exception) {
             what.close()
-            fail(CameraStopped())
+            fail(why)
         }
 
         private fun configure(camera: CameraDevice, chosen: CameraCharacteristics) {
@@ -176,7 +176,7 @@ internal class Camera2Frames internal constructor(
                     it.setRepeatingRequest(request, null, null)
                 }
 
-                override fun onConfigureFailed(failed: CameraCaptureSession) = lost(failed)
+                override fun onConfigureFailed(failed: CameraCaptureSession) = lost(failed, SessionFailed())
             }
             camera.createCaptureSession(
                 SessionConfiguration(

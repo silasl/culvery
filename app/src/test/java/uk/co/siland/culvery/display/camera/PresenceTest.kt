@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.display.camera
 
+import android.hardware.camera2.CameraDevice.StateCallback
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -54,7 +55,7 @@ private class Rig(
     var moves = 0
     val screen = MutableStateFlow(Screen.AWAKE)
     var clock: () -> Long = { test.currentTime }
-    val presence = Presence(source, { clock() }, seen, screen, { moves++ }, test.backgroundScope)
+    val presence = Presence(source, { clock() }, { test.currentTime }, seen, screen, { moves++ }, test.backgroundScope)
 
     val running: Boolean get() = presence.running.value
 
@@ -213,12 +214,141 @@ class PresenceTest {
         assertThat(rig.logs()).containsExactly(Log.WARN to "The camera stopped (CameraStopped)")
     }
 
+    /** Fails if a device error is retried before 10 s, or not at 10 s. */
+    @Test
+    fun aDeviceErrorIsRetriedAfterTenSeconds() = runTest {
+        val rig = Rig(this)
+        rig.want(true)
+        rig.fail(CameraError(StateCallback.ERROR_CAMERA_DEVICE))
+        rig.at(9_999)
+        assertThat(rig.source.opens).isEqualTo(1)
+        rig.at(10_000)
+        assertThat(rig.source.opens).isEqualTo(2)
+    }
+
+    /** Fails if failures straight after each reopen don't wait 10, 20, 40, 80, 160 s, then 300 s each time. */
+    @Test
+    fun eachFailureInARowDoublesTheWaitUpToFiveMinutes() = runTest {
+        val rig = Rig(this)
+        rig.want(true)
+        var opens = 1
+        for (wait in listOf(10, 20, 40, 80, 160, 300, 300)) {
+            rig.fail(CameraError(StateCallback.ERROR_CAMERA_DEVICE))
+            val failedAt = currentTime
+            rig.at(failedAt + wait * 1_000L - 1)
+            assertThat(rig.source.opens).isEqualTo(opens)
+            rig.at(failedAt + wait * 1_000L)
+            assertThat(rig.source.opens).isEqualTo(++opens)
+        }
+    }
+
+    /** Fails if a session failure, a disconnect or a camera service error waits longer than 10 s. */
+    @Test
+    fun aSessionFailureADisconnectAndAServiceErrorAreRetriedSoon() = runTest {
+        listOf(SessionFailed(), CameraStopped(), CameraError(StateCallback.ERROR_CAMERA_SERVICE)).forEach { failure ->
+            val rig = Rig(this)
+            rig.want(true)
+            rig.fail(failure)
+            rig.at(currentTime + 9_999)
+            assertThat(rig.source.opens).isEqualTo(1)
+            rig.at(currentTime + 1)
+            assertThat(rig.source.opens).isEqualTo(2)
+            rig.want(false)
+        }
+    }
+
+    /** Fails if a camera in use, disabled or at its limit is asked again sooner than five minutes. */
+    @Test
+    fun aCameraInUseDisabledOrAtItsLimitWaitsFiveMinutes() = runTest {
+        listOf(StateCallback.ERROR_CAMERA_IN_USE, StateCallback.ERROR_MAX_CAMERAS_IN_USE, StateCallback.ERROR_CAMERA_DISABLED)
+            .forEach { code ->
+                val rig = Rig(this)
+                rig.want(true)
+                val failedAt = currentTime
+                rig.fail(CameraError(code))
+                rig.at(failedAt + 299_999)
+                assertThat(rig.source.opens).isEqualTo(1)
+                rig.at(failedAt + 300_000)
+                assertThat(rig.source.opens).isEqualTo(2)
+                rig.want(false)
+            }
+    }
+
+    private fun Rig.threeFailures() {
+        want(true)
+        fail(CameraError(StateCallback.ERROR_CAMERA_DEVICE))
+        at(10_000)
+        fail(CameraError(StateCallback.ERROR_CAMERA_DEVICE))
+        at(30_000)
+        fail(CameraError(StateCallback.ERROR_CAMERA_DEVICE))
+    }
+
+    /** Fails if a camera that stayed open for CLEAN_RUN_MS doesn't start the waits again from 10 s. */
+    @Test
+    fun tenCleanMinutesEndTheRun() = runTest {
+        val rig = Rig(this)
+        rig.threeFailures()
+        rig.at(70_000)
+        assertThat(rig.source.opens).isEqualTo(4)
+        rig.at(70_000 + CLEAN_RUN_MS)
+        rig.fail(CameraError(StateCallback.ERROR_CAMERA_DEVICE))
+        rig.at(70_000 + CLEAN_RUN_MS + 9_999)
+        assertThat(rig.source.opens).isEqualTo(4)
+        rig.at(70_000 + CLEAN_RUN_MS + 10_000)
+        assertThat(rig.source.opens).isEqualTo(5)
+    }
+
+    /** Fails if a camera that failed after less than CLEAN_RUN_MS open starts the waits again. */
+    @Test
+    fun nineCleanMinutesKeepTheRun() = runTest {
+        val rig = Rig(this)
+        rig.threeFailures()
+        rig.at(70_000)
+        rig.at(70_000 + CLEAN_RUN_MS - 1)
+        rig.fail(CameraError(StateCallback.ERROR_CAMERA_DEVICE))
+        rig.at(70_000 + CLEAN_RUN_MS - 1 + 79_999)
+        assertThat(rig.source.opens).isEqualTo(4)
+        rig.at(70_000 + CLEAN_RUN_MS - 1 + 80_000)
+        assertThat(rig.source.opens).isEqualTo(5)
+    }
+
+    /** Fails if the camera no longer being wanted leaves the next failure's wait where the run had got to. */
+    @Test
+    fun aStopEndsTheRunOfFailures() = runTest {
+        val rig = Rig(this)
+        rig.threeFailures()
+        rig.want(false)
+        rig.want(true)
+        assertThat(rig.source.opens).isEqualTo(4)
+        rig.fail(CameraError(StateCallback.ERROR_CAMERA_DEVICE))
+        rig.at(currentTime + 9_999)
+        assertThat(rig.source.opens).isEqualTo(4)
+        rig.at(currentTime + 1)
+        assertThat(rig.source.opens).isEqualTo(5)
+    }
+
+    /** Fails if a failure's cause isn't in its one log line. */
+    @Test
+    fun eachCauseIsLogged() = runTest {
+        listOf(
+            CameraError(StateCallback.ERROR_CAMERA_DEVICE) to "The camera stopped (CameraError 4)",
+            SessionFailed() to "The camera stopped (SessionFailed)",
+            CameraStopped() to "The camera stopped (CameraStopped)",
+        ).forEach { (failure, line) ->
+            val rig = Rig(this)
+            rig.want(true)
+            rig.fail(failure)
+            assertThat(rig.logs()).containsExactly(Log.WARN to line)
+            rig.want(false)
+        }
+    }
+
     /** Fails if the retry comes before CAMERA_RETRY_MS, or never comes while still wanted. */
     @Test
     fun aFailedCameraIsTriedAgainAfterFiveMinutes() = runTest {
         val rig = Rig(this)
         rig.want(true)
-        rig.fail(CameraStopped())
+        rig.fail(CameraError(StateCallback.ERROR_CAMERA_IN_USE))
         rig.at(299_999)
         assertThat(rig.source.opens).isEqualTo(1)
         rig.at(300_000)
@@ -231,7 +361,7 @@ class PresenceTest {
     fun aRetryWaitsOnlyWhileWanted() = runTest {
         val rig = Rig(this)
         rig.want(true)
-        rig.fail(CameraStopped())
+        rig.fail(CameraError(StateCallback.ERROR_CAMERA_IN_USE))
         rig.at(100_000)
         rig.want(false)
         rig.at(600_000)
@@ -258,7 +388,7 @@ class PresenceTest {
         }
         val rig = Rig(this, backing, wanted)
         rig.want(true)
-        rig.fail(CameraStopped())
+        rig.fail(CameraError(StateCallback.ERROR_CAMERA_IN_USE))
         rig.at(299_999)
         stopOnRead = true
         rig.at(300_000)

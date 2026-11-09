@@ -1,5 +1,8 @@
 package uk.co.siland.culvery.display.camera
 
+import android.hardware.camera2.CameraDevice.StateCallback.ERROR_CAMERA_DEVICE
+import android.hardware.camera2.CameraDevice.StateCallback.ERROR_CAMERA_SERVICE
+import android.os.SystemClock
 import android.util.Log
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -13,6 +16,7 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.doublingMillis
 import uk.co.siland.culvery.display.DisplayState
 import uk.co.siland.culvery.display.Screen
 
@@ -20,10 +24,29 @@ internal const val TAG = "Presence"
 
 internal const val LOOK_EVERY_MS = 1_000L
 internal const val CAMERA_RETRY_MS = 300_000L
+internal const val FIRST_CAMERA_RETRY_MS = 10_000L
+internal const val CLEAN_RUN_MS = 600_000L
 
 internal class NoFrontCamera : Exception()
 
 internal class CameraStopped : Exception()
+
+/** The camera device reported [code], one of `CameraDevice.StateCallback`'s `ERROR_*`. */
+internal class CameraError(val code: Int) : Exception()
+
+internal class SessionFailed : Exception()
+
+/**
+ * How long to wait before trying the camera again after failure number [inARow] (from 1), or null never. Device errors, a
+ * failed session and a lost camera are tried again after 10 s, doubling to [CAMERA_RETRY_MS]; the rest wait [CAMERA_RETRY_MS].
+ */
+internal fun cameraRetryMs(e: Exception, inARow: Int): Long? = when {
+    e is NoFrontCamera -> null
+    e is SessionFailed || e is CameraStopped ||
+        (e is CameraError && (e.code == ERROR_CAMERA_DEVICE || e.code == ERROR_CAMERA_SERVICE)) ->
+        doublingMillis(FIRST_CAMERA_RETRY_MS, CAMERA_RETRY_MS, inARow - 1)
+    else -> CAMERA_RETRY_MS
+}
 
 /**
  * The front camera as small greyscale frames, offered to `onFrame` on the camera's own thread until the returned handle is
@@ -41,6 +64,7 @@ internal fun interface FrameSource {
 internal class Presence internal constructor(
     private val frames: FrameSource,
     private val clock: WallClock,
+    private val elapsed: () -> Long,
     private val wanted: StateFlow<Boolean>,
     private val screen: StateFlow<Screen>,
     private val moved: () -> Unit,
@@ -49,13 +73,17 @@ internal class Presence internal constructor(
 ) : Startable {
     @Inject
     constructor(frames: FrameSource, clock: WallClock, display: DisplayState, @ApplicationScope scope: CoroutineScope) :
-        this(frames, clock, display.cameraWanted, display.screen, display::moved, scope)
+        this(frames, clock, SystemClock::elapsedRealtime, display.cameraWanted, display.screen, display::moved, scope)
 
     // Opening, closing and failures take [turning]; the frame state shared with the camera's thread takes [looking].
     private val turning = Any()
     private val looking = Any()
     private var camera: AutoCloseable? = null
     private var retry: Job? = null
+
+    // Under [turning]: failures since the camera was last wanted off or ran [CLEAN_RUN_MS], and when it last opened.
+    private var inARow = 0
+    private var openedAt = 0L
 
     // Written under both locks; a callback from an earlier opening carries an older number and is ignored.
     private var session = 0
@@ -82,6 +110,7 @@ internal class Presence internal constructor(
             if (camera != null) return
             val mine = synchronized(looking) { ++session }
             _running.value = true
+            openedAt = elapsed()
             // A failure is handled on the scope: closing from the camera's own thread could wait on itself.
             camera = frames.open({ look(mine, it) }, { e -> scope.launch { failed(mine, e) } })
         }
@@ -91,6 +120,7 @@ internal class Presence internal constructor(
         synchronized(turning) {
             retry?.cancel()
             retry = null
+            inARow = 0
             close()
         }
     }
@@ -111,10 +141,16 @@ internal class Presence internal constructor(
         synchronized(turning) {
             if (mine != session) return
             close()
-            Log.w(TAG, "The camera stopped (${e::class.simpleName})")
-            if (e !is NoFrontCamera) {
+            if (elapsed() - openedAt >= CLEAN_RUN_MS) inARow = 0
+            inARow++
+            if (e is CameraError) {
+                Log.w(TAG, "The camera stopped (CameraError ${e.code})")
+            } else {
+                Log.w(TAG, "The camera stopped (${e::class.simpleName})")
+            }
+            cameraRetryMs(e, inARow)?.let { wait ->
                 retry = scope.launch {
-                    delay(CAMERA_RETRY_MS)
+                    delay(wait)
                     // Past its delay a cancel can't stop it, so a stop that came first is seen as retry no longer being this job.
                     synchronized(turning) {
                         if (wanted.value && retry === coroutineContext[Job]) open()

@@ -39,11 +39,12 @@ class CameraSealTest {
         assertWithMessage(found.joinToString("\n")).that(found).isEmpty()
     }
 
-    /** Fails if the camera package logs anything but the stopped warning and the opened line (numbers and mode names). */
+    /** Fails if the camera package logs anything but the two stopped warnings and the opened line (codes, class names, numbers and mode names). */
     @Test
-    fun theCameraPackageLogsOnlyTheStoppedAndOpenedLines() {
+    fun theCameraPackageLogsOnlyTheOneWarning() {
         val calls = cameraFiles().flatMap { file -> LOG_CALL.findAll(file.readText()).map { it.value.trim() } }
         assertThat(calls).containsExactly(
+            "Log.w(TAG, \"The camera stopped (CameraError \${e.code})\")",
             "Log.w(TAG, \"The camera stopped (\${e::class.simpleName})\")",
             "Log.w(TAG, \"The camera opened at \${size.first}x\${size.second}, \${rates.first}-\${rates.last} fps, off: \${quietNames(off)}\")",
         )
@@ -56,7 +57,7 @@ class CameraSealTest {
             file.readLines().mapNotNull { DECLARATION.matchEntire(it) }.map { file.name to it }
         }
         assertThat(declarations.map { it.second.groupValues[3] })
-            .containsAtLeast("Luma", "FrameDiff", "FrameSource", "Presence", "NoFrontCamera", "CameraStopped", "DIFF_WIDTH")
+            .containsAtLeast("Luma", "FrameDiff", "FrameSource", "Presence", "NoFrontCamera", "CameraStopped", "CameraError", "SessionFailed", "DIFF_WIDTH")
         val visible = declarations
             .filterNot { (_, match) -> match.groupValues[1].split(' ').any { it == "internal" || it == "private" } }
             .map { (name, match) -> "$name: ${match.value}" }

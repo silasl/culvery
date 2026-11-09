@@ -224,7 +224,7 @@ class DisplayWiringTest {
         val test = TestScope()
         val source = OpenOrNot()
         val wanted = MutableStateFlow(false)
-        val presence = Presence(source, { test.testScheduler.currentTime }, wanted, MutableStateFlow(Screen.AWAKE), {}, test.backgroundScope)
+        val presence = Presence(source, { test.testScheduler.currentTime }, { test.testScheduler.currentTime }, wanted, MutableStateFlow(Screen.AWAKE), {}, test.backgroundScope)
         presence.start()
         test.runCurrent()
         compose.setContent {
