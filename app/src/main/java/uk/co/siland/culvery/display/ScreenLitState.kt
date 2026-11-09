@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.ScreenLit
@@ -43,7 +42,7 @@ class ScreenLitFeed internal constructor(
 
     override fun start() {
         scope.launch {
-            combine(inFront, screen) { f, s -> f && s == Screen.AWAKE }.distinctUntilChanged().collect(into::set)
+            combine(inFront, screen) { f, s -> f && s == Screen.AWAKE }.collect(into::set)
         }
     }
 }

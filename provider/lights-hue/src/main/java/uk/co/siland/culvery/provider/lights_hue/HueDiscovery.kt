@@ -88,28 +88,27 @@ internal class ResolveQueue(
 }
 
 /**
- * Logs a search that won't start and a bridge that won't resolve once each until it works again (19 §5). NSD calls
- * back on its own threads, so each run is used under its own lock.
+ * Logs a search that won't start and a bridge that won't resolve once each until it works again (19 §5).
  */
 internal class BridgeSearchLog {
     private val search = FailureRun()
     private val resolve = FailureRun()
 
     fun searchDidNotStart() {
-        if (synchronized(search) { search.failed() }) Log.w(TAG, "The bridge search didn't start")
+        if (search.failed()) Log.w(TAG, "The bridge search didn't start")
     }
 
     fun searchStarted() {
-        val failedInARow = synchronized(search) { search.succeeded() }
+        val failedInARow = search.succeeded()
         if (failedInARow > 0) Log.i(TAG, "The bridge search works again after $failedInARow failures")
     }
 
     fun resolveFailed() {
-        if (synchronized(resolve) { resolve.failed() }) Log.w(TAG, "A bridge didn't resolve")
+        if (resolve.failed()) Log.w(TAG, "A bridge didn't resolve")
     }
 
     fun resolved() {
-        val failedInARow = synchronized(resolve) { resolve.succeeded() }
+        val failedInARow = resolve.succeeded()
         if (failedInARow > 0) Log.i(TAG, "Bridges resolve again after $failedInARow failures")
     }
 }

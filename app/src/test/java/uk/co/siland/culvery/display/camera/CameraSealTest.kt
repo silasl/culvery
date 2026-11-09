@@ -41,7 +41,7 @@ class CameraSealTest {
 
     /** Fails if the camera package logs anything but the two stopped warnings and the opened line (codes, class names, numbers and mode names). */
     @Test
-    fun theCameraPackageLogsOnlyTheOneWarning() {
+    fun theCameraPackageLogsOnlyTheStoppedAndOpenedLines() {
         val calls = cameraFiles().flatMap { file -> LOG_CALL.findAll(file.readText()).map { it.value.trim() } }
         assertThat(calls).containsExactly(
             "Log.w(TAG, \"The camera stopped (CameraError \${e.code})\")",

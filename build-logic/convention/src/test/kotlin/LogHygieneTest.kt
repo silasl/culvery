@@ -169,7 +169,7 @@ internal object LogHygiene {
      *
      * `mark.elapsedNow().inWholeMilliseconds` is how long the doorbell's layout read took (19 §3.2).
      *
-     * `size.first`, `size.second`, `rates.first` and `rates.last` are the camera's size and frame-rate range, and `quietNames(off)` the modes turned off: the camera's size, rate range and the modes turned off (19 §4.1).
+     * `size.first`, `size.second`, `rates.first` and `rates.last` are the camera's size and frame-rate range, and `quietNames(off)` the modes turned off (19 §4.1).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",

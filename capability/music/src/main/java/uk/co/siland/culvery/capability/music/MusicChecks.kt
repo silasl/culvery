@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.plugin.FailureRun
 import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.polling
 
 /** What plays, and the group volumes, while a music screen shows (6 §4.2). */
 const val PLAYBACK_CHECK_MS = 2_000L
@@ -84,12 +85,7 @@ class MusicChecks internal constructor(
                 .distinctUntilChanged()
                 .collectLatest { s ->
                     if (s != null) {
-                        Log.d(TAG, "Polling on")
-                        try {
-                            checking(s)
-                        } finally {
-                            Log.d(TAG, "Polling off")
-                        }
+                        polling(TAG) { checking(s) }
                     }
                 }
         }

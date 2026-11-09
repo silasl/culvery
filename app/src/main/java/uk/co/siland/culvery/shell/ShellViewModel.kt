@@ -78,8 +78,6 @@ class ShellViewModel @Inject constructor(
     /** Each system screen allowed; MainActivity unpins and opens it. */
     val systemScreenRequests: Flow<SystemScreenRequest> = systemScreenEvents.receiveAsFlow()
 
-    val kioskExited: Boolean get() = exit.exited.value
-
     /** The household's wall time, for the status bar and Home's clock; not part of [uiState], so a tick redraws only them (4c §4.2). */
     val now: StateFlow<LocalDateTime> =
         clock.minutes.stateIn(viewModelScope, SharingStarted.Eagerly, LocalDateTime.now())
@@ -249,11 +247,6 @@ class ShellViewModel @Inject constructor(
     override fun leavePinning() = Unit
 
     override fun returnToPinning() = Unit
-
-    /** Culvery is in front again after being stopped; with D3 that includes a Home press from another app. */
-    fun returnedToFront() {
-        exit.returned()
-    }
 
     private fun leaveKiosk() {
         exit.left()

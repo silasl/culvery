@@ -112,10 +112,7 @@ internal fun Display.waiting(): Wait? {
     }
 }
 
-/**
- * Wanted only by day, in front, off the night clock, not on Holiday mode, and when allowed and switched on (8 §4.3), and
- * not left with Use other apps (19 §4.3).
- */
+/** Wanted only by day, in front, off the night clock, not on Holiday mode, and when allowed and switched on (8 §4.3). */
 internal fun Display.wantsCamera(camera: CameraState): Boolean =
     inFront && night == false && holiday != true && screen != Screen.NIGHT_CLOCK && prefs?.wakesByCamera(camera) == true
 
@@ -162,6 +159,7 @@ class DisplayState internal constructor(
     val night: StateFlow<Boolean?> = state.map { it.night }.distinctUntilChanged()
         .stateIn(scope, SharingStarted.Eagerly, state.value.night)
 
+    /** [wantsCamera], and not left with Use other apps (19 §4.3). */
     val cameraWanted: StateFlow<Boolean> = combine(state, camera, kioskExited) { display, access, exited -> !exited && display.wantsCamera(access) }
         .stateIn(scope, SharingStarted.Eagerly, !kioskExited.value && state.value.wantsCamera(camera.value))
 

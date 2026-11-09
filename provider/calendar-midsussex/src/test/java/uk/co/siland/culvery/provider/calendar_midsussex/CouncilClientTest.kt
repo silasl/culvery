@@ -7,8 +7,8 @@ import java.net.UnknownHostException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import okhttp3.Dns
-import okhttp3.Interceptor
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertThrows

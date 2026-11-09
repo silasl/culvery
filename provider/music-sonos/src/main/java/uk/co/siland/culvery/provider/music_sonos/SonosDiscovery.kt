@@ -69,12 +69,11 @@ internal class SonosDiscovery(
                     listen(socket, answers)
                 }
             }
+            val failedInARow = failures.succeeded()
+            if (failedInARow > 0) Log.i(TAG, "The speaker scan works again after $failedInARow failures")
         } catch (e: IOException) {
-            if (synchronized(failures) { failures.failed() }) Log.w(TAG, "The speaker scan stopped (${e::class.simpleName})")
-            return@withContext ssdpAddresses(answers, accept)
+            if (failures.failed()) Log.w(TAG, "The speaker scan stopped (${e::class.simpleName})")
         }
-        val failedInARow = synchronized(failures) { failures.succeeded() }
-        if (failedInARow > 0) Log.i(TAG, "The speaker scan works again after $failedInARow failures")
         ssdpAddresses(answers, accept)
     }
 

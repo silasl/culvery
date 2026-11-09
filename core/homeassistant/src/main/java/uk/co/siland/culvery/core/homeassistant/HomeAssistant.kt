@@ -28,6 +28,7 @@ import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.polling
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 /** After a command, Home Assistant is read this often to see it take (11 §6). */
@@ -214,12 +215,7 @@ class HomeAssistant(
                 .distinctUntilChanged()
                 .collectLatest { follow ->
                     if (follow != null) {
-                        Log.d(TAG, "Polling on")
-                        try {
-                            following(follow)
-                        } finally {
-                            Log.d(TAG, "Polling off")
-                        }
+                        polling(TAG) { following(follow) }
                     }
                 }
         }

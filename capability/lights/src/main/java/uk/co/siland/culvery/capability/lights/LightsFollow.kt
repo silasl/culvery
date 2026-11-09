@@ -20,6 +20,7 @@ import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.polling
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 /** A full read of the rooms and scenes, while the stream is open (7 §4.2). */
@@ -61,12 +62,7 @@ class LightsFollow internal constructor(
                 .distinctUntilChanged()
                 .collectLatest { s ->
                     if (s != null) {
-                        Log.d(TAG, "Polling on")
-                        try {
-                            following(s)
-                        } finally {
-                            Log.d(TAG, "Polling off")
-                        }
+                        polling(TAG) { following(s) }
                     }
                 }
         }

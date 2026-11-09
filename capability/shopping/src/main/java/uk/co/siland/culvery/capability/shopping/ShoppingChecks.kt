@@ -21,6 +21,7 @@ import uk.co.siland.culvery.core.plugin.FailureRun
 import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.polling
 import uk.co.siland.culvery.core.plugin.reasonWord
 
 /** How often the list is read while a screen that shows it is on (10 §4.4). */
@@ -72,12 +73,7 @@ class ShoppingChecks internal constructor(
                 .distinctUntilChanged()
                 .collectLatest { on ->
                     if (on) {
-                        Log.d(TAG, "Polling on")
-                        try {
-                            checking()
-                        } finally {
-                            Log.d(TAG, "Polling off")
-                        }
+                        polling(TAG) { checking() }
                     }
                 }
         }

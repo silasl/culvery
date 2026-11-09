@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.plugin
 
+import android.util.Log
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -25,6 +26,16 @@ inline fun <T> attempt(block: () -> T, orElse: (Exception) -> T): T = try {
     orElse(e)
 }
 
+/** Runs [body] between the "Polling on" and "Polling off" lines a poller logs, off even when it is cancelled. */
+suspend inline fun polling(tag: String, body: () -> Unit) {
+    Log.d(tag, "Polling on")
+    try {
+        body()
+    } finally {
+        Log.d(tag, "Polling off")
+    }
+}
+
 /** Waits after an outbox's nth failed send: 30 s, 1 min, 2 min, then 5 min (the calendar's and the shopping list's). */
 val OUTBOX_BACKOFF_MS: List<Long> = listOf(30_000L, 60_000L, 120_000L, 300_000L)
 
@@ -41,14 +52,14 @@ fun retryDelayMillis(attempt: Long): Long =
 
 /**
  * A run of failures with no success between, and the wait that grows with it (19 §5). The caller logs: [failed] is true
- * for the first of a run, [succeeded] says how many there were. Used by one coroutine at a time, unless the caller
- * synchronizes.
+ * for the first of a run, [succeeded] says how many there were. Safe to use from several threads.
  */
 class FailureRun {
     private var inRun = 0
     private var sinceReset = 0
 
     /** Counts a failure; true on the first of a run. */
+    @Synchronized
     fun failed(): Boolean {
         inRun++
         sinceReset++
@@ -56,17 +67,20 @@ class FailureRun {
     }
 
     /** How many failed in the run just ended, 0 if none; clears the run. */
+    @Synchronized
     fun succeeded(): Int = inRun.also {
         inRun = 0
         sinceReset = 0
     }
 
     /** The next [waitMillis] is `everyMs` again; the run itself is kept. */
+    @Synchronized
     fun resetWaits() {
         sinceReset = 0
     }
 
     /** [everyMs] with no failure or one since the last reset, then doubling to [capMs]. */
+    @Synchronized
     fun waitMillis(everyMs: Long, capMs: Long): Long = doublingMillis(everyMs, capMs, sinceReset - 1)
 }
 

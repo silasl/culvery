@@ -136,10 +136,7 @@ class MainActivity : ComponentActivity() {
             isHomeApp = { homeApp.isDefault.value },
             inHomeTask = { isHomeTask(intent) },
             isDeviceOwner = { isDeviceOwner },
-            kioskExited = { shell.kioskExited },
-            // Read when used, so an instance that hands over in onCreate never builds the shell's view model.
-            returnedToFront = { shell.returnedToFront() },
-            front = { kioskExit },
+            kioskExit,
             changingConfigurations = { isChangingConfigurations },
             say = toasts::show,
         )
@@ -198,7 +195,7 @@ class MainActivity : ComponentActivity() {
             var previous: Boolean? = null
             setupComplete.filterNotNull().collect { complete ->
                 val resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-                if (!kiosk.handedOver && pinOnSetupRead(previous, complete, resumed, shell.kioskExited)) pinToScreen()
+                if (!kiosk.handedOver && pinOnSetupRead(previous, complete, resumed, kioskExit.exited.value)) pinToScreen()
                 previous = complete
             }
         }
@@ -295,7 +292,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus && !kiosk.handedOver && !shell.kioskExited) hideSystemBars()
+        if (hasFocus && !kiosk.handedOver && !kioskExit.exited.value) hideSystemBars()
     }
 
     private fun openHomeAppScreen(request: HomeAppRequest) = when (request) {

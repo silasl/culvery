@@ -16,8 +16,7 @@ import org.robolectric.shadows.ShadowAppTask
 import uk.co.siland.culvery.shell.KioskExit
 
 /**
- * The kiosk's pinning over a real activity lifecycle (Robolectric drives it), with the window's effects recorded. The
- * existing tests are regression guards over a shared [KioskExit].
+ * The kiosk's pinning over a real activity lifecycle (Robolectric drives it), with the window's effects recorded.
  */
 @RunWith(AndroidJUnit4::class)
 class KioskLifecycleTest {
@@ -54,9 +53,7 @@ class KioskLifecycleTest {
         isHomeApp = { home },
         inHomeTask = { inHomeTask },
         isDeviceOwner = { owner },
-        kioskExited = { exit.exited.value },
-        returnedToFront = { exit.returned() },
-        front = { exit },
+        exit,
         changingConfigurations = { changing },
         say = { said += it },
     )
@@ -103,24 +100,11 @@ class KioskLifecycleTest {
         assertThat(window.calls).containsExactly("unpin", "showBars", "moveToBack").inOrder()
     }
 
-    /** A configuration change that waited for Culvery to return builds a new activity that never saw the stop. */
-    @Test
-    fun aRelaunchAfterBeingStoppedPinsAgain() {
-        exit.left()
-        kiosk.exitKiosk()
-        controller.pause().stop()
-        window.calls.clear()
-        val next = Robolectric.buildActivity(ComponentActivity::class.java)
-        next.get().lifecycle.addObserver(kioskFor())
-        next.setup()
-        assertThat(window.calls).contains("pin")
-    }
-
-    /** 19 §4.3: a new activity over the same [KioskExit], resumed after the first was stopped, clears the exit and pins. */
+    /** Regression guard, 19 §4.3: a new activity over the same [KioskExit], resumed after the first was stopped, clears the exit and pins. */
     @Test
     fun aSecondLifecycleOverTheSameExitPinsOnReturn() {
-        kiosk.exitKiosk()
         exit.left()
+        kiosk.exitKiosk()
         controller.pause().stop()
         assertThat(exit.stopped).isTrue()
         window.calls.clear()
@@ -373,9 +357,7 @@ class KioskLifecycleTest {
             isHomeApp = { true },
             inHomeTask = { false },
             isDeviceOwner = { error("owner read") },
-            kioskExited = { error("shell read") },
-            returnedToFront = { error("shell read") },
-            front = { error("shell read") },
+            KioskExit(),
             changingConfigurations = { false },
             say = { error("toast") },
         )

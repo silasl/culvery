@@ -308,9 +308,9 @@ class ShellViewModelTest {
         access.result = admin
         vm.exitKiosk()
         runCurrent()
-        assertThat(shouldPin(setupComplete = true, kioskExited = vm.kioskExited)).isFalse()
-        vm.returnedToFront()
-        assertThat(shouldPin(setupComplete = true, kioskExited = vm.kioskExited)).isTrue()
+        assertThat(shouldPin(setupComplete = true, kioskExited = kioskExit.exited.value)).isFalse()
+        kioskExit.returned()
+        assertThat(shouldPin(setupComplete = true, kioskExited = kioskExit.exited.value)).isTrue()
     }
 
     /** 19 §4.3: the exit lives in one place, so a second view model (a new activity's) sees the first's Use other apps. */
@@ -321,7 +321,7 @@ class ShellViewModelTest {
         access.result = admin
         first.exitKiosk()
         runCurrent()
-        assertThat(second.kioskExited).isTrue()
+        assertThat(kioskExit.exited.value).isTrue()
     }
 
     @Test
@@ -336,7 +336,7 @@ class ShellViewModelTest {
         }
         assertThat(access.requested.last()).containsExactly(CorePermissions.KIOSK_EXIT)
         assertThat(access.session.value).isNull()
-        assertThat(vm.kioskExited).isTrue()
+        assertThat(kioskExit.exited.value).isTrue()
         vm.uiState.test { assertThat(expectMostRecentItem().settingsOpen).isFalse() }
     }
 
@@ -350,7 +350,7 @@ class ShellViewModelTest {
         }
         assertThat(access.requested.last()).containsExactly(CorePermissions.SETTINGS_MANAGE)
         assertThat(access.session.value).isNotNull()
-        assertThat(vm.kioskExited).isFalse()
+        assertThat(kioskExit.exited.value).isFalse()
     }
 
     /** Android's screen leaves Culvery unpinned, another way out of the kiosk: a fresh Admin PIN first; a cancelled pad opens nothing. */
@@ -369,7 +369,7 @@ class ShellViewModelTest {
             assertThat(awaitItem()).isEqualTo(SystemScreenRequest(screens, "missing"))
         }
         // Unlike Use other apps, Culvery pins again when it is back in front.
-        assertThat(vm.kioskExited).isFalse()
+        assertThat(kioskExit.exited.value).isFalse()
     }
 
     @Test

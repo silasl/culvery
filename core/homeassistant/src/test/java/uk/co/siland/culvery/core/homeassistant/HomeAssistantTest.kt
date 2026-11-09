@@ -140,29 +140,16 @@ class HomeAssistantTest {
         assertThat(ha.entities.value).containsExactly("vacuum.hoover", hoover, "sensor.hoover_battery", battery, "climate.hall", null)
     }
 
-    /** Regression guard: fails if the socket stays open while the screen is not lit, or doesn't come back when it is. */
+    /**
+     * Regression guard: fails if the socket stays open while the screen is not lit, if the dark screen leaves the socket's
+     * liveness set, or if it doesn't come back when the screen is lit.
+     */
     @Test
-    fun theSocketClosesWhileNotLit() = runTest {
+    fun theSocketClosesWhileTheScreenIsNotLit() = runTest {
         val ha = ha()
         ha.watch(flowOf(setOf("vacuum.hoover")))
         runCurrent()
         assertThat(api.follows).hasSize(1)
-        lit.value = false
-        runCurrent()
-        assertThat(api.cancels).isEqualTo(1)
-        after(60_000)
-        assertThat(api.follows).hasSize(1)
-        lit.value = true
-        runCurrent()
-        assertThat(api.follows).hasSize(2)
-    }
-
-    /** Regression guard: fails if a dark screen leaves the follow running or the socket's liveness set. */
-    @Test
-    fun theSocketClosesWhileTheScreenIsDark() = runTest {
-        val ha = ha()
-        ha.watch(flowOf(setOf("vacuum.hoover")))
-        runCurrent()
         api.socket.emit(mapOf("vacuum.hoover" to hoover))
         runCurrent()
         assertThat(ha.liveSince.value).isNotNull()
@@ -170,6 +157,11 @@ class HomeAssistantTest {
         runCurrent()
         assertThat(api.cancels).isEqualTo(1)
         assertThat(ha.liveSince.value).isNull()
+        after(60_000)
+        assertThat(api.follows).hasSize(1)
+        lit.value = true
+        runCurrent()
+        assertThat(api.follows).hasSize(2)
     }
 
     /** Regression guard: fails if waking doesn't open a new follow whose first event fills the cache. */

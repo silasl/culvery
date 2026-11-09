@@ -55,9 +55,7 @@ internal class KioskLifecycle(
     private val isHomeApp: () -> Boolean,
     private val inHomeTask: () -> Boolean,
     private val isDeviceOwner: () -> Boolean,
-    private val kioskExited: () -> Boolean,
-    private val returnedToFront: () -> Unit,
-    private val front: () -> KioskExit,
+    private val exit: KioskExit,
     private val changingConfigurations: () -> Boolean,
     private val say: (String) -> Unit,
 ) : DefaultLifecycleObserver {
@@ -69,12 +67,11 @@ internal class KioskLifecycle(
 
     // A stop for a configuration change is the same activity coming straight back, so it doesn't count as leaving.
     override fun onStop(owner: LifecycleOwner) {
-        if (!changingConfigurations()) front().stopped = true
+        if (!changingConfigurations()) exit.stopped = true
     }
 
     override fun onStart(owner: LifecycleOwner) {
-        if (!front().stopped) return
-        returnedToFront()
+        if (exit.stopped) exit.returned()
     }
 
     override fun onResume(owner: LifecycleOwner) {
@@ -86,8 +83,8 @@ internal class KioskLifecycle(
         if (isHomeApp() && inHomeTask()) window.removeOtherTasks()
         // Culvery is back in front, however Google's screens ended: Play services is no longer allowed in lock-task.
         if (isDeviceOwner()) window.allowPlayServices(false)
-        if (!kioskExited()) window.hideBars()
-        if (shouldPin(setupComplete(), kioskExited())) window.pin()
+        if (!exit.exited.value) window.hideBars()
+        if (shouldPin(setupComplete(), exit.exited.value)) window.pin()
     }
 
     override fun onPause(owner: LifecycleOwner) {
@@ -110,7 +107,7 @@ internal class KioskLifecycle(
         if (handedOver) return
         if (isDeviceOwner()) {
             window.allowPlayServices(false)
-        } else if (resumed && shouldPin(setupComplete(), kioskExited())) {
+        } else if (resumed && shouldPin(setupComplete(), exit.exited.value)) {
             window.pin()
         }
     }
@@ -138,8 +135,8 @@ internal class KioskLifecycle(
         } catch (e: RuntimeException) {
             if (e !is ActivityNotFoundException && e !is SecurityException) throw e
             Log.w(TAG, "No system screen opened on this tablet (${e::class.simpleName})")
-            returnedToFront()
-            if (shouldPin(setupComplete(), kioskExited())) window.pin()
+            exit.returned()
+            if (shouldPin(setupComplete(), exit.exited.value)) window.pin()
             say(missing)
         }
     }

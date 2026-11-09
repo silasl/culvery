@@ -13,19 +13,19 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 @Singleton
 class KioskExit @Inject constructor() {
-    private val left = MutableStateFlow(false)
+    private val _exited = MutableStateFlow(false)
 
-    val exited: StateFlow<Boolean> = left.asStateFlow()
+    val exited: StateFlow<Boolean> = _exited.asStateFlow()
 
     /** Culvery has been stopped since the exit; main thread only, read by the activity's lifecycle. */
     var stopped = false
 
     fun left() {
-        left.value = true
+        _exited.value = true
     }
 
     fun returned() {
-        left.value = false
+        _exited.value = false
         stopped = false
     }
 }
