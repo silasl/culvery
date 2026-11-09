@@ -88,4 +88,12 @@ class CameraPromptTest {
         assertThat(runCatching { prompt.answered(granted = true, rationale = false) }.isFailure).isTrue()
         assertThat(pins).isEqualTo(1)
     }
+
+    /** Fails if the activity builds the camera prompt without the Admin PIN gate. */
+    @Test
+    fun theActivityPassesTheAdminPinGate() {
+        // Unit tests run in the module's directory.
+        val activity = File("src/main/java/uk/co/siland/culvery/MainActivity.kt").readText()
+        assertThat(activity).contains("CameraPrompt(camera, cameraUnpinGate(access),")
+    }
 }
