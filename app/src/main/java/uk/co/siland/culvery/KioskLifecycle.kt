@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import uk.co.siland.culvery.shell.KioskExit
 
 /** What the kiosk does to the activity's window and task. */
 internal interface KioskWindow {
@@ -45,14 +46,6 @@ internal const val HOME_APP_NOT_SET = "Culvery isn’t the home app yet."
 internal const val HOME_APP_SCREEN_MISSING = "Culvery can’t open the home app setting."
 
 /**
- * Whether Culvery has left the front since the kiosk was exited. It outlives the activity (the view model holds it), so
- * a relaunch after the activity was stopped still counts as coming back.
- */
-internal class FrontTracker {
-    var left = false
-}
-
-/**
  * The kiosk over the activity's lifecycle (4a design D10, 4c §5.1, K2): every resume hides the bars and pins, once
  * setup is complete and the kiosk wasn't exited; coming back to the front after being stopped clears "exited".
  */
@@ -64,7 +57,7 @@ internal class KioskLifecycle(
     private val isDeviceOwner: () -> Boolean,
     private val kioskExited: () -> Boolean,
     private val returnedToFront: () -> Unit,
-    private val front: () -> FrontTracker,
+    private val front: () -> KioskExit,
     private val changingConfigurations: () -> Boolean,
     private val say: (String) -> Unit,
 ) : DefaultLifecycleObserver {
@@ -76,12 +69,11 @@ internal class KioskLifecycle(
 
     // A stop for a configuration change is the same activity coming straight back, so it doesn't count as leaving.
     override fun onStop(owner: LifecycleOwner) {
-        if (!changingConfigurations()) front().left = true
+        if (!changingConfigurations()) front().stopped = true
     }
 
     override fun onStart(owner: LifecycleOwner) {
-        if (!front().left) return
-        front().left = false
+        if (!front().stopped) return
         returnedToFront()
     }
 

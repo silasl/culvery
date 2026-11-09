@@ -74,6 +74,7 @@ import uk.co.siland.culvery.display.camera.Presence
 import uk.co.siland.culvery.display.ui.ConfettiLayer
 import uk.co.siland.culvery.display.ui.SleepLayer
 import uk.co.siland.culvery.shell.HomeAppRequest
+import uk.co.siland.culvery.shell.KioskExit
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellAlerts
 import uk.co.siland.culvery.shell.ShellToasts
@@ -91,6 +92,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var pinPrompt: PinPromptController
     @Inject lateinit var capabilities: Set<@JvmSuppressWildcards Capability>
     @Inject lateinit var toasts: ShellToasts
+    @Inject lateinit var kioskExit: KioskExit
     @Inject lateinit var alerts: ShellAlerts
     @Inject lateinit var userActivity: ShellUserActivity
     @Inject lateinit var access: AccessControl
@@ -137,7 +139,7 @@ class MainActivity : ComponentActivity() {
             kioskExited = { shell.kioskExited },
             // Read when used, so an instance that hands over in onCreate never builds the shell's view model.
             returnedToFront = { shell.returnedToFront() },
-            front = { shell.front },
+            front = { kioskExit },
             changingConfigurations = { isChangingConfigurations },
             say = toasts::show,
         )

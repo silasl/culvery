@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import uk.co.siland.culvery.FrontTracker
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.SESSION_TIMEOUT_MS
@@ -55,6 +54,7 @@ class ShellViewModel @Inject constructor(
     private val access: AccessControl,
     sunToday: SunToday,
     private val toaster: Toaster,
+    private val exit: KioskExit,
 ) : ViewModel(), ShellNavigator {
     private val ordered = capabilities.sortedBy { it.order }
     private val selected = MutableStateFlow(HOME_TAB_ID)
@@ -78,12 +78,7 @@ class ShellViewModel @Inject constructor(
     /** Each system screen allowed; MainActivity unpins and opens it. */
     val systemScreenRequests: Flow<SystemScreenRequest> = systemScreenEvents.receiveAsFlow()
 
-    /**
-     * Use other apps or Change home app, and Culvery not back in front since (4c K2). A field, not saved state: a
-     * configuration change keeps it, a process death forgets it, so the kiosk pins again when next in front (ruling 6).
-     */
-    var kioskExited: Boolean = false
-        private set
+    val kioskExited: Boolean get() = exit.exited.value
 
     /** The household's wall time, for the status bar and Home's clock; not part of [uiState], so a tick redraws only them (4c §4.2). */
     val now: StateFlow<LocalDateTime> =
@@ -257,14 +252,11 @@ class ShellViewModel @Inject constructor(
 
     /** Culvery is in front again after being stopped; with D3 that includes a Home press from another app. */
     fun returnedToFront() {
-        kioskExited = false
+        exit.returned()
     }
 
-    /** Survives the activity, so a relaunch after Culvery was stopped counts as coming back to the front (K2). */
-    internal val front = FrontTracker()
-
     private fun leaveKiosk() {
-        kioskExited = true
+        exit.left()
         settings.value = null
         access.lock()
     }

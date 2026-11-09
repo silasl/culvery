@@ -50,6 +50,7 @@ import uk.co.siland.culvery.display.ui.SleepLayer
 import uk.co.siland.culvery.display.ui.THE_CAMERA_IS_ON
 import uk.co.siland.culvery.holding
 import uk.co.siland.culvery.shell.OverlayState
+import uk.co.siland.culvery.shell.KioskExit
 import uk.co.siland.culvery.shell.ShellAlerts
 import uk.co.siland.culvery.shell.SunToday
 import uk.co.siland.culvery.shell.ui.ShellLayers
@@ -104,6 +105,7 @@ class DisplayWiringTest {
             MutableStateFlow(true),
             MutableStateFlow(CameraState.ALLOWED),
             MutableStateFlow(null),
+            MutableStateFlow(false),
             backgroundScope,
         )
         runCurrent()
@@ -125,7 +127,7 @@ class DisplayWiringTest {
         }
         private val settings = displaySettings(folder.root, scope)
         private val clock = HouseholdClock(flowOf(ZoneOffset.UTC), { 0L }, scope, flowOf(ELEVEN_PM))
-        val display = DisplayState(settings, clock, FakeUserActivity(), alerts, CameraAccess({ true }, { true }, settings, scope), object : HouseMode { override val holiday = MutableStateFlow<Boolean?>(null) }, scope)
+        val display = DisplayState(settings, clock, FakeUserActivity(), alerts, CameraAccess({ true }, { true }, settings, scope), object : HouseMode { override val holiday = MutableStateFlow<Boolean?>(null) }, KioskExit(), scope)
         val brightness = ScreenBrightness(display, alerts, clock, SunToday(null, scope), settings, scope)
 
         init {

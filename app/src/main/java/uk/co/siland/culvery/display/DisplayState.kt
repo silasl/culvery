@@ -28,6 +28,7 @@ import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.plugin.inDailyWindow
+import uk.co.siland.culvery.shell.KioskExit
 import uk.co.siland.culvery.shell.ShellAlerts
 
 private const val TAG = "DisplayState"
@@ -111,7 +112,10 @@ internal fun Display.waiting(): Wait? {
     }
 }
 
-/** Wanted only by day, in front, off the night clock, not on Holiday mode, and when allowed and switched on (8 §4.3). */
+/**
+ * Wanted only by day, in front, off the night clock, not on Holiday mode, and when allowed and switched on (8 §4.3), and
+ * not left with Use other apps (19 §4.3).
+ */
 internal fun Display.wantsCamera(camera: CameraState): Boolean =
     inFront && night == false && holiday != true && screen != Screen.NIGHT_CLOCK && prefs?.wakesByCamera(camera) == true
 
@@ -127,6 +131,7 @@ class DisplayState internal constructor(
     shown: StateFlow<Boolean>,
     camera: StateFlow<CameraState>,
     holiday: StateFlow<Boolean?>,
+    kioskExited: StateFlow<Boolean>,
     scope: CoroutineScope,
 ) : NightHours {
     @Inject
@@ -137,8 +142,9 @@ class DisplayState internal constructor(
         alerts: ShellAlerts,
         camera: CameraAccess,
         house: HouseMode,
+        kioskExit: KioskExit,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(settings.read, clock.now, activity.touches, alerts.shown, camera.state, house.holiday, scope)
+    ) : this(settings.read, clock.now, activity.touches, alerts.shown, camera.state, house.holiday, kioskExit.exited, scope)
 
     private val lock = Any()
     private val state = MutableStateFlow(next(START, prefs.value, now.value, shown.value, holiday.value))
@@ -156,8 +162,8 @@ class DisplayState internal constructor(
     val night: StateFlow<Boolean?> = state.map { it.night }.distinctUntilChanged()
         .stateIn(scope, SharingStarted.Eagerly, state.value.night)
 
-    val cameraWanted: StateFlow<Boolean> = combine(state, camera) { display, access -> display.wantsCamera(access) }
-        .stateIn(scope, SharingStarted.Eagerly, state.value.wantsCamera(camera.value))
+    val cameraWanted: StateFlow<Boolean> = combine(state, camera, kioskExited) { display, access, exited -> !exited && display.wantsCamera(access) }
+        .stateIn(scope, SharingStarted.Eagerly, !kioskExited.value && state.value.wantsCamera(camera.value))
 
     init {
         scope.launch {

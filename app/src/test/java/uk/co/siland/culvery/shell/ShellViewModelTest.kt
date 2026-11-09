@@ -57,6 +57,7 @@ class ShellViewModelTest {
     private val admin = Authorised(alex, Role.ADMIN, setOf(CorePermissions.SETTINGS_MANAGE, CorePermissions.KIOSK_EXIT))
     private val access = FakeAccessControl()
     private val toasts = ShellToasts()
+    private val kioskExit = KioskExit()
     private val london = ZoneId.of("Europe/London")
     private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
@@ -79,7 +80,7 @@ class ShellViewModelTest {
     }
 
     private fun vm(caps: Set<Capability> = emptySet(), daylight: Daylight? = null) =
-        ShellViewModel(caps, clock, access, SunToday(daylight, sunScope), toasts)
+        ShellViewModel(caps, clock, access, SunToday(daylight, sunScope), toasts, kioskExit)
 
     @Test
     fun tabsShowOnlyCapabilitiesWithTabsInOrder() = runTest {
@@ -231,7 +232,7 @@ class ShellViewModelTest {
     @Test
     fun settingsNeverOpenWithoutSession() = runTest {
         val noSessionAccess = FakeAccessControl(result = admin, startsSession = false)
-        val vm = ShellViewModel(emptySet(), clock, noSessionAccess, SunToday(null, sunScope), toasts)
+        val vm = ShellViewModel(emptySet(), clock, noSessionAccess, SunToday(null, sunScope), toasts, kioskExit)
         vm.uiState.test {
             vm.openSettings()
             assertThat(expectMostRecentItem().settingsOpen).isFalse()
@@ -310,6 +311,17 @@ class ShellViewModelTest {
         assertThat(shouldPin(setupComplete = true, kioskExited = vm.kioskExited)).isFalse()
         vm.returnedToFront()
         assertThat(shouldPin(setupComplete = true, kioskExited = vm.kioskExited)).isTrue()
+    }
+
+    /** 19 §4.3: the exit lives in one place, so a second view model (a new activity's) sees the first's Use other apps. */
+    @Test
+    fun twoViewModelsShareTheExit() = runTest {
+        val first = vm()
+        val second = vm()
+        access.result = admin
+        first.exitKiosk()
+        runCurrent()
+        assertThat(second.kioskExited).isTrue()
     }
 
     @Test

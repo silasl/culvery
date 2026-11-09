@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.display.Screen.ASLEEP
 import uk.co.siland.culvery.display.Screen.AWAKE
 import uk.co.siland.culvery.display.Screen.NIGHT_CLOCK
+import uk.co.siland.culvery.shell.KioskExit
 
 private val DAY: LocalDate = LocalDate.of(2026, 10, 19)
 private val NOON: LocalDateTime = DAY.atTime(12, 0)
@@ -38,8 +39,9 @@ private class Wall(
     val inFront = MutableStateFlow(inFront)
     val camera = MutableStateFlow(camera)
     val holiday = MutableStateFlow<Boolean?>(null)
+    val exit = KioskExit()
     val resumed = MutableStateFlow(inFront)
-    val display = DisplayState(this.prefs, now, touches, this.inFront, this.camera, holiday, test.backgroundScope)
+    val display = DisplayState(this.prefs, now, touches, this.inFront, this.camera, holiday, exit.exited, test.backgroundScope)
     val lit = ScreenLitState().also { ScreenLitFeed(resumed, display.screen, it, test.backgroundScope).start() }
     var wakes = 0
         private set
@@ -509,6 +511,27 @@ class DisplayStateTest {
         val wall = wall(at = DAY.atTime(23, 0), prefs = DisplayPrefs(nightFrom = ten, nightUntil = ten))
         assertThat(wall.screen).isEqualTo(AWAKE)
         assertThat(wall.display.isNight()).isFalse()
+    }
+
+    /** 19 §4.3: Fails if the camera keeps looking after Use other apps, when nothing in the display's own state changed. */
+    @Test
+    fun useOtherAppsStopsTheCamera() = runTest {
+        val day = wall()
+        assertThat(day.wanted).isTrue()
+        day.exit.left()
+        day.after(0)
+        assertThat(day.wanted).isFalse()
+    }
+
+    /** 19 §4.3: Fails if the camera stays off once the wall pins again. */
+    @Test
+    fun theCameraComesBackWhenTheWallPinsAgain() = runTest {
+        val day = wall()
+        day.exit.left()
+        day.after(0)
+        day.exit.returned()
+        day.after(0)
+        assertThat(day.wanted).isTrue()
     }
 
     /** Fails if the camera is wanted at night, out of front, switched off, not allowed or before the night is known. */

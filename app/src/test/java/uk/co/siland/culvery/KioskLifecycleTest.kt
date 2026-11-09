@@ -13,8 +13,12 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowAppTask
+import uk.co.siland.culvery.shell.KioskExit
 
-/** The kiosk's pinning over a real activity lifecycle (Robolectric drives it), with the window's effects recorded. */
+/**
+ * The kiosk's pinning over a real activity lifecycle (Robolectric drives it), with the window's effects recorded. The
+ * existing tests are regression guards over a shared [KioskExit].
+ */
 @RunWith(AndroidJUnit4::class)
 class KioskLifecycleTest {
     private class RecordingWindow : KioskWindow {
@@ -35,8 +39,7 @@ class KioskLifecycleTest {
     }
 
     private val window = RecordingWindow()
-    private val front = FrontTracker()
-    private var exited = false
+    private val exit = KioskExit()
     private var home = true
     private var owner = false
     private var changing = false
@@ -51,9 +54,9 @@ class KioskLifecycleTest {
         isHomeApp = { home },
         inHomeTask = { inHomeTask },
         isDeviceOwner = { owner },
-        kioskExited = { exited },
-        returnedToFront = { exited = false },
-        front = { front },
+        kioskExited = { exit.exited.value },
+        returnedToFront = { exit.returned() },
+        front = { exit },
         changingConfigurations = { changing },
         say = { said += it },
     )
@@ -74,7 +77,7 @@ class KioskLifecycleTest {
     @Test
     fun exitKioskAsTheHomeAppStaysInFrontUnpinnedThroughAHomePress() {
         window.calls.clear()
-        exited = true
+        exit.left()
         kiosk.exitKiosk()
         assertThat(window.calls).containsExactly("unpin", "showBars").inOrder()
         // Home pressed while Culvery is home and in front: paused and resumed, never stopped.
@@ -84,7 +87,7 @@ class KioskLifecycleTest {
 
     @Test
     fun leavingAfterExitKioskAndComingBackPinsAgain() {
-        exited = true
+        exit.left()
         kiosk.exitKiosk()
         window.calls.clear()
         controller.pause().stop().start().resume()
@@ -94,7 +97,7 @@ class KioskLifecycleTest {
     @Test
     fun withAnotherHomeAppExitKioskMovesToTheBack() {
         home = false
-        exited = true
+        exit.left()
         window.calls.clear()
         kiosk.exitKiosk()
         assertThat(window.calls).containsExactly("unpin", "showBars", "moveToBack").inOrder()
@@ -103,7 +106,7 @@ class KioskLifecycleTest {
     /** A configuration change that waited for Culvery to return builds a new activity that never saw the stop. */
     @Test
     fun aRelaunchAfterBeingStoppedPinsAgain() {
-        exited = true
+        exit.left()
         kiosk.exitKiosk()
         controller.pause().stop()
         window.calls.clear()
@@ -113,9 +116,25 @@ class KioskLifecycleTest {
         assertThat(window.calls).contains("pin")
     }
 
+    /** 19 §4.3: a new activity over the same [KioskExit], resumed after the first was stopped, clears the exit and pins. */
+    @Test
+    fun aSecondLifecycleOverTheSameExitPinsOnReturn() {
+        kiosk.exitKiosk()
+        exit.left()
+        controller.pause().stop()
+        assertThat(exit.stopped).isTrue()
+        window.calls.clear()
+        val next = Robolectric.buildActivity(ComponentActivity::class.java)
+        next.get().lifecycle.addObserver(kioskFor())
+        next.setup()
+        assertThat(exit.exited.value).isFalse()
+        assertThat(exit.stopped).isFalse()
+        assertThat(window.calls).contains("pin")
+    }
+
     @Test
     fun aConfigurationChangeWhileInFrontKeepsExited() {
-        exited = true
+        exit.left()
         kiosk.exitKiosk()
         changing = true
         controller.pause().stop()
@@ -123,17 +142,17 @@ class KioskLifecycleTest {
         val next = Robolectric.buildActivity(ComponentActivity::class.java)
         next.get().lifecycle.addObserver(kioskFor())
         next.setup()
-        assertThat(exited).isTrue()
+        assertThat(exit.exited.value).isTrue()
         assertThat(window.calls).doesNotContain("pin")
     }
 
     @Test
     fun whenNoHomeAppScreenOpensItPinsAgainAndSaysSo() {
-        exited = true
+        exit.left()
         window.calls.clear()
         kiosk.openSystemScreen(HOME_APP_NOT_SET) { throw ActivityNotFoundException() }
         assertThat(window.calls).containsExactly("unpin", "pin").inOrder()
-        assertThat(exited).isFalse()
+        assertThat(exit.exited.value).isFalse()
         assertThat(said).containsExactly(HOME_APP_NOT_SET)
     }
 
@@ -250,7 +269,7 @@ class KioskLifecycleTest {
 
     @Test
     fun returningToPinningAfterExitKioskDoesNotPin() {
-        exited = true
+        exit.left()
         window.calls.clear()
         kiosk.returnToPinning()
         assertThat(window.calls).isEmpty()
