@@ -40,11 +40,9 @@ internal fun councilHttpClient(version: String, interceptors: Set<Interceptor>):
 /** A redirect off the request's own scheme, host and port. */
 internal class LeftTheSite : IOException()
 
-private val REDIRECTS = setOf(301, 302, 303, 307, 308)
-
 private fun stayOnTheSite(chain: Interceptor.Chain): Response {
     val response = chain.proceed(chain.request())
-    if (response.code in REDIRECTS) {
+    if (response.isRedirect) {
         val from = response.request.url
         val to = response.header("Location")?.let(from::resolve)
         if (to != null && (to.scheme != from.scheme || to.host != from.host || to.port != from.port)) {

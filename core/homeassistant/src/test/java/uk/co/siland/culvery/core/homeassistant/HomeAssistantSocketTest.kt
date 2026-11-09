@@ -10,13 +10,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import okhttp3.Response
@@ -258,13 +258,56 @@ class HomeAssistantSocketTest {
             repeat(300) { _ -> it.send(HaFixtures.ADDED) }
         }
         var failure: HomeAssistantException? = null
-        val collecting = CoroutineScope(Dispatchers.Default).launch {
-            api.follow(link, ids).catch { failure = it as HomeAssistantException }.collect { release.await() }
+        val scope = CoroutineScope(Dispatchers.Default)
+        try {
+            val collecting = scope.launch {
+                api.follow(link, ids).catch { failure = it as HomeAssistantException }.collect { release.await() }
+            }
+            Thread.sleep(500)
+            release.countDown()
+            withTimeout(5_000) { collecting.join() }
+            assertThat(failure?.problem).isEqualTo(HaProblem.UNREACHABLE)
+            assertThat(serverClosed.await(5, TimeUnit.SECONDS)).isTrue()
+        } finally {
+            release.countDown()
+            scope.cancel()
         }
-        Thread.sleep(500)
-        release.countDown()
-        withTimeout(5_000) { collecting.join() }
-        assertThat(failure?.problem).isEqualTo(HaProblem.UNREACHABLE)
+    }
+
+    @Test
+    fun aServerClosingOnAFullQueueEndsTheFlow() = runBlocking<Unit> {
+        val release = CountDownLatch(1)
+        val firstRead = CountDownLatch(1)
+        afterSubscribe = {
+            it.send(HaFixtures.ADDED)
+            firstRead.await(5, TimeUnit.SECONDS)
+            repeat(SOCKET_QUEUE) { _ -> it.send(HaFixtures.ADDED) }
+            it.close(1001, null)
+        }
+        var failure: HomeAssistantException? = null
+        val scope = CoroutineScope(Dispatchers.Default)
+        try {
+            val collecting = scope.launch {
+                api.follow(link, ids).catch { failure = it as HomeAssistantException }.collect {
+                    firstRead.countDown()
+                    release.await()
+                }
+            }
+            Thread.sleep(500)
+            release.countDown()
+            withTimeout(5_000) { collecting.join() }
+            assertThat(failure?.problem).isEqualTo(HaProblem.UNREACHABLE)
+        } finally {
+            release.countDown()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun onlyFollowedEntitiesAreKept() = runBlocking<Unit> {
+        val read = api.follow(link, ids).firstReads(1).single()
+        assertThat(read.keys).containsExactly("vacuum.hoover", "sensor.hoover_battery")
+        assertThat(read.getValue("sensor.hoover_battery")?.state).isEqualTo("86")
     }
 
     @Test

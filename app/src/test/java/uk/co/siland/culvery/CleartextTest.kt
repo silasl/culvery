@@ -21,7 +21,7 @@ class CleartextTest {
             .isEqualTo("@xml/network_security_config")
     }
 
-    /** Fails if cleartext is allowed for Google or Open-Meteo, or not for an address the router chose. */
+    /** Fails if cleartext is allowed for Google, Open-Meteo or the council, or not for an address the router chose. */
     @Test
     fun cleartextOnlyOffTheInternetServices() {
         val config = root("src/main/res/xml/network_security_config.xml").children()

@@ -13,6 +13,7 @@ import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.QueueDispatcher
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertThrows
@@ -159,57 +160,58 @@ class CouncilClientTest {
         assertThat(e).isNotInstanceOf(CouncilUnanswered::class.java)
     }
 
+    private fun MockWebServer.councilBase() = url("/").newBuilder().host("localhost").build()
+
     private fun startBody(site: MockWebServer) =
-        fixture("start.html").replace("https://waste.services.midsussex.gov.uk", site.url("/").toString().trimEnd('/'))
+        fixture("start.html").replace("https://waste.services.midsussex.gov.uk", site.councilBase().toString().trimEnd('/'))
 
-    private fun councilAt(site: MockWebServer) = CouncilClient(site.url("/"), lazy { councilHttpClient("test", emptySet()) })
+    private fun councilAt(site: MockWebServer, followSsl: Boolean = false) =
+        CouncilClient(site.councilBase(), lazy { councilHttpClient("test", emptySet()).newBuilder().followSslRedirects(followSsl).build() })
 
-    private fun searchRedirectedTo(code: Int, target: (MockWebServer, MockWebServer) -> String): Pair<Throwable, MockWebServer> {
-        val first = MockWebServer().apply { start() }
-        val second = MockWebServer().apply {
-            dispatcher = object : Dispatcher() {
-                override fun dispatch(request: RecordedRequest) = MockResponse().setBody("")
-            }
-            start()
+    private fun answeringEverything() = MockWebServer().apply {
+        dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest) = MockResponse().setBody("")
         }
-        try {
-            first.enqueue(MockResponse().setBody(startBody(first)))
-            first.enqueue(MockResponse().setResponseCode(code).setHeader("Location", target(first, second)))
-            val e = failure { councilAt(first).search(HOUSE, POSTCODE) }
-            assertThat(first.requestCount).isEqualTo(2)
-            return e to second
-        } finally {
-            first.shutdown()
-            second.shutdown()
-        }
+        start()
     }
 
-    private fun MockWebServer.onAnotherHost(): String = url("/mop.php").newBuilder().host("127.0.0.1").build().toString()
+    /** The search's POST is answered with a redirect to [target]; the read must fail as an unreadable page. */
+    private fun assertSearchRedirectStays(code: Int, followSsl: Boolean = false, target: (first: MockWebServer, other: MockWebServer) -> String) {
+        val first = answeringEverything()
+        val other = answeringEverything()
+        try {
+            first.dispatcher = QueueDispatcher().apply {
+                enqueueResponse(MockResponse().setBody(startBody(first)))
+                enqueueResponse(MockResponse().setResponseCode(code).setHeader("Location", target(first, other)))
+                setFailFast(MockResponse().setBody(""))
+            }
+            val e = failure { councilAt(first, followSsl).search(HOUSE, POSTCODE) }
+
+            assertThat((e as BinsReadFailed).kind).isEqualTo(BinsFailure.NO_ADDRESS_LIST)
+            assertThat(first.requestCount).isEqualTo(2)
+            assertThat(other.requestCount).isEqualTo(0)
+        } finally {
+            first.shutdown()
+            other.shutdown()
+        }
+    }
 
     @Test
     fun aSearchRedirectedToAnotherHostIsNotFollowed() {
-        listOf(307, 308).forEach { code ->
-            val (e, second) = searchRedirectedTo(code) { _, other -> other.onAnotherHost() }
-
-            assertThat((e as BinsReadFailed).kind).isEqualTo(BinsFailure.NO_ADDRESS_LIST)
-            assertThat(second.requestCount).isEqualTo(0)
+        listOf(300, 301, 302, 303, 307, 308).forEach { code ->
+            assertSearchRedirectStays(code) { first, _ -> first.url("/mop.php").newBuilder().host("127.0.0.1").build().toString() }
         }
     }
 
+    /** The client is told to follow scheme changes, so the council client's own check is the only thing refusing it. */
     @Test
     fun aSearchRedirectedToAnotherSchemeIsNotFollowed() {
-        val (e, second) = searchRedirectedTo(307) { _, other -> "https://localhost:${other.port}/mop.php" }
-
-        assertThat((e as BinsReadFailed).kind).isEqualTo(BinsFailure.NO_ADDRESS_LIST)
-        assertThat(second.requestCount).isEqualTo(0)
+        assertSearchRedirectStays(307, followSsl = true) { first, _ -> "https://localhost:${first.port}/mop.php" }
     }
 
     @Test
     fun aSearchRedirectedToAnotherPortIsNotFollowed() {
-        val (e, second) = searchRedirectedTo(307) { _, other -> other.url("/mop.php").toString() }
-
-        assertThat((e as BinsReadFailed).kind).isEqualTo(BinsFailure.NO_ADDRESS_LIST)
-        assertThat(second.requestCount).isEqualTo(0)
+        assertSearchRedirectStays(307) { _, other -> other.url("/mop.php").newBuilder().host("localhost").build().toString() }
     }
 
     /** Regression guard. */

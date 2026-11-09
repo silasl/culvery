@@ -189,7 +189,7 @@ class HomeAssistantClient internal constructor(
                     SocketMessage.Other -> null
                 }
                 if (entities != null) {
-                    current.putAll(entities.added)
+                    current.putAll(entities.added.filterKeys { it in entityIds })
                     entities.changed.forEach { (id, change) -> current[id]?.let { current[id] = it.apply(change) } }
                     current.keys.removeAll(entities.removed)
                     emit(entityIds.associateWith { current[it] })
@@ -218,14 +218,19 @@ class HomeAssistantClient internal constructor(
             }
         }
 
-        /** Ends the inbox with an error the collector throws once it has drained what is queued; a socket already closing is cancelled. */
+        /** Queues the end after the frames already waiting; with no room it closes the inbox, so the collector still throws once it has drained. */
+        private fun end(problem: HaProblem, code: Int?, error: Throwable?) {
+            if (inbox.trySend(Frame.Ended(problem, code, error)).isFailure) inbox.close(HomeAssistantException(problem))
+        }
+
+        /** A socket already closing is cancelled. */
         private fun dropSocket(webSocket: WebSocket, code: Int) {
-            inbox.close(HomeAssistantException(HaProblem.UNREACHABLE))
+            end(HaProblem.UNREACHABLE, null, null)
             if (!webSocket.close(code, null)) webSocket.cancel()
         }
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-            inbox.trySend(Frame.Ended(unreachableOrOffline(), code, null))
+            end(unreachableOrOffline(), code, null)
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -234,7 +239,7 @@ class HomeAssistantClient internal constructor(
                 HTTP_FORBIDDEN -> HaProblem.BLOCKED
                 else -> unreachableOrOffline()
             }
-            inbox.trySend(Frame.Ended(problem, response?.code, t))
+            end(problem, response?.code, t)
         }
     }
 

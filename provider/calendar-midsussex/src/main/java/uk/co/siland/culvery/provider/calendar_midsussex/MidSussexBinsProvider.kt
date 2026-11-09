@@ -56,7 +56,8 @@ private const val ATTEMPTS_A_DAY = 4
 /**
  * Mid Sussex District Council's bin collections, read from its site (spec 3.5, 4.2). The engine asks every few minutes;
  * the council is read only on a new day, an hour after a failed attempt (at most four attempts a day), or after
- * Update now (at most every ten minutes, unless the last read failed). Every other pass answers from the stored read, and a stored failure is thrown until a read works.
+ * Update now (at most every ten minutes, unless the last read failed). Every other pass answers from the stored read,
+ * and a stored failure is thrown until a read works.
  */
 @Singleton
 class MidSussexBinsProvider internal constructor(
