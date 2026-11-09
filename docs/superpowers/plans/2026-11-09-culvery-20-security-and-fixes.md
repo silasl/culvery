@@ -409,7 +409,7 @@
 **Files:** `core/plugin/.../Overlays.kt` (`ToastAction`), `app/src/main/java/uk/co/siland/culvery/shell/ui/OverlayLayers.kt` (`ToastLayer`), `capability/shopping/.../ShoppingActions.kt`, `ShoppingSync.kt`, `ShoppingView.kt`; tests `OverlayLayersTest.kt`, `ShoppingActionsTest.kt`, `ShoppingSyncTest.kt`.
 
 **Interfaces:**
-- Produces: `data class ToastAction(val label: String, val onClick: () -> Unit, val showMillis: Long = TOAST_WITH_ACTION_MS)`; `ToastLayer` waits `showMillis` for a toast with an action. `const val TICK_UNDO_MS = 6_000L` in `ShoppingActions.kt`, used for the tick's toast, `latestTick`, `undoGoneAt` and the KDocs the spec names.
+- Produces: `data class ToastAction(val label: String, val showMillis: Long = TOAST_WITH_ACTION_MS, val onClick: () -> Unit)`; `ToastLayer` waits `showMillis` for a toast with an action. `const val TICK_UNDO_MS = 6_000L` in `ShoppingActions.kt`, used for the tick's toast, `latestTick`, `undoGoneAt` and the KDocs the spec names.
 
 - [ ] **Step 1:** Write:
   - `OverlayLayersTest.aToastActionsOwnTimeIsKept` (`showMillis = 6_000`: shown at 5 999 ms, gone at 6 000 ms) and `anotherActionToastStillLastsEightSeconds` (regression guard).
@@ -424,7 +424,7 @@
 
 **Files:** `capability/music/.../ui/MusicCard.kt` (`ShuffleButton` loses its `compact` parameter, and the card's call drops `compact = true`); tests `ui/MusicCardTest.kt`, the card's screenshot test.
 
-- [ ] **Step 1:** Write `shuffleEverythingKeepsItsOwnWidth` (nothing playing: `music_card_shuffle`'s width is less than the card's). `theCardFitsTheSideBySideRow` stays as it is.
+- [ ] **Step 1:** Write `shuffleEverythingKeepsItsOwnWidth` (nothing playing: `music_card_shuffle`'s width is less than the card's). `shuffleEverythingFitsBesidePlayAndNext` stays as it is.
 - [ ] **Step 2:** Run `./gradlew :capability:music:testDebugUnitTest`. Expect PASS for the width test (regression guard) and the others.
 - [ ] **Step 3:** Implement; re-record the card's baselines (restore any other).
 - [ ] **Step 4:** Run `./gradlew :capability:music:testDebugUnitTest verifyRoborazziDebug`. Expect PASS.

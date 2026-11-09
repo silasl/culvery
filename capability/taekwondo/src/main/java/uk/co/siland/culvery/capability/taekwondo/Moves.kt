@@ -20,7 +20,7 @@ data class Pattern(val name: String, val moves: List<Move>) {
 
 /**
  * The text of `culvery-notes/taekwondo-choong-moo.html` with the instructor's answers, straight apostrophes included. Every Hangul
- * entry is the plan's transliteration of the romanised ITF term.
+ * entry is the plan's transliteration of the romanised ITF term: Hangul not confirmed by the instructor.
  */
 val CHOONG_MOO = Pattern(
     "Choong-Moo",

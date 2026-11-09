@@ -259,7 +259,8 @@ class ShoppingActionsTest : ShoppingTestBase() {
         assertThat(rig.store.queueNow()).hasSize(2)
         advanceTimeBy(TICK_UNDO_MS - 1)
         assertThat(actions.undoable.value!!.text).isEqualTo("Bread")
-        advanceTimeBy(2)
+        advanceTimeBy(1)
+        runCurrent()
         assertThat(actions.undoable.value).isNull()
     }
 

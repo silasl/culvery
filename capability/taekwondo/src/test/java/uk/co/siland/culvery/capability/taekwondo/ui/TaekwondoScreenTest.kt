@@ -29,8 +29,8 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.capability.taekwondo.FakeAlerts
 import uk.co.siland.culvery.capability.taekwondo.CHOONG_MOO
+import uk.co.siland.culvery.capability.taekwondo.FakeAlerts
 import uk.co.siland.culvery.capability.taekwondo.FakeSpeaker
 import uk.co.siland.culvery.capability.taekwondo.RunState
 import uk.co.siland.culvery.capability.taekwondo.TaekwondoSettings
@@ -142,6 +142,20 @@ class TaekwondoScreenTest {
         }
 
         tag("move_korean").assertTextEquals("Walking stance, grab the opponent's head")
+        assertThat(open("move_romanised")).isFalse()
+        assertThat(open("move_english")).isFalse()
+    }
+
+    @Test
+    fun aMoveWithRomanisedTextAndNoHangulShowsTheRomanisedAsItsBigLine() {
+        val plain = move("1").copy(hangul = null, spokenHangul = null)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                TaekwondoPanel(RunState.Moving(1, plain), CHOONG_MOO, detailed = false, noKorean = false, onDetailed = {}, onPattern = {}, onCancel = {}, onClose = {})
+            }
+        }
+
+        tag("move_korean").assertTextEquals("Niunja so sang sonkal makgi")
         assertThat(open("move_romanised")).isFalse()
     }
 

@@ -183,7 +183,7 @@ The detail sheet's "· 12 times · last on …" no longer lists every date to fi
 ### 4.5 The Music card with nothing playing (item 16)
 Closed apart from one change (the user, 2026-11-09). Since 51766191 the volume pill is gone while nothing plays, under the same rule the card uses for "Nothing playing" (`HomePick.nothingPlaying`). There's no mute button.
 
-What's left: "Shuffle everything" loses its narrow padding (`compact`), now that the row has room, and keeps its own width rather than stretching across the card. The card's screenshots and `theCardFitsTheSideBySideRow` are re-recorded and still pass.
+What's left: "Shuffle everything" loses its narrow padding (`compact`), now that the row has room, and keeps its own width rather than stretching across the card. The card's screenshots and `shuffleEverythingFitsBesidePlayAndNext` are re-recorded and still pass.
 
 ### 4.6 Taekwondo: the instructor's answers and Korean line breaks (the user, 2026-11-09)
 The instructor answered the two flagged moves in Choong-Moo, and asked for one line-break change.

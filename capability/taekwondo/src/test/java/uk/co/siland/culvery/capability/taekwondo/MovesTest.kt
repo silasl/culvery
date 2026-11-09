@@ -12,7 +12,7 @@ class MovesTest {
         assertThat(PATTERNS).containsExactly(CHOONG_MOO)
     }
 
-    /** Fails if any of the 32 entries drifts from the instructor's list and his answers, apostrophes included. */
+    /** Fails if any of the 32 entries drifts from the instructor's list and the instructor's answers, apostrophes included. */
     @Test
     fun everyMoveMatchesTheInstructorsList() {
         val list = listOf<List<String?>>(
