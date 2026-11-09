@@ -43,14 +43,14 @@
 5. **11j:** `SoundPlayer` takes an `io: CoroutineDispatcher` (`Dispatchers.IO` from its `@Inject` constructor), and `playDoorbell` and `playPad` become `suspend`, opening the file `withContext(io)`. Every wrapper of them (the door module's chime `play` and `preview` in `DoorModule.kt`, `PadTaps`' `play`) becomes `suspend` too.
 6. **11n:** `HouseModeThirdTile` gains `faded: Boolean = false`, drawn at `ControlTokens.DISABLED_ALPHA` without disabling the tap. `PadTaps` exposes `val gateRead: StateFlow<Boolean>`, false until `gate.blocked` first emits.
 7. **11v's "format check"**: the build has no formatter. It means imports in alphabetical order with no fully qualified names in code, in the test files Plan 18 added or changed (find them with `git log --name-only` over Plan 18's commits), plus the two named nits.
-8. **Calendar M2's table** is `undone_creates` (`UndoneCreateEntity(key: String @PrimaryKey, connectionId: String, sourceId: String, series: Boolean, stray: Boolean)`), with `UndoneCreateDao` (`all()`, `upsert(e)`, `delete(key)`) on `CalendarDatabase`, version 10, `MIGRATION_9_10` in `Migrations.kt` and the exported `10.json` schema.
+8. **Calendar M2's table** is `undone_creates` (`UndoneCreateEntity(clientKey: String @PrimaryKey, connectionId: String, sourceId: String, series: Boolean, stray: Boolean)`), with `UndoneCreateDao` (`all()`, `upsert(e)`, `delete(key)`) on `CalendarDatabase`, version 10, `MIGRATION_9_10` in `Migrations.kt` and the exported `10.json` schema.
 9. **Calendar M3's cap** is `internal const val COUNTED_LAST_CAP = 1_000` in `Recurrence.kt`.
 
 ## Review Focus
 
 1. **A household linked over http installs Plan 20 and never opens Settings:** the hoover row, the Plugs tab and the socket work as before, with no Check (Task 8: `aLinkSavedBeforePlan20StillLinks`, regression guard).
-2. **An address typed with a capitalised scheme or a trailing slash** after the link moved to https: read the same as its lower-case form, so the https-only rule holds (Task 8: `theSchemeIsReadWhateverItsCase`).
-3. **Forget while the socket is open and the Plugs tab is showing:** the socket closes and every row shows "not linked" at once, not after a timeout (Task 11: `forgetClosesTheSocketAndTheRowsSayNotLinked`).
+2. **An address typed with a capitalised scheme or a trailing slash:** read the same as its lower-case form (Task 8: `theSchemeIsReadWhateverItsCase`).
+3. **Forget while the socket is open and the Plugs tab is showing:** the socket closes and the link is gone at once, not after a timeout (Task 11: `forgetClosesTheSocketAndTheRowsSayNotLinked`).
 4. **A phone's series with an enormous COUNT** (2,000,000,000) on each rule: the label comes back at once and nothing throws (Task 27: `aHugeCountReturnsAtOnce`).
 5. **An Undo of a create the service refused while it was on its way:** no stray is kept and nothing is deleted later (Task 25: `anUndoneCreateTheServiceRefusedLeavesNoStray`).
 
@@ -62,7 +62,7 @@
 
 - [ ] **Step 1:** Make the companion's N7 change.
 - [ ] **Step 2:** Run the companion's N7 check (a `git grep`). Expect no match.
-- [ ] **Step 3:** Commit: `Plan 9c-1c: use a placeholder for a device value`.
+- [ ] **Step 3:** Commit: `Plan 9c-1c: tidy a command example`.
 
 ### Task 2: N8, fixture dates
 
@@ -79,7 +79,7 @@
 - Test: `core/plugin/src/test/.../ConnectionsTest.kt` (create if none), `provider/calendar-midsussex/src/test/.../CouncilPagesTest.kt`, `MidSussexConnectScreenTest.kt`.
 
 **Interfaces:**
-- Produces: `toString` overrides: `Connection(id=…, provider=…)`; `Address`; `Pick`, `Ready`, `Done` as their names alone.
+- Produces: `toString` overrides: `Connection(id=…, provider=…)`; `Address`; `Pick`, `Ready`, `Done` as their names alone. `MidSussexConnectScreen`'s `Step` becomes `internal`, so the test can build its steps.
 
 - [ ] **Step 1:** Write the companion's N10 tests (one per type, sample `1 Example Road`, `ZZ1 1ZZ`: `assertThat(x.toString()).doesNotContain(...)` for each value).
 - [ ] **Step 2:** Run `./gradlew :core:plugin:testDebugUnitTest :provider:calendar-midsussex:testDebugUnitTest`. Expect FAIL.
@@ -92,7 +92,7 @@
 **Files:** `provider/calendar-midsussex/.../MidSussexBinsProvider.kt` (`due`); test `MidSussexBinsProviderTest.kt`.
 
 **Interfaces:**
-- Produces: `internal const val UPDATE_NOW_GAP_MS = 600_000L`.
+- Produces: `internal const val UPDATE_NOW_GAP_MS = 600_000L`, checked with `clock.within(read.lastAttemptMillis, UPDATE_NOW_GAP_MS)`, as `RETRY_GAP_MS` is. The attempt's time is stored across restarts, so it is wall time; the monotonic-clock rule doesn't apply.
 
 - [ ] **Step 1:** Write the companion's N9 tests.
 - [ ] **Step 2:** Run `./gradlew :provider:calendar-midsussex:testDebugUnitTest`. Expect FAIL.
@@ -103,11 +103,17 @@
 ### Task 5: N2, the council's site and internet redirects
 
 **Files:**
-- Modify: `app/src/main/res/xml/network_security_config.xml` (the https-only list only; Task 11 rewords its comment), `core/net/src/main/java/uk/co/siland/culvery/core/net/Http.kt` (`internetHttpClient()`), `provider/calendar-midsussex/.../CouncilPages.kt`, `CouncilClient.kt` (`councilHttpClient`), `provider/weather-openmeteo/.../di/OpenMeteoModule.kt`.
-- Test: `app/src/test/java/uk/co/siland/culvery/CleartextTest.kt`, `core/net/src/test/.../HttpTest.kt`, `provider/calendar-midsussex/src/test/.../CouncilPagesTest.kt`, `CouncilClientTest.kt`, `provider/weather-openmeteo/src/test/.../di/OpenMeteoModuleTest.kt` (new). TLS keystores copied into `core/net` and `provider/weather-openmeteo` test resources if their tests need them.
+- Modify: `app/src/main/res/xml/network_security_config.xml` (the https-only list only; Task 11 rewords its comment), `core/net/src/main/java/uk/co/siland/culvery/core/net/Http.kt` (`internetHttpClient()`), `provider/calendar-midsussex/.../CouncilPages.kt`, `CouncilClient.kt` (`councilHttpClient`), `provider/weather-openmeteo/.../di/OpenMeteoModule.kt`, `provider/weather-openmeteo/build.gradle.kts` (`implementation(project(":core:net"))`).
+- Test: `app/src/test/java/uk/co/siland/culvery/CleartextTest.kt`, `core/net/src/test/.../HttpTest.kt`, `provider/calendar-midsussex/src/test/.../CouncilPagesTest.kt`, `CouncilClientTest.kt`, `provider/weather-openmeteo/src/test/.../di/OpenMeteoModuleTest.kt` (new). No TLS keystores: the redirect tests use plain servers.
 
 **Interfaces:**
-- Produces: Open-Meteo's two clients built as `internetHttpClient().newBuilder()` with their present `connectTimeout`/`readTimeout`. A page that breaks the new rule reads as `BinsReadFailed`, so the household sees "Can’t read the council’s site".
+- Produces:
+  - Open-Meteo's two clients are `internetHttpClient().connectTimeout(…).readTimeout(…).build()`, with their present values.
+  - `councilHttpClient`'s network interceptor throws a private `IOException` subclass (`internal class LeftTheSite : IOException()`), never `BinsReadFailed`; `CouncilClient` maps it to `BinsReadFailed(NO_ADDRESS_LIST)`. A redirect is followed only when its scheme, host and port all match the request's.
+  - A page that breaks the new rules reads as `BinsReadFailed`, so the household sees "Can’t read the council’s site".
+- Tests:
+  - The scheme-redirect tests check http→https: a plain MockWebServer answers 302 with an https URL in `Location`, and the client returns the 302.
+  - The council's second server is addressed as `127.0.0.1`, through `second.url("/").newBuilder().host("127.0.0.1")`, so it differs from the first by host.
 
 - [ ] **Step 1:** Write the companion's N2 tests.
 - [ ] **Step 2:** Run `./gradlew :core:net:testDebugUnitTest :provider:calendar-midsussex:testDebugUnitTest :provider:weather-openmeteo:testDebugUnitTest` and `./gradlew :app:testDebugUnitTest --tests '*CleartextTest*'`. Expect FAIL.
@@ -117,7 +123,7 @@
 
 ### Task 6: N6, the Home Assistant socket's limits
 
-**Files:** `core/homeassistant/.../HomeAssistantClient.kt` (`registry()`, `follow()`, the listener's `onMessage`); `LogHygieneTest.kt` if the size line interpolates a value; test `core/homeassistant/src/test/.../HomeAssistantSocketTest.kt`.
+**Files:** `core/homeassistant/.../HomeAssistantClient.kt` (`registry()`, `follow()`, the listener's `onMessage`; the size line logs no value); test `core/homeassistant/src/test/.../HomeAssistantSocketTest.kt`.
 
 **Interfaces:**
 - Produces: `internal const val SOCKET_QUEUE = 256`, `internal const val MAX_SOCKET_MESSAGE_CHARS = 4_000_000`. Either limit ends the follow flow with `HomeAssistantException(HaProblem.UNREACHABLE)`; the socket reopens on its usual backoff.
@@ -132,16 +138,16 @@
 
 **Files:**
 - Modify: `core/access/src/main/java/uk/co/siland/culvery/core/access/AccessControl.kt`, `DefaultAccessControl.kt` (`promptUntilResolved`), `PinPromptController.kt` (`PinRequest`), `ui/PinPad.kt`, and every implementation in ruling 1.
-- Test: `core/access/src/test/.../DefaultAccessControlTest.kt`, `app/src/test/.../shell/ui/ModalLayersTest.kt`, `ShellScreenshotTest.kt` (a new `pin_pad_detail` snap).
+- Test: `core/access/src/test/.../DefaultAccessControlTest.kt`, `core/access/src/test/.../ui/PinPadTest.kt`, `app/src/test/.../shell/ui/ShellScreenshotTest.kt` (a new `pin_pad_detail` snap).
 
 **Interfaces:**
-- Produces: `suspend fun authorise(vararg anyOf: String, reason, allow, refusal, label: String? = null, detail: String? = null): Authorised?`. `PinRequest.detail: String?`. The pad draws `detail` under its label in `HhType.secondary`, tagged `pin_detail`, read by TalkBack after the label. Nothing passes a detail yet.
+- Produces: `suspend fun authorise(vararg anyOf: String, reason, allow, refusal, label: String? = null, detail: String? = null): Authorised?`. `PinRequest.detail: String?`. `PinPadSheet` and `PinPadFrame` gain `detail: String? = null`, and `PinPadHost` passes `r.detail`. The pad draws `detail` under its label in `HhType.secondary`, tagged `pin_detail`, read by TalkBack after the label. Nothing passes a detail yet.
 
 - [ ] **Step 1:** Write:
   - `DefaultAccessControlTest.aDetailReachesThePinRequest` (`authorise(..., detail = "abcd ef01")`: the pending `PinRequest.detail` is `"abcd ef01"`); `noDetailByDefault` (regression guard: null).
-  - `ModalLayersTest.theDetailShowsUnderTheLabel` (`onNodeWithTag("pin_detail")` has the text; absent when null).
+  - `PinPadTest.theDetailShowsUnderTheLabel` (`onNodeWithTag("pin_detail")` has the text; absent when null).
   - The `pin_pad_detail` screenshot, with label "Trust this Home Assistant" and detail `"Certificate fingerprint\n0001 0203 0405 0607 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f"`.
-- [ ] **Step 2:** Run `./gradlew :core:access:testDebugUnitTest` and `./gradlew :app:testDebugUnitTest --tests '*ModalLayersTest*'`. Expect FAIL.
+- [ ] **Step 2:** Run `./gradlew :core:access:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement, and add the parameter to every fake (ruling 1).
 - [ ] **Step 4:** Run `./gradlew testDebugUnitTest` (every module compiles against the new signature), then record the new baseline with `./gradlew :app:recordRoborazziDebug --tests '*ShellScreenshotTest*'` and restore any other baseline that moved. Expect PASS.
 - [ ] **Step 5:** Commit: `Show a detail line under the PIN pad's label`.
@@ -160,9 +166,10 @@
 
 - [ ] **Step 1:** Write the companion's N1 tests for `HomeAssistantAddressTest`, `HomeAssistantSettingsTest` and the text form, and:
   - `aLinkSavedBeforePlan20StillLinks` (regression guard: a record with only `address` and `token`, as Plan 19 wrote it, reads as a link with `pin == null`).
-  - `theSchemeIsReadWhateverItsCase` (`HTTPS://h`, `Https://H/` and `https://h` all give `https://h/`; `HTTP://h` gives `http://h:8123/`). Task 10's https-only rule reads the scheme from this parsed URL, never from the typed text.
+  - `theSchemeIsReadWhateverItsCase` (`HTTPS://h`, `Https://H/` and `https://h` all give `https://h/`; `HTTP://192.168.1.20` gives `http://192.168.1.20:8123/`).
+  - `httpsWithNoPortIs443` replaces `httpsWithNoPortGets8123`.
 - [ ] **Step 2:** Run `./gradlew :core:homeassistant:testDebugUnitTest`. Expect FAIL.
-- [ ] **Step 3:** Implement. Update callers of `HomeAssistantLink(` (`FakeHomeAssistantApi`, `TestHomeAssistant` and the providers' tests) with `pin = null`.
+- [ ] **Step 3:** Implement. Update callers of `HomeAssistantLink(` (`HomeAssistantLinking.kt`, `FakeHomeAssistantApi`, `TestHomeAssistant`) with `pin = null`.
 - [ ] **Step 4:** Run the same and `./gradlew :provider:plugs-homeassistant:testDebugUnitTest :provider:hoover-homeassistant:testDebugUnitTest :provider:heating-homeassistant:testDebugUnitTest`. Expect PASS.
 - [ ] **Step 5:** Commit: `Keep Home Assistant's certificate with its link, and use port 443 for https`.
 
@@ -170,16 +177,19 @@
 
 **Files:**
 - Create: `core/homeassistant/src/main/java/uk/co/siland/culvery/core/homeassistant/HomeAssistantTrust.kt`, `core/homeassistant/src/test/resources/tls/` (Hue's two keystores), `core/homeassistant/src/test/.../TestCerts.kt`.
-- Modify: `HomeAssistantClient.kt` (`HomeAssistantApi` gains `certificate`; the clients per link), `HaProblem` (`CERTIFICATE_CHANGED`), `FakeHomeAssistantApi.kt`.
-- Test: `HomeAssistantTrustTest.kt` (new), `HomeAssistantClientTest.kt`, `HomeAssistantSocketTest.kt`.
+- Modify: `HomeAssistantClient.kt` (`HomeAssistantApi` gains `certificate`; the clients per link), `HaProblem` (`CERTIFICATE_CHANGED`), `HaCall.kt`, `HomeAssistant.kt` (`certificate`), `HomeAssistantWords.kt` (`problemLine`), `FakeHomeAssistantApi.kt`.
+- Test: `HomeAssistantTrustTest.kt` (new), `HomeAssistantClientTest.kt`, `HomeAssistantSocketTest.kt`, `HomeAssistantWordsTest.kt`.
 
 **Interfaces:**
 - Produces:
   - In `HomeAssistantTrust.kt`, built as `HueTrust.kt` is: the trust managers and verifier the companion names, and `fun fingerprint(pin: String): String`: lowercase hex of the SHA-256 the pin encodes, in 16 groups of four, joined by single spaces.
-  - `suspend fun HomeAssistantApi.certificate(base: HttpUrl): String` (a member of the interface; the fake returns a settable value).
-  - `enum class HaProblem { …, CERTIFICATE_CHANGED }`.
+  - `suspend fun certificate(base: HttpUrl): String`, a member of `HomeAssistantApi` (the fake returns a settable value), and `HaCall.CERTIFICATE("certificate")`.
+  - `suspend fun HomeAssistant.certificate(base: HttpUrl): String = api.certificate(base)`, which records no problem.
+  - `enum class HaProblem { …, CERTIFICATE_CHANGED }`, and in `problemLine`: `HaProblem.CERTIFICATE_CHANGED -> "Home Assistant’s certificate has changed. Press Check in Settings › Home Assistant to trust the new one."`, so the `when` stays exhaustive and the build passes from this task on.
 
-- [ ] **Step 1:** Write the companion's N1 tests for `HomeAssistantTrustTest`, `HomeAssistantClientTest` and the socket, and `theFingerprintIsLowercaseHexInGroupsOfFour`: `fingerprint("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")` is `"0001 0203 0405 0607 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f"`.
+- [ ] **Step 1:** Write the companion's N1 tests for `HomeAssistantTrustTest`, `HomeAssistantClientTest` and the socket, and:
+  - `theFingerprintIsLowercaseHexInGroupsOfFour`: `fingerprint("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")` is `"0001 0203 0405 0607 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f"`.
+  - `HomeAssistantWordsTest`: the `CERTIFICATE_CHANGED` row line, as above.
 - [ ] **Step 2:** Run `./gradlew :core:homeassistant:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement as the companion says.
 - [ ] **Step 4:** Run the same and `./gradlew -p build-logic :convention:test`. Expect PASS.
@@ -205,18 +215,18 @@
 ### Task 11: N1, the page, the rows and the docs
 
 **Files:**
-- Modify: `core/homeassistant/.../HomeAssistant.kt` (`LINK_PROBLEMS`), `HomeAssistantWords.kt` (`problemLine`), `ui/OtherIntegrationsPage.kt` (`pageProblemLine`, the status line, the linked line, Forget), `app/src/main/res/xml/network_security_config.xml` (its comment, per the companion), `README.md` (ruling 3).
+- Modify: `core/homeassistant/.../HomeAssistant.kt` (`LINK_PROBLEMS`), `ui/OtherIntegrationsPage.kt` (`pageProblemLine`, the status line, the linked line, Forget), `app/src/main/res/xml/network_security_config.xml` (its comment, per the companion), `README.md` (ruling 3).
 - Test: `HomeAssistantTest.kt`, `ui/OtherIntegrationsTest.kt`, the page's screenshot test, the hoover and plugs providers' problem-line tests.
 
 **Interfaces:**
-- Consumes: `forget()`, the words (Task 10).
+- Consumes: `forget()`, the words (Task 10); `problemLine(CERTIFICATE_CHANGED)`, the rows' line, came in Task 9.
 - Produces:
-  - `problemLine(CERTIFICATE_CHANGED)` = `"Home Assistant’s certificate has changed. Press Check in Settings › Home Assistant to trust the new one."`; `pageProblemLine` gives `CERTIFICATE_CHANGED_ON_PAGE`.
+  - `pageProblemLine` gives `CERTIFICATE_CHANGED_ON_PAGE`.
   - Linked over https, the page shows `"Linked over https."` with `CERTIFICATE_FINGERPRINT` and the fingerprint under it; over http, `"Linked."` as now.
   - A quiet `FORGET_HOME_ASSISTANT` button (tag `ha_forget`) while linked; on success the toast `HOME_ASSISTANT_FORGOTTEN` and the page's "Not linked yet…" state. Chosen devices are kept.
 
 - [ ] **Step 1:** Write:
-  - `HomeAssistantTest.aChangedCertificateIsTheLinksProblem` (the fake API throws `CERTIFICATE_CHANGED`: `problem` is it); `forgetClosesTheSocketAndTheRowsSayNotLinked` (watching, socket open; `settings.forget()`: the follow flow is cancelled and `problem` is `NOT_LINKED` with no time passing).
+  - `HomeAssistantTest.aChangedCertificateIsTheLinksProblem` (the fake API throws `CERTIFICATE_CHANGED`: `problem` is it); `forgetClosesTheSocketAndTheRowsSayNotLinked` (regression guard: watching, socket open; `settings.forget()`: the follow flow is cancelled, `link.value` and `savedLink()` are null, and `problem` is null).
   - `OtherIntegrationsTest`: `linkedOverHttpsShowsTheFingerprint`, `linkedOverHttpSaysLinked` (regression guard), `forgetShowsOnlyWhileLinked`, `forgetRefusedKeepsTheLink`, `forgetSaysForgottenAndShowsNotLinked`, `theChangedCertificateLineShows`.
   - Screenshots: linked over https with the fingerprint and Forget; the changed-certificate line.
 - [ ] **Step 2:** Run `./gradlew :core:homeassistant:testDebugUnitTest`. Expect FAIL.
@@ -228,7 +238,7 @@
 
 **Files:** `app/src/main/java/uk/co/siland/culvery/shell/ShellViewModel.kt`; test `app/src/test/.../shell/ShellViewModelTest.kt` (the fake `AccessControl` in `Fakes.kt` records `lock()` if it doesn't yet).
 
-- [ ] **Step 1:** Rewrite `settingsSetsAndClearsItsTimeout` and write the companion's other M2 tests.
+- [ ] **Step 1:** Rewrite `settingsSetsAndClearsItsTimeout`, replace `chooseHomeAppUsesTheOpenSession` with `chooseHomeAppSignsOutBeforeLeaving`, and write the companion's other M2 tests. `theFirstValueDoesNotSignOut` and `leavingForAndroidsScreenKeepsTheSession` are regression guards.
 - [ ] **Step 2:** Run `./gradlew :app:testDebugUnitTest --tests '*ShellViewModel*'`. Expect FAIL.
 - [ ] **Step 3:** Implement as the companion says.
 - [ ] **Step 4:** Run `./gradlew :app:testDebugUnitTest`. Expect PASS.
@@ -251,7 +261,7 @@
 
 **Files:**
 - Modify: `core/access/.../AccessControl.kt` (`TURN_OFF_NEEDS_A_PIN = "Turn off Needs a PIN"`), `capability/plugs/.../PlugActions.kt`, `capability/plugs/.../ui/PlugsSettings.kt`, `capability/party/.../StoredModeActions.kt`, `ModesStore.kt`, `ui/StoredModePage.kt`.
-- Test: `PlugActionsTest.kt`, `PlugsSettingsTest.kt`, `StoredModeActionsTest.kt`, `ModesStoreTest.kt`, `ui/StoredModePageTest.kt`.
+- Test: `PlugActionsTest.kt`, `capability/plugs/src/test/.../ui/PlugsSettingsHostTest.kt`, `StoredModeActionsTest.kt`, `ModesStoreTest.kt`, `ui/StoredModePageTest.kt`. Any existing test that turns a mode's PIN off through `update` moves to `setNeedsPin`.
 
 **Interfaces:**
 - Produces: `PlugActions.setNeedsPin(entityId, on)` asks when `on` is false; `suspend fun StoredModeActions.setNeedsPin(id: String, on: Boolean): Boolean` (false when refused); `suspend fun ModesStore.setNeedsPin(id: String, on: Boolean)` writing only that mode's PIN key; `ModesStore.update` keeps a stored "Needs a PIN" that's on. `StoredModePage`'s switch calls `setNeedsPin`.
@@ -264,18 +274,18 @@
 
 ### Task 15: N5 with 11f, 11g, 11h: clean sound names, case and theme folders
 
-**Files:** `core/sound/src/main/java/uk/co/siland/culvery/core/sound/Sounds.kt` (`readSoundsFolder`, `soundNameFromId`), `SoundWords.kt`; the Settings rows that label a tablet sound (`capability/door/.../ui/DoorSettingsPage.kt`, `capability/party/.../ui/SoundButtonsSection.kt`); test `core/sound/src/test/.../SoundsTest.kt`, the two pages' tests.
+**Files:** `core/sound/src/main/java/uk/co/siland/culvery/core/sound/Sounds.kt` (`readSoundsFolder`, `soundNameFromId`), `SoundWords.kt`; the Settings rows that label a tablet sound (`capability/door/.../ui/DoorSettingsPage.kt`, `capability/party/.../ui/SoundButtonsSection.kt`); test `core/sound/src/test/.../SoundsFolderTest.kt`, the two pages' tests.
 
 **Interfaces:**
 - Produces:
   - `fun cleanSoundName(raw: String): String` (the companion's N5 rules), `const val UNNAMED_SOUND = "Unnamed sound"`, `const val SOUND_NAME_MAX = 40`. Used by `readSoundsFolder` and `soundNameFromId`.
   - Duplicates are judged on the cleaned name ignoring case, within the main folder and within each theme folder on its own (11f, 11h).
   - A theme folder is matched whatever its case (11g).
-  - A theme sound's Settings line is `"On this tablet · ${theme display name}"`, e.g. `"On this tablet · Halloween"`.
+  - A theme sound's Settings line is `"On this tablet · ${sound.theme.label}"`, e.g. `"On this tablet · Halloween"`.
 
-- [ ] **Step 1:** Write the companion's N5 tests in `SoundsTest`, and:
+- [ ] **Step 1:** Write the companion's N5 tests in `SoundsFolderTest`, and:
   - `aThemeFolderIsFoundWhateverItsCase` (`Halloween/howl.mp3` has `theme == HALLOWEEN`)
-  - `sameNamesDifferingInCaseShowOnce` (`Howl.mp3`, `howl.mp3` in the main folder: one, the first by path)
+  - `sameNamesDifferingInCaseShowOnce` (`Howl.mp3` and `howl.wav` in the main folder: one shows, the first by path)
   - `aThemeSoundSharingAMainFolderNameIsKept` (`howl.mp3` and `halloween/howl.mp3`: both)
   - The pages: a Halloween tablet sound's row says `"On this tablet · Halloween"`.
 - [ ] **Step 2:** Run `./gradlew :core:sound:testDebugUnitTest`. Expect FAIL.
@@ -302,12 +312,12 @@
 
 ### Task 17: 11j, sounds open off the caller's thread
 
-**Files:** `core/sound/.../SoundPlayer.kt`, `capability/door/.../di/DoorModule.kt` (the chime's `play` and `preview`) and the interface they implement, `capability/door/.../ui/DoorSettingsPage.kt` (Play chime drops its `Dispatchers.IO`), `capability/party/.../PadTaps.kt` (drops its `withContext(io)`); tests `SoundPlayerTest.kt`, `PadTapsTest.kt`, the door tests that play.
+**Files:** `core/sound/.../SoundPlayer.kt`, `capability/door/.../Chime.kt` (`play` and `preview` become `suspend`), `capability/door/.../di/DoorModule.kt` (their implementation), `capability/door/.../DoorAlerts.kt` (the caller), `capability/door/.../ui/DoorSettingsPage.kt` (Play chime runs in `scope.launch`; the preview drops its `Dispatchers.IO`), `capability/party/.../PadTaps.kt` (drops its `withContext(io)`); tests `SoundPlayerTest.kt`, `PadTapsTest.kt`, `capability/door/src/test/.../TestDoor.kt` (the fake chime), the door tests that play.
 
 **Interfaces:**
 - Produces: ruling 5. `SoundPlayer internal constructor(..., io: CoroutineDispatcher)`; `suspend fun playDoorbell(sound, volume): Boolean`; `suspend fun playPad(pad, sound, volume, capMs = PAD_CAP_MS): Boolean`. `SoundPlayer`'s lock comment becomes one line (11v).
 
-- [ ] **Step 1:** Write `SoundPlayerTest.aFileOpensOnTheInjectedDispatcher` (a test dispatcher that records the thread name: the open runs there, never on the caller's) and `PadTapsTest.aTapDoesNotSwitchDispatcherItself` (regression guard on the new shape: `PadTaps` takes no `io`).
+- [ ] **Step 1:** Write `SoundPlayerTest.aFileOpensOnTheInjectedDispatcher` (a test dispatcher that records the thread name: the open runs there, never on the caller's).
 - [ ] **Step 2:** Run `./gradlew :core:sound:testDebugUnitTest :capability:party:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run the same and `./gradlew :capability:door:testDebugUnitTest`. Expect PASS.
@@ -323,7 +333,7 @@
   - 11k: `stopPads()` counts like a ring: a pad whose open finishes after a stop doesn't start. `PadTaps` keeps `opening: Int?`; a tap on the pad that's opening calls `stop()` instead.
   - 11l: `playPad` returns false while the doorbell's sound is opening or playing.
 
-- [ ] **Step 1:** Write `aDoorbellSoundThatFailsMidwayFallsBackToTheChimeOnce`, `noFallbackAfterANewerRing`, `aStopWhileAPadOpensKeepsItFromStarting`, `aSecondTapOnAnOpeningPadStopsIt`, `aPadWaitsWhileTheDoorbellOpens`, `aPadWaitsWhileTheDoorbellPlays`.
+- [ ] **Step 1:** Write `aDoorbellSoundThatFailsMidwayFallsBackToTheChimeOnce`, `noFallbackAfterANewerRing`, `aStopWhileAPadOpensKeepsItFromStarting`, `aSecondTapOnAnOpeningPadStopsIt`, `aPadDoesNotStartWhileTheDoorbellOpens`, `aPadDoesNotStartWhileTheDoorbellPlays`.
 - [ ] **Step 2:** Run `./gradlew :core:sound:testDebugUnitTest :capability:party:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run the same and `./gradlew :capability:door:testDebugUnitTest`. Expect PASS.
@@ -331,26 +341,26 @@
 
 ### Task 19: 11m, 11n, 11o: the pads on the tray
 
-**Files:** `capability/party/.../PadGate.kt`, `PadTaps.kt`, `capability/party/.../ui/SoundPadTile.kt`, `capability/taekwondo/.../ui/TaekwondoTile.kt`, `core/ui/.../HouseMode.kt` (`HouseModeThirdTile`); tests `PadGateTest.kt`, `PadTapsTest.kt`, `core/ui` tile test, `ShellScreenshotTest.kt` (a new `home_tray_pads_unread` snap).
+**Files:** `capability/party/.../PadGate.kt`, `PadTaps.kt`, `capability/party/.../ui/SoundPadTile.kt`, `capability/taekwondo/.../ui/TaekwondoTile.kt`, `core/ui/.../HouseMode.kt` (`HouseModeThirdTile`); tests `PadGateTest.kt`, `PadTapsTest.kt`, `capability/party/src/test/.../TestSounds.kt` (its `PadGate`), `core/ui/src/test/.../HouseModeTileTest.kt` (new), `ShellScreenshotTest.kt` (a new `home_tray_pads_unread` snap, passing at most 2 modes).
 
 **Interfaces:**
 - Produces:
-  - 11m: `PadGate.blocked` re-reads at each minute boundary of the clock (the first wait is to the next whole minute, then `MINUTE_MS`).
+  - 11m: `PadGate` takes a `WallClock`. `PadGate.blocked` re-reads at each minute boundary: each wait runs to the next whole minute, recomputed from the clock each time. Wall time is right here: it's a clock boundary, not a duration.
   - 11n: ruling 6; `PadTaps.line` is null until `gateRead`.
   - 11o: `HouseModeThirdTile` flashes `accentSoft` for `PRESS_FLASH_MS = 150L` on a tap. Mode tiles (`HouseModeTile`) don't flash.
 
 - [ ] **Step 1:** Write `theGateIsReadOnTheMinute` (clock at 21:59:30, night from 22:00: blocked turns `NIGHT` at 22:00:00, not 22:00:30), `padsAreFadedWithNoLineUntilTheGateIsRead`, `aTapFlashesForAHundredAndFiftyMs` (the flash colour at 0 ms and gone at 150 ms, under the compose test clock), `aModeTileDoesNotFlash` (regression guard), the screenshot.
 - [ ] **Step 2:** Run `./gradlew :capability:party:testDebugUnitTest :core:ui:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run the same, `./gradlew :capability:taekwondo:testDebugUnitTest`, and record the new baseline (restore any other). Expect PASS.
+- [ ] **Step 4:** Run the same, `./gradlew :capability:taekwondo:testDebugUnitTest`, and record the new baseline. The existing tray snaps are drawn with the gate read, so their baselines don't move; restore any that does. Expect PASS.
 - [ ] **Step 5:** Commit: `Read the pads' rules on the minute, fade the pads until read, and flash a tray tile on a tap`.
 
 ### Task 20: 11p, a failed Play in Settings says so
 
-**Files:** `capability/door/.../ui/DoorSettingsPage.kt` (Play chime), `capability/party/.../ui/SoundButtonsSection.kt` (the pads' Play), `core/sound/.../SoundWords.kt`; the two pages' tests.
+**Files:** `capability/door/.../ui/DoorSettingsPage.kt` (Play chime and the per-sound preview), `capability/party/.../ui/SoundButtonsSection.kt` (the pads' Play), `capability/party/.../PadTaps.kt` (`preview`), `core/sound/.../SoundWords.kt`; the two pages' tests.
 
 **Interfaces:**
-- Produces: `fun couldntPlay(sound: Sound): String` in `SoundWords.kt`: `"Couldn’t play ${sound.name}. Copy the file to the tablet’s sounds folder again."` for a tablet sound, `"Couldn’t play ${sound.name}. Restart Culvery and try again."` for a built-in. Shown with the page's `Toaster` when the play returns false.
+- Produces: `fun couldntPlay(sound: Sound): String` in `SoundWords.kt`: `"Couldn’t play ${sound.name}. Copy the file to the tablet’s sounds folder again."` for a tablet sound, `"Couldn’t play ${sound.name}. Restart Culvery and try again."` for a built-in. Shown with the page's `Toaster` when any Play in Settings returns false, the door's per-sound preview included. `PadTaps.preview(sound): Boolean` returns the play's result.
 
 - [ ] **Step 1:** Write `couldntPlayNamesTheFix` (both forms) and, on each page, `aFailedPlayShowsItsToast` (a player that returns false: the toaster got the line).
 - [ ] **Step 2:** Run `./gradlew :core:sound:testDebugUnitTest :capability:door:testDebugUnitTest :capability:party:testDebugUnitTest`. Expect FAIL.
@@ -362,7 +372,7 @@
 
 **Files:** `capability/door/.../DoorSettings.kt` (`doorbellSound`); test `DoorSettingsTest.kt`.
 
-- [ ] **Step 1:** Write `aStoredHappyBirthdayChoicePlaysTheClassicChime` (prefs doorbell `BuiltInSound.HAPPY_BIRTHDAY.id`, no birthday: `CLASSIC`) and `aBirthdayStillPlaysHappyBirthday` (regression guard: `birthday = true` with Follow the theme). 11r: confirm `goneName`/`goneFileName` are gone (`git grep -n "goneName\|goneFileName"` returns nothing); nothing else to do.
+- [ ] **Step 1:** Write `aStoredHappyBirthdayChoicePlaysTheClassicChime` (prefs doorbell `BuiltInSound.HAPPY_BIRTHDAY.id`, no birthday: `CLASSIC`) and `aBirthdayStillPlaysHappyBirthday` (regression guard: `birthday = true` with Follow the theme). 11r: confirm `goneName`/`goneFileName` are gone (`git grep -n "goneName\|goneFileName" -- '*.kt'` returns nothing); nothing else to do.
 - [ ] **Step 2:** Run `./gradlew :capability:door:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run the same. Expect PASS.
@@ -375,6 +385,7 @@
 **Interfaces:**
 - Produces in `wav_out.py`: `rms(frames, seconds, rate) -> float`; `write_peak(path, frames, rate, headroom)` (the chime's way); `write_loud(path, frames, rate, target_rms, rms_seconds, headroom, limit=False)` (the others'). With `limit=True`, a gentle limiter on the note onsets, applied only where the peak cap would otherwise win, so `target_rms` is met with the peak inside `headroom`.
 
+- [ ] **Step 0:** Run the four generators on the unchanged code. `git status --short core/sound/src/main/res/raw` must show nothing; if it shows a file, stop and report.
 - [ ] **Step 1:** Move the code; run all four generators. `git status --short core/sound/src/main/res/raw` shows nothing. If it shows a file, the move changed its output: fix before going on.
 - [ ] **Step 2:** Turn on `limit=True` in `happy_birthday.py` only; run it.
 - [ ] **Step 3:** Check with a one-off Python line using `wav_out.rms`: Happy Birthday's RMS over `RMS_SECONDS` is within 2 % of `TARGET_RMS`, its peak at most `HEADROOM * 32767`. `git status` shows only `happy_birthday.wav` changed. Write the two numbers under this step.
@@ -399,7 +410,7 @@
 
 ### Task 24: Item 16, Shuffle everything's padding
 
-**Files:** `capability/music/.../ui/MusicCard.kt` (drop `compact = true` on `ShuffleButton`); tests `ui/MusicCardTest.kt`, the card's screenshot test.
+**Files:** `capability/music/.../ui/MusicCard.kt` (`ShuffleButton` loses its `compact` parameter, and the card's call drops `compact = true`); tests `ui/MusicCardTest.kt`, the card's screenshot test.
 
 - [ ] **Step 1:** Write `shuffleEverythingKeepsItsOwnWidth` (nothing playing: `music_card_shuffle`'s width is less than the card's). `theCardFitsTheSideBySideRow` stays as it is.
 - [ ] **Step 2:** Run `./gradlew :capability:music:testDebugUnitTest`. Expect PASS for the width test (regression guard) and the others.
@@ -418,12 +429,12 @@
   - `deliver`'s CREATE in the spec's four steps (§4.3). `undo` drops a create that isn't on its way and lets its key go at once; one on its way leaves the key to the drain.
 
 - [ ] **Step 1:** Write in `CalendarSyncTest`, with a fake writer whose `create` waits on a gate:
-  - `anUndoWhileTheCreateIsSentDeletesItWhenItLands` (Undo during step 2: the event never reaches the store; the stray is deleted the same pass)
-  - `anUndoAfterTheCreateLandedDeletesTheEvent` (the other order: the normal delete path; the week loses it)
+  - `anUndoBetweenTheReplyAndTheStoreIsSettled` (Undo after the create's reply and before step 3 stores it: the event never reaches the store; the stray is deleted the same pass)
+  - `anUndoAfterTheCreateLandedDeletesTheEvent` (regression guard: the other order, the normal delete path; the week loses it)
   - `anUndoOfAQueuedCreateLetsTheKeyGo` (`undone.pending` empty, no create sent)
-  - `noWriterCallRunsUnderTheLock` (each fake writer call asserts `!writeLock.held`)
+  - `noDrainWriterCallRunsUnderTheLock` (regression guard: each fake writer call the drain makes asserts `!writeLock.held`; Undo's own delete stays under the lock)
   - `aFailedStrayDeleteIsTriedNextPass` (regression guard)
-  - `anUndoneCreateTheServiceRefusedLeavesNoStray` (Review Focus 5: the create is `Rejected` after Undo: `strayCreates` empty, no delete sent)
+  - `anUndoneCreateTheServiceRefusedLeavesNoStray` (regression guard; Review Focus 5: the create is `Rejected` after Undo: `strayCreates` empty, no delete sent)
 - [ ] **Step 2:** Run `./gradlew :capability:calendar:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement. No locked step calls `drop()`.
 - [ ] **Step 4:** Run the same. Expect PASS.
@@ -432,16 +443,17 @@
 ### Task 26: Calendar M2, undone creates across a restart
 
 **Files:**
-- Modify: `capability/calendar/.../db/CalendarDatabase.kt` (ruling 8), `db/Migrations.kt`, `UndoneKeys.kt` (takes `UndoneCreateDao`), `CalendarSync.kt` (loads before the first pass; leaves strays out), the calendar `di` module (provides the DAO), `capability/calendar/schemas/.../10.json` (exported).
+- Modify: `capability/calendar/.../db/CalendarDatabase.kt` (ruling 8), `db/Migrations.kt` (`MIGRATION_9_10`, added to `ALL_MIGRATIONS`, its SQL taken from `10.json`'s `createSql`), `UndoneKeys.kt` (takes `UndoneCreateDao`), `CalendarSync.kt` (loads before the first pass; leaves strays out), the calendar `di` module (provides the DAO), `capability/calendar/schemas/.../10.json` (exported).
+- Modify, the `UndoneKeys()` callers: `CalendarEditorTest.kt`, `TestEngines.kt`, and `app/src/testDebug/.../SampleAddTest.kt` and `SampleRollbackTest.kt` (an in-memory fake DAO).
 - Test: `CalendarMigrationTest.kt`, `UndoneKeysTest.kt` (new), `CalendarSyncTest.kt`.
 
 **Interfaces:**
-- Produces: `UndoneKeys @Inject constructor(dao: UndoneCreateDao)`; `suspend fun load()` (once; `CalendarSync.syncAll` calls it first); `add`, `stray`, `letGo`, `done` become `suspend` and write through. After `load()` every stored key is a stray. `CalendarSync` leaves out an event whose id is a stray's key, and any instance whose recurring event id is that key or whose id starts with `"${key}_"`.
+- Produces: `UndoneKeys @Inject constructor(dao: UndoneCreateDao)`; `suspend fun load()` (once; `CalendarSync.syncAll` calls it first), which merges the stored rows into the map rather than replacing it; `add`, `stray`, `letGo`, `done` become `suspend` and write through. After `load()` every stored key is a stray. `CalendarSync` leaves out an event whose id is a stray's key, and any instance whose recurring event id is that key or whose id starts with `"${key}_"`.
 
 - [ ] **Step 1:** Write `migrate9To10` (the table exists, empty, with the four columns plus `stray`); `aStoredStraySurvivesARestartAndIsDeletedOnTheNextPass` (a new `UndoneKeys` over the same database: the first drain sends the delete; a 404 counts as done); `aStrayIsNotShownBySync`; `aStraySeriesInstancesAreNotShown` (`key_20270101T090000Z` and one with `recurringEventId == key`).
 - [ ] **Step 2:** Run `./gradlew :capability:calendar:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run the same and `./gradlew :app:testDebugUnitTest --tests '*Wiring*'`. Expect PASS.
+- [ ] **Step 4:** Run the same and the full `./gradlew :app:testDebugUnitTest`. Expect PASS.
 - [ ] **Step 5:** Commit: `Remember undone events across a restart`.
 
 ### Task 27: Calendar M3, a counted series' last date
@@ -466,7 +478,7 @@
 
 **Files:** `capability/door/src/test/.../TestDoor.kt`, `DoorQuietnessTest.kt`, the door module's other tests, `capability/party/src/test/.../ui/StoredModePageTest.kt`, `app/src/test/.../shell/ui/ShellScreenshotTest.kt` (`trayHome`, the `home_tray_full_*` snaps), `core/sound/src/test/.../BuiltInSoundTest.kt`, `capability/door/src/test/.../ChimeTest.kt`, Plan 18's test files (ruling 7).
 
-- [ ] **Step 1 (11t):** Give `testSounds()` and `DoorQuietnessTest`'s `first { }` waits a 5 s timeout (`withTimeout(5_000)`), each failing with a message naming what it waited for.
+- [ ] **Step 1 (11t):** Give `testSounds()`'s wait for `firstReadDone` and `DoorQuietnessTest`'s `first { }` waits a 5 s timeout (`withTimeout(5_000)`), each failing with a message naming what it waited for.
 - [ ] **Step 2 (11u):** `trayHome` fails with `require` when asked for more modes than fit (2); the `home_tray_full_*` snaps pass `modes = 2`. Write `theTrayFixtureRefusesMoreModesThanFit`. The baselines shouldn't move; if they do, look before accepting.
 - [ ] **Step 3 (11s):** Run `./gradlew test` three times. List each test that failed in any run, under this step. For each, find the cause and fix it: a real-time wait becomes a test-clock wait or a bounded `waitUntil`. No retries, no `@Ignore`. Then three more runs with no failure.
 - [ ] **Step 4 (11v):** `Context` imported in `BuiltInSoundTest` and `ChimeTest`; imports ordered in Plan 18's files.
@@ -475,7 +487,7 @@
 
 ### Task 29: 11w, 11x, 11y: the private sound script
 
-**Files:** `culvery-notes/sounds/prepare.sh` only. Nothing in the repo; no commit (the notes folder isn't a git repository).
+**Files:** the private sound script (its path is in the companion) only. Nothing in the repo; no commit (the notes folder isn't a git repository).
 
 - [ ] **Step 1:** Make the companion's 11w, 11x and 11y changes.
 - [ ] **Step 2:** Run the companion's checks for them (its "Plan 20 tasks", Task 29) and write the results there.
