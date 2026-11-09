@@ -834,6 +834,7 @@ class StoredModesHouseTest {
         house.turnOff(by())
         rig.trace.throws.clear()
         rig.choose(FILM_NIGHT)
+        rig.settings.setNeedsPin(FILM_ID, false)
         rig.trace.throws += "plugs.enter"
         house.turnOn(FILM_ID, ModeGrant.Wall(FILM_ID))
         house.turnOff(by())

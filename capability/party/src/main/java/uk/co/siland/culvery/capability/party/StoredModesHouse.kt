@@ -126,7 +126,7 @@ class StoredModesHouse internal constructor(
         require(grant.allows(modeId)) { "Turning a stored mode on needs its own grant" }
         exclusive(ModeRunning(modeId, ModeRun.TURNING_ON)) {
             if (load().on) return@exclusive
-            val mode = settings.prefsSoon().mode(modeId) ?: return@exclusive
+            val mode = settings.prefs.first().mode(modeId) ?: return@exclusive
             // A plug locked since the tap is left out by the plug store instead (15b Ruling 4).
             require(grant is ModeGrant.Person || !mode.needsPin) { "A stored mode that needs a PIN can't turn on with none" }
             orphansChecked = true
