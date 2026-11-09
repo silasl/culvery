@@ -94,7 +94,7 @@ class HomeAssistantSettingsTest {
             try {
                 settings.save(link)
                 error("The save went through")
-            } catch (_: IllegalStateException) {
+            } catch (_: PinStoredException) {
             }
         }
         assertThat(settings.link.first()).isEqualTo(pinned)

@@ -20,6 +20,9 @@ import uk.co.siland.culvery.core.plugin.settingsDataStore
 private const val FILE = "homeassistant_settings"
 private const val TAG = "HomeAssistantSettings"
 
+/** A save without a pin was refused because one is stored. */
+class PinStoredException : IllegalStateException("A pin is stored")
+
 /** The saved [HomeAssistantLink], pin included, in a small DataStore file under `files/datastore/`, which backup and transfer already leave alone. Writes throw `IOException`. */
 @Singleton
 class HomeAssistantSettings(private val store: DataStore<Preferences>) {
@@ -40,12 +43,12 @@ class HomeAssistantSettings(private val store: DataStore<Preferences>) {
 
     /**
      * A pin goes only with an https address; saving one with http throws `IllegalArgumentException`. Saving without a
-     * pin while one is stored throws `IllegalStateException` and writes nothing: [forget] is the way to clear it.
+     * pin while one is stored throws [PinStoredException] and writes nothing: [forget] is the way to clear it.
      */
     suspend fun save(link: HomeAssistantLink) {
         require(link.pin == null || link.baseUrl.isHttps) { "A pin needs an https address" }
         store.edit {
-            check(link.pin != null || it[PIN] == null) { "A pin is stored" }
+            if (link.pin == null && it[PIN] != null) throw PinStoredException()
             it[ADDRESS] = link.baseUrl.toString()
             it[TOKEN] = link.token
             if (link.pin == null) it.remove(PIN) else it[PIN] = link.pin

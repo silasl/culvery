@@ -60,12 +60,12 @@ import uk.co.siland.culvery.core.homeassistant.HomeAssistantSettings
 import uk.co.siland.culvery.core.homeassistant.MemoryStore
 import uk.co.siland.culvery.core.homeassistant.SAVED
 import uk.co.siland.culvery.core.homeassistant.TestAccess
+import uk.co.siland.culvery.core.homeassistant.fingerprint
 import uk.co.siland.culvery.core.homeassistant.homeAssistantUrl
 import uk.co.siland.culvery.core.homeassistant.hoover
 import uk.co.siland.culvery.core.homeassistant.test.FakeHomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.test.entityState
 import uk.co.siland.culvery.core.homeassistant.test.testHomeAssistant
-import uk.co.siland.culvery.core.homeassistant.fingerprint
 import uk.co.siland.culvery.core.homeassistant.thermostat
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
@@ -400,6 +400,7 @@ class OtherIntegrationsTest {
         compose.onAllNodes(hasText("Certificate fingerprint")).assertCountEquals(0)
     }
 
+    /** Fails if Forget shows with nothing linked. */
     @Test
     fun forgetShowsOnlyWhileLinked() {
         showHost(saved = false)
@@ -408,6 +409,7 @@ class OtherIntegrationsTest {
         compose.onAllNodes(hasText("Forget this Home Assistant")).assertCountEquals(0)
     }
 
+    /** Fails if a refused PIN clears the link or says Forgotten. */
     @Test
     fun forgetRefusedKeepsTheLink() {
         access.role = Role.ADULT
@@ -422,6 +424,7 @@ class OtherIntegrationsTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Fails if Forget leaves the link or the pin, keeps no picks, or skips the toast. */
     @Test
     fun forgetSaysForgottenAndShowsNotLinked() {
         oneOfEach()
