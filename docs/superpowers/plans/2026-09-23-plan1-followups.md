@@ -8,14 +8,14 @@ The open work, one number each; the details are in the sections below. Numbers n
 
 **From the November 2026 review and Plan 18**
 1. Camera wake-up's cost: the fixes (P1, P2, P9) are built; left is re-running runs B and C against decision 9's bar. See "November 2026 review" below.
-3. Security fixes N1–N10 and M2 (rulings in the private notes). In this batch; not started.
-5. A shorter pause after ticking off a shopping item.
+3. Security fixes N1–N10 and M2 (rulings in the private notes). Built, not merged; comes off after the tablet checks. N1 also needs HTTPS set up on the NAS.
+5. A shorter pause after ticking off a shopping item. Built, not merged; comes off after the tablet checks.
 6. A new name for Settings › Modes, at the end-of-v1 review.
 7. Sound pads played on Sonos.
 8. A Christmas seasonal theme.
 9. A real sleigh-bell recording for Christmas.
 10. Whether birthdays override a doorbell set to one sound.
-11. Plan 18's deferred minors (details under "Plan 18 deferred minors"):
+11. Plan 18's deferred minors (details under "Plan 18 deferred minors"). All 25 built, not merged; they come off after the tablet checks (11w–11y are in the private sounds folder, done):
    - 11a. Sound generators: the WAV normalise-and-write code is copied across `tools/sound/*.py`.
    - 11b. Happy Birthday plays at about 92% of the chime's loudness (the peak cap beats the loudness target).
    - 11c. Sound library: the first folder read can overwrite a faster refresh.
@@ -43,14 +43,20 @@ The open work, one number each; the details are in the sections below. Numbers n
    - 11y. `prepare.sh`: single-pass loudness normalising (±0.5 LU).
 
 **Bugs** (see "Bugs (2026-10-23)")
-12. Calendar M2: an Undo racing a drain create leaves the event on the week; `UndoneKeys` is lost on restart.
-13. Calendar M3: a phone's counted series is expanded in full on every detail update.
+12. Calendar M2: an Undo racing a drain create leaves the event on the week; `UndoneKeys` is lost on restart. Built, not merged; comes off after the tablet checks.
+13. Calendar M3: a phone's counted series is expanded in full on every detail update. Built, not merged; comes off after the tablet checks.
 14. Home slow to fill (2.2–2.9 s from a cold start).
 15. Accented letters garbled on the Music card.
-16. Hide the Music card's volume pill while nothing plays (no mute button). In this batch; not started.
+16. Hide the Music card's volume pill while nothing plays (no mute button). Built, not merged; comes off after the tablet checks.
 17. Not tried yet: "Use for new events" with real calendars, and a new Sonos playlist appearing.
 32. Culvery started while the tablet was on its lock screen (after an update) didn't pin once unlocked; a normal open asks to pin.
 33. The sample house's Music card says "Nothing playing" while a room plays.
+34. Settings that don't update: a screen that starts reading a setting at the moment it's being saved can miss the save until the next one (a known fault in DataStore 1.2.1). It could leave the Lights tab or the current mode out of date. One Lights test (`theTabShowsOnceABridgeIsPaired`) is still exposed to it.
+35. Calendar: Undo pressed in the instant a cancelled send finishes can leave the event at Google until the next restart (very narrow; only when the send is cancelled).
+36. Calendar: Undo after a send that was cancelled (with no Undo during it) treats the event as never sent; if the send had reached Google, the event stays.
+37. The chime's Play button in Settings should report what happened the same way Preview does (one wording for "Couldn't play" and "The doorbell is playing").
+38. Tidy-up: one shared set of test certificates for Home Assistant and Hue (two copies today).
+39. Tidy-up: Undo's bookkeeping in the calendar is kept in several places at once; fold it into one.
 
 **To check on the tablet** (see "To check when the tablet is next plugged in")
 18. Taps that seemed lost on the emulator.
