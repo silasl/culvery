@@ -68,6 +68,18 @@ class OtherIntegrationsScreenshotTest {
 
     @Test fun linkedLight() = snap("settings_other_linked_light", false, linked, "http://192.168.1.20:8123/")
 
+    private val https = linked.copy(fingerprint = "0001 0203 0405 0607 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f")
+
+    @Test fun linkedOverHttpsDark() = snap("settings_other_linked_https_dark", true, https, "https://192.168.1.20:8443/")
+
+    @Test fun linkedOverHttpsLight() = snap("settings_other_linked_https_light", false, https, "https://192.168.1.20:8443/")
+
+    private val certificateChanged = https.copy(status = "Home Assistant’s certificate has changed. Press Check to trust the new one.")
+
+    @Test fun certificateChangedDark() = snap("settings_other_certificate_changed_dark", true, certificateChanged, "https://192.168.1.20:8443/")
+
+    @Test fun certificateChangedLight() = snap("settings_other_certificate_changed_light", false, certificateChanged, "https://192.168.1.20:8443/")
+
     private val noThermostat = linked.copy(devices = listOf(hoover, thermostat.copy(choices = emptyList(), chosen = null, line = null)))
 
     @Test fun noThermostatDark() = snap("settings_other_no_thermostat_dark", true, noThermostat, "http://192.168.1.20:8123/")

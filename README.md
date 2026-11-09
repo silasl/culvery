@@ -199,6 +199,14 @@ The wall tablet should be set up with Culvery as device owner, on a freshly rese
 
 **Forgotten PIN:** an Admin can reset anyone's PIN in Settings › People. If every Admin has forgotten theirs, clear the app's data (Android Settings › Apps › Culvery › Storage › Clear data). That wipes all configuration and starts setup again.
 
+## Home Assistant
+
+Settings › Home Assistant links Culvery to a Home Assistant on the home network: its address and a token made for Culvery. Check saves the link after an Admin PIN.
+
+**Linking over https:** turn on https in Home Assistant, type its address starting `https://` with the port you chose, and press Check. The PIN pad shows the certificate's fingerprint; check it matches Home Assistant's own, then enter an Admin PIN to trust it. Culvery then recognises this Home Assistant by that certificate, and the page says "Linked over https." with the fingerprint. An address starting `http://` is refused while an https link is saved. If the certificate changes, the rows say so; press Check, compare the new fingerprint and enter an Admin PIN to trust it.
+
+**Forget this Home Assistant:** a quiet button on the page while linked. It asks a fresh Admin PIN, then removes the address, the token and the certificate, so the link can be set up again over http or https. The devices picked on the page are kept.
+
 ## Privacy
 
 Open-Meteo (town search and weather; no key, no account) receives the town typed into the search, and then the home's coordinates and time zone with each forecast request, every 30 minutes. Beyond the tablet's IP address, which any web request reveals, nothing that identifies the household or its people is sent to it. Neither the town, the coordinates nor the time zone is written to the app's log.

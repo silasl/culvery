@@ -26,8 +26,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import uk.co.siland.culvery.core.homeassistant.CERTIFICATE_CHANGED_ON_PAGE
+import uk.co.siland.culvery.core.homeassistant.CERTIFICATE_FINGERPRINT
 import uk.co.siland.culvery.core.homeassistant.CheckOutcome
 import uk.co.siland.culvery.core.homeassistant.EntityChoice
+import uk.co.siland.culvery.core.homeassistant.FORGET_HOME_ASSISTANT
 import uk.co.siland.culvery.core.homeassistant.HA_ADDRESS
 import uk.co.siland.culvery.core.homeassistant.HA_ADDRESS_EXAMPLE
 import uk.co.siland.culvery.core.homeassistant.HA_CHECK
@@ -37,6 +40,7 @@ import uk.co.siland.culvery.core.homeassistant.HA_TOKEN
 import uk.co.siland.culvery.core.homeassistant.HA_TOKEN_PLACEHOLDER
 import uk.co.siland.culvery.core.homeassistant.HA_TOKEN_SAVED
 import uk.co.siland.culvery.core.homeassistant.HOME_ASSISTANT
+import uk.co.siland.culvery.core.homeassistant.HOME_ASSISTANT_FORGOTTEN
 import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantDevice
@@ -44,9 +48,11 @@ import uk.co.siland.culvery.core.homeassistant.HomeAssistantException
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantLinking
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantSection
 import uk.co.siland.culvery.core.homeassistant.LINKED
+import uk.co.siland.culvery.core.homeassistant.LINKED_OVER_HTTPS
 import uk.co.siland.culvery.core.homeassistant.NOT_LINKED_YET
 import uk.co.siland.culvery.core.homeassistant.OTHER_INTEGRATIONS_LINE
 import uk.co.siland.culvery.core.homeassistant.TOKEN_REFUSED_ON_PAGE
+import uk.co.siland.culvery.core.homeassistant.fingerprint
 import uk.co.siland.culvery.core.homeassistant.problemLine
 import uk.co.siland.culvery.core.plugin.CHECKING
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -106,8 +112,10 @@ data class OtherIntegrationsUi(
     val checking: Boolean,
     val checkLine: String?,
     val devices: List<DeviceUi>,
+    /** The pinned certificate's fingerprint while linked over https; null over http. */
+    val fingerprint: String? = null,
 ) {
-    override fun toString() = "OtherIntegrationsUi(linked=$linked, status=${status != null}, checking=$checking, devices=${devices.size})"
+    override fun toString() = "OtherIntegrationsUi(linked=$linked, status=${status != null}, checking=$checking, devices=${devices.size}, https=${fingerprint != null})"
 }
 
 @Composable
@@ -120,15 +128,22 @@ fun OtherIntegrations(
     onCheck: () -> Unit,
     onChoose: (domain: String, entityId: String?) -> Unit,
     sections: List<HomeAssistantSection> = emptyList(),
+    onForget: () -> Unit = {},
 ) {
     val c = Culvery.colors
     Column(verticalArrangement = Arrangement.spacedBy(SettingsTokens.rowGap), modifier = Modifier.testTag("settings_other")) {
         HhPageTitle(HOME_ASSISTANT, OTHER_INTEGRATIONS_LINE)
         HhSectionLabel(HOME_ASSISTANT)
         Text(
-            ui.status ?: if (ui.linked) LINKED else NOT_LINKED_YET, style = HhType.body,
+            ui.status ?: if (!ui.linked) NOT_LINKED_YET else if (ui.fingerprint != null) LINKED_OVER_HTTPS else LINKED, style = HhType.body,
             color = if (ui.status != null) c.danger else c.mute, modifier = Modifier.testTag("ha_status"),
         )
+        if (ui.linked && ui.fingerprint != null) {
+            Column(modifier = Modifier.testTag("ha_fingerprint_block")) {
+                Text(CERTIFICATE_FINGERPRINT, style = HhType.body, color = c.mute)
+                Text(ui.fingerprint, style = HhType.body, color = c.mute, modifier = Modifier.testTag("ha_fingerprint"))
+            }
+        }
         HhTextField(address, onAddress, HA_ADDRESS_EXAMPLE, HA_ADDRESS, "ha_address", capitalization = KeyboardCapitalization.None)
         HhTextField(token, onToken, if (ui.linked) HA_TOKEN_SAVED else HA_TOKEN_PLACEHOLDER, HA_TOKEN, "ha_token", secret = true)
         Text(HA_HELP, style = HhType.body, color = c.mute, modifier = Modifier.testTag("ha_help"))
@@ -140,6 +155,7 @@ fun OtherIntegrations(
         if (ui.linked) {
             Column(verticalArrangement = Arrangement.spacedBy(HomeAssistantDimens.deviceGap)) { ui.devices.forEach { DevicePicker(it, showLine = ui.status == null, onChoose) } }
             sections.forEach { it.Content() }
+            HhButton(FORGET_HOME_ASSISTANT, onForget, Modifier.testTag("ha_forget"), tone = ButtonTone.Quiet, on = ButtonSurface.Bg)
         }
     }
 }
@@ -191,6 +207,7 @@ internal fun OtherIntegrationsHost(
     var token by remember { mutableStateOf("") }
     var checking by remember { mutableStateOf(false) }
     var checkLine by remember { mutableStateOf<String?>(null) }
+    var forgetting by remember { mutableStateOf(false) }
     var linkedCount by remember { mutableIntStateOf(0) }
     var choices by remember { mutableStateOf<Map<String, List<EntityChoice>>>(emptyMap()) }
     val scope = rememberCoroutineScope()
@@ -221,6 +238,7 @@ internal fun OtherIntegrationsHost(
         OtherIntegrationsUi(
             linked = isLinked, status = problem?.let(::pageProblemLine), checking = checking, checkLine = checkLine,
             devices = deviceUis.map { it.copy(choices = choices[it.domain]) },
+            fingerprint = link?.pin?.let(::fingerprint),
         ),
         address = address, onAddress = { address = it },
         token = token, onToken = { token = it },
@@ -253,6 +271,26 @@ internal fun OtherIntegrationsHost(
         },
         onChoose = { domain, entityId -> sorted.firstOrNull { it.domain == domain }?.let { device -> change { device.choose(entityId) } } },
         sections = ordered,
+        onForget = {
+            if (!forgetting) {
+                forgetting = true
+                scope.launch {
+                    var forgotten = false
+                    try {
+                        toaster.save({ forgotten = linking.forget() }) {
+                            Log.w(TAG, "Couldn't forget the Home Assistant link (${it::class.simpleName})")
+                        }
+                    } finally {
+                        forgetting = false
+                    }
+                    if (forgotten) {
+                        token = ""
+                        checkLine = null
+                        toaster.show(HOME_ASSISTANT_FORGOTTEN)
+                    }
+                }
+            }
+        },
     )
 }
 
@@ -260,7 +298,11 @@ private fun watchedBy(devices: List<HomeAssistantDevice>): Flow<Set<String>> =
     if (devices.isEmpty()) flowOf(emptySet()) else combine(devices.map { it.watched }) { sets -> sets.flatMapTo(mutableSetOf()) { it } }
 
 private fun pageProblemLine(problem: HaProblem): String =
-    if (problem == HaProblem.TOKEN_REFUSED) TOKEN_REFUSED_ON_PAGE else problemLine(problem)
+    when (problem) {
+        HaProblem.TOKEN_REFUSED -> TOKEN_REFUSED_ON_PAGE
+        HaProblem.CERTIFICATE_CHANGED -> CERTIFICATE_CHANGED_ON_PAGE
+        else -> problemLine(problem)
+    }
 
 /** Each device as it stands, without its [DeviceUi.choices]. */
 private fun deviceUis(devices: List<HomeAssistantDevice>): Flow<List<DeviceUi>> =

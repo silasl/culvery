@@ -161,6 +161,20 @@ class HaHooverSystemTest {
         assertThat(system.state.first()).isEqualTo(HooverState(null, null, problemLine(HaProblem.TOKEN_REFUSED)))
     }
 
+    /** Fails if a changed certificate doesn't show as the row's line. */
+    @Test
+    fun aChangedCertificateShowsItsLine() = runTest {
+        val ha = ha()
+        val system = system(ha)
+        ha.cached("docked")
+        api.failNext = HaProblem.CERTIFICATE_CHANGED
+        try {
+            ha.read("vacuum.hoover")
+        } catch (_: HomeAssistantException) {
+        }
+        assertThat(system.state.first()).isEqualTo(HooverState(null, null, problemLine(HaProblem.CERTIFICATE_CHANGED)))
+    }
+
     /** Fails if the system watches more or less than the vacuum and its battery, or doesn't stop. */
     @Test
     fun itWatchesTheVacuumAndItsBattery() = runTest {

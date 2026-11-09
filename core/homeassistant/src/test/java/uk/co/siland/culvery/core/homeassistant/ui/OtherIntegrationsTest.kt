@@ -43,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
@@ -52,6 +53,7 @@ import uk.co.siland.culvery.core.homeassistant.EntityChoice
 import uk.co.siland.culvery.core.homeassistant.FakeDevice
 import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
+import uk.co.siland.culvery.core.homeassistant.HomeAssistantLink
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantLinking
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantSection
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantSettings
@@ -63,6 +65,7 @@ import uk.co.siland.culvery.core.homeassistant.hoover
 import uk.co.siland.culvery.core.homeassistant.test.FakeHomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.test.entityState
 import uk.co.siland.culvery.core.homeassistant.test.testHomeAssistant
+import uk.co.siland.culvery.core.homeassistant.fingerprint
 import uk.co.siland.culvery.core.homeassistant.thermostat
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
@@ -76,6 +79,9 @@ private const val HELP = "Give the NAS a fixed address on the router. Then sign 
 private val NOTHING_LINKED = OtherIntegrationsUi(
     linked = false, status = null, checking = false, checkLine = null, devices = emptyList(),
 )
+
+private const val PIN = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+private val PINNED = HomeAssistantLink(checkNotNull(homeAssistantUrl("https://192.168.1.20:8443")), "test-token", PIN)
 
 /** 11 §4.1, §6: Settings › Home Assistant: the address and the token, Check, and the two pickers. */
 @RunWith(AndroidJUnit4::class)
@@ -106,11 +112,12 @@ class OtherIntegrationsTest {
 
     private fun showHost(
         saved: Boolean = true,
+        link: HomeAssistantLink = SAVED,
         devices: List<FakeDevice> = listOf(hoover, thermostat),
         sections: Set<HomeAssistantSection> = emptySet(),
         shown: () -> Boolean = { true },
     ) {
-        runBlocking { if (saved) settings.save(SAVED) }
+        runBlocking { if (saved) settings.save(link) }
         ha = testHomeAssistant(api, settings.link, MutableStateFlow(true), scope)
         val linking = HomeAssistantLinking(ha, settings, access, devices.toSet()) { homeAssistantUrl(it) }
         setPage { if (shown()) OtherIntegrationsHost(ha, linking, devices.toSet(), sections, toaster) }
@@ -371,6 +378,75 @@ class OtherIntegrationsTest {
         compose.waitFor { compose.onAllNodes(hasText("Check")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("ha_check_line").assertTextEquals("")
         assertThat(ha.link.value).isNull()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Plan 20 N1: over https the page says so and shows the pinned certificate's fingerprint. */
+    @Test
+    fun linkedOverHttpsShowsTheFingerprint() {
+        showHost(link = PINNED)
+        compose.onNodeWithTag("ha_status").assertTextEquals("Linked over https.")
+        compose.onNodeWithText("Certificate fingerprint").assertExists()
+        compose.onNodeWithTag("ha_fingerprint").assertTextEquals(fingerprint(PIN))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Regression guard: over http the page still says "Linked." and shows no fingerprint. */
+    @Test
+    fun linkedOverHttpSaysLinked() {
+        showHost()
+        compose.onNodeWithTag("ha_status").assertTextEquals("Linked.")
+        compose.onAllNodesWithTag("ha_fingerprint").assertCountEquals(0)
+        compose.onAllNodes(hasText("Certificate fingerprint")).assertCountEquals(0)
+    }
+
+    @Test
+    fun forgetShowsOnlyWhileLinked() {
+        showHost(saved = false)
+        compose.onNodeWithTag("settings_other").assertExists()
+        compose.onAllNodesWithTag("ha_forget").assertCountEquals(0)
+        compose.onAllNodes(hasText("Forget this Home Assistant")).assertCountEquals(0)
+    }
+
+    @Test
+    fun forgetRefusedKeepsTheLink() {
+        access.role = Role.ADULT
+        showHost(link = PINNED)
+        compose.onNodeWithTag("ha_forget").assertTextEquals("Forget this Home Assistant").performScrollTo().performClick()
+        compose.waitFor { access.asked.isNotEmpty() }
+        compose.waitForIdle()
+        assertThat(access.labels).containsExactly("Forget this Home Assistant")
+        assertThat(ha.link.value).isEqualTo(PINNED)
+        assertThat(toaster.shown).isEmpty()
+        compose.onNodeWithTag("ha_status").assertTextEquals("Linked over https.")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun forgetSaysForgottenAndShowsNotLinked() {
+        oneOfEach()
+        hoover.picked.value = "vacuum.hoover"
+        showHost(link = PINNED)
+        compose.onNodeWithTag("ha_forget").performScrollTo().performClick()
+        compose.waitFor { ha.link.value == null }
+        compose.waitFor { toaster.shown.isNotEmpty() }
+        assertThat(toaster.shown).containsExactly("Home Assistant forgotten.")
+        compose.onNodeWithTag("ha_status")
+            .assertTextEquals("Not linked yet. Enter Home Assistant’s address and a token for Culvery, then Check.")
+        compose.onAllNodesWithTag("ha_forget").assertCountEquals(0)
+        compose.onAllNodesWithTag("ha_fingerprint").assertCountEquals(0)
+        assertThat(hoover.picked.value).isEqualTo("vacuum.hoover")
+        assertThat(hoover.picks).isEmpty()
+        assertThat(runBlocking { settings.storedPin.first() }).isNull()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theChangedCertificateLineShows() {
+        api.failAll = HaProblem.CERTIFICATE_CHANGED
+        showHost(link = PINNED)
+        compose.waitFor { ha.problem.value == HaProblem.CERTIFICATE_CHANGED }
+        compose.onNodeWithTag("ha_status").assertTextEquals("Home Assistant’s certificate has changed. Press Check to trust the new one.")
         compose.assertClickablesHaveRoleAndLabel()
     }
 

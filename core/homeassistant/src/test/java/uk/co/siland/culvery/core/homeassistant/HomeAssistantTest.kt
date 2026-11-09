@@ -70,6 +70,35 @@ class HomeAssistantTest {
         assertThat(ha.problem.value).isNull()
     }
 
+    /** Fails if a changed certificate isn't the link's problem. */
+    @Test
+    fun aChangedCertificateIsTheLinksProblem() = runTest {
+        api.states["vacuum.hoover"] = hoover
+        val ha = ha()
+        api.failNext = HaProblem.CERTIFICATE_CHANGED
+        assertThat(refusal { ha.read("vacuum.hoover") }).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
+        assertThat(ha.problem.value).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
+    }
+
+    /** Regression guard: Forget (the link going) closes the socket, and the rows then say not linked, with no other problem. */
+    @Test
+    fun forgetClosesTheSocketAndTheRowsSayNotLinked() = runTest {
+        val settings = HomeAssistantSettings(MemoryStore())
+        settings.save(TEST_LINK)
+        val ha = ha(settings.link)
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        after(1_000)
+        assertThat(api.follows).hasSize(1)
+        settings.forget()
+        after(1_000)
+        assertThat(api.cancels).isEqualTo(1)
+        assertThat(ha.liveSince.value).isNull()
+        assertThat(ha.link.value).isNull()
+        assertThat(ha.savedLink()).isNull()
+        assertThat(ha.problem.value).isNull()
+        assertThat(refusal { ha.read("vacuum.hoover") }).isEqualTo(HaProblem.NOT_LINKED)
+    }
+
     /** Fails if a service Home Assistant refuses is taken as the link's problem. */
     @Test
     fun aRefusedServiceLeavesTheProblemAlone() = runTest {

@@ -75,13 +75,30 @@ class HomeAssistantSettingsTest {
         assertThat(settings.storedPin.first()).isEqualTo("test-pin")
     }
 
-    /** Fails if saving a link without a pin leaves the earlier pin behind. */
+    /** Fails if a save without a pin leaves a pin behind that Forget cleared, or stores one. */
     @Test
-    fun savingWithoutAPinRemovesTheOldOne() = runBlocking {
+    fun savingWithoutAPinAfterForgettingStoresNone() = runBlocking {
         settings.save(HomeAssistantLink(secureUrl, "test-token", "test-pin"))
+        settings.forget()
         settings.save(HomeAssistantLink(url, "test-token", pin = null))
         assertThat(settings.storedPin.first()).isNull()
         assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(url, "test-token", pin = null))
+    }
+
+    /** Fails if a save without a pin goes through while a pin is stored, or changes anything when it is refused. */
+    @Test
+    fun aPinlessSaveIsRefusedWhileAPinIsStored() = runBlocking {
+        val pinned = HomeAssistantLink(secureUrl, "test-token", "test-pin")
+        settings.save(pinned)
+        for (link in listOf(HomeAssistantLink(url, "other-token", pin = null), HomeAssistantLink(secureUrl, "other-token", pin = null))) {
+            try {
+                settings.save(link)
+                error("The save went through")
+            } catch (_: IllegalStateException) {
+            }
+        }
+        assertThat(settings.link.first()).isEqualTo(pinned)
+        assertThat(settings.storedPin.first()).isEqualTo("test-pin")
     }
 
     /** Fails if an http address with a pin reads as a link. */

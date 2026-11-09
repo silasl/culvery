@@ -41,7 +41,7 @@ const val CONFIRM_FOR_MS = 30_000L
 private const val TAG = "HomeAssistant"
 
 /** The problems that are the link's, not one device's or Check's. */
-private val LINK_PROBLEMS = setOf(HaProblem.UNREACHABLE, HaProblem.OFFLINE, HaProblem.TOKEN_REFUSED, HaProblem.BLOCKED)
+private val LINK_PROBLEMS = setOf(HaProblem.UNREACHABLE, HaProblem.OFFLINE, HaProblem.TOKEN_REFUSED, HaProblem.BLOCKED, HaProblem.CERTIFICATE_CHANGED)
 
 /** A REST call that met these while the socket is live is a busy NAS, not a lost one: the socket's ping would know. */
 private val PASSING_PROBLEMS = setOf(HaProblem.UNREACHABLE, HaProblem.OFFLINE)

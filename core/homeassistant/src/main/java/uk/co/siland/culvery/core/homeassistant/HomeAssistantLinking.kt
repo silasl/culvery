@@ -95,7 +95,11 @@ class HomeAssistantLinking internal constructor(
         }
         if (link == saved) return CheckOutcome.Linked
         if (!trusted && !access.mayManageConnections()) return CheckOutcome.PinRefused
-        settings.save(link)
+        try {
+            settings.save(link)
+        } catch (e: IllegalStateException) {
+            return CheckOutcome.Failed(USE_HTTPS)
+        }
         pickTheOnlyOnes(link)
         return CheckOutcome.Linked
     }

@@ -38,10 +38,14 @@ class HomeAssistantSettings(private val store: DataStore<Preferences>) {
         .map { it[PIN] }
         .distinctUntilChanged()
 
-    /** A pin goes only with an https address; saving one with http throws `IllegalArgumentException`. */
+    /**
+     * A pin goes only with an https address; saving one with http throws `IllegalArgumentException`. Saving without a
+     * pin while one is stored throws `IllegalStateException` and writes nothing: [forget] is the way to clear it.
+     */
     suspend fun save(link: HomeAssistantLink) {
         require(link.pin == null || link.baseUrl.isHttps) { "A pin needs an https address" }
         store.edit {
+            check(link.pin != null || it[PIN] == null) { "A pin is stored" }
             it[ADDRESS] = link.baseUrl.toString()
             it[TOKEN] = link.token
             if (link.pin == null) it.remove(PIN) else it[PIN] = link.pin

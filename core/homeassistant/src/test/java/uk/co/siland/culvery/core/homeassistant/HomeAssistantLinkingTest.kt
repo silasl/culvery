@@ -337,6 +337,20 @@ class HomeAssistantLinkingTest {
         assertThat(access.asked).isEmpty()
     }
 
+    /** Fails if an http save that meets a pin stored meanwhile crashes, replaces the pin, or gets any line but the https one. */
+    @Test
+    fun anHttpSaveRacingAStoredPinGetsUseHttpsAndKeepsThePin() = runTest {
+        val linking = linking(SAVED)
+        val pad = CompletableDeferred<Unit>().also { access.padGate = it }
+        val outcome = async { linking.check("http://192.168.1.20:8123", "new-token") }
+        runCurrent()
+        settings.save(PINNED)
+        pad.complete(Unit)
+        assertThat(outcome.await()).isEqualTo(CheckOutcome.Failed(USE_HTTPS))
+        assertThat(settings.link.first()).isEqualTo(PINNED)
+        assertThat(settings.storedPin.first()).isEqualTo(PINNED.pin)
+    }
+
     /** Fails if the https-only rule reads the typed text rather than the address's scheme. */
     @Test
     fun aCapitalisedHttpSchemeIsRefusedOncePinned() = runTest {

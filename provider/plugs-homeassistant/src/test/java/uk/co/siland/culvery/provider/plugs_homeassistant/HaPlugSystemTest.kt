@@ -174,6 +174,19 @@ class HaPlugSystemTest {
         assertThat(system.problem.first()).isEqualTo(problemLine(HaProblem.TOKEN_REFUSED))
     }
 
+    /** Fails if a changed certificate isn't no link for every plug, with its line. */
+    @Test
+    fun aChangedCertificateIsNoLink() = runTest {
+        seedAll()
+        val ha = ha()
+        ha.read("switch.lamp")
+        val system = system(ha)
+        api.failNext = HaProblem.CERTIFICATE_CHANGED
+        assertThat(system.read("switch.fan").power).isEqualTo(PlugPower.UNREACHABLE)
+        assertThat(system.plugs.first()!!.map { it.power }).containsExactly(PlugPower.NO_LINK, PlugPower.NO_LINK, PlugPower.NO_LINK)
+        assertThat(system.problem.first()).isEqualTo(problemLine(HaProblem.CERTIFICATE_CHANGED))
+    }
+
     /** Fails if the Home Assistant down line is anything but NO_LINK for every plug. */
     @Test
     fun unreachableIsNoLinkForEveryPlug() = runTest {
