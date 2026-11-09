@@ -5,9 +5,14 @@ import android.media.MediaPlayer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
+import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import org.junit.Test
@@ -21,6 +26,8 @@ import org.robolectric.shadows.util.DataSource
 @RunWith(AndroidJUnit4::class)
 class SoundPlayerTest {
     private val scope = TestScope(StandardTestDispatcher())
+    private var io: CoroutineDispatcher = UnconfinedTestDispatcher()
+    private fun test(block: suspend () -> Unit) = runBlocking { block() }
     private val asked = mutableListOf<String>()
     private val made = mutableMapOf<String, MediaPlayer>()
 
@@ -45,7 +52,7 @@ class SoundPlayerTest {
                 }
                 null -> null
             }
-        }, scope)
+        }, scope, io)
     }
 
     private fun prepared(source: String): MediaPlayer {
@@ -66,20 +73,42 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun theChimeIsANotificationEvent() {
+    fun theChimeIsANotificationEvent() = test {
         assertThat(CHIME_ATTRIBUTES.usage).isEqualTo(AudioAttributes.USAGE_NOTIFICATION_EVENT)
         assertThat(CHIME_ATTRIBUTES.contentType).isEqualTo(AudioAttributes.CONTENT_TYPE_SONIFICATION)
     }
 
+    /** Fails if a sound opens on the caller's thread rather than the injected dispatcher. */
     @Test
-    fun anOrganThatWontLoadPlaysTheChime() {
+    fun aFileOpensOnTheInjectedDispatcher() = test {
+        val executor = Executors.newSingleThreadExecutor { Thread(it, "sound-io-test") }
+        io = executor.asCoroutineDispatcher()
+        val openedOn = mutableListOf<String>()
+        val callers = mutableListOf<String>()
+        val player = SoundPlayer({ sound ->
+            openedOn += Thread.currentThread().name.substringBefore(" @coroutine")
+            prepared(sound.id).also { made[sound.id] = it }
+        }, scope, io)
+        try {
+            callers += Thread.currentThread().name.substringBefore(" @coroutine")
+            assertThat(player.playPad(1, honk, 1f)).isTrue()
+            assertThat(player.playDoorbell(organ, 1f)).isTrue()
+        } finally {
+            executor.shutdown()
+        }
+        assertThat(openedOn).containsExactly("sound-io-test", "sound-io-test")
+        assertThat(callers.single()).isNotEqualTo("sound-io-test")
+    }
+
+    @Test
+    fun anOrganThatWontLoadPlaysTheChime() = test {
         val player = player(organ to null, classic to Player.STARTS)
         assertThat(player.playDoorbell(organ, 1f)).isTrue()
         assertThat(asked).containsExactly(organ.id, classic.id).inOrder()
     }
 
     @Test
-    fun anOrganThatWontStartPlaysTheChime() {
+    fun anOrganThatWontStartPlaysTheChime() = test {
         val player = player(organ to Player.WONT_START, classic to Player.STARTS)
         assertThat(player.playDoorbell(organ, 1f)).isTrue()
         assertThat(asked).containsExactly(organ.id, classic.id).inOrder()
@@ -87,14 +116,14 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun theOrganPlaysAloneWhenItWorks() {
+    fun theOrganPlaysAloneWhenItWorks() = test {
         val player = player(organ to Player.STARTS, classic to Player.STARTS)
         assertThat(player.playDoorbell(organ, 1f)).isTrue()
         assertThat(asked).containsExactly(organ.id)
     }
 
     @Test
-    fun theChimeFailingIsFalse() {
+    fun theChimeFailingIsFalse() = test {
         val player = player()
         assertThat(player.playDoorbell(organ, 1f)).isFalse()
         assertThat(asked).containsExactly(organ.id, classic.id).inOrder()
@@ -104,7 +133,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aBrokenDoorbellSoundRingsTheClassicChime() {
+    fun aBrokenDoorbellSoundRingsTheClassicChime() = test {
         val player = player(honk to Player.WONT_START, classic to Player.STARTS)
         assertThat(player.playDoorbell(honk, 1f)).isTrue()
         assertThat(asked).containsExactly(honk.id, classic.id).inOrder()
@@ -112,7 +141,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aPadPlaysAndReportsItself() {
+    fun aPadPlaysAndReportsItself() = test {
         val player = player(honk to Player.STARTS)
         assertThat(player.padPlaying.value).isNull()
         assertThat(player.playPad(2, honk, 1f)).isTrue()
@@ -120,7 +149,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aPreviewNamesItsSoundUntilItStops() {
+    fun aPreviewNamesItsSoundUntilItStops() = test {
         val player = player(honk to Player.STARTS)
         assertThat(player.playPad(2, honk, 1f)).isTrue()
         assertThat(player.previewing.value).isNull()
@@ -131,7 +160,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aPreviewStopsAtTheCapItWasGiven() {
+    fun aPreviewStopsAtTheCapItWasGiven() = test {
         val player = player(honk to Player.STARTS)
         player.playPad(PREVIEW_PAD, honk, 1f, SoundPlayer.DOORBELL_CAP_MS)
         passTime(SoundPlayer.PAD_CAP_MS + 1)
@@ -142,7 +171,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aPadClearsWhenItsSoundEnds() {
+    fun aPadClearsWhenItsSoundEnds() = test {
         val player = player(honk to Player.STARTS)
         player.playPad(2, honk, 1f)
         shadowOf(made.getValue(honk.id)).invokeCompletionListener()
@@ -151,7 +180,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aPadClearsWhenItsSoundErrors() {
+    fun aPadClearsWhenItsSoundErrors() = test {
         val player = player(honk to Player.STARTS)
         player.playPad(2, honk, 1f)
         shadowOf(made.getValue(honk.id)).invokeErrorListener(MediaPlayer.MEDIA_ERROR_UNKNOWN, 0)
@@ -160,7 +189,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aPadStopsTheLastPad() {
+    fun aPadStopsTheLastPad() = test {
         val player = player(honk to Player.STARTS, howl to Player.STARTS)
         player.playPad(1, honk, 1f)
         assertThat(player.playPad(2, howl, 1f)).isTrue()
@@ -170,7 +199,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun stopPadsStopsThePad() {
+    fun stopPadsStopsThePad() = test {
         val player = player(honk to Player.STARTS)
         player.playPad(1, honk, 1f)
         player.stopPads()
@@ -179,7 +208,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aDoorbellStopsThePads() {
+    fun aDoorbellStopsThePads() = test {
         val player = player(honk to Player.STARTS, classic to Player.STARTS)
         player.playPad(1, honk, 1f)
         assertThat(player.playDoorbell(classic, 1f)).isTrue()
@@ -189,7 +218,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aBrokenPadSoundIsFalse() {
+    fun aBrokenPadSoundIsFalse() = test {
         val player = player(honk to null, howl to Player.WONT_START)
         assertThat(player.playPad(1, honk, 1f)).isFalse()
         assertThat(player.padPlaying.value).isNull()
@@ -199,7 +228,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aBrokenPadStillStopsThePadBefore() {
+    fun aBrokenPadStillStopsThePadBefore() = test {
         val player = player(honk to Player.STARTS, howl to null)
         player.playPad(1, honk, 1f)
         assertThat(player.playPad(2, howl, 1f)).isFalse()
@@ -208,7 +237,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aTabletSoundStopsAtItsCap() {
+    fun aTabletSoundStopsAtItsCap() = test {
         val player = player(honk to Player.STARTS, howl to Player.STARTS)
         player.playPad(1, honk, 1f)
         passTime(SoundPlayer.PAD_CAP_MS - 1)
@@ -226,7 +255,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aBuiltInSoundHasNoCap() {
+    fun aBuiltInSoundHasNoCap() = test {
         val player = player(organ to Player.STARTS)
         player.playDoorbell(organ, 1f)
         passTime(SoundPlayer.DOORBELL_CAP_MS + 1)
@@ -234,7 +263,7 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aCapDoesNotStopTheNextSound() {
+    fun aCapDoesNotStopTheNextSound() = test {
         val player = player(honk to Player.STARTS, howl to Player.STARTS)
         player.playPad(1, honk, 1f)
         passTime(5_000)
@@ -245,16 +274,16 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aRingWhileAPadOpensLeavesThePadUnstarted() {
+    fun aRingWhileAPadOpensLeavesThePadUnstarted() = test {
         lateinit var player: SoundPlayer
         var ringDuringOpen = true
         player = SoundPlayer({ sound ->
             if (sound.id == honk.id && ringDuringOpen) {
                 ringDuringOpen = false
-                player.playDoorbell(classic, 1f)
+                runBlocking { player.playDoorbell(classic, 1f) }
             }
             prepared(sound.id).also { made[sound.id] = it }
-        }, scope)
+        }, scope, io)
         assertThat(player.playPad(1, honk, 1f)).isFalse()
         assertThat(released(honk)).isTrue()
         assertThat(player.padPlaying.value).isNull()
@@ -262,12 +291,12 @@ class SoundPlayerTest {
     }
 
     @Test
-    fun aRingStartingWhileAPadOpensLeavesThePadUnstarted() {
+    fun aRingStartingWhileAPadOpensLeavesThePadUnstarted() = test {
         lateinit var player: SoundPlayer
         player = SoundPlayer({ sound ->
             player.ringStarted()
             prepared(sound.id).also { made[sound.id] = it }
-        }, scope)
+        }, scope, io)
         assertThat(player.playPad(1, honk, 1f)).isFalse()
         assertThat(released(honk)).isTrue()
         assertThat(player.padPlaying.value).isNull()

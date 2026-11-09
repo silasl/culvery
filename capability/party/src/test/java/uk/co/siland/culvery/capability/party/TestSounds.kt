@@ -46,7 +46,6 @@ internal class GateRig(val door: FakeDoor? = FakeDoor()) {
 internal class FakePlayer {
     val playing = MutableStateFlow<Int?>(null)
     val plays: MutableList<Pair<Int, Float>> = CopyOnWriteArrayList()
-    var playThread: String? = null
     @Volatile var stops = 0
     var starts = true
 
@@ -55,7 +54,6 @@ internal class FakePlayer {
 
     fun play(pad: Int, sound: Sound, volume: Float): Boolean {
         plays += pad to volume
-        playThread = Thread.currentThread().name
         whilePlaying()
         if (starts) playing.value = pad
         return starts

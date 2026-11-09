@@ -110,7 +110,7 @@ internal class FakeChime : Chime {
     /** What [play] reports: false for a chime that couldn't start. */
     var starts = true
 
-    override fun play(sound: Sound, volume: Float): Boolean {
+    override suspend fun play(sound: Sound, volume: Float): Boolean {
         plays += sound.id to volume
         return starts
     }
@@ -120,7 +120,7 @@ internal class FakeChime : Chime {
         onHush()
     }
 
-    override fun preview(sound: Sound, volume: Float): Boolean {
+    override suspend fun preview(sound: Sound, volume: Float): Boolean {
         previews += sound.id to volume
         previewing.value = sound.id
         return true

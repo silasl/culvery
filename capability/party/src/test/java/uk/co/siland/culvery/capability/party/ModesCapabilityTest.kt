@@ -25,7 +25,7 @@ class ModesCapabilityTest {
         StoredModeActions(TestAccess(Role.ADULT), rig.house, rig.settings, emptySet()), rig.house, rig.settings,
         ModesShelf(rig.settings, Provider { emptySet() }, backgroundScope),
         SoundPads(flowOf(listOf(TROMBONE.id, null, HONK.id)), flowOf(padRoom), flowOf(LIBRARY), flowOf(false)),
-        PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 1f }, backgroundScope, Dispatchers.Unconfined),
+        PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 1f }, backgroundScope),
         SoundPadsStore(MemoryStore()), SoundLibrary({ null }, backgroundScope, Dispatchers.Unconfined),
         Optional.of(rig.music), Optional.of(rig.lights), Optional.of(rig.plugs), emptySet(), emptySet(), RecordingToaster(),
     )

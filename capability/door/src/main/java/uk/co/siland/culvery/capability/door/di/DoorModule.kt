@@ -57,13 +57,13 @@ abstract class DoorModule {
     companion object {
         @Provides
         fun chime(player: SoundPlayer): Chime = object : Chime {
-            override fun play(sound: Sound, volume: Float) = player.playDoorbell(sound, volume)
+            override suspend fun play(sound: Sound, volume: Float) = player.playDoorbell(sound, volume)
 
             override fun hushPads() = player.ringStarted()
 
             override val previewing = player.previewing
 
-            override fun preview(sound: Sound, volume: Float) = player.playPad(PREVIEW_PAD, sound, volume, SoundPlayer.DOORBELL_CAP_MS)
+            override suspend fun preview(sound: Sound, volume: Float) = player.playPad(PREVIEW_PAD, sound, volume, SoundPlayer.DOORBELL_CAP_MS)
 
             override fun stopPreview() = player.stopPads()
         }

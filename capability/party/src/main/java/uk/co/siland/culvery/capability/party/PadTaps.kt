@@ -3,9 +3,7 @@ package uk.co.siland.culvery.capability.party
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -16,7 +14,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.sound.PREVIEW_PAD
@@ -31,19 +28,17 @@ private const val COULDNT_PLAY_MS = 4_000L
  */
 @Singleton
 class PadTaps internal constructor(
-    private val play: (pad: Int, sound: Sound, volume: Float) -> Boolean,
+    private val play: suspend (pad: Int, sound: Sound, volume: Float) -> Boolean,
     private val stop: () -> Unit,
     /** The pad playing, or null. */
     val playing: StateFlow<Int?>,
     private val gate: PadGate,
     private val volume: () -> Float,
     private val scope: CoroutineScope,
-    /** Where a play opens its sound, off the main thread. */
-    private val io: CoroutineDispatcher,
 ) {
     @Inject
     constructor(player: SoundPlayer, gate: PadGate, door: Optional<DoorQuiet>, @ApplicationScope scope: CoroutineScope) :
-        this(player::playPad, player::stopPads, player.padPlaying, gate, { door.map { it.volume }.orElse(1f) }, scope, Dispatchers.IO)
+        this(player::playPad, player::stopPads, player.padPlaying, gate, { door.map { it.volume }.orElse(1f) }, scope)
 
     val blocked: StateFlow<PadBlock?> = gate.blocked.stateIn(scope, SharingStarted.Eagerly, null)
 
@@ -65,7 +60,7 @@ class PadTaps internal constructor(
         if (gate.blockedNow() != null) return
         clearFailed(pad.pad)
         val volume = volume()
-        val started = withContext(io) { play(pad.pad, pad.sound, volume) }
+        val started = play(pad.pad, pad.sound, volume)
         // A ring that arrived while the sound opened shows as the Doorbell block, not as a failure.
         if (!started && gate.blockedNow() != PadBlock.DOORBELL) failedNow(pad.pad)
     }
@@ -74,7 +69,7 @@ class PadTaps internal constructor(
     suspend fun preview(sound: Sound) {
         val volume = volume()
         previewed.value = sound.id
-        withContext(io) { play(PREVIEW_PAD, sound, volume) }
+        play(PREVIEW_PAD, sound, volume)
     }
 
     /** Stops the sound [preview] started. */

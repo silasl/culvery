@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import org.junit.After
@@ -81,7 +80,7 @@ class SoundPadTileTest {
     private val player = FakePlayer()
 
     private fun host(rig: GateRig, pads: List<PadUi> = three) {
-        val taps = PadTaps(player::play, player::stop, player.playing, rig.gate, { 1f }, scope, Dispatchers.IO)
+        val taps = PadTaps(player::play, player::stop, player.playing, rig.gate, { 1f }, scope)
         compose.setContent {
             CulveryTheme(dark = true) {
                 HhTrayGrid(

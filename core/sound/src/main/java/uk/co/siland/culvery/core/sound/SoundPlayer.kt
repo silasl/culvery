@@ -9,13 +9,20 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Collections
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 
 /** A notification event, so the tablet's notification volume and Do Not Disturb still apply (5 §4.1). */
@@ -30,12 +37,13 @@ const val PREVIEW_PAD = 0
 /**
  * Plays the doorbell and the sound pads. Each play is its own player, held until it ends or fails: MediaPlayer's
  * native side keeps only a weak reference to it. A ring stops the pad sound; a pad stops the pad sound before it.
- * Tablet sounds stop at a cap; built-in sounds play to their end.
+ * Tablet sounds stop at a cap; built-in sounds play to their end. A sound opens on [io], never on the caller's thread.
  */
 @Singleton
 class SoundPlayer internal constructor(
     private val open: (Sound) -> MediaPlayer?,
     private val scope: CoroutineScope,
+    private val io: CoroutineDispatcher,
 ) {
     @Inject constructor(@ApplicationContext context: Context, @ApplicationScope scope: CoroutineScope) : this({ sound ->
         when (val source = sound.source) {
@@ -43,14 +51,14 @@ class SoundPlayer internal constructor(
                 MediaPlayer.create(context, source.sound.res, CHIME_ATTRIBUTES, AudioManager.AUDIO_SESSION_ID_GENERATE)
             is SoundSource.OnTablet -> openFile(source.file.path)
         }
-    }, scope)
+    }, scope, Dispatchers.IO)
 
     private class Play(val player: MediaPlayer) {
         var cap: Job? = null
     }
 
     internal val live: MutableSet<MediaPlayer> = Collections.synchronizedSet(mutableSetOf())
-    // Guards live membership, listeners, cap setup, pad, padState, previewState and rings: caps finish on the scope's thread, listeners on main, rings off main.
+    // Guards live, pad, padState, previewState and rings: caps, listeners and rings reach them from different threads.
     private val lock = Any()
     private var pad: Play? = null
     private var rings = 0L
@@ -66,7 +74,7 @@ class SoundPlayer internal constructor(
      * Stops any pad sound first. [volume] 0–1 scales the sound within the tablet's own notification volume.
      * A sound that won't open or start gives way to the classic chime. True when a sound started.
      */
-    fun playDoorbell(sound: Sound, volume: Float): Boolean {
+    suspend fun playDoorbell(sound: Sound, volume: Float): Boolean {
         ringStarted()
         if (start(sound, volume, DOORBELL_CAP_MS, null, 0)) return true
         if (sound.id == BuiltInSound.CLASSIC.id) return false
@@ -74,7 +82,7 @@ class SoundPlayer internal constructor(
     }
 
     /** Stops the current pad sound first; a tablet sound stops at [capMs]. False when it won't open or start, or a ring began while it opened. */
-    fun playPad(pad: Int, sound: Sound, volume: Float, capMs: Long = PAD_CAP_MS): Boolean {
+    suspend fun playPad(pad: Int, sound: Sound, volume: Float, capMs: Long = PAD_CAP_MS): Boolean {
         val ringsBefore = synchronized(lock) {
             stopPads()
             rings
@@ -94,8 +102,20 @@ class SoundPlayer internal constructor(
         synchronized(lock) { pad?.let(::finish) }
     }
 
-    private fun start(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, ringsBefore: Long): Boolean {
-        val player = open(sound)
+    /** Opens [sound] on [io]; a caller cancelled meanwhile gets its cancellation, and the player is released. */
+    private suspend fun openOffThread(sound: Sound): MediaPlayer? {
+        val player = withContext(io + NonCancellable) { open(sound) }
+        try {
+            currentCoroutineContext().ensureActive()
+        } catch (e: CancellationException) {
+            player?.release()
+            throw e
+        }
+        return player
+    }
+
+    private suspend fun start(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, ringsBefore: Long): Boolean {
+        val player = openOffThread(sound)
         if (player == null) {
             logFailed(sound)
             return false

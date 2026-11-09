@@ -18,7 +18,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,7 +71,7 @@ class SoundButtonsSectionTest {
 
     private fun show(vararg pads: String?) {
         pads.forEachIndexed { i, id -> runBlocking { store.setPad(i + 1, id) } }
-        val taps = PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 0.6f }, scope, Dispatchers.Unconfined)
+        val taps = PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 0.6f }, scope)
         val choices = flowOf((LIBRARY + themed).filter { it.id != BuiltInSound.HAPPY_BIRTHDAY.id })
         val sounds = SoundButtons(store, room, choices, folderRead, { refreshes++ }, taps)
         compose.setContent {
