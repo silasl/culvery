@@ -80,6 +80,7 @@ class FakeAccessControl(var result: Authorised? = null, private val startsSessio
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
         label: String?,
+        detail: String?,
     ): Authorised? {
         requested += anyOf.toList()
         if (startsSession) result?.let { session.value = Identified(it.person, it.role) }

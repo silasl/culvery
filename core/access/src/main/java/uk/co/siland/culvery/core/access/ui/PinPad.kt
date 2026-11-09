@@ -59,6 +59,7 @@ import uk.co.siland.culvery.core.plugin.OVERLAY_IDLE_MS
 import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.hhClickable
@@ -88,6 +89,7 @@ fun PinPadHost(
         }
         PinPadSheet(
             label = r.label,
+            detail = r.detail,
             reason = r.reason,
             error = r.error,
             lockedUntilMillis = r.lockedUntilMillis,
@@ -147,6 +149,7 @@ fun PinPadSheet(
     overSheet: Boolean = false,
     nowMillis: () -> Long = System::currentTimeMillis,
     clearOn: Any? = null,
+    detail: String? = null,
 ) {
     // Counts down from the lock's first value (deterministic under a virtual frame clock), reset in the same composition
     // as a lock that arrives on a retry, so it shows at once.
@@ -173,6 +176,7 @@ fun PinPadSheet(
     PinPadFrame(
         title = "Who’s this?",
         line = pinReasonText(reason, label),
+        detail = detail,
         message = message,
         // Said once, from the lockout's first value: a line read every second would drown everything else.
         spokenMessage = if (locked) tooManyTries(firstSeconds) else message,
@@ -247,6 +251,7 @@ internal fun PinPadFrame(
     drawScrim: Boolean = true,
     paneTitle: String = title,
     clearOn: Any? = null,
+    detail: String? = null,
 ) {
     val c = Culvery.colors
     // Emptied for each try by [clearOn], not by rebuilding the pad: new nodes move TalkBack's focus, and its reading of
@@ -312,6 +317,9 @@ internal fun PinPadFrame(
                     Box(contentAlignment = Alignment.Center) {
                         if (line != null) ReasonLine(line, shown = lock == null)
                         if (lock != null || line != null) ReasonLine(WAIT_A_MOMENT, shown = lock != null)
+                    }
+                    if (detail != null) {
+                        Text(detail, style = HhType.secondary, color = c.mute, textAlign = TextAlign.Center, modifier = Modifier.testTag("pin_detail"))
                     }
                 }
                 Box(contentAlignment = Alignment.Center) {

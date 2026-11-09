@@ -69,7 +69,7 @@ interface AccessControl {
      * [refusal] decides whether a "no" asks for another PIN in the pad, or closes the pad with a toast. With
      * [Refusal.Toast], a signed-in person who is refused gets the toast without a PIN pad and is signed out, so
      * the next tap asks for a PIN. Each success restarts the session's two minutes. [label] names the action on
-     * the PIN pad in place of the first permission's label.
+     * the PIN pad in place of the first permission's label. [detail] is a second line the pad draws under it.
      */
     suspend fun authorise(
         vararg anyOf: String,
@@ -77,6 +77,7 @@ interface AccessControl {
         allow: (Identified, granted: Set<String>) -> Boolean = { _, granted -> granted.isNotEmpty() },
         refusal: Refusal = Refusal.InPad,
         label: String? = null,
+        detail: String? = null,
     ): Authorised?
 
     /**

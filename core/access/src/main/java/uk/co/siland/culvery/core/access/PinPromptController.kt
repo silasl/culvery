@@ -15,6 +15,7 @@ sealed interface PinError {
 /** One showing of the PIN pad. Identity equality: every retry is a new request. */
 class PinRequest internal constructor(
     val label: String,
+    val detail: String?,
     val reason: PinReason,
     val error: PinError?,
     val lockedUntilMillis: Long?,
@@ -35,11 +36,17 @@ class PinPromptController @Inject constructor() {
         _request.value?.answer?.complete(null)
     }
 
-    internal fun open(label: String, error: PinError?, lockedUntilMillis: Long?, reason: PinReason = PinReason.Generic): PinRequest =
-        PinRequest(label, reason, error, lockedUntilMillis).also { _request.value = it }
+    internal fun open(
+        label: String,
+        error: PinError?,
+        lockedUntilMillis: Long?,
+        reason: PinReason = PinReason.Generic,
+        detail: String? = null,
+    ): PinRequest =
+        PinRequest(label, detail, reason, error, lockedUntilMillis).also { _request.value = it }
 
-    internal suspend fun ask(label: String, reason: PinReason, error: PinError?, lockedUntilMillis: Long?): String? =
-        open(label, error, lockedUntilMillis, reason).answer.await()
+    internal suspend fun ask(label: String, detail: String?, reason: PinReason, error: PinError?, lockedUntilMillis: Long?): String? =
+        open(label, error, lockedUntilMillis, reason, detail).answer.await()
 
     internal fun dismiss() {
         _request.value = null

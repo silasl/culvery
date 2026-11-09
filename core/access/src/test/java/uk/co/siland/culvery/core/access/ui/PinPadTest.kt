@@ -18,6 +18,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -70,6 +71,21 @@ class PinPadTest {
     private fun showAtZero() = compose.setContent { CulveryTheme(dark = true) { PinPadHost(controller, activity, nowMillis = { 0L }) } }
 
     private fun tap(vararg keys: String) = keys.forEach { compose.onNodeWithTag("pin_key_$it").performClick() }
+
+    @Test
+    fun theDetailShowsUnderTheLabel() {
+        val detail = "Certificate fingerprint\n0001 0203"
+        controller.open("Trust this Home Assistant", null, null, detail = detail)
+        show()
+        compose.onNodeWithTag("pin_detail").assertTextEquals(detail)
+    }
+
+    @Test
+    fun noDetailLineWithoutADetail() {
+        controller.open("Change settings", null, null)
+        show()
+        compose.onNodeWithTag("pin_detail").assertDoesNotExist()
+    }
 
     @Test
     fun fourthDigitSubmitsAutomatically() {

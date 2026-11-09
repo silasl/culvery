@@ -514,6 +514,19 @@ class ShellScreenshotTest {
     }
 
     @Test
+    fun pinPadDetail() = snap("pin_pad_detail", dark = true) {
+        PinPadSheet(
+            "Trust this Home Assistant",
+            PinReason.Generic,
+            error = null,
+            lockedUntilMillis = null,
+            onSubmit = {},
+            onCancel = {},
+            detail = "Certificate fingerprint\n0001 0203 0405 0607 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f",
+        )
+    }
+
+    @Test
     fun pinPadLight() = snap("pin_pad_light", dark = false) {
         PinPadSheet("Change settings", PinReason.Generic, error = null, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
     }
@@ -697,6 +710,7 @@ private class NoAccess : AccessControl {
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
         label: String?,
+        detail: String?,
     ): Authorised? = null
 
     override fun beginSetupSession(person: Identified) = Unit

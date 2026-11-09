@@ -86,11 +86,24 @@ class DefaultAccessControlTest {
     }
 
     /** Starts [permission] and returns the first PIN pad request it shows, then cancels it. */
-    private suspend fun TestScope.firstPromptFor(access: DefaultAccessControl, permission: String, label: String? = null): PinRequest {
-        val job = launch { access.authorise(permission, label = label) }
+    private suspend fun TestScope.firstPromptFor(access: DefaultAccessControl, permission: String, label: String? = null, detail: String? = null): PinRequest {
+        val job = launch { access.authorise(permission, label = label, detail = detail) }
         val request = prompt.request.filterNotNull().first()
         job.cancel()
         return request
+    }
+
+    @Test
+    fun aDetailReachesThePinRequest() = runTest {
+        val request = firstPromptFor(access(), CorePermissions.CONNECTIONS_MANAGE, detail = "abcd ef01")
+        assertThat(request.detail).isEqualTo("abcd ef01")
+    }
+
+    /** Regression guard: a caller that gives no detail gets none. */
+    @Test
+    fun noDetailByDefault() = runTest {
+        val request = firstPromptFor(access(), CorePermissions.CONNECTIONS_MANAGE)
+        assertThat(request.detail).isNull()
     }
 
     @Test

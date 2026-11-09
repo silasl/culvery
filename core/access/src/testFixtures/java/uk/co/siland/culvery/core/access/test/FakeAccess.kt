@@ -31,6 +31,10 @@ class FakeAccess(var role: Role?, vararg sources: PermissionSource) : AccessCont
     /** The pad's label for each ask, in order; null where none was given. */
     val labels: MutableList<String?> = CopyOnWriteArrayList()
 
+    /** The detail the last ask was given; null where none was. */
+    var lastDetail: String? = null
+        private set
+
     override val session = MutableStateFlow<Identified?>(null)
     override val expiresAt: StateFlow<Long?> = MutableStateFlow(null)
 
@@ -40,9 +44,11 @@ class FakeAccess(var role: Role?, vararg sources: PermissionSource) : AccessCont
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
         label: String?,
+        detail: String?,
     ): Authorised? {
         asked += anyOf.toList()
         labels += label
+        lastDetail = detail
         padGate?.await()
         val role = role ?: return null
         val granted = anyOf.filter { registry.isGranted(role, it) }.toSet()

@@ -50,6 +50,7 @@ class PlugsSettingsSectionTest {
             allow: (Identified, Set<String>) -> Boolean,
             refusal: Refusal,
             label: String?,
+            detail: String?,
         ): Authorised? = null
 
         override fun beginSetupSession(person: Identified) = Unit

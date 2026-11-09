@@ -28,6 +28,7 @@ internal class FakeAccess(var admin: Boolean = true) : AccessControl {
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
         label: String?,
+        detail: String?,
     ): Authorised? {
         asked += anyOf.toList()
         labels += label

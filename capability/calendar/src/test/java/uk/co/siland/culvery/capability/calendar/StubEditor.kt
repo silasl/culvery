@@ -24,6 +24,7 @@ private object NobodyMay : AccessControl {
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
         label: String?,
+        detail: String?,
     ): Authorised? = null
 
     override fun lock() = Unit
