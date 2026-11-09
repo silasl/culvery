@@ -1,15 +1,23 @@
 package uk.co.siland.culvery.provider.calendar_midsussex
 
 import java.io.IOException
+import java.net.ConnectException
+import java.net.InetSocketAddress
+import java.net.NoRouteToHostException
+import java.net.Proxy
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import okhttp3.Call
 import okhttp3.Cookie
 import okhttp3.CookieJar
+import okhttp3.EventListener
 import okhttp3.FormBody
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
+import okhttp3.Response
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.core.net.await
 import uk.co.siland.culvery.core.net.internetHttpClient
@@ -48,7 +56,8 @@ class CouncilClient(private val baseUrl: HttpUrl, private val client: Lazy<OkHtt
     }
 
     internal inner class Session {
-        private val http = client.value.newBuilder().cookieJar(SessionCookies()).build()
+        private val http = client.value.newBuilder().cookieJar(SessionCookies()).eventListener(Listening).build()
+        private val heard = Heard()
 
         suspend fun search(house: String, postcode: String): List<Address> {
             val start = page(Request.Builder().url(baseUrl).build(), BinsFailure.NO_START_LINK)
@@ -62,10 +71,12 @@ class CouncilClient(private val baseUrl: HttpUrl, private val client: Lazy<OkHtt
 
         private suspend fun page(request: Request, refused: BinsFailure): String {
             val answer = try {
-                http.newCall(request).await(MAX_PAGE_BYTES)
+                http.newCall(request.newBuilder().tag(Heard::class.java, heard).build()).await(MAX_PAGE_BYTES)
             } catch (e: IOException) {
                 currentCoroutineContext().ensureActive()
-                throw e.asUnreachable(COUNCIL_SITE, offlineOnUnknownHost = true)
+                val neverAnswered = !heard.answered &&
+                    (e is ConnectException || e is NoRouteToHostException || heard.connectFailed)
+                throw if (neverAnswered) CouncilUnanswered(e) else e.asUnreachable(COUNCIL_SITE, offlineOnUnknownHost = true)
             }
             if (answer.code == 429 || answer.code >= 500) {
                 throw UnreachableException("The council’s site asked to try later (${answer.code})")
@@ -73,6 +84,22 @@ class CouncilClient(private val baseUrl: HttpUrl, private val client: Lazy<OkHtt
             if (answer.code !in 200..299) throw BinsReadFailed(refused)
             return answer.text
         }
+    }
+}
+
+/** Whether the council's site answered anything in one read, and whether a connection to it failed outright. */
+private class Heard {
+    @Volatile var answered = false
+    @Volatile var connectFailed = false
+}
+
+private object Listening : EventListener() {
+    override fun responseHeadersEnd(call: Call, response: Response) {
+        call.request().tag(Heard::class.java)?.answered = true
+    }
+
+    override fun connectFailed(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?, ioe: IOException) {
+        call.request().tag(Heard::class.java)?.connectFailed = true
     }
 }
 
@@ -92,3 +119,6 @@ private class SessionCookies : CookieJar {
         return cookies.filter { it.matches(url) }
     }
 }
+
+/** The council's site never answered anything in the read: no network, or nothing listening. Not the site's fault, so not counted against the day. */
+internal class CouncilUnanswered(cause: IOException) : UnreachableException("The council’s site didn’t answer", cause)

@@ -108,4 +108,24 @@ class CouncilClientTest {
         council.shutdown()
         assertThat(failure { subject.read(HOUSE, POSTCODE, LINE) }).isInstanceOf(UnreachableException::class.java)
     }
+
+    @Test
+    fun aClosedPortIsUnanswered() {
+        council.shutdown()
+        assertThat(failure { subject.read(HOUSE, POSTCODE, LINE) }).isInstanceOf(CouncilUnanswered::class.java)
+    }
+
+    @Test
+    fun aDropAfterAnAnswerIsStillAnAnswer() {
+        council.dropsAfterStart = true
+        val e = failure { subject.read(HOUSE, POSTCODE, LINE) }
+        assertThat(e).isInstanceOf(UnreachableException::class.java)
+        assertThat(e).isNotInstanceOf(CouncilUnanswered::class.java)
+    }
+
+    @Test
+    fun aBusyOrDownSiteHasAnswered() {
+        council.status = 503
+        assertThat(failure { subject.read(HOUSE, POSTCODE, LINE) }).isNotInstanceOf(CouncilUnanswered::class.java)
+    }
 }

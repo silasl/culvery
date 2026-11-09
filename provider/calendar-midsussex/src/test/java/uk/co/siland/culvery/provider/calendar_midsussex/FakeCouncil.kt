@@ -49,12 +49,27 @@ internal class FakeCouncil {
     /** When set, every page answers this status. */
     @Volatile var status: Int? = null
 
+    /**
+     * When set, the start page answers and the connection then drops before every later request is read, as a site that
+     * answers once and goes away. Setting it again starts the next walk.
+     */
+    @Volatile var dropsAfterStart = false
+        set(value) {
+            field = value
+            startAnswered = false
+        }
+
+    @Volatile private var startAnswered = false
+
     val requests: Int get() = server.requestCount
 
     private var sessions = 0
 
     fun start(): HttpUrl {
         server.dispatcher = object : Dispatcher() {
+            override fun peek(): MockResponse =
+                if (dropsAfterStart && startAnswered) MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START) else super.peek()
+
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val url = checkNotNull(request.requestUrl)
                 val failing = status
@@ -63,6 +78,12 @@ internal class FakeCouncil {
                     request.method == "POST" -> MockResponse().setBody(fixture(addresses))
                     url.queryParameter("seq") == "3" -> MockResponse().setBody(fixture(collections))
                     else -> MockResponse()
+                        .also {
+                            if (dropsAfterStart) {
+                                startAnswered = true
+                                it.setSocketPolicy(SocketPolicy.DISCONNECT_AT_END)
+                            }
+                        }
                         .setHeader("Set-Cookie", "session=${++sessions}; Path=/")
                         .setBody(fixture(start).replace("https://waste.services.midsussex.gov.uk", base.toString().trimEnd('/')))
                 }

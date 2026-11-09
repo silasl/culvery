@@ -23,7 +23,7 @@ private const val FILE = "bins_reads"
  * A connection's last read and how today's attempts went. [addressKey] tells the connection's address from an earlier
  * one's without holding it. [failure] is the last page-shape failure and [unreached] the last attempt that didn't get the
  * council's pages; a good read clears both. [failuresToday] counts the failed attempts on the day of [lastAttemptMillis],
- * unreachable ones included.
+ * unreachable ones included, but not those the council's site never answered (no network, nothing listening).
  */
 @Serializable
 internal data class BinsRead(

@@ -2,6 +2,8 @@ package uk.co.siland.culvery.provider.calendar_midsussex
 
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import java.io.IOException
+import java.net.ConnectException
 import java.net.UnknownHostException
 import java.time.LocalDate
 import java.time.LocalTime
@@ -344,6 +346,132 @@ class MidSussexBinsProviderTest {
         offline = false
         wall.plusMinutes(60)
         assertThat(subject.read().upserts).hasSize(3)
+    }
+
+    private var outage: IOException? = null
+    private var triedWhileDown = 0
+
+    private fun flaky() = MidSussexBinsProvider(
+        CouncilClient(
+            base,
+            lazy {
+                councilHttpClient(
+                    "test",
+                    setOf(
+                        Interceptor { chain ->
+                            val down = outage
+                            if (down != null) {
+                                triedWhileDown++
+                                throw down
+                            }
+                            chain.proceed(chain.request())
+                        },
+                    ),
+                )
+            },
+        ),
+        reads,
+        wall,
+        updates,
+    ) { LONDON }
+
+    private suspend fun MidSussexBinsProvider.eachHour(attempts: Int, expected: Class<out Throwable>) = repeat(attempts) {
+        assertThat(failure()).isInstanceOf(expected)
+        wall.plusMinutes(60)
+    }
+
+    @Test
+    fun anOfflineNightDoesNotUseUpTheDay() = runTest {
+        val subject = flaky()
+        outage = UnknownHostException("council")
+        wall.at(today, LocalTime.of(0, 5))
+
+        subject.eachHour(8, OfflineException::class.java)
+        assertThat(triedWhileDown).isEqualTo(8)
+
+        outage = null
+        assertThat(subject.read().upserts).hasSize(3)
+    }
+
+    @Test
+    fun aRefusedConnectionIsFree() = runTest {
+        val subject = flaky()
+        outage = ConnectException("refused")
+        wall.at(today, LocalTime.of(0, 5))
+
+        subject.eachHour(5, UnreachableException::class.java)
+        assertThat(triedWhileDown).isEqualTo(5)
+
+        outage = null
+        assertThat(subject.read().upserts).hasSize(3)
+    }
+
+    /** Regression guard: the hour's gap held for every kind of failed attempt. */
+    @Test
+    fun aFreeAttemptStillWaitsAnHour() = runTest {
+        val subject = flaky()
+        outage = UnknownHostException("council")
+        assertThat(subject.failure()).isInstanceOf(OfflineException::class.java)
+        assertThat(triedWhileDown).isEqualTo(1)
+
+        wall.plusMinutes(30)
+        assertThat(subject.failure()).isInstanceOf(OfflineException::class.java)
+        assertThat(triedWhileDown).isEqualTo(1)
+
+        wall.plusMinutes(30)
+        assertThat(subject.failure()).isInstanceOf(OfflineException::class.java)
+        assertThat(triedWhileDown).isEqualTo(2)
+    }
+
+    @Test
+    fun freeAttemptsLeaveTheDaysFourForTheSite() = runTest {
+        val subject = flaky()
+        outage = UnknownHostException("council")
+        wall.at(today, LocalTime.of(0, 5))
+        subject.eachHour(3, OfflineException::class.java)
+
+        outage = null
+        council.status = 503
+        subject.eachHour(4, UnreachableException::class.java)
+        assertThat(council.requests).isEqualTo(4)
+
+        subject.eachHour(4, UnreachableException::class.java)
+        assertThat(council.requests).isEqualTo(4)
+    }
+
+    @Test
+    fun yesterdaysFailuresDontCarryIntoAFreeMorning() = runTest {
+        val subject = flaky()
+        council.status = 503
+        wall.at(today.minusDays(1), LocalTime.of(8, 5))
+        subject.eachHour(4, UnreachableException::class.java)
+        assertThat(council.requests).isEqualTo(4)
+
+        council.status = null
+        outage = UnknownHostException("council")
+        wall.at(today, LocalTime.of(0, 5))
+        subject.eachHour(8, OfflineException::class.java)
+
+        outage = null
+        assertThat(subject.read().upserts).hasSize(3)
+    }
+
+    /** Regression guard: a failure after the site has answered still counts. */
+    @Test
+    fun aFailureAfterAnAnswerCounts() = runTest {
+        repeat(4) {
+            council.dropsAfterStart = true
+            assertThat(subject.failure()).isInstanceOf(UnreachableException::class.java)
+            wall.plusMinutes(60)
+        }
+        val asked = council.requests
+
+        repeat(3) {
+            council.dropsAfterStart = true
+            assertThat(subject.failure()).isInstanceOf(UnreachableException::class.java)
+            wall.plusMinutes(60)
+        }
+        assertThat(council.requests).isEqualTo(asked)
     }
 
     @Test

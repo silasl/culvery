@@ -117,12 +117,13 @@ class MidSussexBinsProvider internal constructor(
             keep(conn.id, BinsRead(key, now, lastGoodMillis = now, collections = collections))
         } catch (failed: BinsReadFailed) {
             Log.w(TAG, "Bins read failed: ${failed.kind.name}")
-            keep(conn.id, attempted(stored, key, now, today, householdZone).copy(failure = failed.kind, unreached = null))
+            keep(conn.id, attempted(stored, key, now, today, householdZone, counts = true).copy(failure = failed.kind, unreached = null))
         } catch (e: Exception) {
             // A CancellationException is the engine's timeout, and anything unexpected is kept as unreachable too, so
             // either still waits for the next retry.
             val unreached = if (e is OfflineException) Unreached.OFFLINE else Unreached.UNREACHABLE
-            keep(conn.id, attempted(stored, key, now, today, householdZone).copy(unreached = unreached))
+            val free = e is OfflineException || e is CouncilUnanswered
+            keep(conn.id, attempted(stored, key, now, today, householdZone, counts = !free).copy(unreached = unreached))
             throw e
         }
     }
@@ -134,9 +135,11 @@ class MidSussexBinsProvider internal constructor(
         return read.failuresToday < ATTEMPTS_A_DAY && !clock.within(read.lastAttemptMillis, RETRY_GAP_MS)
     }
 
-    private fun attempted(stored: BinsRead?, key: String, now: Long, today: LocalDate, householdZone: ZoneId): BinsRead {
+    /** An attempt the council's site never answered is recorded, so the hour's gap holds, but isn't [counts] toward the day's four. */
+    private fun attempted(stored: BinsRead?, key: String, now: Long, today: LocalDate, householdZone: ZoneId, counts: Boolean): BinsRead {
         val base = stored ?: BinsRead(key, now)
-        val failures = if (dayOf(base.lastAttemptMillis, householdZone) == today) base.failuresToday + 1 else 1
+        val before = if (dayOf(base.lastAttemptMillis, householdZone) == today) base.failuresToday else 0
+        val failures = before + if (counts) 1 else 0
         return base.copy(lastAttemptMillis = now, failuresToday = failures)
     }
 
