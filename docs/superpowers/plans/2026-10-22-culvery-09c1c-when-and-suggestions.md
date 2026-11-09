@@ -619,7 +619,7 @@ git commit -m "Record the emulator walk-through of Plans 9c-1, 9c-1b and 9c-1c"
 
 ### Task 16: On the tablet
 
-**Review:** the controller with the user. **Needs the SM-T510 (`R52N60KXWJF`) on the cable.** 4e's rules: save and restore every setting changed, a signed release installed with `adb -s R52N60KXWJF install -r`, **never uninstall**, and the names check before any commit.
+**Review:** the controller with the user. **Needs the SM-T510 (`<tablet serial>`) on the cable.** 4e's rules: save and restore every setting changed, a signed release installed with `adb -s <tablet serial> install -r`, **never uninstall**, and the names check before any commit.
 
 - [ ] **Step 1: Install the release**, signed per `docs/setup/release.md`. Keep `mapping.txt` in `culvery-notes/mappings/`.
 - [ ] **Step 2: To check when the tablet is next plugged in** (from the follow-ups): the doorbell logcat around 2026-10-21 13:10 (missed), 16:20 (fine) and 18:03 (unexplained); Home's speed, launch to Home filled, three runs.
@@ -643,7 +643,7 @@ git commit -m "Record Plans 9c-1, 9c-1b and 9c-1c on the tablet"
   - the end-of-v1 design-review notes (9c-1b's and this plan's).
   Remove the "From before" suggestions entry: built here. Commit "Record what Plans 9c-1b and 9c-1c left for later".
 - [ ] **Step 3: Merge**, on the user's say: `git merge --ff-only plan-9c-forms` on `main`, then the gate on main. Never push. 9c-2 then branches from it.
-- [ ] **Step 4: Install** the release from the merged `main` with `adb -s R52N60KXWJF install -r`.
+- [ ] **Step 4: Install** the release from the merged `main` with `adb -s <tablet serial> install -r`.
 
 ---
 
