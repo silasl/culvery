@@ -349,6 +349,7 @@ class MidSussexBinsProviderTest {
     }
 
     private var outage: IOException? = null
+    private var outageAfterStart: IOException? = null
     private var triedWhileDown = 0
 
     private fun flaky() = MidSussexBinsProvider(
@@ -359,7 +360,7 @@ class MidSussexBinsProviderTest {
                     "test",
                     setOf(
                         Interceptor { chain ->
-                            val down = outage
+                            val down = outage ?: outageAfterStart.takeIf { chain.request().method == "POST" }
                             if (down != null) {
                                 triedWhileDown++
                                 throw down
@@ -454,6 +455,19 @@ class MidSussexBinsProviderTest {
 
         outage = null
         assertThat(subject.read().upserts).hasSize(3)
+    }
+
+    @Test
+    fun aRefusalAfterTheStartPageCounts() = runTest {
+        val subject = flaky()
+        outageAfterStart = ConnectException("refused")
+        wall.at(today, LocalTime.of(0, 5))
+
+        subject.eachHour(4, UnreachableException::class.java)
+        assertThat(triedWhileDown).isEqualTo(4)
+
+        subject.eachHour(3, UnreachableException::class.java)
+        assertThat(triedWhileDown).isEqualTo(4)
     }
 
     /** Regression guard: a failure after the site has answered still counts. */

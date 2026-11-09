@@ -87,13 +87,21 @@ class CouncilClient(private val baseUrl: HttpUrl, private val client: Lazy<OkHtt
     }
 }
 
-/** Whether the council's site answered anything in one read, and whether a connection to it failed outright. */
+/** [answered] is set once the council's server took a connection or sent headers in this read; [connectFailed] when a connection attempt failed. */
 private class Heard {
     @Volatile var answered = false
     @Volatile var connectFailed = false
 }
 
 private object Listening : EventListener() {
+    override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) {
+        call.request().tag(Heard::class.java)?.answered = true
+    }
+
+    override fun secureConnectStart(call: Call) {
+        call.request().tag(Heard::class.java)?.answered = true
+    }
+
     override fun responseHeadersEnd(call: Call, response: Response) {
         call.request().tag(Heard::class.java)?.answered = true
     }

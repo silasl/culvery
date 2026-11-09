@@ -1,11 +1,13 @@
 package uk.co.siland.culvery.provider.calendar_midsussex
 
 import com.google.common.truth.Truth.assertThat
+import java.net.ConnectException
 import java.net.InetAddress
 import java.net.UnknownHostException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import okhttp3.Dns
+import okhttp3.Interceptor
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import org.junit.After
@@ -16,7 +18,8 @@ import uk.co.siland.culvery.core.plugin.OfflineException
 
 class CouncilClientTest {
     private val council = FakeCouncil()
-    private val subject = testCouncil(council.start())
+    private val base = council.start()
+    private val subject = testCouncil(base)
 
     @After
     fun tearDown() = council.shutdown()
@@ -127,5 +130,28 @@ class CouncilClientTest {
     fun aBusyOrDownSiteHasAnswered() {
         council.status = 503
         assertThat(failure { subject.read(HOUSE, POSTCODE, LINE) }).isNotInstanceOf(CouncilUnanswered::class.java)
+    }
+
+    @Test
+    fun aRefusedConnectionAfterTheStartPageCounts() {
+        val refuseLater = Interceptor { chain -> if (chain.request().method == "POST") throw ConnectException("refused") else chain.proceed(chain.request()) }
+        val later = CouncilClient(base, lazy { councilHttpClient("test", setOf(refuseLater)) })
+        val e = failure { later.read(HOUSE, POSTCODE, LINE) }
+        assertThat(e).isInstanceOf(UnreachableException::class.java)
+        assertThat(e).isNotInstanceOf(CouncilUnanswered::class.java)
+    }
+
+    @Test
+    fun aServerThatTookTheConnectionHasAnswered() {
+        val twoRoutes = object : Dns {
+            override fun lookup(hostname: String): List<InetAddress> =
+                listOf(InetAddress.getByName("127.0.0.2"), InetAddress.getByName("127.0.0.1"))
+        }
+        val url = "http://council.test:${base.port}/".toHttpUrl()
+        val routed = CouncilClient(url, lazy { OkHttpClient.Builder().dns(twoRoutes).build() })
+        council.dropsEveryConnection = true
+        val e = failure { routed.read(HOUSE, POSTCODE, LINE) }
+        assertThat(e).isInstanceOf(UnreachableException::class.java)
+        assertThat(e).isNotInstanceOf(CouncilUnanswered::class.java)
     }
 }

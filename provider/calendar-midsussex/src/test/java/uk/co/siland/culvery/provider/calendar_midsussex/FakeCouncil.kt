@@ -61,6 +61,9 @@ internal class FakeCouncil {
 
     @Volatile private var startAnswered = false
 
+    /** When set, every connection is closed as soon as it is accepted. */
+    @Volatile var dropsEveryConnection = false
+
     val requests: Int get() = server.requestCount
 
     private var sessions = 0
@@ -68,7 +71,7 @@ internal class FakeCouncil {
     fun start(): HttpUrl {
         server.dispatcher = object : Dispatcher() {
             override fun peek(): MockResponse =
-                if (dropsAfterStart && startAnswered) MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START) else super.peek()
+                if (dropsEveryConnection || (dropsAfterStart && startAnswered)) MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START) else super.peek()
 
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val url = checkNotNull(request.requestUrl)

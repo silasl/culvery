@@ -135,7 +135,7 @@ class MidSussexBinsProvider internal constructor(
         return read.failuresToday < ATTEMPTS_A_DAY && !clock.within(read.lastAttemptMillis, RETRY_GAP_MS)
     }
 
-    /** An attempt the council's site never answered is recorded, so the hour's gap holds, but isn't [counts] toward the day's four. */
+    /** Every attempt is recorded, so the hour's gap holds, and counts toward the day's four only when [counts]. */
     private fun attempted(stored: BinsRead?, key: String, now: Long, today: LocalDate, householdZone: ZoneId, counts: Boolean): BinsRead {
         val base = stored ?: BinsRead(key, now)
         val before = if (dayOf(base.lastAttemptMillis, householdZone) == today) base.failuresToday else 0
