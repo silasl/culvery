@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.plugin.ApplicationScope
-import uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -27,6 +26,9 @@ const val ADDS_PER_MINUTE = 60
 
 /** How long the row an add matched shows in the accent colour (10 §4.6). */
 const val FLASH_MS = 1_200L
+
+/** How long a ticked item can be taken back with Undo, and its toast shows. */
+const val TICK_UNDO_MS = 6_000L
 
 private const val ONE_SECOND_MS = 1_000L
 private const val ONE_MINUTE_MS = 60_000L
@@ -65,7 +67,7 @@ class ShoppingActions @Inject constructor(
 ) {
     private val recentAdds = ArrayDeque<Long>()
 
-    private val latestTick = Expiring<Ticked>(scope, TOAST_WITH_ACTION_MS)
+    private val latestTick = Expiring<Ticked>(scope, TICK_UNDO_MS)
 
     /** The latest tick while Undo can still take it back. */
     internal val undoable: StateFlow<Ticked?> = latestTick.value
@@ -112,10 +114,10 @@ class ShoppingActions @Inject constructor(
         return AddResult.Added
     }
 
-    /** Ticks [row] off: queued at once, with an Undo for [TOAST_WITH_ACTION_MS]. A newer tick takes its place. */
+    /** Ticks [row] off: queued at once, with an Undo for [TICK_UNDO_MS]. A newer tick takes its place. */
     suspend fun tick(row: ShownItem) {
         val latest = lock.withLock { tickLocked(row) } ?: return
-        toaster.show(ticked(latest.text), action = ToastAction(UNDO) { scope.launch { undo(latest) } })
+        toaster.show(ticked(latest.text), action = ToastAction(UNDO, TICK_UNDO_MS) { scope.launch { undo(latest) } })
     }
 
     private suspend fun tickLocked(row: ShownItem): Ticked? {

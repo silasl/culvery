@@ -16,7 +16,6 @@ import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.shopping.db.QueuedEntity
 import uk.co.siland.culvery.core.plugin.NeedsSignInException
 import uk.co.siland.culvery.core.plugin.OUTBOX_BACKOFF_MS
-import uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.plugin.backoffMillis
@@ -139,7 +138,7 @@ class ShoppingSync @Inject constructor(
             // Ticking the refused item off is how the house lets the rest go, once the tick's Undo has gone.
             val tick = queue.firstOrNull { it.kind == QueuedKind.TICK.name && it.clientKey == head.clientKey }
             if (tick != null) {
-                val undoGoneAt = tick.madeAtMillis + TOAST_WITH_ACTION_MS
+                val undoGoneAt = tick.madeAtMillis + TICK_UNDO_MS
                 if (now < undoGoneAt) return Drained.Done(undoGoneAt)
                 store.inTransaction {
                     store.drop(tick.seq)

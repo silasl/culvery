@@ -20,7 +20,7 @@ data class ShownItem(val key: String, val text: String, val ticked: Boolean, val
 }
 
 /**
- * The latest tick, which Undo can take back for [TOAST_WITH_ACTION_MS][uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS].
+ * The latest tick, which Undo can take back for [TICK_UNDO_MS].
  * [itemId] is null when the row was a queued add; [index] is where the row was.
  */
 internal data class Ticked(val itemId: String?, val clientKey: String, val text: String, val index: Int) {

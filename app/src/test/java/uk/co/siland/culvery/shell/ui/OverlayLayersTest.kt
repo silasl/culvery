@@ -397,6 +397,23 @@ class OverlayLayersTest {
     }
 
     @Test
+    fun aToastActionsOwnTimeIsKept() {
+        showToasts()
+        post(ToastMessage(1, "Ticked Milk", "info", action = ToastAction("Undo", showMillis = 6_000) {}))
+        assertThat(shownAt(5_984, "Ticked Milk")).isTrue()
+        assertThat(shownAt(32, "Ticked Milk")).isFalse()
+    }
+
+    /** Regression guard: an action toast that names no time of its own still lasts eight seconds. */
+    @Test
+    fun anotherActionToastStillLastsEightSeconds() {
+        showToasts()
+        post(ToastMessage(1, "Added Piano.", "info", action = ToastAction("Undo") {}))
+        assertThat(shownAt(7_984, "Added Piano.")).isTrue()
+        assertThat(shownAt(32, "Added Piano.")).isFalse()
+    }
+
+    @Test
     fun aToastWithAnActionStaysEightSeconds() {
         showToasts()
         post(ToastMessage(1, "Added Piano.", "info", action = ToastAction("Undo") {}))

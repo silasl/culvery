@@ -13,7 +13,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS
 
 /** 10 §4.6, §4.8, §4.11: add, tick and Undo, and what each refuses. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -155,6 +154,15 @@ class ShoppingActionsTest : ShoppingTestBase() {
     }
 
     @Test
+    fun theTicksToastShowsForSixSeconds() = runTest {
+        val rig = rig(open = listOf("Milk"))
+        rig.readTheList()
+        val toasts = ToastLog()
+        rig.actions(toasts).tick(milk)
+        assertThat(toasts.actions.single()!!.showMillis).isEqualTo(6_000L)
+    }
+
+    @Test
     fun undoingFromTheToastTakesTheTickBack() = runTest {
         val rig = rig(open = listOf("Milk"))
         rig.readTheList()
@@ -249,7 +257,7 @@ class ShoppingActionsTest : ShoppingTestBase() {
         val first = rig.store.queueNow().first()
         actions.undo(Ticked("g1", first.clientKey, "Milk", 0))
         assertThat(rig.store.queueNow()).hasSize(2)
-        advanceTimeBy(TOAST_WITH_ACTION_MS - 1)
+        advanceTimeBy(TICK_UNDO_MS - 1)
         assertThat(actions.undoable.value!!.text).isEqualTo("Bread")
         advanceTimeBy(2)
         assertThat(actions.undoable.value).isNull()

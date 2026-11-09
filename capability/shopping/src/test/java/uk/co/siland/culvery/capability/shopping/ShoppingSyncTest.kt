@@ -19,7 +19,6 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.NeedsSignInException
 import uk.co.siland.culvery.core.plugin.OfflineException
-import uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS
 import uk.co.siland.culvery.core.plugin.UnreachableException
 
 /** 10 §4.4, §4.5: the queue is sent in order, an add never lands twice or goes missing, and the read follows the writes. */
@@ -625,7 +624,7 @@ class ShoppingSyncTest : ShoppingTestBase() {
         // The tick waits out its Undo before both go.
         rig.sync.drain()
         assertThat(rig.store.queueNow().map { it.kind to it.text }).containsExactly("ADD" to "Milk", "ADD" to "Eggs", "TICK" to "Milk").inOrder()
-        advanceTimeBy(TOAST_WITH_ACTION_MS)
+        advanceTimeBy(TICK_UNDO_MS)
         rig.sync.drain()
         assertThat(rig.store.queueNow()).isEmpty()
         assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)
@@ -674,7 +673,7 @@ class ShoppingSyncTest : ShoppingTestBase() {
         rig.enqueue(QueuedKind.ADD, "k1", "Milk")
         rig.enqueue(QueuedKind.TICK, "k1", "Milk")
         rig.enqueue(QueuedKind.ADD, "k2", "Eggs")
-        advanceTimeBy(TOAST_WITH_ACTION_MS)
+        advanceTimeBy(TICK_UNDO_MS)
         assertThat(rig.sync.drain()).isNull()
         assertThat(rig.store.queueNow()).isEmpty()
         assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)

@@ -52,8 +52,8 @@ interface Toaster {
     fun show(message: String, icon: String = TOAST_ICON_INFO, urgent: Boolean = false, action: ToastAction? = null)
 }
 
-/** The button a toast carries; a tap runs [onClick] and hides the toast. */
-data class ToastAction(val label: String, val onClick: () -> Unit)
+/** The button a toast carries; a tap runs [onClick] and hides the toast, which stays [showMillis]. */
+data class ToastAction(val label: String, val showMillis: Long = TOAST_WITH_ACTION_MS, val onClick: () -> Unit)
 
 /** How long a toast with an action shows, whatever its length (3.1). */
 const val TOAST_WITH_ACTION_MS = 8_000L

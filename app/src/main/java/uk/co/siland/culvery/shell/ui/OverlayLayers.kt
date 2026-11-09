@@ -37,7 +37,6 @@ import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
 import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.OVERLAY_IDLE_MS
-import uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS
 import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.ui.Countdown
 import uk.co.siland.culvery.core.ui.Culvery
@@ -236,13 +235,13 @@ internal fun ClosingWarningLayer(text: String, tag: String, endsAt: Long, nowMil
 
 /**
  * Draws [toast] bottom-centre, 28 dp above the bottom or above the on-screen keyboard while it shows (hand-off §7),
- * and reports it hidden after its reading time ([toastMillis]), or TalkBack's longer one; a toast with an action stays [TOAST_WITH_ACTION_MS], and its tap runs the action and hides it; a new toast restarts the timer.
+ * and reports it hidden after its reading time ([toastMillis]), or TalkBack's longer one; a toast with an action stays its [ToastAction.showMillis], and its tap runs the action and hides it; a new toast restarts the timer.
  */
 @Composable
 fun ToastLayer(toast: ToastMessage?, activity: UserActivity, keyboard: WindowInsets = WindowInsets.ime, onHidden: (Long) -> Unit) {
     val t = toast ?: return
     LaunchedEffect(t.id) {
-        delay(activity.timeout(if (t.action == null) toastMillis(t.message) else TOAST_WITH_ACTION_MS, hasControls = t.action != null))
+        delay(activity.timeout(if (t.action == null) toastMillis(t.message) else t.action.showMillis, hasControls = t.action != null))
         onHidden(t.id)
     }
     ToastSlot(keyboard) {
