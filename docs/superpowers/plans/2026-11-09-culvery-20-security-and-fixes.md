@@ -94,6 +94,8 @@
 **Interfaces:**
 - Produces: `internal const val UPDATE_NOW_GAP_MS = 600_000L`, checked with `clock.within(read.lastAttemptMillis, UPDATE_NOW_GAP_MS)`, as `RETRY_GAP_MS` is. The attempt's time is stored across restarts, so it is wall time; the monotonic-clock rule doesn't apply.
 
+- Regression guards: `aFirstUpdateNowReads`, `anUpdateNowAfterAFailedReadReadsAgain`, `twoUpdateNowsElevenMinutesApartReadTwice`. Only the one-minute test fails today.
+
 - [ ] **Step 1:** Write the companion's N9 tests.
 - [ ] **Step 2:** Run `./gradlew :provider:calendar-midsussex:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement as the companion says.
@@ -115,6 +117,8 @@
   - The scheme-redirect tests check http→https: a plain MockWebServer answers 302 with an https URL in `Location`, and the client returns the 302.
   - The council's second server is addressed as `127.0.0.1`, through `second.url("/").newBuilder().host("127.0.0.1")`, so it differs from the first by host.
 
+- Regression guards: `councilBaseUrlIsHttps`, "a 302 to the same host is followed", and `OpenMeteoModuleTest`'s timeouts.
+
 - [ ] **Step 1:** Write the companion's N2 tests.
 - [ ] **Step 2:** Run `./gradlew :core:net:testDebugUnitTest :provider:calendar-midsussex:testDebugUnitTest :provider:weather-openmeteo:testDebugUnitTest` and `./gradlew :app:testDebugUnitTest --tests '*CleartextTest*'`. Expect FAIL.
 - [ ] **Step 3:** Implement the companion's four parts.
@@ -127,6 +131,8 @@
 
 **Interfaces:**
 - Produces: `internal const val SOCKET_QUEUE = 256`, `internal const val MAX_SOCKET_MESSAGE_CHARS = 4_000_000`. Either limit ends the follow flow with `HomeAssistantException(HaProblem.UNREACHABLE)`; the socket reopens on its usual backoff.
+
+- Regression guards: `aOneMegabyteMessageIsRead`.
 
 - [ ] **Step 1:** Write the companion's N6 tests.
 - [ ] **Step 2:** Run `./gradlew :core:homeassistant:testDebugUnitTest`. Expect FAIL.
@@ -206,6 +212,8 @@
   - `suspend fun HomeAssistantLinking.forget(): Boolean`: a fresh Admin PIN labelled `FORGET_HOME_ASSISTANT`, then `settings.forget()`; false when refused.
   - Words: `TRUST_HOME_ASSISTANT = "Trust this Home Assistant"`, `CERTIFICATE_FINGERPRINT = "Certificate fingerprint"` (the detail is `"$CERTIFICATE_FINGERPRINT\n${fingerprint(pin)}"`), `USE_HTTPS = "This Home Assistant is linked over https. Type its address starting https://."`, `CERTIFICATE_CHANGED_ON_PAGE = "Home Assistant’s certificate has changed. Press Check to trust the new one."`, `FORGET_HOME_ASSISTANT = "Forget this Home Assistant"`, `HOME_ASSISTANT_FORGOTTEN = "Home Assistant forgotten."`.
 
+- Regression guards: `httpStillLinksWithNoPin`.
+
 - [ ] **Step 1:** Write the companion's `HomeAssistantLinkingTest` list.
 - [ ] **Step 2:** Run `./gradlew :core:homeassistant:testDebugUnitTest`. Expect FAIL.
 - [ ] **Step 3:** Implement as the companion says.
@@ -251,6 +259,8 @@
 **Interfaces:**
 - Produces: `CameraPrompt(access: CameraAccess, mayUnpin: suspend () -> Boolean, openSystemScreen, returnToPinning)`; `suspend fun request(launch: () -> Unit)`. `MainActivity` passes `{ access.authorise(CorePermissions.CONNECTIONS_MANAGE, label = ALLOW_THE_CAMERA) != null }`.
 
+- Regression guards: `answeredRepinsAfterAnException`.
+
 - [ ] **Step 1:** Write the companion's N3 tests.
 - [ ] **Step 2:** Run `./gradlew :app:testDebugUnitTest --tests '*CameraPrompt*'`. Expect FAIL.
 - [ ] **Step 3:** Implement.
@@ -265,6 +275,8 @@
 
 **Interfaces:**
 - Produces: `PlugActions.setNeedsPin(entityId, on)` asks when `on` is false; `suspend fun StoredModeActions.setNeedsPin(id: String, on: Boolean): Boolean` (false when refused); `suspend fun ModesStore.setNeedsPin(id: String, on: Boolean)` writing only that mode's PIN key; `ModesStore.update` keeps a stored "Needs a PIN" that's on. `StoredModePage`'s switch calls `setNeedsPin`.
+
+- Regression guards: "on never asks" (plugs and modes), and "a rename of a mode that needs a PIN never asks and keeps it".
 
 - [ ] **Step 1:** Write the companion's N4 tests.
 - [ ] **Step 2:** Run `./gradlew :capability:plugs:testDebugUnitTest :capability:party:testDebugUnitTest`. Expect FAIL.
@@ -429,7 +441,7 @@
   - `deliver`'s CREATE in the spec's four steps (§4.3). `undo` drops a create that isn't on its way and lets its key go at once; one on its way leaves the key to the drain.
 
 - [ ] **Step 1:** Write in `CalendarSyncTest`, with a fake writer whose `create` waits on a gate:
-  - `anUndoBetweenTheReplyAndTheStoreIsSettled` (Undo after the create's reply and before step 3 stores it: the event never reaches the store; the stray is deleted the same pass)
+  - `anUndoBetweenTheReplyAndTheStoreIsSettled` (the fake writer's `create` returns, and Undo runs before the event is stored: a gate on the store's accepted-write, or Undo launched as `create` returns. Today the event stays on the week.)
   - `anUndoAfterTheCreateLandedDeletesTheEvent` (regression guard: the other order, the normal delete path; the week loses it)
   - `anUndoOfAQueuedCreateLetsTheKeyGo` (`undone.pending` empty, no create sent)
   - `noDrainWriterCallRunsUnderTheLock` (regression guard: each fake writer call the drain makes asserts `!writeLock.held`; Undo's own delete stays under the lock)
