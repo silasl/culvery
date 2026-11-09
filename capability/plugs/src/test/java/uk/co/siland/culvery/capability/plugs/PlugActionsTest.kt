@@ -19,6 +19,8 @@ import uk.co.siland.culvery.capability.plugs.ModeChoice.ON
 import uk.co.siland.culvery.capability.plugs.PlugPower.GONE
 import uk.co.siland.culvery.capability.plugs.PlugPower.UNKNOWN
 import uk.co.siland.culvery.capability.plugs.PlugPower.UNREACHABLE
+import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.access.TURN_OFF_NEEDS_A_PIN
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.capability.plugs.PlugPower.OFF as OFF_NOW
 import uk.co.siland.culvery.capability.plugs.PlugPower.ON as ON_NOW
@@ -286,7 +288,7 @@ class PlugActionsTest {
     /** 12r §4.2: fails if show doubles, or hide loses the plug's choices or PIN setting. */
     @Test
     fun showHideAndPinReachTheStore() = runTest {
-        val rig = Rig(this, Role.ADULT, fan(ON_NOW))
+        val rig = Rig(this, Role.ADMIN, fan(ON_NOW))
         rig.actions.show(FAN, true)
         rig.actions.show(FAN, true)
         rig.actions.show(LAMP, true)
@@ -308,6 +310,42 @@ class PlugActionsTest {
 
         rig.actions.show(FAN, true)
         assertThat(rig.plugs.prefs().choice(HOLIDAY, FAN)).isEqualTo(ON)
+    }
+
+    /** Fails if turning a plug's PIN off without an accepted Admin PIN writes anything. */
+    @Test
+    fun turningThePinOffWithARefusedPinWritesNothing() = runTest {
+        for (role in listOf(null, Role.ADULT)) {
+            val rig = rig(role, pin = true)
+
+            rig.actions.setNeedsPin(FAN, false)
+
+            assertThat(rig.access.asked).containsExactly(listOf(CorePermissions.CONNECTIONS_MANAGE))
+            assertThat(rig.access.labels).containsExactly(TURN_OFF_NEEDS_A_PIN)
+            assertThat(rig.plugs.prefs().needsPin).containsExactly(FAN)
+        }
+    }
+
+    /** Fails if an Admin's fresh PIN doesn't turn it off. */
+    @Test
+    fun turningThePinOffWithAPinWrites() = runTest {
+        val rig = rig(Role.ADMIN, pin = true)
+
+        rig.actions.setNeedsPin(FAN, false)
+
+        assertThat(rig.access.asked).containsExactly(listOf(CorePermissions.CONNECTIONS_MANAGE))
+        assertThat(rig.plugs.prefs().needsPin).isEmpty()
+    }
+
+    /** Regression guard: turning the PIN on never asks, whoever is at the wall. */
+    @Test
+    fun turningThePinOnNeverAsks() = runTest {
+        val rig = rig(null, pin = false)
+
+        rig.actions.setNeedsPin(FAN, true)
+
+        assertThat(rig.access.asked).isEmpty()
+        assertThat(rig.plugs.prefs().needsPin).containsExactly(FAN)
     }
 
     /** Fails if a PIN switch landing after a hide writes for a plug that isn't shown. */

@@ -278,6 +278,54 @@ class ModesStoreTest {
         assertThat(settings.record.value).isEqualTo(record)
     }
 
+    /** Fails if setting a mode's PIN writes any key but that mode's own, or a mode that isn't stored gains keys. */
+    @Test
+    fun setNeedsPinWritesOnlyThatModesPinKey() = runTest {
+        val memory = MemoryStore()
+        val settings = ModesStore(memory, backgroundScope)
+        settings.update { ModesPrefs(modes = listOf(FULL_MODE, FULL_MODE.copy(id = "modeabcdef", name = "Film night"))) }
+        settings.save(FULL_RECORD)
+        val before = memory.state.value!!.asMap().mapKeys { it.key.name }
+
+        settings.setNeedsPin("modeabcdef", false)
+        settings.setNeedsPin("nowhere", false)
+
+        val after = memory.state.value!!.asMap().mapKeys { it.key.name }
+        val changed = (before.keys + after.keys).filter { before[it] != after[it] }
+        assertThat(changed).containsExactly(ModeKeys.For("modeabcdef").pin.name)
+        assertThat(settings.prefs.first().mode("modeabcdef")!!.needsPin).isFalse()
+        assertThat(settings.prefs.first().mode(PARTY_MODE.id)!!.needsPin).isTrue()
+    }
+
+    /** Fails if a write made from a copy that says off over a stored on drops the PIN, or can't write one that is stored off. */
+    @Test
+    fun updateKeepsAStoredPinOn() = runTest {
+        val settings = ModesStore(MemoryStore(), backgroundScope)
+        val film = FULL_MODE.copy(id = "modeabcdef", name = "Film night", needsPin = false)
+        settings.update { ModesPrefs(modes = listOf(FULL_MODE, film)) }
+
+        settings.update { it.copy(modes = it.modes.map { m -> m.copy(needsPin = false, showOnHome = false) }) }
+
+        val modes = settings.prefs.first().modes
+        assertThat(modes.map { it.needsPin }).containsExactly(true, false).inOrder()
+        assertThat(modes.map { it.showOnHome }).containsExactly(false, false)
+        settings.update { it.copy(modes = it.modes.map { m -> m.copy(needsPin = true) }) }
+        assertThat(settings.prefs.first().modes.map { it.needsPin }).containsExactly(true, true)
+    }
+
+    /** Regression guard: renaming a mode that needs a PIN keeps it. */
+    @Test
+    fun aRenameOfAModeThatNeedsAPinKeepsIt() = runTest {
+        val settings = ModesStore(MemoryStore(), backgroundScope)
+        settings.update { FULL_PREFS }
+
+        settings.update { it.withMode(FULL_MODE.id) { m -> m.copy(name = "Disco") } }
+
+        val mode = settings.prefs.first().mode(FULL_MODE.id)!!
+        assertThat(mode.name).isEqualTo("Disco")
+        assertThat(mode.needsPin).isTrue()
+    }
+
     /** 13 §4.3: fails if turning off wipes the family's choices. */
     @Test
     fun clearingTheRecordKeepsTheChoices() = runTest {

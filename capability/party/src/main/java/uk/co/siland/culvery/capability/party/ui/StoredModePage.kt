@@ -95,7 +95,7 @@ internal fun StoredModePage(
             HhSwitchRow(
                 ModesWords.NEEDS_A_PIN, line = ModesWords.PLUG_NEEDS_PIN.takeIf { locked },
                 checked = mode.needsPin || locked, tag = "mode_pin", enabled = !locked,
-                onChange = { save { m -> m.copy(needsPin = it) } },
+                onChange = { on -> change { controls.actions.setNeedsPin(mode.id, on) } },
             )
         },
     )

@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
@@ -51,7 +52,7 @@ private val FAN_CANDIDATE = PlugCandidate(FAN, "Fan")
 class PlugsSettingsHostTest {
     @get:Rule val compose = createComposeRule()
     private val rig = PlugsRig()
-    private val actions = PlugActions(TestAccess(Role.ADMIN), rig.settings, rig.system, RecordingToaster(), CoroutineScope(Job()))
+    private var actions = PlugActions(TestAccess(Role.ADMIN), rig.settings, rig.system, RecordingToaster(), CoroutineScope(Job()))
 
     private fun show(found: PlugCandidates, shown: List<String> = emptyList(), needsPin: Set<String> = emptySet()) {
         rig.system.found = found
@@ -111,6 +112,20 @@ class PlugsSettingsHostTest {
         compose.onNodeWithTag("plugs_show_1").performClick()
         compose.waitFor { runCatching { compose.onNodeWithTag("plugs_pin_1").assertIsEnabled() }.isSuccess }
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the switch shows off, or the plug stops needing a PIN, when the Admin PIN was refused. */
+    @Test
+    fun needsPinStaysOnWhenTheAdminPinIsRefused() {
+        val access = TestAccess(Role.ADULT)
+        actions = PlugActions(access, rig.settings, rig.system, RecordingToaster(), CoroutineScope(Job()))
+        show(found(LAMP_CANDIDATE), shown = listOf(LAMP), needsPin = setOf(LAMP))
+        compose.waitFor { count("plugs_pin_0") == 1 }
+        compose.onNodeWithTag("plugs_pin_0").assertIsOn().performClick()
+        compose.waitFor { access.asked.isNotEmpty() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("plugs_pin_0").assertIsOn()
+        assertThat(runBlocking { rig.prefs().needsPin }).containsExactly(LAMP)
     }
 
     @Test

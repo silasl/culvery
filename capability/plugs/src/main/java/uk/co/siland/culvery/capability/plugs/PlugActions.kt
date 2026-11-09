@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.access.TURN_OFF_NEEDS_A_PIN
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Toaster
 
@@ -78,9 +80,12 @@ class PlugActions internal constructor(
 
     suspend fun show(entityId: String, on: Boolean) = write { if (on) it.showing(entityId) else it.hiding(entityId) }
 
-    /** Nothing is written for a plug that isn't shown. */
-    suspend fun setNeedsPin(entityId: String, on: Boolean) = write {
-        if (entityId in it.plugs) it.copy(needsPin = if (on) it.needsPin + entityId else it.needsPin - entityId) else it
+    /** Nothing is written for a plug that isn't shown. Turning it off asks a fresh Admin PIN first; refused, nothing is written. On never asks. */
+    suspend fun setNeedsPin(entityId: String, on: Boolean) {
+        if (!on && access.authorise(CorePermissions.CONNECTIONS_MANAGE, label = TURN_OFF_NEEDS_A_PIN) == null) return
+        write {
+            if (entityId in it.plugs) it.copy(needsPin = if (on) it.needsPin + entityId else it.needsPin - entityId) else it
+        }
     }
 
     private suspend fun needsPin(entityId: String): Boolean = try {

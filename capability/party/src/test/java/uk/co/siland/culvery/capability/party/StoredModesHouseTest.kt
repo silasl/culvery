@@ -888,7 +888,8 @@ class StoredModesHouseTest {
     @Test
     fun aPlugLockedBetweenTapAndTurnOnDoesntCrash() = runTest {
         val rig = rig()
-        rig.choose(PARTY_MODE.copy(needsPin = false))
+        rig.choose(PARTY_MODE)
+        rig.settings.setNeedsPin(PARTY, false)
         rig.plugs.addedNow.value = listOf(LOCKED_HEATER)
         rig.plugs.enters += HouseStep.Failed(LEFT_OUT)
         val house = rig.house()

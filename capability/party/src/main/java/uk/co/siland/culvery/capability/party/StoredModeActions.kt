@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.access.TURN_OFF_NEEDS_A_PIN
 import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HousePermissions
@@ -64,6 +66,13 @@ class StoredModeActions @Inject internal constructor(
                 refused.value = modeId
             }
         }
+    }
+
+    /** Turning [modeId]'s PIN off asks a fresh Admin PIN first, before the store is touched; false when it was refused and nothing was written. On never asks. */
+    suspend fun setNeedsPin(id: String, on: Boolean): Boolean {
+        if (!on && access.authorise(CorePermissions.CONNECTIONS_MANAGE, label = TURN_OFF_NEEDS_A_PIN) == null) return false
+        store.setNeedsPin(id, on)
+        return true
     }
 
     /** True, with [modeId]'s tile saying why, while another mode is on: Holiday mode, or a stored one (decision 1). */

@@ -19,6 +19,9 @@ const val SETUP_IDLE_MS = 600_000L
 /** Why the PIN pad is asking; it picks the pad's reason line. */
 enum class PinReason { Generic, Save, Edit, Delete, Assign, ContinueSetup }
 
+/** The PIN pad's label for turning a plug's or a mode's "Needs a PIN" off. */
+const val TURN_OFF_NEEDS_A_PIN = "Turn off Needs a PIN"
+
 /** The PIN pad's reason line, from explicit copy, never an enum's name (4d-2 §7.1.2, C60). [label] is the permission's, for [PinReason.Generic]. */
 fun pinReasonText(reason: PinReason, label: String): String = when (reason) {
     PinReason.Generic -> "Enter your PIN to ${label.replaceFirstChar { it.lowercase() }}."

@@ -59,6 +59,7 @@ import uk.co.siland.culvery.core.house.LightChoice
 import uk.co.siland.culvery.core.house.ModeGrant
 import uk.co.siland.culvery.core.house.PlugOption
 import uk.co.siland.culvery.core.house.RoomChoice
+import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
@@ -315,16 +316,49 @@ class StoredModePageTest {
         assertThat(rig.house.onMode.value).isNull()
     }
 
-    /** U1: fails if switching the PIN off asks for a PIN. */
+    /** Fails if the switch goes off, or the mode stops needing a PIN, when the Admin PIN was refused. */
     @Test
-    fun pinOffNeedsOnlyTheSession() {
+    fun pinOffRefusedLeavesItOn() {
         show(PARTY_MODE)
 
         compose.onNodeWithTag("mode_pin").assertIsOn().assertIsEnabled().performClick()
 
+        compose.waitFor { rig.access.asked.isNotEmpty() }
+        assertThat(rig.access.asked).containsExactly(listOf("connections.manage"))
+        compose.waitForIdle()
+        assertThat(saved("party").needsPin).isTrue()
+        compose.onNodeWithTag("mode_pin").assertIsOn()
+    }
+
+    /** Fails if the switch shows off before the Admin PIN, or doesn't save off with it. */
+    @Test
+    fun pinOffShowsOffOnlyAfterTheAdminPin() {
+        rig = PageRig(scope, role = Role.ADMIN)
+        val gate = CompletableDeferred<Unit>()
+        rig.access.padGate = gate
+        show(PARTY_MODE)
+
+        compose.onNodeWithTag("mode_pin").assertIsOn().performClick()
+
+        compose.waitFor { rig.access.asked.isNotEmpty() }
+        compose.onNodeWithTag("mode_pin").assertIsOn()
+        assertThat(saved("party").needsPin).isTrue()
+        gate.complete(Unit)
         compose.waitFor { !saved("party").needsPin }
-        assertThat(rig.access.asked).isEmpty()
+        assertThat(rig.access.labels).containsExactly("Turn off Needs a PIN")
         compose.onNodeWithTag("mode_pin").assertIsOff()
+    }
+
+    /** Regression guard: switching the PIN on asks for nothing. */
+    @Test
+    fun pinOnNeverAsks() {
+        show(FILM_NIGHT)
+
+        compose.onNodeWithTag("mode_pin").assertIsOff().performClick()
+
+        compose.waitFor { saved().needsPin }
+        assertThat(rig.access.asked).isEmpty()
+        compose.onNodeWithTag("mode_pin").assertIsOn()
     }
 
     // Lights

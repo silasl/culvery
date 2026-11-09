@@ -12,6 +12,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.access.TURN_OFF_NEEDS_A_PIN
 import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
@@ -35,6 +37,57 @@ class StoredModeActionsTest {
     private suspend fun HouseRig.withFilmNight(film: StoredMode = FILM_NIGHT) = choose(PARTY_MODE, film).also { loaded() }
 
     private suspend fun turnOnParty(rig: HouseRig) = rig.house.turnOn(PARTY, ModeGrant.Person(grant(HousePermissions.STORED_MODE)))
+
+    /** Fails if turning a mode's PIN off without an accepted Admin PIN writes anything. */
+    @Test
+    fun turningAModesPinOffWithARefusedPinWritesNothing() = runTest {
+        val rig = rig()
+        rig.withFilmNight(FILM_NIGHT.copy(needsPin = true))
+        for (role in listOf(null, Role.ADULT)) {
+            val access = TestAccess(role)
+
+            assertThat(actions(access, rig).setNeedsPin(FILM_ID, on = false)).isFalse()
+
+            assertThat(access.asked).containsExactly(listOf(CorePermissions.CONNECTIONS_MANAGE))
+            assertThat(access.labels).containsExactly(TURN_OFF_NEEDS_A_PIN)
+            assertThat(rig.settings.prefsSoon().mode(FILM_ID)!!.needsPin).isTrue()
+        }
+    }
+
+    /** Fails if an Admin's fresh PIN doesn't turn a mode's PIN off, or the pad is shown after the write. */
+    @Test
+    fun turningAModesPinOffAsksBeforeTheStoreIsTouched() = runTest {
+        val rig = rig()
+        rig.withFilmNight(FILM_NIGHT.copy(needsPin = true))
+        val access = TestAccess(Role.ADMIN)
+        val gate = CompletableDeferred<Unit>()
+        access.padGate = gate
+        var done: Boolean? = null
+        launch { done = actions(access, rig).setNeedsPin(FILM_ID, on = false) }
+        runCurrent()
+
+        assertThat(access.asked).containsExactly(listOf(CorePermissions.CONNECTIONS_MANAGE))
+        assertThat(rig.settings.prefsSoon().mode(FILM_ID)!!.needsPin).isTrue()
+        assertThat(done).isNull()
+        gate.complete(Unit)
+        runCurrent()
+
+        assertThat(done).isTrue()
+        assertThat(rig.settings.prefs.first().mode(FILM_ID)!!.needsPin).isFalse()
+    }
+
+    /** Regression guard: turning a mode's PIN on never asks. */
+    @Test
+    fun turningAModesPinOnNeverAsks() = runTest {
+        val rig = rig()
+        rig.withFilmNight()
+        val access = TestAccess(null)
+
+        assertThat(actions(access, rig).setNeedsPin(FILM_ID, on = true)).isTrue()
+
+        assertThat(access.asked).isEmpty()
+        assertThat(rig.settings.prefs.first().mode(FILM_ID)!!.needsPin).isTrue()
+    }
 
     /** Decision 7: fails if a no-PIN mode asks for a PIN, or a Child can't turn it on and off. */
     @Test

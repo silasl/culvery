@@ -73,12 +73,21 @@ class ModesStore(private val store: DataStore<Preferences>, scope: CoroutineScop
     /** Null until the file is first read, so nothing takes "off" for the saved answer. */
     val record: StateFlow<ModeRecord?> = data.map { it.toRecord() }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, null)
 
-    /** Replaces the modes and Holiday's place on Home; the record's keys stay. */
+    /** Replaces the modes and Holiday's place on Home; the record's keys stay. A mode stored as needing a PIN still does: only [setNeedsPin] turns that off. */
     suspend fun update(change: (ModesPrefs) -> ModesPrefs) {
         store.edit {
-            val next = change(it.toModesPrefs())
-            it.writeModes(next.modes)
+            val before = it.toModesPrefs()
+            val next = change(before)
+            val locked = before.modes.filter { m -> m.needsPin }.mapTo(HashSet()) { m -> m.id }
+            it.writeModes(next.modes.map { m -> if (m.id in locked && !m.needsPin) m.copy(needsPin = true) else m })
             it[ModeKeys.HOLIDAY_HOME] = next.holidayOnHome
+        }
+    }
+
+    /** Writes [id]'s "Needs a PIN" alone; nothing for a mode that isn't stored. The PIN is asked before this, never in it. */
+    suspend fun setNeedsPin(id: String, on: Boolean) {
+        store.edit {
+            if (id in it.toModesPrefs().modes.map { m -> m.id }) it[ModeKeys.For(id).pin] = on
         }
     }
 
