@@ -7,8 +7,8 @@ Writes: core/sound/src/main/res/raw/door_organ.wav
 """
 import math
 import pathlib
-import struct
-import wave
+
+from wav_out import write_loud
 
 RATE = 22050
 LENGTH = 4.0
@@ -56,15 +56,7 @@ def sample(t):
 
 def main():
     frames = [sample(i / RATE) for i in range(int(LENGTH * RATE))]
-    peak = max(abs(f) for f in frames)
-    held = frames[:int(RMS_SECONDS * RATE)]
-    gain = min(TARGET_RMS / math.sqrt(sum(f * f for f in held) / len(held)), HEADROOM * 32767 / peak)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    with wave.open(str(OUT), "wb") as out:
-        out.setnchannels(1)
-        out.setsampwidth(2)
-        out.setframerate(RATE)
-        out.writeframes(b"".join(struct.pack("<h", int(f * gain)) for f in frames))
+    write_loud(OUT, frames, RATE, TARGET_RMS, RMS_SECONDS, HEADROOM)
 
 
 if __name__ == "__main__":

@@ -7,8 +7,8 @@ Writes: core/sound/src/main/res/raw/door_chime.wav
 """
 import math
 import pathlib
-import struct
-import wave
+
+from wav_out import write_peak
 
 RATE = 22050
 LENGTH = 3.2
@@ -34,13 +34,7 @@ def sample(t):
 
 def main():
     frames = [sample(i / RATE) for i in range(int(LENGTH * RATE))]
-    peak = max(abs(f) for f in frames)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    with wave.open(str(OUT), "wb") as out:
-        out.setnchannels(1)
-        out.setsampwidth(2)
-        out.setframerate(RATE)
-        out.writeframes(b"".join(struct.pack("<h", int(f / peak * HEADROOM * 32767)) for f in frames))
+    write_peak(OUT, frames, RATE, HEADROOM)
 
 
 if __name__ == "__main__":

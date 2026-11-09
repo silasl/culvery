@@ -7,8 +7,8 @@ Writes: core/sound/src/main/res/raw/christmas_music_box.wav
 """
 import math
 import pathlib
-import struct
-import wave
+
+from wav_out import write_loud
 
 RATE = 22050
 BPM = 150
@@ -59,15 +59,7 @@ def main():
         t = i / RATE
         fade = 0.5 * (1 + math.cos(math.pi * min(1.0, (t - (LENGTH - FADE)) / FADE))) if t > LENGTH - FADE else 1.0
         frames.append(sample(t) * fade)
-    peak = max(abs(f) for f in frames)
-    held = frames[:int(RMS_SECONDS * RATE)]
-    gain = min(TARGET_RMS / math.sqrt(sum(f * f for f in held) / len(held)), HEADROOM * 32767 / peak)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    with wave.open(str(OUT), "wb") as out:
-        out.setnchannels(1)
-        out.setsampwidth(2)
-        out.setframerate(RATE)
-        out.writeframes(b"".join(struct.pack("<h", int(f * gain)) for f in frames))
+    write_loud(OUT, frames, RATE, TARGET_RMS, RMS_SECONDS, HEADROOM)
 
 
 if __name__ == "__main__":
