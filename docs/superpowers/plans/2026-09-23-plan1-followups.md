@@ -7,8 +7,8 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 The open work, one number each; the details are in the sections below. Numbers never change: a done or dropped item is taken off the list, the others keep their numbers, and a new item takes the next number.
 
 **From the November 2026 review and Plan 18**
-1. Camera wake-up's cost: the fixes (P1, P2, P9) are built in Plan 19; left is re-running runs B and C against decision 9's bar. See "November 2026 review" below.
-3. Security fixes N1–N10 and M2, in Plan 20 (rulings in the private notes).
+1. Camera wake-up's cost: the fixes (P1, P2, P9) are built; left is re-running runs B and C against decision 9's bar. See "November 2026 review" below.
+3. Security fixes N1–N10 and M2 (rulings in the private notes). In this batch; not started.
 5. A shorter pause after ticking off a shopping item.
 6. A new name for Settings › Modes, at the end-of-v1 review.
 7. Sound pads played on Sonos.
@@ -47,7 +47,7 @@ The open work, one number each; the details are in the sections below. Numbers n
 13. Calendar M3: a phone's counted series is expanded in full on every detail update.
 14. Home slow to fill (2.2–2.9 s from a cold start).
 15. Accented letters garbled on the Music card.
-16. Hide the Music card's volume pill while nothing plays (no mute button); Plan 21.
+16. Hide the Music card's volume pill while nothing plays (no mute button). In this batch; not started.
 17. Not tried yet: "Use for new events" with real calendars, and a new Sonos playlist appearing.
 32. Culvery started while the tablet was on its lock screen (after an update) didn't pin once unlocked; a normal open asks to pin.
 33. The sample house's Music card says "Nothing playing" while a room plays.
