@@ -28,6 +28,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalTime
 import java.time.ZoneId
+import java.util.concurrent.CountDownLatch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -63,6 +64,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
@@ -101,13 +103,13 @@ class DoorSettingsPageTest {
 
     private fun prefs(): DoorPrefs = runBlocking { settings.prefs.first() }
 
-    private fun showHost(showing: SeasonalTheme? = null, birthday: Boolean = false) {
+    private fun showHost(showing: SeasonalTheme? = null, birthday: Boolean = false, library: SoundLibrary = testSounds(sounds)) {
         val wall = FakeShowing(showing).apply { birthdayShowing.value = birthday }
         val health = DoorHealth(provider, settings, MutableStateFlow(true), MutableStateFlow(true), io)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
                 CulveryTheme(dark = true) {
-                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, testSounds(sounds), clock, flowOf(london), toaster, wall, access) }
+                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, library, clock, flowOf(london), toaster, wall, access) }
                 }
             }
         }
@@ -209,6 +211,25 @@ class DoorSettingsPageTest {
         compose.onNodeWithTag("door_doorbell_follow").assertIsNotSelected()
         compose.onNodeWithTag("door_play_chime").performClick()
         assertThat(chime.plays).containsExactly(BuiltInSound.CLASSIC.id to 1.0f)
+    }
+
+    /** Fails if a chosen file is called gone before the folder's first read, or isn't once it has been read and the file is missing. */
+    @Test
+    fun aChosenFileIsNotCalledGoneBeforeTheFolderIsRead() {
+        val id = "file:halloween/Gone Howl.ogg"
+        runBlocking { settings.setDoorbell(id) }
+        val release = CountDownLatch(1)
+        val held = SoundLibrary({ release.await(); sounds }, CoroutineScope(Dispatchers.Unconfined), Dispatchers.IO)
+        try {
+            showHost(library = held)
+            waitFor { shows("door_doorbell_$id") }
+            compose.onNodeWithTag("door_doorbell_$id").assertIsSelected().assertTextContains("Gone Howl")
+            assertThat(shows("door_doorbell_${id}_note")).isFalse()
+        } finally {
+            release.countDown()
+        }
+        waitFor { shows("door_doorbell_${id}_note") }
+        compose.onNodeWithTag("door_doorbell_${id}_note", useUnmergedTree = true).assertTextEquals("Not on this tablet any more")
     }
 
     @Test

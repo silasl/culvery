@@ -91,7 +91,7 @@ class ModesCapability @Inject constructor(
             settings, ModeControls(actions, house, shelf::place, music.orElse(null), lights.orElse(null)),
             switches.firstOrNull { it.modeId == HouseModes.HOLIDAY }?.isOn ?: MutableStateFlow(false),
             shelf.room, plugs.orElse(null), toaster, builtIn,
-            SoundButtons(padsStore, shelf.soundRoom, library.choices, library::refresh, taps),
+            SoundButtons(padsStore, shelf.soundRoom, library.choices, library.firstReadDone, library::refresh, taps),
         ),
     )
 }

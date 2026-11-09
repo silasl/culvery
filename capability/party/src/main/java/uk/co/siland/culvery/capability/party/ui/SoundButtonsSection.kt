@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.party.ModesWords
 import uk.co.siland.culvery.capability.party.PadTaps
@@ -56,6 +57,8 @@ class SoundButtons internal constructor(
     internal val store: SoundPadsStore,
     internal val room: Flow<Int>,
     internal val choices: Flow<List<Sound>>,
+    /** True once the sounds folder has been read; before then a chosen tablet sound isn't called gone. */
+    internal val folderRead: StateFlow<Boolean>,
     /** Reads the tablet's sounds folder again. */
     internal val refresh: suspend () -> Unit,
     internal val taps: PadTaps,
@@ -70,6 +73,7 @@ internal fun SoundButtonsSection(sounds: SoundButtons, toaster: Toaster) {
     val stored by sounds.store.pads.collectAsStateWithLifecycle(null)
     val room by sounds.room.collectAsStateWithLifecycle(null)
     val choices by sounds.choices.collectAsStateWithLifecycle(null)
+    val folderRead by sounds.folderRead.collectAsStateWithLifecycle()
     val overlay = LocalOverlayHost.current
     val scope = rememberCoroutineScope()
     val change = scope.saving(toaster, logPadSave)
@@ -84,7 +88,7 @@ internal fun SoundButtonsSection(sounds: SoundButtons, toaster: Toaster) {
         val value = when {
             id == null -> ModesWords.NONE
             sound != null -> sound.name
-            else -> soundNameFromId(id)?.let(ModesWords::goneSound) ?: ModesWords.NONE
+            else -> soundNameFromId(id)?.let { if (folderRead) ModesWords.goneSound(it) else it } ?: ModesWords.NONE
         }
         HhListRow(
             ModesWords.padName(pad), Modifier.testTag("sound_pad_$pad").semantics {

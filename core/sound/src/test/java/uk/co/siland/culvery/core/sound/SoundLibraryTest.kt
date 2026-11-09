@@ -1,5 +1,7 @@
 package uk.co.siland.culvery.core.sound
 
+import android.util.Log
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.util.concurrent.CountDownLatch
@@ -15,9 +17,12 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(AndroidJUnit4::class)
 class SoundLibraryTest {
     @get:Rule val folder = TemporaryFolder()
 
@@ -29,9 +34,9 @@ class SoundLibraryTest {
 
     private fun library() = SoundLibrary({ folder.root }, CoroutineScope(UnconfinedTestDispatcher()), UnconfinedTestDispatcher())
 
-    /** 18 §2.2: the page's re-read wins over a start-up read that was slower to finish. */
+    /** Regression guard: the page's re-read wins over a start-up read that was slower to finish. */
     @Test
-    fun aSlowStartUpReadLeavesARefreshsSounds() = runBlocking {
+    fun aLaterRefreshWinsOverAHeldFirstRead() = runBlocking {
         val empty = folder.newFolder("empty")
         val reading = CountDownLatch(1)
         val finish = CountDownLatch(1)
@@ -50,6 +55,46 @@ class SoundLibraryTest {
         finish.countDown()
         start.children.forEach { it.join() }
         assertThat(library.sounds.value.map { it.id }).contains("file:Test Honk.wav")
+    }
+
+    @Test
+    fun theFirstReadSaysWhenItLands() = runBlocking {
+        val reading = CountDownLatch(1)
+        val finish = CountDownLatch(1)
+        val start = SupervisorJob()
+        val library = SoundLibrary({
+            reading.countDown()
+            finish.await()
+            folder.root
+        }, CoroutineScope(start + Dispatchers.Unconfined), Dispatchers.IO)
+        reading.await()
+        assertThat(library.firstReadDone.value).isFalse()
+        finish.countDown()
+        start.children.forEach { it.join() }
+        assertThat(library.firstReadDone.value).isTrue()
+    }
+
+    @Test
+    fun aFailedReadKeepsTheListAndCountsAsLanded() = runTest {
+        touch("Test Honk.wav")
+        var failing = false
+        val library = SoundLibrary({ if (failing) throw IllegalStateException("no folder") else folder.root }, CoroutineScope(UnconfinedTestDispatcher()), UnconfinedTestDispatcher())
+        val before = library.sounds.value
+        assertThat(before.map { it.id }).contains("file:Test Honk.wav")
+        ShadowLog.clear()
+        failing = true
+        library.refresh()
+        assertThat(library.sounds.value).isEqualTo(before)
+        assertThat(library.firstReadDone.value).isTrue()
+        val warnings = ShadowLog.getLogsForTag("SoundLibrary").filter { it.type == Log.WARN }
+        assertThat(warnings.map { it.msg }).containsExactly("The sounds folder couldn't be read (IllegalStateException)")
+    }
+
+    @Test
+    fun aFailedFirstReadStillCountsAsLanded() {
+        val library = SoundLibrary({ throw IllegalStateException("no folder") }, CoroutineScope(UnconfinedTestDispatcher()), UnconfinedTestDispatcher())
+        assertThat(library.firstReadDone.value).isTrue()
+        assertThat(library.sounds.value.map { it.id }).containsExactlyElementsIn(BuiltInSound.entries.map { it.id })
     }
 
     @Test

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -65,6 +66,7 @@ class SoundButtonsSectionTest {
     private val room = MutableStateFlow(3)
     private var refreshes = 0
     private var themed = emptyList<Sound>()
+    private val folderRead = MutableStateFlow(true)
 
     @After fun stop() = scope.cancel()
 
@@ -72,7 +74,7 @@ class SoundButtonsSectionTest {
         pads.forEachIndexed { i, id -> runBlocking { store.setPad(i + 1, id) } }
         val taps = PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 0.6f }, scope, Dispatchers.Unconfined)
         val choices = flowOf((LIBRARY + themed).filter { it.id != BuiltInSound.HAPPY_BIRTHDAY.id })
-        val sounds = SoundButtons(store, room, choices, { refreshes++ }, taps)
+        val sounds = SoundButtons(store, room, choices, folderRead, { refreshes++ }, taps)
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
@@ -217,6 +219,18 @@ class SoundButtonsSectionTest {
 
         compose.onNodeWithTag("sound_pad_2").assertTextContains("Test Howl · Not on this tablet any more")
         assertThat(exists("sound_pad_2_play")).isFalse()
+    }
+
+    /** Fails if a chosen file is called gone before the folder's first read, or isn't once it has been read and the file is missing. */
+    @Test
+    fun aChosenFileIsNotCalledGoneBeforeTheFolderIsRead() {
+        folderRead.value = false
+        show(TROMBONE.id, GONE, null)
+
+        compose.onNodeWithTag("sound_pad_2").assertTextContains("Test Howl")
+        assertThat(compose.onAllNodesWithText("Not on this tablet any more", substring = true, useUnmergedTree = true).fetchSemanticsNodes()).isEmpty()
+        folderRead.value = true
+        compose.waitFor { compose.onAllNodesWithText("Test Howl · Not on this tablet any more", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
     }
 
     /** Fails if a pad holding a sound that isn't a tablet file and isn't offered names it as a gone file. */

@@ -129,6 +129,8 @@ data class DoorSettingsUi(
     val busy: Boolean = false,
     /** The id of the sound being previewed, or null. */
     val previewing: String? = null,
+    /** False until the sounds folder has been read; a chosen tablet sound isn't called gone before then. */
+    val folderRead: Boolean = true,
 )
 
 class DoorSettingsActions(
@@ -164,7 +166,7 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
                 )
             }
             soundNameFromId(ui.doorbell)?.takeIf { ui.sounds.none { it.id == ui.doorbell } }?.let { name ->
-                HhRadioRow(name, NOT_ON_THIS_TABLET, selected = true, "door_doorbell_${ui.doorbell}") {}
+                HhRadioRow(name, NOT_ON_THIS_TABLET.takeIf { ui.folderRead }, selected = true, "door_doorbell_${ui.doorbell}") {}
             }
         }
         HhSectionLabel(CHIME)
@@ -237,6 +239,7 @@ internal fun DoorSettingsHost(
 ) {
     val prefs by settings.prefs.collectAsStateWithLifecycle(null)
     val sounds by library.choices.collectAsStateWithLifecycle(null)
+    val folderRead by library.firstReadDone.collectAsStateWithLifecycle()
     val previewing by chime.previewing.collectAsStateWithLifecycle()
     val birthday by showing.birthdayShowing.collectAsStateWithLifecycle()
     val checks by health.checks.collectAsStateWithLifecycle()
@@ -263,6 +266,7 @@ internal fun DoorSettingsHost(
             doorbell = p.doorbell,
             sounds = choices,
             previewing = previewing,
+            folderRead = folderRead,
             quietOn = p.quietOn,
             quietFrom = p.quietFrom,
             quietUntil = p.quietUntil,

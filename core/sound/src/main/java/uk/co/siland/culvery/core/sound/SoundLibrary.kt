@@ -1,11 +1,13 @@
 package uk.co.siland.culvery.core.sound
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.VisibleForTesting
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +20,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.ui.SeasonalTheme
+
+private const val TAG = "SoundLibrary"
 
 /** The built-in sounds followed by the ones in the tablet's sounds folder. The folder is read at start and on [refresh]. */
 @Singleton
@@ -36,22 +40,34 @@ class SoundLibrary @VisibleForTesting constructor(
     private var reads = 0L
     private var shown = 0L
 
+    private val firstRead = MutableStateFlow(false)
+
     val sounds: StateFlow<List<Sound>> = state.asStateFlow()
+
+    /** False until a read of the folder has landed or failed; a tablet sound that isn't listed before then may only not have been read yet. */
+    val firstReadDone: StateFlow<Boolean> = firstRead.asStateFlow()
 
     init {
         scope.launch { refresh() }
     }
 
-    /** When reads overlap, the one that began last wins. */
+    /** When reads overlap, the one that began last wins. A failed read keeps the list as it was. */
     suspend fun refresh() {
         val read = synchronized(state) { ++reads }
-        val found = withContext(io) { readSoundsFolder(root()) }
-        synchronized(state) {
-            if (read > shown) {
-                shown = read
-                state.value = builtIns + found
+        try {
+            val found = withContext(io) { readSoundsFolder(root()) }
+            synchronized(state) {
+                if (read > shown) {
+                    shown = read
+                    state.value = builtIns + found
+                }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "The sounds folder couldn't be read (${e::class.simpleName})")
         }
+        firstRead.value = true
     }
 
     fun byId(id: String?): Sound? = sounds.value.soundFor(id)
