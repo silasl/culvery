@@ -117,9 +117,9 @@ class PadTapsTest {
         runCurrent()
         player.outcomes += listOf(PadStart.DOORBELL, PadStart.STOPPED)
 
+        taps.tap(pad1)
+        assertThat(taps.line(1, first = false).first()).isNull()
         taps.tap(pad2)
-        taps.tap(pad2)
-
         assertThat(taps.line(2, first = false).first()).isNull()
     }
 
@@ -135,7 +135,7 @@ class PadTapsTest {
         assertThat(taps.line(2, first = false).first()).isNull()
     }
 
-    /** A second tap on a pad that is still opening stops it, and the stopped first tap shows no failure. */
+    /** Fails if a second tap on a pad that is still opening doesn't stop it, or the stopped first tap shows a failure. */
     @Test
     fun aSecondTapOnAnOpeningPadStopsIt() = runTest {
         val taps = taps()

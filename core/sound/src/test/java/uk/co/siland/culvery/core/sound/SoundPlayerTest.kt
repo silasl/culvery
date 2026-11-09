@@ -343,7 +343,7 @@ class SoundPlayerTest {
         assertThat(asked).containsExactly(honk.id, classic.id).inOrder()
     }
 
-    /** Regression guard: passes today, as there is no fallback to cancel; it fails if one ignores a newer ring. */
+    /** Regression guard: fails if a doorbell sound that errors after a newer ring still gets the fallback chime. */
     @Test
     fun noFallbackAfterANewerRing() = test {
         val player = player(honk to Player.STARTS, classic to Player.STARTS)

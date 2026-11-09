@@ -143,7 +143,6 @@ class SoundPlayer internal constructor(
                 player.release()
                 return PadStart.STOPPED
             }
-            stopPads()
             val ringsAtStart = rings
             live += player
             if (play.doorbell) doorbellPlaying++
