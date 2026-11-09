@@ -4,7 +4,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
-import uk.co.siland.culvery.core.ui.plural
+import java.util.Locale
 
 /** The Repeats row when the rule isn't simple, or unknown. */
 const val REPEATS_YES = "Yes"
@@ -14,7 +14,8 @@ private val UNITS = mapOf("DAILY" to "day", "WEEKLY" to "week", "MONTHLY" to "mo
 /**
  * The detail sheet's Repeats row (9 §3.4), in the editor's words from the series' first date (else [start]): "Every
  * Saturday", "Every month, on the last Thursday", "Every month, on the 22nd"; another interval reads "Every 3 months".
- * Then " · 12 times · last on Sat 12 Dec" (" · 12 times" when the rule has no first date) or " · until Sat 12 Dec".
+ * Then " · 12 times · last on Sat 12 Dec" (" · 12 times" when the rule has no first date, or past the count
+ * [lastOccurrence] works out) or " · until Sat 12 Dec".
  * Anything else is "Yes".
  */
 fun repeatsLabel(rule: String?, start: EventTime, zone: ZoneId): String {
@@ -24,10 +25,10 @@ fun repeatsLabel(rule: String?, start: EventTime, zone: ZoneId): String {
     val choice = readChoice(parts, day)
     val nth = nthOf(rule, day)
     val words = if (choice != null) choice.wording(day, nth) else otherInterval(parts, day) ?: return REPEATS_YES
-    val dates: ((LocalDate, Int) -> List<LocalDate>)? = choice?.let { c -> { from, n -> occurrences(c, from, n, nth) } }
     val count = parts["COUNT"]?.toIntOrNull()?.takeIf { it >= 1 }?.let { n ->
-        val last = if (dates != null && first != null) " · last on ${dates(first, n).last().format(SHORT_DAY)}" else ""
-        " · ${plural(n.toLong(), "time")}$last"
+        val lastDay = if (choice != null && first != null) lastOccurrence(choice, first, n, nth) else null
+        val last = lastDay?.let { " · last on ${it.format(SHORT_DAY)}" }.orEmpty()
+        " · ${"%,d".format(Locale.UK, n)} ${if (n == 1) "time" else "times"}$last"
     }.orEmpty()
     val until = parts["UNTIL"]?.let { untilDay(it, zone) }?.let { " · until ${it.format(SHORT_DAY)}" }.orEmpty()
     return words + count + until

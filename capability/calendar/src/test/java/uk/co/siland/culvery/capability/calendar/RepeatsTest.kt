@@ -113,6 +113,35 @@ class RepeatsTest {
             .isEqualTo("Every Saturday")
     }
 
+    /** 20 §4.4: past 1,000 times a series that can skip a month or a year isn't counted, so the label is the count alone. */
+    @Test
+    fun aboveTheCapTheLabelIsTheCountAlone() {
+        val the31st = LocalDate.of(2026, 10, 31)
+        assertThat(label("DTSTART:20261031\nRRULE:FREQ=MONTHLY;BYMONTHDAY=31;COUNT=10000", the31st))
+            .isEqualTo("Every month, on the 31st · 10,000 times")
+        val leapDay = LocalDate.of(2028, 2, 29)
+        assertThat(label("DTSTART:20280229\nRRULE:FREQ=YEARLY;COUNT=10000", leapDay)).endsWith(" · 10,000 times")
+    }
+
+    /** Regression guard: a short series still names its last date. */
+    @Test
+    fun aTwelveTimeSeriesStillSaysItsLastDate() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=WEEKLY;BYDAY=SA;COUNT=12")).isEqualTo("Every Saturday · 12 times · last on Sat 12 Dec")
+    }
+
+    /** Review Focus 4: a phone's series with an enormous COUNT, on each rule. */
+    @Test(timeout = 1_000)
+    fun aHugeCountReturnsAtOnce() {
+        listOf(
+            "FREQ=DAILY",
+            "FREQ=WEEKLY;BYDAY=SA",
+            "FREQ=WEEKLY;INTERVAL=2;BYDAY=SA",
+            "FREQ=MONTHLY;BYDAY=4SA",
+            "FREQ=MONTHLY;BYMONTHDAY=26",
+            "FREQ=YEARLY",
+        ).forEach { assertThat(label("DTSTART:20260926\nRRULE:$it;COUNT=2000000000")).contains(" · 2,000,000,000 times") }
+    }
+
     @Test
     fun theReadBackAgreesWithTheEditor() {
         for (choice in EDITOR_REPEATS - RepeatChoice.Never) {

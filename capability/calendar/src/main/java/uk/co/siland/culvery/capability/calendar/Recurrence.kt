@@ -113,6 +113,26 @@ fun occurrences(choice: RepeatChoice, day: LocalDate, count: Int, nth: Int = nth
     return generateSequence(0L) { it + 1 }.mapNotNull(candidate).take(count).toList()
 }
 
+/** The most times a series that can skip a month or a year is counted through for its last date (20 §4.4). */
+internal const val COUNTED_LAST_CAP = 1_000
+
+/**
+ * The last of [count] dates of [choice] from [first], as [occurrences] lists them. Worked out directly where every
+ * period has a date; counted for a series by date in the month or year, which can skip one, and null past
+ * [COUNTED_LAST_CAP] times.
+ */
+internal fun lastOccurrence(choice: RepeatChoice, first: LocalDate, count: Int, nth: Int): LocalDate? {
+    if (count < 1) return null
+    val steps = (count - 1L) * choice.interval
+    return when (choice) {
+        RepeatChoice.Never -> first
+        RepeatChoice.Daily -> first.plusDays(steps)
+        RepeatChoice.Weekly, RepeatChoice.Fortnightly -> first.plusWeeks(steps)
+        RepeatChoice.MonthlyOnWeekday -> nthWeekdayIn(YearMonth.from(first).plusMonths(steps), nth, first.dayOfWeek)
+        RepeatChoice.Monthly, RepeatChoice.Yearly -> if (count > COUNTED_LAST_CAP) null else occurrences(choice, first, count, nth).last()
+    }
+}
+
 const val MIN_TIMES = 2
 const val MAX_TIMES = 52
 const val DEFAULT_TIMES = 10

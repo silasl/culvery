@@ -69,6 +69,31 @@ class RecurrenceTest {
             .containsExactly("1st", "2nd", "3rd", "4th", "last", "11th", "12th", "13th", "21st", "22nd", "23rd", "31st").inOrder()
     }
 
+    /** 20 §4.4: a series with a date in every period has its last date worked out, not listed. */
+    @Test
+    fun theDirectLastDateMatchesTheListedOne() {
+        listOf(
+            Triple(RepeatChoice.Daily, saturday, nthWeekday(saturday)),
+            Triple(RepeatChoice.Weekly, saturday, nthWeekday(saturday)),
+            Triple(RepeatChoice.Fortnightly, saturday, nthWeekday(saturday)),
+            Triple(RepeatChoice.MonthlyOnWeekday, thursday, LAST),
+        ).forEach { (choice, first, nth) ->
+            assertThat(lastOccurrence(choice, first, 10_000, nth)).isEqualTo(occurrences(choice, first, 10_000, nth).last())
+        }
+    }
+
+    /** 20 §4.4: a series that can skip a month or a year is counted, up to the cap. */
+    @Test
+    fun underTheCapTheLastDateIsTheListedOne() {
+        val the31st = LocalDate.of(2026, 10, 31)
+        val leapDay = LocalDate.of(2028, 2, 29)
+        assertThat(lastOccurrence(RepeatChoice.Monthly, the31st, 1_000, nthWeekday(the31st)))
+            .isEqualTo(occurrences(RepeatChoice.Monthly, the31st, 1_000).last())
+        assertThat(lastOccurrence(RepeatChoice.Yearly, leapDay, 1_000, nthWeekday(leapDay)))
+            .isEqualTo(occurrences(RepeatChoice.Yearly, leapDay, 1_000).last())
+        assertThat(lastOccurrence(RepeatChoice.Monthly, the31st, COUNTED_LAST_CAP + 1, nthWeekday(the31st))).isNull()
+    }
+
     @Test
     fun occurrencesFollowTheRule() {
         assertThat(occurrences(RepeatChoice.Weekly, saturday, 12).last()).isEqualTo(LocalDate.of(2026, 12, 12))
