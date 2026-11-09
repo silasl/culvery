@@ -63,7 +63,7 @@ internal sealed interface Step {
     data object Failed : Step
 }
 
-/** "Next: Monday 9 November — Food": the first collection from [today] on, and the bins in it. */
+/** "Next: Thursday 2 January — Food": the first collection from [today] on, and the bins in it. */
 internal fun nextLine(days: List<BinDay>, today: LocalDate): String {
     val next = days.firstOrNull { !it.date.isBefore(today) } ?: days.first()
     return "Next: ${FULL_DATE.format(next.date)} — " + binNames(next.kinds)
