@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,9 +42,12 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.Sound
+import uk.co.siland.culvery.core.sound.SoundSource
 import uk.co.siland.culvery.core.sound.SAD_TROMBONE_ID
 import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.waitFor
 
@@ -60,13 +64,14 @@ class SoundButtonsSectionTest {
     private val store = SoundPadsStore(MemoryStore())
     private val room = MutableStateFlow(3)
     private var refreshes = 0
+    private var themed = emptyList<Sound>()
 
     @After fun stop() = scope.cancel()
 
     private fun show(vararg pads: String?) {
         pads.forEachIndexed { i, id -> runBlocking { store.setPad(i + 1, id) } }
         val taps = PadTaps(player::play, player::stop, player.playing, GateRig().gate, { 0.6f }, scope, Dispatchers.Unconfined)
-        val choices = flowOf(LIBRARY.filter { it.id != BuiltInSound.HAPPY_BIRTHDAY.id })
+        val choices = flowOf((LIBRARY + themed).filter { it.id != BuiltInSound.HAPPY_BIRTHDAY.id })
         val sounds = SoundButtons(store, room, choices, { refreshes++ }, taps)
         compose.setContent {
             CulveryTheme(dark = true) {
@@ -118,6 +123,18 @@ class SoundButtonsSectionTest {
 
         compose.onNodeWithTag("sound_pad_1").assertTextContains(TROMBONE.name)
         assertThat(exists("sound_pad_1_play")).isTrue()
+    }
+
+    /** Fails if a theme folder's sound isn't lined with its theme's name. */
+    @Test
+    fun aThemeSoundNamesItsTheme() {
+        val howl = Sound("file:halloween/Test Howl.ogg", "Test Howl", SoundSource.OnTablet(File("Test Howl.ogg")), SeasonalTheme.HALLOWEEN)
+        themed = listOf(howl)
+        show(TROMBONE.id, ORGAN.id, null)
+
+        compose.onNodeWithTag("sound_pad_3").performClick()
+        compose.onNodeWithTag("sound_choice_${howl.id}").assertTextContains("On this tablet · Halloween")
+        compose.onNodeWithTag("sound_choice_${HONK.id}").assertTextContains("On this tablet")
     }
 
     /** Fails if choosing a sound doesn't store it for that pad, close the sheet, or line a tablet sound "On this tablet". */

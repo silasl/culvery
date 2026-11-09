@@ -65,12 +65,11 @@ import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.plugin.save
 import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.sound.NOT_ON_THIS_TABLET
-import uk.co.siland.culvery.core.sound.ON_THIS_TABLET
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
-import uk.co.siland.culvery.core.sound.onTablet
 import uk.co.siland.culvery.core.sound.soundFor
 import uk.co.siland.culvery.core.sound.soundNameFromId
+import uk.co.siland.culvery.core.sound.tabletLine
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.FROM
@@ -160,7 +159,7 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
             val chosen = ui.sounds.soundFor(ui.doorbell)?.id
             ui.sounds.forEach { sound ->
                 HhSoundRow(
-                    sound.name, ON_THIS_TABLET.takeIf { sound.onTablet }, ui.previewing == sound.id, chosen == sound.id, "door_doorbell_${sound.id}",
+                    sound.name, sound.tabletLine, ui.previewing == sound.id, chosen == sound.id, "door_doorbell_${sound.id}",
                     onPlay = { actions.onPreview(sound) }, onChoose = { actions.onDoorbell(sound.id) },
                 )
             }

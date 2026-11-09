@@ -58,10 +58,85 @@ class SoundsFolderTest {
     }
 
     @Test
-    fun aSharedNameKeepsTheFirstPath() {
-        touch("Test Honk.wav")
-        touch("halloween/Test Honk.mp3")
-        assertThat(readSoundsFolder(folder.root).map { it.id }).containsExactly("file:Test Honk.wav")
+    fun aThemeSoundSharingAMainFolderNameIsKept() {
+        touch("howl.mp3")
+        touch("halloween/howl.mp3")
+        assertThat(readSoundsFolder(folder.root).map { it.id }).containsExactly("file:howl.mp3", "file:halloween/howl.mp3").inOrder()
+    }
+
+    @Test
+    fun aThemeFolderIsFoundWhateverItsCase() {
+        touch("Halloween/howl.mp3")
+        val sound = readSoundsFolder(folder.root).single()
+        assertThat(sound.theme).isEqualTo(SeasonalTheme.HALLOWEEN)
+        assertThat(sound.id).isEqualTo("file:Halloween/howl.mp3")
+    }
+
+    @Test
+    fun sameNamesDifferingInCaseShowOnce() {
+        touch("Howl.mp3")
+        touch("howl.wav")
+        assertThat(readSoundsFolder(folder.root).map { it.id }).containsExactly("file:Howl.mp3")
+    }
+
+    @Test
+    fun sameNamesInAThemeFolderShowOnceToo() {
+        touch("halloween/Howl.mp3")
+        touch("halloween/howl.wav")
+        assertThat(readSoundsFolder(folder.root).map { it.id }).containsExactly("file:halloween/Howl.mp3")
+    }
+
+    @Test
+    fun namesDifferingOnlyByAFormattingCharacterShowOnce() {
+        touch("Howl.mp3")
+        touch("Ho\u200Bwl.wav")
+        assertThat(readSoundsFolder(folder.root)).hasSize(1)
+    }
+
+    @Test
+    fun formattingAndControlCharactersAreDropped() {
+        assertThat(cleanSoundName("\u202EHo\u200Bwl\uFEFF\u0007")).isEqualTo("Howl")
+        assertThat(cleanSoundName("a\u2028b\u2029c")).isEqualTo("abc")
+    }
+
+    @Test
+    fun runsOfSpacesCollapseAndTheEndsAreTrimmed() {
+        assertThat(cleanSoundName("  Test   Honk\u00A0 two ")).isEqualTo("Test Honk two")
+    }
+
+    @Test
+    fun aLongNameIsCutToFortyWithAnEllipsis() {
+        val cleaned = cleanSoundName("x".repeat(60))
+        assertThat(cleaned).isEqualTo("x".repeat(SOUND_NAME_MAX - 1) + "\u2026")
+        assertThat(cleanSoundName("x".repeat(SOUND_NAME_MAX))).isEqualTo("x".repeat(SOUND_NAME_MAX))
+    }
+
+    @Test
+    fun anEmojiAtTheCutIsNotSplit() {
+        val cleaned = cleanSoundName("x".repeat(38) + "\uD83D\uDE00".repeat(5))
+        assertThat(cleaned).isEqualTo("x".repeat(38) + "\uD83D\uDE00" + "\u2026")
+        assertThat(cleaned.codePointCount(0, cleaned.length)).isEqualTo(SOUND_NAME_MAX)
+    }
+
+    @Test
+    fun aNameWithNothingLeftIsUnnamed() {
+        assertThat(cleanSoundName("\u200B\u202E \u0000")).isEqualTo(UNNAMED_SOUND)
+        assertThat(cleanSoundName("")).isEqualTo(UNNAMED_SOUND)
+    }
+
+    @Test
+    fun aCleanedNameKeepsTheStoredId() {
+        touch("Ho\u200Bwl.wav")
+        val sound = readSoundsFolder(folder.root).single()
+        assertThat(sound.name).isEqualTo("Howl")
+        assertThat(sound.id).isEqualTo("file:Ho\u200Bwl.wav")
+        assertThat(soundNameFromId(sound.id)).isEqualTo("Howl")
+    }
+
+    @Test
+    fun theTromboneIsFoundByItsCleanedName() {
+        touch("Sad\u200B trombone.mp3")
+        assertThat(readSoundsFolder(folder.root).soundFor(SAD_TROMBONE_ID)!!.id).isEqualTo("file:Sad\u200B trombone.mp3")
     }
 
     @Test

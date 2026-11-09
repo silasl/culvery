@@ -189,6 +189,15 @@ class DoorSettingsPageTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Fails if a theme folder's sound isn't lined with its theme's name. */
+    @Test
+    fun aThemeSoundNamesItsTheme() {
+        tabletSound(sounds, "halloween/Test Howl.ogg")
+        showHost()
+        waitFor { shows("door_doorbell_file:halloween/Test Howl.ogg") }
+        compose.onNodeWithTag("door_doorbell_file:halloween/Test Howl.ogg_note", useUnmergedTree = true).assertTextEquals("On this tablet · Halloween")
+    }
+
     /** 18 §6.1: a chosen file that has gone stays chosen, named from its file, says so, and plays the classic chime. */
     @Test
     fun aGoneChoiceSaysSo() {

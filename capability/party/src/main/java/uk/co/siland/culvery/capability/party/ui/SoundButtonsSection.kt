@@ -29,11 +29,10 @@ import uk.co.siland.culvery.capability.party.SoundPadsStore
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.saving
-import uk.co.siland.culvery.core.sound.ON_THIS_TABLET
 import uk.co.siland.culvery.core.sound.Sound
-import uk.co.siland.culvery.core.sound.onTablet
 import uk.co.siland.culvery.core.sound.soundFor
 import uk.co.siland.culvery.core.sound.soundNameFromId
+import uk.co.siland.culvery.core.sound.tabletLine
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
@@ -148,7 +147,7 @@ private fun SoundSheet(pad: Int, sounds: List<Sound>, chosenId: String?, buttons
                 }
                 items(sounds, key = { it.id }) { sound ->
                     HhSoundRow(
-                        sound.name, ON_THIS_TABLET.takeIf { sound.onTablet }, previewing == sound.id, chosenId == sound.id, "sound_choice_${sound.id}",
+                        sound.name, sound.tabletLine, previewing == sound.id, chosenId == sound.id, "sound_choice_${sound.id}",
                         onPlay = { if (previewing == sound.id) buttons.taps.stopPreview() else scope.launch { buttons.taps.preview(sound) } },
                         onChoose = { onPick(sound) },
                     )
