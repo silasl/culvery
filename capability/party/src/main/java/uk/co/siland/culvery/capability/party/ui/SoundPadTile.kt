@@ -36,10 +36,11 @@ private const val PULSE_MS = 450
 /**
  * A sound pad in the tray's last row (18 §4.1, walk-through), tagged `sound_pad_{pad}`: the pad's number in accent with
  * two sound waves off it, the sound's name spoken but not shown. While it plays the tile is accent-soft and the waves pulse.
- * While [blocked] it is faded and a tap does nothing, unless it is [playing], when a tap still stops it.
+ * While [blocked] it is faded and a tap does nothing, unless it is [playing], when a tap still stops it. Until the gate
+ * is read ([gateRead]) it is faded too, and a tap still works.
  */
 @Composable
-internal fun SoundPadTile(pad: PadUi, playing: Boolean, blocked: Boolean, onTap: () -> Unit) {
+internal fun SoundPadTile(pad: PadUi, playing: Boolean, blocked: Boolean, gateRead: Boolean = true, onTap: () -> Unit) {
     val colors = Culvery.colors
     HouseModeThirdTile(
         tag = "sound_pad_${pad.pad}",
@@ -48,6 +49,7 @@ internal fun SoundPadTile(pad: PadUi, playing: Boolean, blocked: Boolean, onTap:
         enabled = !blocked || playing,
         onTap = onTap,
         background = if (playing) colors.accentSoft else colors.surf2,
+        faded = !gateRead,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HouseModeDimens.gap)) {
             Text(pad.pad.toString(), style = HouseModeDimens.thirdNumber, color = colors.accent, maxLines = 1)
@@ -89,6 +91,7 @@ private fun SoundWaves(color: Color, pulsing: Boolean) {
 fun SoundPadTileHost(pad: PadUi, taps: PadTaps) {
     val playing by taps.playing.collectAsState()
     val blocked by taps.blocked.collectAsState()
+    val gateRead by taps.gateRead.collectAsState()
     val action = rememberSingleAction(taps) { e -> Log.w(TAG, "A sound pad's tap failed: ${e::class.simpleName}") }
-    SoundPadTile(pad, playing == pad.pad, blocked != null) { action.run { taps.tap(pad) } }
+    SoundPadTile(pad, playing == pad.pad, blocked != null, gateRead) { action.run { taps.tap(pad) } }
 }

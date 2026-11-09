@@ -18,6 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -28,6 +33,10 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+
+/** How long a third-width tile shows its pressed colour after a tap. */
+const val PRESS_FLASH_MS = 150L
 
 /** Holiday and Party mode's tile and sheet layout values (11 §5.2, 13 §2.6); provisional until the end-of-v1 design walk-through. */
 object HouseModeDimens {
@@ -134,7 +143,8 @@ fun HouseModeTile(
 
 /**
  * A button in a third of the tray with no label (18 walk-through): [content] centred on [background], spoken as [spoken],
- * tagged [tag]. A tap does nothing unless [enabled], and the tile fades while it isn't.
+ * tagged [tag]. A tap does nothing unless [enabled], and the tile fades while it isn't, or while [faded] (a tap still
+ * works). A tap flashes the tile's `accentSoft` for [PRESS_FLASH_MS].
  */
 @Composable
 fun HouseModeThirdTile(
@@ -144,17 +154,28 @@ fun HouseModeThirdTile(
     enabled: Boolean,
     onTap: () -> Unit,
     background: Color = Culvery.colors.surf2,
+    faded: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    var flashing by remember { mutableStateOf(false) }
+    LaunchedEffect(flashing) {
+        if (flashing) {
+            delay(PRESS_FLASH_MS)
+            flashing = false
+        }
+    }
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxSize()
             .testTag(tag)
-            .then(if (enabled) Modifier else Modifier.alpha(ControlTokens.DISABLED_ALPHA))
+            .then(if (enabled && !faded) Modifier else Modifier.alpha(ControlTokens.DISABLED_ALPHA))
             .clip(RoundedCornerShape(HouseModeDimens.radius))
-            .background(background)
-            .hhClickable(onTap, label = clickLabel, enabled = enabled, spoken = spoken),
+            .background(if (flashing) Culvery.colors.accentSoft else background)
+            .hhClickable({
+                flashing = true
+                onTap()
+            }, label = clickLabel, enabled = enabled, spoken = spoken),
     ) {
         Box(Modifier.shownNotSpoken()) { content() }
     }

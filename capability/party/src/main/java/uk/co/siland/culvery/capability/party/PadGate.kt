@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.merge
 import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.plugin.NightHours
+import uk.co.siland.culvery.core.plugin.WallClock
 
 private const val MINUTE_MS = 60_000L
 
@@ -29,6 +30,7 @@ class PadGate @Inject constructor(
     private val door: Optional<DoorQuiet>,
     private val house: HouseMode,
     private val night: NightHours,
+    private val clock: WallClock,
 ) {
     /** Null when the pads may play. A night not known yet counts as night, as the door counts it. */
     suspend fun blockedNow(): PadBlock? {
@@ -42,12 +44,12 @@ class PadGate @Inject constructor(
         }
     }
 
-    /** [blockedNow], read again each minute and whenever the ring card or Holiday changes. */
+    /** [blockedNow], read again at each whole minute of the wall clock and whenever the ring card or Holiday changes. */
     val blocked: Flow<PadBlock?> = merge<Any?>(
         flow {
             while (true) {
                 emit(Unit)
-                delay(MINUTE_MS)
+                delay(MINUTE_MS - Math.floorMod(clock.nowMillis(), MINUTE_MS))
             }
         },
         door.map { it.ringShowing }.orElse(emptyFlow()),

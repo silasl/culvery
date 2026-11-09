@@ -90,6 +90,22 @@ class PadTapsTest {
         assertThat(player.plays).isEmpty()
     }
 
+    /** Ruling 6: fails if the pads look playable, or carry a line, before the gate's first read. */
+    @Test
+    fun padsAreFadedWithNoLineUntilTheGateIsRead() = runTest {
+        val rig = GateRig()
+        rig.night = true
+        val taps = taps(rig)
+
+        assertThat(taps.gateRead.value).isFalse()
+        assertThat(taps.line(1, first = true).first()).isNull()
+
+        runCurrent()
+
+        assertThat(taps.gateRead.value).isTrue()
+        assertThat(taps.line(1, first = true).first()).isEqualTo("Night")
+    }
+
     /** Ruling 6: fails if a pad but the first shown carries the block, or the first doesn't. */
     @Test
     fun theFirstPadCarriesTheBlock() = runTest {

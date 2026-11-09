@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -40,7 +42,11 @@ class PadTaps internal constructor(
     constructor(player: SoundPlayer, gate: PadGate, door: Optional<DoorQuiet>, @ApplicationScope scope: CoroutineScope) :
         this(player::playPad, player::stopPads, player.padPlaying, gate, { door.map { it.volume }.orElse(1f) }, scope)
 
-    val blocked: StateFlow<PadBlock?> = gate.blocked.stateIn(scope, SharingStarted.Eagerly, null)
+    /** False until the gate has been read once. */
+    private val read = MutableStateFlow(false)
+    val gateRead: StateFlow<Boolean> = read.asStateFlow()
+
+    val blocked: StateFlow<PadBlock?> = gate.blocked.onEach { read.value = true }.stateIn(scope, SharingStarted.Eagerly, null)
 
     private val previewed = MutableStateFlow<String?>(null)
 
@@ -101,8 +107,9 @@ class PadTaps internal constructor(
     }
 
     /** The line under [pad]; the [first] pad shown carries the block. */
-    fun line(pad: Int, first: Boolean): Flow<String?> = combine(failed, blocked) { failedPad, block ->
+    fun line(pad: Int, first: Boolean): Flow<String?> = combine(failed, blocked, read) { failedPad, block, gateRead ->
         when {
+            !gateRead -> null
             failedPad == pad -> ModesWords.COULDNT_PLAY
             first -> block?.line
             else -> null

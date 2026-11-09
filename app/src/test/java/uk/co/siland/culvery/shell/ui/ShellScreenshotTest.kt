@@ -123,6 +123,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.HouseModeThirdTile
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.WithFontScale
@@ -302,11 +303,21 @@ class ShellScreenshotTest {
         trayMode("pad.3", 83, "Bell", TrayWidth.THIRD),
     )
 
+    /** The pads before the gate's first read: faded, with no line. */
+    private val trayPadsUnread = (1..3).map { n ->
+        TrayButton("pad.$n", 80 + n, TrayWidth.THIRD) {
+            HouseModeThirdTile("pad$n", "Pad $n", "Play", enabled = true, onTap = {}, faded = true) {
+                Text("$n", style = HhType.buttonLabel, color = Culvery.colors.accent)
+            }
+        }
+    }
+
     /** Taekwondo's third right of the pads (18 Ruling 3), which leaves room for two of them. */
     private val trayTaekwondo = trayMode("taekwondo", 90, "Taekwondo", TrayWidth.THIRD)
 
     private fun trayHome(
         dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true, modes: Int = 2, pads: Int = 0, taekwondo: Boolean = false,
+        unread: Boolean = false,
     ) = calendarHome(dark).copy(
         tabs = allTabs,
         homeCards = HomeCardPlacer.place(
@@ -316,7 +327,7 @@ class ShellScreenshotTest {
                         HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
                     }.takeIf { shopping },
                 ),
-            listOf(trayRow) + trayModes.take(modes) + trayPads.take(pads) + listOfNotNull(trayTaekwondo.takeIf { taekwondo }),
+            listOf(trayRow) + trayModes.take(modes) + (if (unread) trayPadsUnread else trayPads).take(pads) + listOfNotNull(trayTaekwondo.takeIf { taekwondo }),
         ),
     )
 
@@ -657,6 +668,10 @@ class ShellScreenshotTest {
 
     @Test
     fun homeTrayFullLight() = snap("home_tray_full_light", dark = false, state = trayHome(dark = false, shopping = true, modes = 4, pads = 3))
+
+    /** The pads before the gate's first read (two modes: a tray holds no more with pads). */
+    @Test
+    fun homeTrayPadsUnread() = snap("home_tray_pads_unread", dark = true, state = trayHome(dark = true, shopping = true, modes = 2, pads = 3, unread = true))
 
     /** Two pads and Taekwondo's third under the hoover's row (18 §4.1). */
     @Test

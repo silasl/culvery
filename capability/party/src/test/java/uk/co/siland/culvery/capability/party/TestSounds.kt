@@ -6,6 +6,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.flow.MutableStateFlow
 import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.house.HouseMode
+import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundSource
@@ -36,10 +37,10 @@ internal class FakeHoliday : HouseMode {
 }
 
 /** A gate over [door] (null: no door), [house], and a night that [night] says. */
-internal class GateRig(val door: FakeDoor? = FakeDoor()) {
+internal class GateRig(val door: FakeDoor? = FakeDoor(), val clock: WallClock = WallClock { 0L }) {
     val house = FakeHoliday()
     var night: Boolean? = false
-    val gate = PadGate(Optional.ofNullable(door), house) { night }
+    val gate = PadGate(Optional.ofNullable(door), house, { night }, clock)
 }
 
 /** Stands in for the sound player: records each play and stop, and plays while [playing] says. */
