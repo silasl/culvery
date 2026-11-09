@@ -64,7 +64,7 @@ fun readSoundsFolder(root: File?): List<Sound> {
 fun soundNameFromId(id: String): String? =
     if (id.startsWith("file:")) cleanSoundName(id.substringAfterLast('/').removePrefix("file:").substringBeforeLast('.')) else null
 
-/** What a pad's first default was before the clip moved to the tablet (18 ง4.2): now the tablet sound named [SAD_TROMBONE_NAME], if there is one. */
+/** What a pad's first default was before the clip moved to the tablet (18 ยง4.2): now the tablet sound named [SAD_TROMBONE_NAME], if there is one. */
 const val SAD_TROMBONE_ID = "builtin:sad_trombone"
 private const val SAD_TROMBONE_NAME = "Sad trombone"
 
