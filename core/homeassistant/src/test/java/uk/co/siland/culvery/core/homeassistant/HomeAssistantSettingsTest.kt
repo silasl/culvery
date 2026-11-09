@@ -84,7 +84,7 @@ class HomeAssistantSettingsTest {
         assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(url, "test-token", pin = null))
     }
 
-    /** Fails if an http address with a pin, as a hand edit could leave, reads as a link. */
+    /** Fails if an http address with a pin reads as a link. */
     @Test
     fun httpWithAPinReadsAsNotLinked() = runBlocking {
         store.edit {
@@ -104,7 +104,7 @@ class HomeAssistantSettingsTest {
         assertThat(settings.link.first()).isNull()
     }
 
-    /** Fails if the stored pin is read through the link, so a record missing its address hides it. */
+    /** Fails if the stored pin is read through the link. */
     @Test
     fun storedPinReadsTheKeyWhateverTheRest() = runBlocking {
         store.edit { it[certificatePin] = "test-pin" }

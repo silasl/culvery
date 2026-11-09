@@ -10,7 +10,10 @@ const val HOME_ASSISTANT_ID = "home.homeassistant"
 /** Home Assistant's own port, assumed when none is typed (11 §4.1). */
 const val HOME_ASSISTANT_PORT = 8123
 
-/** The saved address, long-lived token and certificate pin (the https certificate's fingerprint, null for http); [toString] names none of them. */
+/**
+ * The saved address, long-lived token and certificate pin (null for http).
+ * [toString] names none of them.
+ */
 data class HomeAssistantLink(val baseUrl: HttpUrl, val token: String, val pin: String?) {
     override fun toString() = "HomeAssistantLink"
 }
