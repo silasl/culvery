@@ -147,6 +147,8 @@ internal object LogHygiene {
      *
      * `collections.size` is how many collection days a bins read found, never the address or a date (17 §3.7); `failed.kind.name`
      * is the step a bins read or connect failed at (`BinsReadFailed.kind`).
+     *
+     * `failedInARow` is the count `FailureRun.succeeded()` returned, always named so at the call site (19 §5).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
@@ -154,7 +156,7 @@ internal object LogHygiene {
         "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
         "step.name", "own.logName", "source.sound.key", "after.screen.name", "names.size",
-        "collections.size", "failed.kind.name",
+        "collections.size", "failed.kind.name", "failedInARow",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|i|wtf|println)\(""")

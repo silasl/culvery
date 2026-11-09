@@ -22,6 +22,55 @@ class FlowRetryTest {
     }
 
     @Test
+    fun doublingIsClampedAndCapped() {
+        assertThat(listOf(0, 1, 5, 100).map { doublingMillis(10_000, 300_000, it) })
+            .containsExactly(10_000L, 20_000L, 300_000L, 300_000L).inOrder()
+        assertThat(doublingMillis(10_000, 300_000, -1)).isEqualTo(10_000L)
+    }
+
+    /** Regression guard: `retryDelayMillis` keeps its callers' waits. */
+    @Test
+    fun retryDelaysAreUnchanged() {
+        assertThat((0L..8L).map(::retryDelayMillis))
+            .containsExactly(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 32_000L, 60_000L, 60_000L, 60_000L).inOrder()
+    }
+
+    @Test
+    fun theWaitDoublesFromTheSecondFailureToTheCap() {
+        val run = FailureRun()
+        val waits = (0..7).map {
+            run.waitMillis(2_000, 60_000).also { run.failed() }
+        }
+        assertThat(waits)
+            .containsExactly(2_000L, 2_000L, 4_000L, 8_000L, 16_000L, 32_000L, 60_000L, 60_000L).inOrder()
+    }
+
+    @Test
+    fun onlyTheFirstFailureOfARunIsFirst() {
+        val run = FailureRun()
+        assertThat(listOf(run.failed(), run.failed(), run.failed())).containsExactly(true, false, false).inOrder()
+    }
+
+    @Test
+    fun succeededSaysHowManyFailed() {
+        val run = FailureRun()
+        repeat(3) { run.failed() }
+        assertThat(run.succeeded()).isEqualTo(3)
+        assertThat(run.succeeded()).isEqualTo(0)
+    }
+
+    @Test
+    fun aResetKeepsTheRunButNotTheWait() {
+        val run = FailureRun()
+        repeat(3) { run.failed() }
+        run.resetWaits()
+        assertThat(run.waitMillis(2_000, 60_000)).isEqualTo(2_000L)
+        assertThat(run.failed()).isFalse()
+        assertThat(run.waitMillis(2_000, 60_000)).isEqualTo(2_000L)
+        assertThat(run.succeeded()).isEqualTo(4)
+    }
+
+    @Test
     fun aFailingFlowStartsAgainAfterItsWaitAndEachFailureIsReported() = runTest {
         var starts = 0
         val failures = mutableListOf<String>()

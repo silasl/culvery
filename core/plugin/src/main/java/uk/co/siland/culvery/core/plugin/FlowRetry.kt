@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 private const val FIRST_RETRY_MS = 1_000L
 private const val LAST_RETRY_MS = 60_000L
-private const val MAX_DOUBLINGS = 6L
+private const val MAX_SHIFT = 30
 
 /** [block]'s result, or [orElse]'s for what it threw, which is where it is logged. Cancellation is never caught. */
 inline fun <T> attempt(block: () -> T, orElse: (Exception) -> T): T = try {
@@ -31,9 +31,44 @@ val OUTBOX_BACKOFF_MS: List<Long> = listOf(30_000L, 60_000L, 120_000L, 300_000L)
 /** The wait after failure number [attempts] (from 1); the last step repeats. */
 fun backoffMillis(attempts: Int): Long = OUTBOX_BACKOFF_MS[(attempts - 1).coerceIn(0, OUTBOX_BACKOFF_MS.lastIndex)]
 
+/** [firstMs] doubled [doublings] times (fewer than 0 count as 0), at most [capMs]. */
+fun doublingMillis(firstMs: Long, capMs: Long, doublings: Int): Long =
+    (firstMs shl doublings.coerceIn(0, MAX_SHIFT)).coerceAtMost(capMs)
+
 /** The wait before retrying after failure number [attempt] (from 0): 1 s, doubling each time, at most 60 s. */
 fun retryDelayMillis(attempt: Long): Long =
-    (FIRST_RETRY_MS shl attempt.coerceAtMost(MAX_DOUBLINGS).toInt()).coerceAtMost(LAST_RETRY_MS)
+    doublingMillis(FIRST_RETRY_MS, LAST_RETRY_MS, attempt.coerceAtMost(MAX_SHIFT.toLong()).toInt())
+
+/**
+ * A run of failures with no success between, and the wait that grows with it (19 §5). The caller logs: [failed] is true
+ * for the first of a run, [succeeded] says how many there were. Used by one coroutine at a time, unless the caller
+ * synchronizes.
+ */
+class FailureRun {
+    private var inRun = 0
+    private var sinceReset = 0
+
+    /** Counts a failure; true on the first of a run. */
+    fun failed(): Boolean {
+        inRun++
+        sinceReset++
+        return inRun == 1
+    }
+
+    /** How many failed in the run just ended, 0 if none; clears the run. */
+    fun succeeded(): Int = inRun.also {
+        inRun = 0
+        sinceReset = 0
+    }
+
+    /** The next [waitMillis] is `everyMs` again; the run itself is kept. */
+    fun resetWaits() {
+        sinceReset = 0
+    }
+
+    /** [everyMs] with no failure or one since the last reset, then doubling to [capMs]. */
+    fun waitMillis(everyMs: Long, capMs: Long): Long = doublingMillis(everyMs, capMs, sinceReset - 1)
+}
 
 /**
  * Starts the flow again after a failure, waiting [retryDelayMillis], instead of ending it: a store hiccup must not
