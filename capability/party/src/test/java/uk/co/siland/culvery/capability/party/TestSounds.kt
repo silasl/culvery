@@ -50,9 +50,9 @@ internal class FakePlayer {
     var starts = true
 
     /** Runs as a play begins, as a ring arriving while the sound opens would. */
-    var whilePlaying: () -> Unit = {}
+    var whilePlaying: suspend () -> Unit = {}
 
-    fun play(pad: Int, sound: Sound, volume: Float): Boolean {
+    suspend fun play(pad: Int, sound: Sound, volume: Float): Boolean {
         plays += pad to volume
         whilePlaying()
         if (starts) playing.value = pad

@@ -50,9 +50,12 @@ class PadTaps internal constructor(
     private val failed = MutableStateFlow<Int?>(null)
     private var failedExpiry: Job? = null
 
-    /** Stops [pad] while it plays, even while the pads are greyed out; else plays it unless they are. */
+    @Volatile private var opening: Int? = null
+
+    /** Stops [pad] while it plays or opens, even while the pads are greyed out; else plays it unless they are. */
     suspend fun tap(pad: PadUi) {
-        if (playing.value == pad.pad) {
+        if (playing.value == pad.pad || opening == pad.pad) {
+            opening = null
             clearFailed(pad.pad)
             stop()
             return
@@ -60,9 +63,16 @@ class PadTaps internal constructor(
         if (gate.blockedNow() != null) return
         clearFailed(pad.pad)
         val volume = volume()
-        val started = play(pad.pad, pad.sound, volume)
-        // A ring that arrived while the sound opened shows as the Doorbell block, not as a failure.
-        if (!started && gate.blockedNow() != PadBlock.DOORBELL) failedNow(pad.pad)
+        opening = pad.pad
+        var stopped = false
+        val started = try {
+            play(pad.pad, pad.sound, volume)
+        } finally {
+            stopped = opening != pad.pad
+            if (!stopped) opening = null
+        }
+        // A tap that stopped the opening, or a ring that arrived meanwhile, is not a failure.
+        if (!started && !stopped && gate.blockedNow() != PadBlock.DOORBELL) failedNow(pad.pad)
     }
 
     /** Plays [sound] for Settings at the doorbell's volume, whatever the time or mode. */

@@ -1,8 +1,10 @@
 package uk.co.siland.culvery.capability.party
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -97,6 +99,26 @@ class PadTapsTest {
         runCurrent()
 
         assertThat(taps.line(1, first = true).first()).isEqualTo("Night")
+        assertThat(taps.line(2, first = false).first()).isNull()
+    }
+
+    /** A second tap on a pad that is still opening stops it, and the stopped first tap shows no failure. */
+    @Test
+    fun aSecondTapOnAnOpeningPadStopsIt() = runTest {
+        val taps = taps()
+        val release = CompletableDeferred<Unit>()
+        player.starts = false
+        player.whilePlaying = { release.await() }
+
+        val first = launch { taps.tap(pad2) }
+        runCurrent()
+        taps.tap(pad2)
+        release.complete(Unit)
+        first.join()
+        runCurrent()
+
+        assertThat(player.stops).isEqualTo(1)
+        assertThat(player.plays).hasSize(1)
         assertThat(taps.line(2, first = false).first()).isNull()
     }
 }

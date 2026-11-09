@@ -50,15 +50,20 @@ class SoundPlayer internal constructor(
         }
     }, scope, Dispatchers.IO)
 
-    private class Play(val player: MediaPlayer) {
+    private class Play(val player: MediaPlayer, val doorbell: Boolean) {
         var cap: Job? = null
     }
 
     internal val live: MutableSet<MediaPlayer> = Collections.synchronizedSet(mutableSetOf())
-    // Guards live, pad, padState, previewState and rings: caps, listeners and rings reach them from different threads.
+    // Guards live, pad, padState, previewState and the counters: caps, listeners and rings reach them from different threads.
     private val lock = Any()
     private var pad: Play? = null
     private var rings = 0L
+
+    // Counts rings and stops, so a pad whose open finishes after either doesn't start.
+    private var padEpoch = 0L
+    private var doorbellOpening = 0
+    private var doorbellPlaying = 0
     private val padState = MutableStateFlow<Int?>(null)
     private val previewState = MutableStateFlow<String?>(null)
 
@@ -72,19 +77,30 @@ class SoundPlayer internal constructor(
      * A sound that won't open or start gives way to the classic chime. True when a sound started.
      */
     suspend fun playDoorbell(sound: Sound, volume: Float): Boolean {
-        ringStarted()
-        if (start(sound, volume, DOORBELL_CAP_MS, null, 0)) return true
-        if (sound.id == BuiltInSound.CLASSIC.id) return false
-        return start(CLASSIC, volume, DOORBELL_CAP_MS, null, 0)
+        synchronized(lock) {
+            doorbellOpening++
+            ringStarted()
+        }
+        try {
+            if (start(sound, volume, DOORBELL_CAP_MS, null, null)) return true
+            if (sound.id == BuiltInSound.CLASSIC.id) return false
+            return start(CLASSIC, volume, DOORBELL_CAP_MS, null, null)
+        } finally {
+            synchronized(lock) { doorbellOpening-- }
+        }
     }
 
-    /** Stops the current pad sound first; a tablet sound stops at [capMs]. False when it won't open or start, or a ring began while it opened. */
+    /**
+     * Stops the current pad sound first; a tablet sound stops at [capMs]. False when it won't open or start, the
+     * doorbell's sound is opening or playing, or a ring or stop came while it opened.
+     */
     suspend fun playPad(pad: Int, sound: Sound, volume: Float, capMs: Long = PAD_CAP_MS): Boolean {
-        val ringsBefore = synchronized(lock) {
+        val epochBefore = synchronized(lock) {
+            if (doorbellOpening > 0 || doorbellPlaying > 0) return false
             stopPads()
-            rings
+            padEpoch
         }
-        return start(sound, volume, capMs, pad, ringsBefore)
+        return start(sound, volume, capMs, pad, epochBefore)
     }
 
     /** Stops any pad sound, and any pad still opening won't start. */
@@ -95,35 +111,40 @@ class SoundPlayer internal constructor(
         }
     }
 
+    /** Stops the pad sound; a pad still opening won't start. */
     fun stopPads() {
-        synchronized(lock) { pad?.let(::finish) }
+        synchronized(lock) {
+            padEpoch++
+            pad?.let(::finish)
+        }
     }
 
     /** Opens and starts on [io] as one step a cancelled caller can't interrupt, so an opened player is always tracked. */
-    private suspend fun start(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, ringsBefore: Long): Boolean =
-        withContext(io + NonCancellable) { startNow(sound, volume, capMs, padNumber, ringsBefore) }
+    private suspend fun start(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, epochBefore: Long?): Boolean =
+        withContext(io + NonCancellable) { startNow(sound, volume, capMs, padNumber, epochBefore) }
 
-    private fun startNow(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, ringsBefore: Long): Boolean {
+    private fun startNow(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, epochBefore: Long?): Boolean {
         val player = open(sound)
         if (player == null) {
             logFailed(sound)
             return false
         }
-        val play = Play(player)
+        val play = Play(player, doorbell = padNumber == null)
         synchronized(lock) {
-            if (padNumber != null) {
-                if (rings != ringsBefore) {
-                    player.release()
-                    return false
-                }
-                stopPads()
+            if (epochBefore != null && padEpoch != epochBefore) {
+                player.release()
+                return false
             }
+            stopPads()
+            val ringsAtStart = rings
             live += player
+            if (play.doorbell) doorbellPlaying++
             try {
                 player.setVolume(volume, volume)
                 player.setOnCompletionListener { finish(play) }
                 player.setOnErrorListener { _, _, _ ->
                     finish(play)
+                    if (play.doorbell && sound.id != CLASSIC.id) chimeAfterError(volume, ringsAtStart)
                     true
                 }
                 player.start()
@@ -147,9 +168,25 @@ class SoundPlayer internal constructor(
         return true
     }
 
+    /** The classic chime in place of a doorbell sound that errored after it started, unless a newer ring came. */
+    private fun chimeAfterError(volume: Float, ringsAtStart: Long) {
+        synchronized(lock) {
+            if (rings != ringsAtStart) return
+            doorbellOpening++
+        }
+        scope.launch {
+            try {
+                start(CLASSIC, volume, DOORBELL_CAP_MS, null, null)
+            } finally {
+                synchronized(lock) { doorbellOpening-- }
+            }
+        }
+    }
+
     private fun finish(play: Play) {
         synchronized(lock) {
             if (!live.remove(play.player)) return
+            if (play.doorbell) doorbellPlaying--
             play.cap?.cancel()
             play.player.release()
             if (pad === play) {

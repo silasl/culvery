@@ -328,4 +328,78 @@ class SoundPlayerTest {
         assertThat(released(honk)).isTrue()
         assertThat(player.padPlaying.value).isNull()
     }
+
+    @Test
+    fun aDoorbellSoundThatFailsMidwayFallsBackToTheChimeOnce() = test {
+        val player = player(honk to Player.STARTS, classic to Player.STARTS)
+        assertThat(player.playDoorbell(honk, 1f)).isTrue()
+        shadowOf(made.getValue(honk.id)).invokeErrorListener(MediaPlayer.MEDIA_ERROR_UNKNOWN, 0)
+        passTime(0)
+        assertThat(asked).containsExactly(honk.id, classic.id).inOrder()
+        assertThat(playing(classic)).isTrue()
+        shadowOf(made.getValue(classic.id)).invokeErrorListener(MediaPlayer.MEDIA_ERROR_UNKNOWN, 0)
+        passTime(0)
+        assertThat(asked).containsExactly(honk.id, classic.id).inOrder()
+    }
+
+    /** Regression guard: passes today, as there is no fallback to cancel; it fails if one ignores a newer ring. */
+    @Test
+    fun noFallbackAfterANewerRing() = test {
+        val player = player(honk to Player.STARTS, classic to Player.STARTS)
+        player.playDoorbell(honk, 1f)
+        player.ringStarted()
+        shadowOf(made.getValue(honk.id)).invokeErrorListener(MediaPlayer.MEDIA_ERROR_UNKNOWN, 0)
+        passTime(0)
+        assertThat(asked).containsExactly(honk.id)
+    }
+
+    @Test
+    fun aStopWhileAPadOpensKeepsItFromStarting() = test {
+        lateinit var player: SoundPlayer
+        player = SoundPlayer({ sound ->
+            player.stopPads()
+            prepared(sound.id).also { made[sound.id] = it }
+        }, scope, io)
+        assertThat(player.playPad(1, honk, 1f)).isFalse()
+        assertThat(released(honk)).isTrue()
+        assertThat(player.padPlaying.value).isNull()
+    }
+
+    @Test
+    fun aPadDoesNotStartWhileTheDoorbellOpens() = test {
+        lateinit var player: SoundPlayer
+        var padResult: Boolean? = null
+        player = SoundPlayer({ sound ->
+            asked += sound.id
+            if (sound.id == classic.id) padResult = runBlocking { player.playPad(1, honk, 1f) }
+            prepared(sound.id).also { made[sound.id] = it }
+        }, scope, io)
+        assertThat(player.playDoorbell(classic, 1f)).isTrue()
+        assertThat(padResult).isFalse()
+        assertThat(asked).containsExactly(classic.id)
+        assertThat(player.padPlaying.value).isNull()
+    }
+
+    @Test
+    fun aPadDoesNotStartWhileTheDoorbellPlays() = test {
+        val player = player(classic to Player.STARTS, honk to Player.STARTS)
+        player.playDoorbell(classic, 1f)
+        assertThat(player.playPad(1, honk, 1f)).isFalse()
+        assertThat(asked).containsExactly(classic.id)
+        shadowOf(made.getValue(classic.id)).invokeCompletionListener()
+        assertThat(player.playPad(1, honk, 1f)).isTrue()
+    }
+
+    @Test
+    fun aPadThatPlaysDuringTheDoorbellsOpenIsNotLeftPlaying() = test {
+        lateinit var player: SoundPlayer
+        player = SoundPlayer({ sound ->
+            if (sound.id == classic.id) runBlocking { player.playPad(1, honk, 1f) }
+            prepared(sound.id).also { made[sound.id] = it }
+        }, scope, io)
+        assertThat(player.playDoorbell(classic, 1f)).isTrue()
+        assertThat(player.padPlaying.value).isNull()
+        assertThat(made[honk.id]?.let { released(honk) } ?: true).isTrue()
+        assertThat(playing(classic)).isTrue()
+    }
 }
