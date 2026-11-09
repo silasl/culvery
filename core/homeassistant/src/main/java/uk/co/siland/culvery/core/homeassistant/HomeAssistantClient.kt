@@ -6,6 +6,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.Dispatchers
@@ -273,7 +274,10 @@ class HomeAssistantClient internal constructor(
 
     /** Hands the socket's messages and its end to the collector, which owns all the state. */
     private fun listener(inbox: Channel<Frame>) = object : WebSocketListener() {
+        private val dropped = AtomicBoolean(false)
+
         override fun onMessage(webSocket: WebSocket, text: String) {
+            if (dropped.get()) return
             if (text.length > MAX_SOCKET_MESSAGE_CHARS) {
                 Log.w(TAG, "socket message too large")
                 dropSocket(webSocket, MESSAGE_TOO_BIG)
@@ -287,8 +291,9 @@ class HomeAssistantClient internal constructor(
             if (inbox.trySend(Frame.Ended(problem, code, error)).isFailure) inbox.close(HomeAssistantException(problem))
         }
 
-        /** A socket already closing is cancelled. */
+        /** Only the first drop acts: a second `close` would fail and cancel the connection before the close frame goes out. */
         private fun dropSocket(webSocket: WebSocket, code: Int) {
+            if (!dropped.compareAndSet(false, true)) return
             end(HaProblem.UNREACHABLE, null, null)
             if (!webSocket.close(code, null)) webSocket.cancel()
         }
