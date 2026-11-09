@@ -45,6 +45,7 @@ import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundSource
 import uk.co.siland.culvery.core.sound.SAD_TROMBONE_ID
+import uk.co.siland.culvery.core.sound.couldntPlay
 import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
@@ -61,6 +62,7 @@ class SoundButtonsSectionTest {
     private val scope = CoroutineScope(Job())
     private val overlay = TestOverlay()
     private val player = FakePlayer()
+    private val toaster = RecordingToaster()
     private val store = SoundPadsStore(MemoryStore())
     private val room = MutableStateFlow(3)
     private var refreshes = 0
@@ -78,7 +80,7 @@ class SoundButtonsSectionTest {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Box(Modifier.size(960.dp, 1200.dp)) {
-                        InSettingsPane { SoundButtonsSection(sounds, RecordingToaster()) }
+                        InSettingsPane { SoundButtonsSection(sounds, toaster) }
                         overlay.content?.invoke()
                     }
                 }
@@ -90,6 +92,22 @@ class SoundButtonsSectionTest {
     private fun exists(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     private fun saved() = runBlocking { store.pads.first() }
+
+    /** Fails if a Play that couldn't start says nothing, or doesn't name the fix. */
+    @Test
+    fun aFailedPlayShowsItsToast() {
+        player.starts = false
+        show(TROMBONE.id, ORGAN.id, null)
+
+        compose.onNodeWithTag("sound_pad_1_play").performClick()
+        compose.waitFor { toaster.shown.size == 1 }
+        assertThat(toaster.shown.last()).isEqualTo(couldntPlay(TROMBONE))
+
+        compose.onNodeWithTag("sound_pad_3").performClick()
+        compose.onNodeWithTag("sound_choice_${HONK.id}").performClick()
+        compose.waitFor { toaster.shown.size == 2 }
+        assertThat(toaster.shown.last()).isEqualTo(couldntPlay(HONK))
+    }
 
     /** Fails if a pad's row doesn't name its sound or None, hide Play for None, or the birthday note is missing. */
     @Test

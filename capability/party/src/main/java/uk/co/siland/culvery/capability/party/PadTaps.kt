@@ -81,11 +81,11 @@ class PadTaps internal constructor(
         if (!started && !stopped && gate.blockedNow() != PadBlock.DOORBELL) failedNow(pad.pad)
     }
 
-    /** Plays [sound] for Settings at the doorbell's volume, whatever the time or mode. */
-    suspend fun preview(sound: Sound) {
+    /** Plays [sound] for Settings at the doorbell's volume, whatever the time or mode. False when it didn't start. */
+    suspend fun preview(sound: Sound): Boolean {
         val volume = volume()
         previewed.value = sound.id
-        play(PREVIEW_PAD, sound, volume)
+        return play(PREVIEW_PAD, sound, volume)
     }
 
     /** Stops the sound [preview] started. */

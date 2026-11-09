@@ -66,6 +66,7 @@ import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.sound.NOT_ON_THIS_TABLET
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
+import uk.co.siland.culvery.core.sound.couldntPlay
 import uk.co.siland.culvery.core.sound.soundFor
 import uk.co.siland.culvery.core.sound.soundNameFromId
 import uk.co.siland.culvery.core.sound.tabletLine
@@ -282,9 +283,18 @@ internal fun DoorSettingsHost(
             onVolume = { v -> change { settings.setVolume(v) } },
             onDoorbell = { choice -> change { settings.setDoorbell(choice) } },
             onPreview = { sound ->
-                if (previewing == sound.id) chime.stopPreview() else scope.launch { chime.preview(sound, p.volume) }
+                if (previewing == sound.id) {
+                    chime.stopPreview()
+                } else {
+                    scope.launch { if (!chime.preview(sound, p.volume)) toaster.show(couldntPlay(sound), urgent = true) }
+                }
             },
-            onPlayChime = { scope.launch { chime.play(p.doorbellSound(library, showing.showing.value, birthday), p.volume) } },
+            onPlayChime = {
+                scope.launch {
+                    val sound = p.doorbellSound(library, showing.showing.value, birthday)
+                    if (!chime.play(sound, p.volume)) toaster.show(couldntPlay(sound), urgent = true)
+                }
+            },
             onQuietHours = { on, from, until -> change { settings.setQuietHours(on, from, until) } },
             onAllowAccess = { navigator.openSystemScreen(provider.accessScreens(), NOTIFICATION_ACCESS_MISSING) },
             onCapture = { on -> change { settings.setCapture(if (on) clock.nowMillis() + CAPTURE_MS else 0L) } },

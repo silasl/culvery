@@ -65,6 +65,8 @@ import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.SoundLibrary
+import uk.co.siland.culvery.core.sound.asSound
+import uk.co.siland.culvery.core.sound.couldntPlay
 import uk.co.siland.culvery.core.sound.id
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.SeasonalTheme
@@ -252,6 +254,20 @@ class DoorSettingsPageTest {
         waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:classic_choose").assertIsSelected() }.isSuccess }
         compose.onNodeWithTag("door_play_chime").performClick()
         assertThat(chime.plays.last()).isEqualTo(BuiltInSound.CLASSIC.id to 1.0f)
+    }
+
+    /** Fails if a Play that couldn't start says nothing, or doesn't name the fix. */
+    @Test
+    fun aFailedPlayShowsItsToast() {
+        chime.starts = false
+        showHost()
+        compose.onNodeWithTag("door_play_chime").performClick()
+        waitFor { toaster.messages.isNotEmpty() }
+        assertThat(toaster.messages.last()).isEqualTo(couldntPlay(BuiltInSound.CLASSIC.asSound()))
+
+        compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
+        waitFor { toaster.messages.size == 2 }
+        assertThat(toaster.messages.last()).isEqualTo(couldntPlay(BuiltInSound.ORGAN.asSound()))
     }
 
     /** Fails if Play chime stops playing what a ring would on a birthday under Follow the theme. */

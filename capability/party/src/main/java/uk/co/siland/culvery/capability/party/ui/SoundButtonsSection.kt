@@ -31,6 +31,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.sound.Sound
+import uk.co.siland.culvery.core.sound.couldntPlay
 import uk.co.siland.culvery.core.sound.soundFor
 import uk.co.siland.culvery.core.sound.soundNameFromId
 import uk.co.siland.culvery.core.sound.tabletLine
@@ -103,7 +104,7 @@ internal fun SoundButtonsSection(sounds: SoundButtons, toaster: Toaster) {
             trailing = {
                 if (sound != null) {
                     HhButton(
-                        ModesWords.PLAY_SOUND, { scope.launch { sounds.taps.preview(sound) } }, Modifier.testTag("sound_pad_${pad}_play"),
+                        ModesWords.PLAY_SOUND, { scope.launch { if (!sounds.taps.preview(sound)) toaster.show(couldntPlay(sound), urgent = true) } }, Modifier.testTag("sound_pad_${pad}_play"),
                         icon = Icons.PLAY_ARROW, on = ButtonSurface.Surf, spokenName = ModesWords.playSpoken(pad),
                     )
                 }
@@ -111,7 +112,7 @@ internal fun SoundButtonsSection(sounds: SoundButtons, toaster: Toaster) {
             onClick = {
                 overlay.show {
                     SoundSheet(
-                        pad, offered, sound?.id ?: id?.takeIf { soundNameFromId(it) != null }, sounds,
+                        pad, offered, sound?.id ?: id?.takeIf { soundNameFromId(it) != null }, sounds, toaster,
                         onPick = { picked ->
                             change { sounds.store.setPad(pad, picked?.id) }
                             overlay.dismiss()
@@ -131,7 +132,7 @@ internal fun SoundButtonsSection(sounds: SoundButtons, toaster: Toaster) {
  * (again, to stop it); its radio chooses it. The preview stops with the sheet.
  */
 @Composable
-private fun SoundSheet(pad: Int, sounds: List<Sound>, chosenId: String?, buttons: SoundButtons, onPick: (Sound?) -> Unit, onClose: () -> Unit) {
+private fun SoundSheet(pad: Int, sounds: List<Sound>, chosenId: String?, buttons: SoundButtons, toaster: Toaster, onPick: (Sound?) -> Unit, onClose: () -> Unit) {
     val title = ModesWords.padName(pad)
     val previewing by buttons.taps.previewing.collectAsStateWithLifecycle(null)
     val scope = rememberCoroutineScope()
@@ -152,7 +153,7 @@ private fun SoundSheet(pad: Int, sounds: List<Sound>, chosenId: String?, buttons
                 items(sounds, key = { it.id }) { sound ->
                     HhSoundRow(
                         sound.name, sound.tabletLine, previewing == sound.id, chosenId == sound.id, "sound_choice_${sound.id}",
-                        onPlay = { if (previewing == sound.id) buttons.taps.stopPreview() else scope.launch { buttons.taps.preview(sound) } },
+                        onPlay = { if (previewing == sound.id) buttons.taps.stopPreview() else scope.launch { if (!buttons.taps.preview(sound)) toaster.show(couldntPlay(sound), urgent = true) } },
                         onChoose = { onPick(sound) },
                     )
                 }

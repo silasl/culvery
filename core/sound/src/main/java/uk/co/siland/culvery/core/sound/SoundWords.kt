@@ -11,3 +11,8 @@ val Sound.tabletLine: String?
         theme != null -> "$ON_THIS_TABLET · ${theme.label}"
         else -> ON_THIS_TABLET
     }
+
+/** What a Play in Settings says when [sound] won't play, and what to do about it. */
+fun couldntPlay(sound: Sound): String =
+    if (sound.onTablet) "Couldn’t play ${sound.name}. Copy the file to the tablet’s sounds folder again."
+    else "Couldn’t play ${sound.name}. Restart Culvery and try again."

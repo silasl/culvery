@@ -123,7 +123,7 @@ internal class FakeChime : Chime {
     override suspend fun preview(sound: Sound, volume: Float): Boolean {
         previews += sound.id to volume
         previewing.value = sound.id
-        return true
+        return starts
     }
 
     override fun stopPreview() {
