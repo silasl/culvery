@@ -7,6 +7,7 @@ import java.io.IOException
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
+import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -67,7 +68,8 @@ class HomeAssistantException(val problem: HaProblem) : Exception("Home Assistant
 interface HomeAssistantApi {
     /**
      * The pin of the certificate an https [base] presents, read with one `GET /auth/providers` that carries no token or
-     * cookie. [HaProblem.NOT_HOME_ASSISTANT] unless the answer is Home Assistant's list of login providers.
+     * cookie. A 403 is [HaProblem.BLOCKED]; any other answer but a 2xx with Home Assistant's list of login providers is
+     * [HaProblem.NOT_HOME_ASSISTANT]. A failed connection is unreachable, offline or [HaProblem.CERTIFICATE_CHANGED].
      */
     suspend fun certificate(base: HttpUrl): String
 
@@ -146,20 +148,26 @@ class HomeAssistantClient internal constructor(
     override suspend fun certificate(base: HttpUrl): String {
         require(base.isHttps) { "Only an https address has a certificate" }
         val seen = HomeAssistantTrust.capturing()
-        val probe = probeHttp.newBuilder()
-            .sslSocketFactory(HomeAssistantTrust.socketFactory(seen), seen)
-            .hostnameVerifier(HomeAssistantTrust.anyHostname)
-            .build()
         val url = base.newBuilder().addPathSegment("auth").addPathSegment("providers").build()
         try {
-            val answer = send(HaCall.CERTIFICATE, probe, Request.Builder().url(url))
-            val providers = answer.code != HTTP_NOT_FOUND && withContext(Dispatchers.Default) { HaJson.authProviders(answer.text) }
+            val answer = send(HaCall.CERTIFICATE, probeClient(seen), Request.Builder().url(url))
+            val providers = withContext(Dispatchers.Default) { HaJson.authProviders(answer.text) }
             if (!providers) refuse(HaCall.CERTIFICATE, answer, HaProblem.NOT_HOME_ASSISTANT)
         } finally {
             probeHttp.connectionPool.evictAll()
         }
-        return seen.pin ?: throw HomeAssistantException(HaProblem.UNREACHABLE)
+        return seen.pin ?: run {
+            val what = HaCall.CERTIFICATE
+            Log.w(TAG, "${what.label} failed (no certificate)")
+            throw HomeAssistantException(HaProblem.UNREACHABLE)
+        }
     }
+
+    /** A client for one certificate read: [seen] decides trust, over [probeHttp]'s pool. */
+    internal fun probeClient(seen: X509TrustManager): OkHttpClient = probeHttp.newBuilder()
+        .sslSocketFactory(HomeAssistantTrust.socketFactory(seen), seen)
+        .hostnameVerifier(HomeAssistantTrust.anyHostname)
+        .build()
 
     override suspend fun check(link: HomeAssistantLink) {
         val answer = send(HaCall.CHECK, link, request(link, "api", ""))
@@ -371,9 +379,11 @@ class HomeAssistantClient internal constructor(
         capture(what, answer.text)
         when {
             answer.code in 200..299 -> Unit
+            // No token was sent, so only an IP ban's 403 says more than "not Home Assistant".
+            what == HaCall.CERTIFICATE && answer.code != HTTP_FORBIDDEN -> refuse(what, answer, HaProblem.NOT_HOME_ASSISTANT)
             answer.code == HTTP_UNAUTHORIZED -> refuse(what, answer, HaProblem.TOKEN_REFUSED)
             answer.code == HTTP_FORBIDDEN -> refuse(what, answer, HaProblem.BLOCKED)
-            answer.code == HTTP_NOT_FOUND && (missingIsNull || what == HaCall.CHECK || what == HaCall.CERTIFICATE) -> Unit
+            answer.code == HTTP_NOT_FOUND && (missingIsNull || what == HaCall.CHECK) -> Unit
             what == HaCall.SERVICE -> refuse(what, answer, HaProblem.REFUSED)
             else -> refuse(what, answer, HaProblem.UNREACHABLE)
         }

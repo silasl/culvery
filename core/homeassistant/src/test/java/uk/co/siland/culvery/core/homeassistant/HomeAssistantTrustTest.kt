@@ -3,6 +3,7 @@ package uk.co.siland.culvery.core.homeassistant
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.security.MessageDigest
+import java.security.cert.CertificateExpiredException
 import java.util.Base64
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.X509TrustManager
@@ -54,13 +55,14 @@ class HomeAssistantTrustTest {
         assertThat(requests).isEqualTo(0)
     }
 
-    /** Fails if the pinned manager checks the certificate's dates. */
+    /** Fails if the pinned manager checks the certificate's dates, or trusts an expired leaf with another key. */
     @Test
     fun thePinnedLeafIsTrustedPastItsExpiry() {
-        val expired = TestCerts.expired(TestCerts.leaf("bridge"))
-        HomeAssistantTrust.pinned(hashOf("bridge")).checkServerTrusted(arrayOf(expired), "RSA")
+        val expired = TestCerts.leaf("expired")
+        assertThrows(CertificateExpiredException::class.java) { expired.checkValidity() }
+        assertThat(call("expired", HomeAssistantTrust.pinned(hashOf("expired"))).first.getOrThrow()).isEqualTo(200)
         assertThrows(CertificateChanged::class.java) {
-            HomeAssistantTrust.pinned(hashOf("other")).checkServerTrusted(arrayOf(expired), "RSA")
+            HomeAssistantTrust.pinned(hashOf("bridge")).checkServerTrusted(arrayOf(expired), "RSA")
         }
     }
 
@@ -99,7 +101,7 @@ class HomeAssistantTrustTest {
         val client = File("src/main/java/uk/co/siland/culvery/core/homeassistant/HomeAssistantClient.kt").readText(Charsets.UTF_8)
         val start = client.indexOf("override suspend fun certificate(")
         assertThat(start).isAtLeast(0)
-        val probe = client.substring(start, client.indexOf("\n    }\n", start))
+        val probe = client.substring(start, Regex("\\R    }\\R").find(client, start)!!.range.first)
         assertThat(Regex("capturing").findAll(client).count()).isEqualTo(1)
         assertThat(probe).contains("capturing")
     }

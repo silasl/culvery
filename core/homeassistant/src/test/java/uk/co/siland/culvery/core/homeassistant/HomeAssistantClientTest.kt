@@ -270,6 +270,7 @@ class HomeAssistantClientTest {
         first.use { tls ->
             tls.enqueue(MockResponse().setBody(HaFixtures.AUTH_PROVIDERS))
             assertThat(api.certificate(tls.url("/"))).isEqualTo(bridgePin)
+            assertThat(api.probeClient(HomeAssistantTrust.capturing()).connectionPool).isSameInstanceAs(api.probeHttp.connectionPool)
             assertThat(api.probeHttp.connectionPool.connectionCount()).isEqualTo(0)
         }
         tlsServer("other", port).use { tls ->
@@ -305,10 +306,14 @@ class HomeAssistantClientTest {
                 MockResponse().setBody("[]"),
                 MockResponse().setBody("<html>router</html>"),
                 MockResponse().setResponseCode(404).setBody(HaFixtures.AUTH_PROVIDERS),
+                MockResponse().setResponseCode(401).setBody(HaFixtures.AUTH_PROVIDERS),
+                MockResponse().setResponseCode(500),
             ).forEach { answer ->
                 tls.enqueue(answer)
                 assertThat(problemOf { api.certificate(tls.url("/")) }).isEqualTo(HaProblem.NOT_HOME_ASSISTANT)
             }
+            tls.enqueue(MockResponse().setResponseCode(403))
+            assertThat(problemOf { api.certificate(tls.url("/")) }).isEqualTo(HaProblem.BLOCKED)
         }
     }
 }
