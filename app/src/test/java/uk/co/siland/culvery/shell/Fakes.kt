@@ -86,7 +86,11 @@ class FakeAccessControl(var result: Authorised? = null, private val startsSessio
         if (startsSession) result?.let { session.value = Identified(it.person, it.role) }
         return result
     }
-    override fun lock() { session.value = null }
+    var locks = 0
+    override fun lock() {
+        locks++
+        session.value = null
+    }
 
     var touches = 0
     var setupSessionsBegun = 0

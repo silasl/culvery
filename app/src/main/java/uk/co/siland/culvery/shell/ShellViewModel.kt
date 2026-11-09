@@ -179,10 +179,13 @@ class ShellViewModel @Inject constructor(
     init {
         viewModelScope.launch { scheduledDark.drop(1).collect { previewing.value = false } }
         viewModelScope.launch { access.session.collect { if (it == null) settings.value = null } }
-        // 15b Ruling 16: Settings' own 90 s while it is open.
+        // 15b Ruling 16: Settings' own 90 s while it is open; closing it, however it closes, signs out.
         viewModelScope.launch {
+            var wasOpen = false
             settings.map { it != null }.distinctUntilChanged().collect { open ->
                 access.sessionTimeout(if (open) SETTINGS_TIMEOUT_MS else SESSION_TIMEOUT_MS)
+                if (wasOpen && !open) access.lock()
+                wasOpen = open
             }
         }
     }
@@ -222,6 +225,7 @@ class ShellViewModel @Inject constructor(
     override fun chooseHomeApp() {
         viewModelScope.launch {
             access.authorise(CorePermissions.SETTINGS_MANAGE) ?: return@launch
+            access.lock()
             homeAppEvents.send(HomeAppRequest.CHOOSE)
         }
     }

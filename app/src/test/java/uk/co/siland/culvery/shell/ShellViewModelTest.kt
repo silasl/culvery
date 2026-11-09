@@ -163,7 +163,7 @@ class ShellViewModelTest {
         }
     }
 
-    /** 15b Ruling 16: 90 s while Settings is open, two minutes again once it closes, by Close or as its session ends. */
+    /** Settings runs on its own 90 s; closing it, by Close or as its session ends, signs out and returns to the wall's two minutes. */
     @Test
     fun settingsSetsAndClearsItsTimeout() = runTest {
         access.result = admin
@@ -173,14 +173,58 @@ class ShellViewModelTest {
         vm.openSettings()
         runCurrent()
         assertThat(access.timeouts).containsExactly(SETTINGS_TIMEOUT_MS)
+        assertThat(access.session.value).isNotNull()
         vm.closeSettings()
         runCurrent()
         assertThat(access.timeouts).containsExactly(SETTINGS_TIMEOUT_MS, SESSION_TIMEOUT_MS).inOrder()
+        assertThat(access.session.value).isNull()
+        val requests = access.requested.size
         vm.openSettings()
         runCurrent()
+        assertThat(access.requested.size).isEqualTo(requests + 1)
         access.lock()
         runCurrent()
         assertThat(access.timeouts).containsExactly(SETTINGS_TIMEOUT_MS, SESSION_TIMEOUT_MS, SETTINGS_TIMEOUT_MS, SESSION_TIMEOUT_MS).inOrder()
+    }
+
+    /** A tab opened from over Settings closes it, which signs out. */
+    @Test
+    fun openTabFromOverSettingsSignsOut() = runTest {
+        access.result = admin
+        val vm = vm(setOf(FakeCapability("door", order = 40, shown = true)))
+        vm.openSettings()
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        vm.openTab("door")
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    /** Regression guard: a session started on the wall before Settings was ever opened survives the view model's start. */
+    @Test
+    fun theFirstValueDoesNotSignOut() = runTest {
+        access.beginSetupSession(Identified(alex, Role.ADMIN))
+        val vm = vm()
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        assertThat(access.locks).isEqualTo(0)
+        vm.uiState.test { assertThat(expectMostRecentItem().session).isNotNull() }
+    }
+
+    /** Regression guard: Android's own screens don't close Settings, so the session is still there on return. */
+    @Test
+    fun leavingForAndroidsScreenKeepsTheSession() = runTest {
+        access.result = admin
+        val vm = vm()
+        vm.openSettings()
+        runCurrent()
+        vm.systemScreenRequests.test {
+            vm.openSystemScreen(listOf(Intent("detail")), "missing")
+            awaitItem()
+        }
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        vm.uiState.test { assertThat(expectMostRecentItem().settingsOpen).isTrue() }
     }
 
     @Test
@@ -340,15 +384,15 @@ class ShellViewModelTest {
     }
 
     @Test
-    fun chooseHomeAppUsesTheOpenSession() = runTest {
+    fun chooseHomeAppSignsOutBeforeLeaving() = runTest {
         val vm = vm()
         access.result = admin
         vm.homeAppRequests.test {
             vm.chooseHomeApp()
             assertThat(awaitItem()).isEqualTo(HomeAppRequest.CHOOSE)
+            assertThat(access.session.value).isNull()
         }
         assertThat(access.requested.last()).containsExactly(CorePermissions.SETTINGS_MANAGE)
-        assertThat(access.session.value).isNotNull()
         assertThat(kioskExit.exited.value).isFalse()
     }
 
