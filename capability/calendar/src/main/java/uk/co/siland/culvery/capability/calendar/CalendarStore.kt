@@ -443,7 +443,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
             forgetUnheld(connectionId, sourceId, before.titled(), today, zone)
         }
 
-    /** Shows an accepted series assign on every occurrence of [seriesId] held and, if it came from the outbox, completes it. */
+    /** Shows an accepted series assign on every occurrence of [seriesId] held and, if it came from the outbox, completes it; nothing once Undo dropped that change. */
     suspend fun applySeriesAssigned(connectionId: String, sourceId: String, seriesId: String, forPerson: String?, completing: Long? = null) =
         db.withTransaction {
             if (completing != null && dao.deleteOutbox(completing) == 0) return@withTransaction

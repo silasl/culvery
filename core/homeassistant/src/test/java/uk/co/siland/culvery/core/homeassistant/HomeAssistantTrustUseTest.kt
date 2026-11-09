@@ -17,6 +17,7 @@ class HomeAssistantTrustUseTest {
         assertThat(calls.map { it.first.name }).containsExactly("HomeAssistantClient.kt")
         val lines = calls.single().first.readLines(Charsets.UTF_8)
         val lookup = lines.indexOfFirst { "override suspend fun certificate(" in it }
+        assertThat(lookup).isAtLeast(0)
         val end = lines.drop(lookup + 1).indexOfFirst { it.startsWith("    }") } + lookup + 1
         assertThat(calls.single().second).isIn(lookup..end)
     }
