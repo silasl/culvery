@@ -9,15 +9,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Collections
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -102,20 +99,12 @@ class SoundPlayer internal constructor(
         synchronized(lock) { pad?.let(::finish) }
     }
 
-    /** Opens [sound] on [io]; a caller cancelled meanwhile gets its cancellation, and the player is released. */
-    private suspend fun openOffThread(sound: Sound): MediaPlayer? {
-        val player = withContext(io + NonCancellable) { open(sound) }
-        try {
-            currentCoroutineContext().ensureActive()
-        } catch (e: CancellationException) {
-            player?.release()
-            throw e
-        }
-        return player
-    }
+    /** Opens and starts on [io] as one step a cancelled caller can't interrupt, so an opened player is always tracked. */
+    private suspend fun start(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, ringsBefore: Long): Boolean =
+        withContext(io + NonCancellable) { startNow(sound, volume, capMs, padNumber, ringsBefore) }
 
-    private suspend fun start(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, ringsBefore: Long): Boolean {
-        val player = openOffThread(sound)
+    private fun startNow(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, ringsBefore: Long): Boolean {
+        val player = open(sound)
         if (player == null) {
             logFailed(sound)
             return false

@@ -5,10 +5,14 @@ import android.media.MediaPlayer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -27,7 +31,7 @@ import org.robolectric.shadows.util.DataSource
 class SoundPlayerTest {
     private val scope = TestScope(StandardTestDispatcher())
     private var io: CoroutineDispatcher = UnconfinedTestDispatcher()
-    private fun test(block: suspend () -> Unit) = runBlocking { block() }
+    private fun test(block: suspend CoroutineScope.() -> Unit) = runBlocking { block() }
     private val asked = mutableListOf<String>()
     private val made = mutableMapOf<String, MediaPlayer>()
 
@@ -98,6 +102,29 @@ class SoundPlayerTest {
         }
         assertThat(openedOn).containsExactly("sound-io-test", "sound-io-test")
         assertThat(callers.single()).isNotEqualTo("sound-io-test")
+    }
+
+    /** Fails if a caller cancelled while its sound opens leaves the opened player neither released nor tracked. */
+    @Test
+    fun aCancelledCallerLeavesNoPlayerOpen() = test {
+        val executor = Executors.newSingleThreadExecutor { Thread(it, "sound-io-test") }
+        val opening = CountDownLatch(1)
+        val gate = CountDownLatch(1)
+        val player = SoundPlayer({ sound ->
+            opening.countDown()
+            gate.await()
+            prepared(sound.id).also { made[sound.id] = it }
+        }, scope, executor.asCoroutineDispatcher())
+        try {
+            val job = launch(Dispatchers.Default) { player.playPad(1, honk, 1f) }
+            opening.await()
+            job.cancel()
+            gate.countDown()
+            job.join()
+        } finally {
+            executor.shutdown()
+        }
+        assertThat(player.live.size == 1 || released(honk)).isTrue()
     }
 
     @Test

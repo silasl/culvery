@@ -20,20 +20,27 @@ internal val SOUND_EXTENSIONS = setOf("wav", "mp3", "ogg")
 const val UNNAMED_SOUND = "Unnamed sound"
 const val SOUND_NAME_MAX = 40
 
-/** A file's name as Settings shows it: no control or formatting characters, spaces collapsed, at most [SOUND_NAME_MAX] characters. */
-fun cleanSoundName(raw: String): String {
+/** [raw] with line breaks and tabs as spaces, other control and formatting characters dropped, and spaces collapsed; not cut. */
+private fun tidySoundName(raw: String): String {
     val kept = StringBuilder()
     raw.codePoints().forEach { cp ->
-        when (Character.getType(cp).toByte()) {
-            Character.CONTROL, Character.FORMAT, Character.LINE_SEPARATOR, Character.PARAGRAPH_SEPARATOR -> Unit
-            else -> kept.appendCodePoint(if (Character.isWhitespace(cp) || Character.isSpaceChar(cp)) ' '.code else cp)
+        when {
+            cp in 0x09..0x0D || Character.getType(cp).toByte().let { it == Character.LINE_SEPARATOR || it == Character.PARAGRAPH_SEPARATOR } ->
+                kept.append(' ')
+            Character.getType(cp).toByte().let { it == Character.CONTROL || it == Character.FORMAT } -> Unit
+            Character.isWhitespace(cp) || Character.isSpaceChar(cp) -> kept.append(' ')
+            else -> kept.appendCodePoint(cp)
         }
     }
-    val name = kept.toString().replace(Regex(" +"), " ").trim()
-    if (name.isEmpty()) return UNNAMED_SOUND
-    if (name.codePointCount(0, name.length) <= SOUND_NAME_MAX) return name
-    return name.substring(0, name.offsetByCodePoints(0, SOUND_NAME_MAX - 1)).trimEnd() + "\u2026"
+    return kept.toString().replace(Regex(" +"), " ").trim().ifEmpty { UNNAMED_SOUND }
 }
+
+private fun cutSoundName(name: String): String =
+    if (name.codePointCount(0, name.length) <= SOUND_NAME_MAX) name
+    else name.substring(0, name.offsetByCodePoints(0, SOUND_NAME_MAX - 1)).trimEnd() + "…"
+
+/** A file's name as Settings shows it: line breaks and tabs as spaces, other control and formatting characters gone, spaces collapsed, at most [SOUND_NAME_MAX] characters. */
+fun cleanSoundName(raw: String): String = cutSoundName(tidySoundName(raw))
 
 /**
  * The sounds in [root], then those in its theme subfolders (`halloween/`, whatever its case), each group by path. Within the main
@@ -54,10 +61,12 @@ fun readSoundsFolder(root: File?): List<Sound> {
         .filter { (file, _) -> file.isFile && !file.name.startsWith(".") && file.extension.lowercase() in SOUND_EXTENSIONS }
         .map { (file, theme) ->
             val path = file.relativeTo(root).invariantSeparatorsPath
-            Sound("file:$path", cleanSoundName(file.nameWithoutExtension), SoundSource.OnTablet(file), theme)
+            val tidy = tidySoundName(file.nameWithoutExtension)
+            Sound("file:$path", cutSoundName(tidy), SoundSource.OnTablet(file), theme) to tidy.lowercase()
         }
-        .sortedWith(compareBy<Sound> { it.theme != null }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.id }.thenBy { it.id })
-        .distinctBy { it.theme to it.name.lowercase() }
+        .sortedWith(compareBy<Pair<Sound, String>> { it.first.theme != null }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.first.id }.thenBy { it.first.id })
+        .distinctBy { (sound, key) -> sound.theme to key }
+        .map { it.first }
 }
 
 /** The name [readSoundsFolder] gives the file a `file:` [id] names, so a file that has gone can still be named; null for any other id. */

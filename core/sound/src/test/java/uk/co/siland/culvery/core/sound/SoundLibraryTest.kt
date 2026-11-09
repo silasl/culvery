@@ -34,7 +34,7 @@ class SoundLibraryTest {
 
     private fun library() = SoundLibrary({ folder.root }, CoroutineScope(UnconfinedTestDispatcher()), UnconfinedTestDispatcher())
 
-    /** Regression guard: the page's re-read wins over a start-up read that was slower to finish. */
+    /** Regression guard (18 §2.2): the page's re-read wins over a start-up read that was slower to finish. */
     @Test
     fun aLaterRefreshWinsOverAHeldFirstRead() = runBlocking {
         val empty = folder.newFolder("empty")
@@ -57,6 +57,7 @@ class SoundLibraryTest {
         assertThat(library.sounds.value.map { it.id }).contains("file:Test Honk.wav")
     }
 
+    /** Fails if firstReadDone is true before the first read lands, or false after. */
     @Test
     fun theFirstReadSaysWhenItLands() = runBlocking {
         val reading = CountDownLatch(1)
