@@ -23,6 +23,11 @@ class FakeHomeAssistantApi : HomeAssistantApi {
     /** `"certificate"`, `"check"`, `"states"`, `"state vacuum.hoover"`, `"service vacuum/start vacuum.hoover"`, `"… preset_mode=eco"`. */
     val calls: List<String> get() = _calls
 
+    private val _checked = mutableListOf<HomeAssistantLink>()
+
+    /** The link each [check] was given, in order. */
+    val checked: List<HomeAssistantLink> get() = _checked
+
     private val _follows = mutableListOf<Set<String>>()
 
     /** The ids each socket opened for, in order. */
@@ -71,6 +76,7 @@ class FakeHomeAssistantApi : HomeAssistantApi {
 
     override suspend fun check(link: HomeAssistantLink) {
         _calls += "check"
+        _checked += link
         gate?.await()
         failIfAsked()
     }

@@ -48,3 +48,11 @@ const val PASTE_A_TOKEN = "Paste a token for Culvery first."
 const val TOKEN_CANT_BE_SENT = "That token has characters it can’t contain. Copy it again from Home Assistant and paste it here."
 const val TOKEN_NOT_ACCEPTED = "Home Assistant didn’t accept that token. Create a new one and paste it here."
 const val NOT_HOME_ASSISTANT_LINE = "Nothing at that address answered as Home Assistant. Check the address."
+
+/** Plan 20 N1: the PIN pad's label and detail when Check meets an https certificate, then the page's own lines. */
+const val TRUST_HOME_ASSISTANT = "Trust this Home Assistant"
+const val CERTIFICATE_FINGERPRINT = "Certificate fingerprint"
+const val USE_HTTPS = "This Home Assistant is linked over https. Type its address starting https://."
+const val CERTIFICATE_CHANGED_ON_PAGE = "Home Assistant’s certificate has changed. Press Check to trust the new one."
+const val FORGET_HOME_ASSISTANT = "Forget this Home Assistant"
+const val HOME_ASSISTANT_FORGOTTEN = "Home Assistant forgotten."

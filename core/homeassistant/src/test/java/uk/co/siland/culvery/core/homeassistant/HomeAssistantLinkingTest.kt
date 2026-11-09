@@ -1,8 +1,11 @@
 package uk.co.siland.culvery.core.homeassistant
 
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -15,7 +18,10 @@ import uk.co.siland.culvery.core.homeassistant.test.entityState
 import uk.co.siland.culvery.core.homeassistant.test.testHomeAssistant
 import uk.co.siland.culvery.core.household.Role
 
-/** 11 §4.1: Check asks for an Admin PIN before a different link is saved, and a refused address or token is never saved. */
+/**
+ * 11 §4.1: Check asks for an Admin PIN before a different link is saved, and a refused address or token is never saved.
+ * Plan 20 N1: an https address asks the PIN, showing the certificate's fingerprint, before the token is sent; Forget asks it too.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class HomeAssistantLinkingTest {
@@ -231,11 +237,190 @@ class HomeAssistantLinkingTest {
         assertThat(ha.problem.value).isEqualTo(HaProblem.TOKEN_REFUSED)
     }
 
+    /** Regression guard: with no pin stored, http links as before, with no certificate read and a link saved without a pin. */
+    @Test
+    fun httpStillLinksWithNoPin() = runTest {
+        val linking = linking()
+        assertThat(linking.check("http://192.168.1.20:8123", "new-token")).isEqualTo(CheckOutcome.Linked)
+        assertThat(api.calls).doesNotContain("certificate")
+        assertThat(access.labels).containsExactly(null)
+        assertThat(access.lastDetail).isNull()
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(HTTP_H, "new-token", pin = null))
+    }
+
+    /** Fails if anything but the tokenless certificate read reaches Home Assistant before the Admin PIN is given. */
+    @Test
+    fun httpsAsksTheFreshPinBeforeTheTokenIsSent() = runTest {
+        val linking = linking()
+        val pad = CompletableDeferred<Unit>().also { access.padGate = it }
+        val outcome = async { linking.check("https://192.168.1.20:8443", "new-token") }
+        runCurrent()
+        assertThat(api.calls).containsExactly("certificate")
+        assertThat(access.asked).containsExactly(listOf("connections.manage"))
+        pad.complete(Unit)
+        assertThat(outcome.await()).isEqualTo(CheckOutcome.Linked)
+        assertThat(api.calls.take(2)).containsExactly("certificate", "check").inOrder()
+        assertThat(api.checked.first()).isEqualTo(HomeAssistantLink(HTTPS_H, "new-token", PIN))
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(HTTPS_H, "new-token", PIN))
+        assertThat(access.asked).hasSize(1)
+    }
+
+    /** Fails if the PIN pad isn't labelled to trust Home Assistant, or doesn't show the fingerprint as grouped lowercase hex. */
+    @Test
+    fun thePinPadShowsTheFingerprint() = runTest {
+        val linking = linking()
+        linking.check("https://192.168.1.20:8443", "new-token")
+        assertThat(access.labels).containsExactly("Trust this Home Assistant")
+        assertThat(access.lastDetail).isEqualTo(
+            "Certificate fingerprint\n0001 0203 0405 0607 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f",
+        )
+    }
+
+    /** Fails if a refused or cancelled trust PIN sends the token or saves anything. */
+    @Test
+    fun aRefusedPinSendsNoTokenAndSavesNothing() = runTest {
+        val linking = linking(SAVED)
+        for (role in listOf(Role.ADULT, null)) {
+            access.role = role
+            assertThat(linking.check("https://192.168.1.20:8443", "new-token")).isEqualTo(CheckOutcome.PinRefused)
+        }
+        assertThat(api.calls).containsExactly("certificate", "certificate")
+        assertThat(settings.link.first()).isEqualTo(SAVED)
+        assertThat(settings.storedPin.first()).isNull()
+    }
+
+    /** Fails if moving the saved http link to https on the same host needs the token again, or asks a second PIN to save. */
+    @Test
+    fun theUpgradeKeepsTheSavedToken() = runTest {
+        val linking = linking(SAVED)
+        assertThat(linking.check("https://192.168.1.21:8443", "")).isEqualTo(CheckOutcome.Failed(PASTE_A_TOKEN))
+        assertThat(api.calls).isEmpty()
+        assertThat(linking.check("https://192.168.1.20:8443", "")).isEqualTo(CheckOutcome.Linked)
+        assertThat(access.labels).containsExactly("Trust this Home Assistant")
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(HTTPS_H, "test-token", PIN))
+    }
+
+    /** Fails if the pinned key at a new port needs the token again or asks to trust it; the different link still asks to save. */
+    @Test
+    fun theSameKeyOnANewPortKeepsTheToken() = runTest {
+        val linking = linking(PINNED)
+        assertThat(linking.check("https://192.168.1.20:9443", "")).isEqualTo(CheckOutcome.Linked)
+        assertThat(access.labels).containsExactly(null)
+        assertThat(access.lastDetail).isNull()
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(checkNotNull(homeAssistantUrl("https://192.168.1.20:9443")), "test-token", PIN))
+    }
+
+    /** Fails if an http address is contacted, or asks the PIN, once a pin is stored. */
+    @Test
+    fun httpIsRefusedOncePinned() = runTest {
+        val linking = linking(PINNED)
+        for (token in listOf("new-token", "")) {
+            assertThat(linking.check("http://192.168.1.20:8123", token))
+                .isEqualTo(CheckOutcome.Failed("This Home Assistant is linked over https. Type its address starting https://."))
+        }
+        assertThat(api.calls).isEmpty()
+        assertThat(access.asked).isEmpty()
+        assertThat(settings.link.first()).isEqualTo(PINNED)
+    }
+
+    /** Fails if a record with a pin but no address lets an http address through. */
+    @Test
+    fun httpIsRefusedWhenOnlyThePinIsStored() = runTest {
+        val store = MemoryStore()
+        store.updateData { it.toMutablePreferences().apply { set(stringPreferencesKey("certificate_pin"), PIN) } }
+        val onlyPin = HomeAssistantSettings(store)
+        ha = testHomeAssistant(api, onlyPin.link, lit, backgroundScope)
+        val linking = HomeAssistantLinking(ha, onlyPin, access, setOf(hoover)) { homeAssistantUrl(it) }
+        assertThat(onlyPin.link.first()).isNull()
+        assertThat(linking.check("http://192.168.1.20:8123", "new-token")).isEqualTo(CheckOutcome.Failed(USE_HTTPS))
+        assertThat(api.calls).isEmpty()
+        assertThat(access.asked).isEmpty()
+    }
+
+    /** Fails if the https-only rule reads the typed text rather than the address's scheme. */
+    @Test
+    fun aCapitalisedHttpSchemeIsRefusedOncePinned() = runTest {
+        val linking = linking(PINNED)
+        assertThat(linking.check("HTTP://192.168.1.20:8123", "new-token")).isEqualTo(CheckOutcome.Failed(USE_HTTPS))
+        assertThat(api.calls).isEmpty()
+        assertThat(access.asked).isEmpty()
+    }
+
+    /** Fails if a different key at the pinned address is trusted without the PIN and its fingerprint, or asks twice. */
+    @Test
+    fun aNewKeyAsksThePinAgain() = runTest {
+        val linking = linking(PINNED)
+        api.certificate = OTHER_PIN
+        assertThat(linking.check("https://192.168.1.20:8443", "")).isEqualTo(CheckOutcome.Linked)
+        assertThat(access.labels).containsExactly("Trust this Home Assistant")
+        assertThat(access.lastDetail).isEqualTo("Certificate fingerprint\n${fingerprint(OTHER_PIN)}")
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(HTTPS_H, "test-token", OTHER_PIN))
+    }
+
+    /** Fails if re-checking the pinned link with the same key asks any PIN. */
+    @Test
+    fun theSameKeyDoesNotAskAgain() = runTest {
+        val linking = linking(PINNED)
+        assertThat(linking.check("https://192.168.1.20:8443", "")).isEqualTo(CheckOutcome.Linked)
+        assertThat(access.asked).isEmpty()
+        assertThat(api.checked).containsExactly(PINNED)
+    }
+
+    /** Fails if a key that changes between the certificate read and the check saves anything, or gets another line. */
+    @Test
+    fun aKeyChangedDuringCheckSavesNothing() = runTest {
+        val linking = linking(SAVED)
+        val pad = CompletableDeferred<Unit>().also { access.padGate = it }
+        val outcome = async { linking.check("https://192.168.1.20:8443", "") }
+        runCurrent()
+        api.failNext = HaProblem.CERTIFICATE_CHANGED
+        pad.complete(Unit)
+        assertThat(outcome.await())
+            .isEqualTo(CheckOutcome.Failed("Home Assistant’s certificate has changed. Press Check to trust the new one."))
+        assertThat(settings.link.first()).isEqualTo(SAVED)
+        assertThat(settings.storedPin.first()).isNull()
+    }
+
+    /** Fails if a certificate read that fails asks the PIN, or gets a line other than Check's. */
+    @Test
+    fun aFailedCertificateReadAsksNoPin() = runTest {
+        val linking = linking()
+        api.failNext = HaProblem.NOT_HOME_ASSISTANT
+        assertThat(linking.check("https://192.168.1.20:8443", "new-token")).isEqualTo(CheckOutcome.Failed(NOT_HOME_ASSISTANT_LINE))
+        assertThat(api.calls).containsExactly("certificate")
+        assertThat(access.asked).isEmpty()
+    }
+
+    /** Fails if Forget clears without a fresh Admin PIN, leaves any of the three, or stops http linking again. */
+    @Test
+    fun forgetAsksThePinAndClearsAll() = runTest {
+        val linking = linking(PINNED)
+        access.role = Role.ADULT
+        assertThat(linking.forget()).isFalse()
+        assertThat(settings.link.first()).isEqualTo(PINNED)
+        access.role = Role.ADMIN
+        assertThat(linking.forget()).isTrue()
+        assertThat(access.asked).containsExactly(listOf("connections.manage"), listOf("connections.manage"))
+        assertThat(access.labels).containsExactly("Forget this Home Assistant", "Forget this Home Assistant")
+        assertThat(settings.link.first()).isNull()
+        assertThat(settings.storedPin.first()).isNull()
+        assertThat(linking.check("http://192.168.1.20:8123", "new-token")).isEqualTo(CheckOutcome.Linked)
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(HTTP_H, "new-token", pin = null))
+    }
+
     /** Fails if a choice's text holds its id or name. */
     @Test
     fun aChoiceNamesNeitherIdNorName() {
         val text = EntityChoice("climate.hall", "Hall").toString()
         assertThat(text).doesNotContain("hall")
         assertThat(text).doesNotContain("Hall")
+    }
+
+    private companion object {
+        val HTTP_H = checkNotNull(homeAssistantUrl("http://192.168.1.20:8123"))
+        val HTTPS_H = checkNotNull(homeAssistantUrl("https://192.168.1.20:8443"))
+        const val PIN = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+        const val OTHER_PIN = "HyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4="
+        val PINNED = HomeAssistantLink(HTTPS_H, "test-token", PIN)
     }
 }

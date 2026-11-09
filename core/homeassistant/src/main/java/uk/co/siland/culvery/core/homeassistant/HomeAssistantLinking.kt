@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl
 import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.mayManageConnections
 
 private const val TAG = "HomeAssistantLinking"
@@ -29,8 +30,11 @@ class EntityChoice(val id: String, val name: String) {
 }
 
 /**
- * Check on Settings › Home Assistant (11 §4.1): the address by the rule, `GET /api/` with the token, then a fresh
- * Admin PIN before a different link is saved; the first of each kind found alone is chosen.
+ * Check on Settings › Home Assistant (11 §4.1; Plan 20 N1). Over http: the address by the rule, `GET /api/` with the
+ * token, then a fresh Admin PIN before a different link is saved. Over https: the certificate is read first without the
+ * token; a key other than the saved pin asks the fresh Admin PIN, showing its fingerprint, before the token is sent, and
+ * the link is then saved with that pin. Once a pin is stored, an http address is refused. The first of each kind found
+ * alone is chosen.
  */
 @Singleton
 class HomeAssistantLinking internal constructor(
@@ -44,27 +48,59 @@ class HomeAssistantLinking internal constructor(
     constructor(ha: HomeAssistant, settings: HomeAssistantSettings, access: AccessControl, devices: Set<@JvmSuppressWildcards HomeAssistantDevice>) :
         this(ha, settings, access, devices, ::homeAssistantUrl)
 
-    /** A blank [token] keeps the saved one while the address is the saved one. A refused address sends nothing. */
+    /**
+     * A blank [token] keeps the saved one for the saved address, for the same host moving from http to https, and for any
+     * https address presenting the saved pin's key. A refused address sends nothing.
+     */
     suspend fun check(address: String, token: String): CheckOutcome {
         val base = url(address) ?: return CheckOutcome.Failed(ADDRESS_REFUSED)
+        if (!base.isHttps && settings.storedPin.first() != null) return CheckOutcome.Failed(USE_HTTPS)
         val saved = settings.link.first()
         val typed = token.trim()
         // A pasted zero-width space or line break can't go in a header; refusing it here sends nothing.
         if (typed.any { it !in '!'..'~' }) return CheckOutcome.Failed(TOKEN_CANT_BE_SENT)
-        val secret = typed.ifEmpty { saved?.takeIf { it.baseUrl == base }?.token }
-            ?: return CheckOutcome.Failed(PASTE_A_TOKEN)
-        val link = HomeAssistantLink(base, secret, pin = null)
+        val kept = typed.ifEmpty { saved?.takeIf { it.baseUrl == base || it.movesToHttps(base) }?.token }
+        if (!base.isHttps) {
+            val link = HomeAssistantLink(base, kept ?: return CheckOutcome.Failed(PASTE_A_TOKEN), pin = null)
+            return checkAndSave(link, saved, trusted = false)
+        }
+        if (kept == null && saved?.pin == null) return CheckOutcome.Failed(PASTE_A_TOKEN)
+        val pin = try {
+            ha.certificate(base)
+        } catch (e: HomeAssistantException) {
+            return e.problem.failure()
+        }
+        val secret = kept ?: saved?.takeIf { it.pin == pin }?.token ?: return CheckOutcome.Failed(PASTE_A_TOKEN)
+        val known = pin == saved?.pin
+        if (!known) {
+            val detail = "$CERTIFICATE_FINGERPRINT\n${fingerprint(pin)}"
+            access.authorise(CorePermissions.CONNECTIONS_MANAGE, label = TRUST_HOME_ASSISTANT, detail = detail) ?: return CheckOutcome.PinRefused
+        }
+        return checkAndSave(HomeAssistantLink(base, secret, pin), saved, trusted = !known)
+    }
+
+    /** Asks a fresh Admin PIN, then removes the saved address, token and pin; false when refused. Throws `IOException` if the write fails. */
+    suspend fun forget(): Boolean {
+        access.authorise(CorePermissions.CONNECTIONS_MANAGE, label = FORGET_HOME_ASSISTANT) ?: return false
+        settings.forget()
+        return true
+    }
+
+    // [trusted]: the Admin PIN was given for this link already, so saving asks no second one.
+    private suspend fun checkAndSave(link: HomeAssistantLink, saved: HomeAssistantLink?, trusted: Boolean): CheckOutcome {
         try {
             ha.check(link)
         } catch (e: HomeAssistantException) {
             return e.problem.failure()
         }
         if (link == saved) return CheckOutcome.Linked
-        if (!access.mayManageConnections()) return CheckOutcome.PinRefused
+        if (!trusted && !access.mayManageConnections()) return CheckOutcome.PinRefused
         settings.save(link)
         pickTheOnlyOnes(link)
         return CheckOutcome.Linked
     }
+
+    private fun HomeAssistantLink.movesToHttps(to: HttpUrl) = !baseUrl.isHttps && to.isHttps && baseUrl.host == to.host
 
     /** Each of [domains]' entities by name, from one read of Home Assistant; throws [HomeAssistantException]. */
     suspend fun entities(domains: Set<String>): Map<String, List<EntityChoice>> {
@@ -99,6 +135,7 @@ class HomeAssistantLinking internal constructor(
     private fun HaProblem.failure() = when (this) {
         HaProblem.TOKEN_REFUSED -> CheckOutcome.Failed(TOKEN_NOT_ACCEPTED)
         HaProblem.NOT_HOME_ASSISTANT -> CheckOutcome.Failed(NOT_HOME_ASSISTANT_LINE)
+        HaProblem.CERTIFICATE_CHANGED -> CheckOutcome.Failed(CERTIFICATE_CHANGED_ON_PAGE)
         else -> CheckOutcome.Failed(problemLine(this))
     }
 
