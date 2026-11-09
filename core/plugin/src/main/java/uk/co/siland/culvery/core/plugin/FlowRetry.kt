@@ -42,6 +42,9 @@ val OUTBOX_BACKOFF_MS: List<Long> = listOf(30_000L, 60_000L, 120_000L, 300_000L)
 /** The wait after failure number [attempts] (from 1); the last step repeats. */
 fun backoffMillis(attempts: Int): Long = OUTBOX_BACKOFF_MS[(attempts - 1).coerceIn(0, OUTBOX_BACKOFF_MS.lastIndex)]
 
+/** "1 failure" or "[count] failures", for the line a [FailureRun] logs when work comes back. */
+fun failuresPhrase(count: Int): String = if (count == 1) "1 failure" else "$count failures"
+
 /** [firstMs] doubled [doublings] times (fewer than 0 count as 0), at most [capMs]. */
 fun doublingMillis(firstMs: Long, capMs: Long, doublings: Int): Long =
     (firstMs shl doublings.coerceIn(0, MAX_SHIFT)).coerceAtMost(capMs)

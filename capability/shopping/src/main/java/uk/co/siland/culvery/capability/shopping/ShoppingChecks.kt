@@ -21,6 +21,7 @@ import uk.co.siland.culvery.core.plugin.FailureRun
 import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.failuresPhrase
 import uk.co.siland.culvery.core.plugin.polling
 import uk.co.siland.culvery.core.plugin.reasonWord
 
@@ -88,7 +89,7 @@ class ShoppingChecks internal constructor(
             attempt({
                 check()
                 val failedInARow = run.succeeded()
-                if (failedInARow > 0) Log.i(TAG, "Shopping checks work again after ${failedInARow} failures")
+                if (failedInARow > 0) Log.i(TAG, "Shopping checks work again after ${failuresPhrase(failedInARow)}")
             }) { e ->
                 if (run.failed()) Log.w(TAG, "A shopping check failed (${e::class.simpleName}, ${e.reasonWord()})")
             }

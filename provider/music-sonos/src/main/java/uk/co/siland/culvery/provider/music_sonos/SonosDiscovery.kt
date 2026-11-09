@@ -11,6 +11,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.plugin.FailureRun
+import uk.co.siland.culvery.core.plugin.failuresPhrase
 
 internal const val SSDP_HOST = "239.255.255.250"
 internal const val SSDP_PORT = 1900
@@ -70,7 +71,7 @@ internal class SonosDiscovery(
                 }
             }
             val failedInARow = failures.succeeded()
-            if (failedInARow > 0) Log.i(TAG, "The speaker scan works again after $failedInARow failures")
+            if (failedInARow > 0) Log.i(TAG, "The speaker scan works again after ${failuresPhrase(failedInARow)}")
         } catch (e: IOException) {
             if (failures.failed()) Log.w(TAG, "The speaker scan stopped (${e::class.simpleName})")
         }

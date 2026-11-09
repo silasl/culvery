@@ -13,6 +13,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.capability.lights.BridgeFound
 import uk.co.siland.culvery.core.plugin.FailureRun
+import uk.co.siland.culvery.core.plugin.failuresPhrase
 
 /** How long a search listens (7 §3.2). */
 internal const val SEARCH_MS = 5_000L
@@ -100,7 +101,7 @@ internal class BridgeSearchLog {
 
     fun searchStarted() {
         val failedInARow = search.succeeded()
-        if (failedInARow > 0) Log.i(TAG, "The bridge search works again after $failedInARow failures")
+        if (failedInARow > 0) Log.i(TAG, "The bridge search works again after ${failuresPhrase(failedInARow)}")
     }
 
     fun resolveFailed() {
@@ -109,7 +110,7 @@ internal class BridgeSearchLog {
 
     fun resolved() {
         val failedInARow = resolve.succeeded()
-        if (failedInARow > 0) Log.i(TAG, "Bridges resolve again after $failedInARow failures")
+        if (failedInARow > 0) Log.i(TAG, "Bridges resolve again after ${failuresPhrase(failedInARow)}")
     }
 }
 

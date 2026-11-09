@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.plugin.FailureRun
 import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.failuresPhrase
 import uk.co.siland.culvery.core.plugin.polling
 
 /** What plays, and the group volumes, while a music screen shows (6 §4.2). */
@@ -105,7 +106,7 @@ class MusicChecks internal constructor(
                 attempt({
                     s.checkPlayback()
                     val failedInARow = run.succeeded()
-                    if (failedInARow > 0) Log.i(TAG, "Music playback checks work again after ${failedInARow} failures")
+                    if (failedInARow > 0) Log.i(TAG, "Music playback checks work again after ${failuresPhrase(failedInARow)}")
                 }) { e ->
                     if (run.failed()) Log.w(TAG, "A music playback check failed (${e::class.simpleName})")
                 }
@@ -122,7 +123,7 @@ class MusicChecks internal constructor(
                 attempt({
                     readLayout(s)
                     val failedInARow = run.succeeded()
-                    if (failedInARow > 0) Log.i(TAG, "Music layout reads work again after ${failedInARow} failures")
+                    if (failedInARow > 0) Log.i(TAG, "Music layout reads work again after ${failuresPhrase(failedInARow)}")
                 }) { e ->
                     if (run.failed()) Log.w(TAG, "A music layout read failed (${e::class.simpleName})")
                 }

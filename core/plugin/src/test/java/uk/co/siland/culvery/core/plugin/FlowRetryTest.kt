@@ -175,4 +175,11 @@ class FlowRetryTest {
         assertThat(starts).isEqualTo(3)
         assertThat(result.await()).containsExactly("a", "b").inOrder()
     }
+
+    /** Fails if the recovery line says "after 1 failures". */
+    @Test
+    fun oneFailureIsSingular() {
+        assertThat(failuresPhrase(1)).isEqualTo("1 failure")
+        assertThat(failuresPhrase(3)).isEqualTo("3 failures")
+    }
 }
