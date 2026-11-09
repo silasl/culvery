@@ -117,8 +117,8 @@ private val butter = Learned("butter", "Butter", 2, 0)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ShoppingTabTest {
     @get:Rule(order = 0) val touchMode = TouchModeRule()
-    @get:Rule(order = 0) val closing = AfterTheScreen { rigs.forEach { it.close() } }
-    @get:Rule(order = 1) val compose = createComposeRule()
+    @get:Rule(order = 1) val closing = AfterTheScreen { rigs.forEach { it.close() } }
+    @get:Rule(order = 2) val compose = createComposeRule()
     private val navigator = RecordingNavigator()
     private val overlay = TestOverlay()
     private val rigs = mutableListOf<UiRig>()

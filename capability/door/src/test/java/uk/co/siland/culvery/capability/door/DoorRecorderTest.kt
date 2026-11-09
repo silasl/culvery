@@ -13,8 +13,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -22,6 +20,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.settingsDataStore
+import uk.co.siland.culvery.core.ui.test.awaiting
 
 /** 5 §3.1, §4.2: the sink records in the order notices arrive, keeps last heard and the unrecognised run. */
 @RunWith(AndroidJUnit4::class)
@@ -107,7 +106,7 @@ class DoorRecorderTest {
         val flakyRecorder = DoorRecorder(store, DoorSettings(flaky, scope), scope, WallClock { now }) { alerted.send(it) }
         flakyRecorder.post(ring(key = "a"))
         flakyRecorder.post(ring(key = "b"))
-        withContext(Dispatchers.Default) { withTimeout(5_000) { repeat(2) { alerted.receive() } } }
+        awaiting("two alerts") { repeat(2) { alerted.receive() } }
         assertThat(store.events.first().map { it.device }).hasSize(2)
     }
 

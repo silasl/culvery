@@ -80,6 +80,7 @@ class PinPadTest {
         compose.onNodeWithTag("pin_detail").assertTextEquals(detail)
     }
 
+    /** Regression guard: a PIN request with no detail must not show an empty detail line. */
     @Test
     fun noDetailLineWithoutADetail() {
         controller.open("Change settings", null, null)

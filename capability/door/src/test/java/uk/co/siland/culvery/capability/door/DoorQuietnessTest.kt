@@ -20,6 +20,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.test.awaiting
 
 /** 18 §7: the pads see the ring card, quiet hours and the doorbell's volume. */
 @RunWith(AndroidJUnit4::class)

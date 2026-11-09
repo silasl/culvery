@@ -9,7 +9,6 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -23,6 +22,7 @@ import uk.co.siland.culvery.capability.music.MusicProblem
 import uk.co.siland.culvery.capability.music.MusicUnreachableException
 import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.capability.music.RoomGroup
+import uk.co.siland.culvery.core.ui.test.awaiting
 
 /** The debug samples (13 §8): in-memory speakers and lights the walk-through groups, plays and changes by hand. */
 @RunWith(AndroidJUnit4::class)
@@ -36,7 +36,7 @@ class SampleHouseTest {
     private fun receive(configure: Intent.() -> Unit) = DebugSampleHouseReceiver().onReceive(context, Intent().apply(configure))
 
     // Fresh reads, not one collection: DataStore can keep a collection begun during a write from ever seeing it.
-    private suspend fun settled(done: suspend () -> Boolean) = withTimeout(10_000) { while (!done()) delay(10) }
+    private suspend fun settled(what: String, done: suspend () -> Boolean) = awaiting(what, 10_000) { while (!done()) delay(10) }
 
     private suspend inline fun <reified T : Exception> thrown(block: suspend () -> Unit): T {
         try {
@@ -139,11 +139,11 @@ class SampleHouseTest {
         deps.lightsSettings().connect("lights.hue", bridge)
 
         receive { putExtra("sample", true) }
-        settled { deps.musicSettings().prefs.first().providerId == "sample.music" && deps.lightsSettings().prefs.first().providerId == "sample.lights" }
+        settled("the samples to be connected") { deps.musicSettings().prefs.first().providerId == "sample.music" && deps.lightsSettings().prefs.first().providerId == "sample.lights" }
         // A second sample true must not replace what was kept with the samples.
         deps.sampleHouse().use(true)
         receive { putExtra("sample", false) }
-        settled { deps.musicSettings().prefs.first().providerId == "music.sonos" && deps.lightsSettings().prefs.first().providerId == "lights.hue" }
+        settled("the saved connections to come back") { deps.musicSettings().prefs.first().providerId == "music.sonos" && deps.lightsSettings().prefs.first().providerId == "lights.hue" }
         assertThat(deps.musicSettings().prefs.first().link).isEqualTo(music)
         assertThat(deps.lightsSettings().prefs.first().link).isEqualTo(bridge)
     }

@@ -105,11 +105,11 @@ import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 @RunWith(AndroidJUnit4::class)
 class PeopleUiTest {
     @get:Rule(order = 0) val touchMode = TouchModeRule()
-    @get:Rule(order = 0) val closing = AfterTheScreen {
+    @get:Rule(order = 1) val closing = AfterTheScreen {
         scope.cancel()
         db.close()
     }
-    @get:Rule(order = 1) val compose = createComposeRule()
+    @get:Rule(order = 2) val compose = createComposeRule()
     private lateinit var db: HouseholdDatabase
     private lateinit var household: HouseholdRepository
     private lateinit var access: TestAccess

@@ -21,18 +21,20 @@ const val UNNAMED_SOUND = "Unnamed sound"
 const val SOUND_NAME_MAX = 40
 
 /** [raw] with line breaks and tabs as spaces, other control and formatting characters dropped, and spaces collapsed; not cut. */
+private val RUN_OF_SPACES = Regex(" +")
+
 private fun tidySoundName(raw: String): String {
     val kept = StringBuilder()
     raw.codePoints().forEach { cp ->
+        val type = Character.getType(cp).toByte()
         when {
-            cp in 0x09..0x0D || Character.getType(cp).toByte().let { it == Character.LINE_SEPARATOR || it == Character.PARAGRAPH_SEPARATOR } ->
-                kept.append(' ')
-            Character.getType(cp).toByte().let { it == Character.CONTROL || it == Character.FORMAT } -> Unit
+            cp in 0x09..0x0D -> kept.append(' ')
+            type == Character.CONTROL || type == Character.FORMAT -> Unit
             Character.isWhitespace(cp) || Character.isSpaceChar(cp) -> kept.append(' ')
             else -> kept.appendCodePoint(cp)
         }
     }
-    return kept.toString().replace(Regex(" +"), " ").trim().ifEmpty { UNNAMED_SOUND }
+    return kept.toString().replace(RUN_OF_SPACES, " ").trim().ifEmpty { UNNAMED_SOUND }
 }
 
 private fun cutSoundName(name: String): String =

@@ -26,7 +26,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Before
@@ -49,6 +48,7 @@ import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.backoffMillis
+import uk.co.siland.culvery.core.ui.test.awaiting
 
 // Robolectric for Room and for android.util.Log (the engine logs timeouts).
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -903,7 +903,7 @@ class CalendarSyncTest {
         a.failWith = UnreachableException("reads are down")
         w.createGate = CompletableDeferred()
         val pass = launch { sync.syncAll() }
-        withContext(Dispatchers.Default) { withTimeout(5_000) { w.entered.await() } }
+        awaiting("the write to start") { w.entered.await() }
         // The editor asks for the lock while the drain settles the refusal under it (20 §4.3), so it holds the lock
         // when the drain comes to drop the create, and queues a change behind it.
         val holding = CompletableDeferred<Unit>()
@@ -918,7 +918,7 @@ class CalendarSyncTest {
                 awaitWaiting(lock, 2)
             }
         }
-        withContext(Dispatchers.Default) { withTimeout(5_000) { holding.await() } }
+        awaiting("the lock to be held") { holding.await() }
         // The drain's drop waits for the lock; one that didn't take it would time out here.
         awaitWaiting(lock, 1)
         queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
@@ -1195,7 +1195,7 @@ class CalendarSyncTest {
     private suspend fun TestScope.passSendingTheCreate(sync: CalendarSync): Job {
         w.createGate = CompletableDeferred()
         val pass = launch { sync.syncAll() }
-        withContext(Dispatchers.Default) { withTimeout(5_000) { w.entered.await() } }
+        awaiting("the write to start") { w.entered.await() }
         return pass
     }
 
@@ -1421,7 +1421,7 @@ class CalendarSyncTest {
 
     /** Returns once [n] callers wait for [lock]. */
     private suspend fun awaitWaiting(lock: CalendarWriteLock, n: Int) =
-        withContext(Dispatchers.Default) { withTimeout(5_000) { while (lock.waiting != n) yield() } }
+        awaiting("$n callers to wait for the lock") { while (lock.waiting != n) yield() }
 
     /** Fix round 1: what was queued behind an undone create went with it, so the pass doesn't send it. */
     @Test

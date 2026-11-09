@@ -10,6 +10,9 @@ data class Move(
     /** What the Korean voice says, when it differs from what's shown (step 6 drops its "A"). */
     val spokenHangul: String? = hangul,
 ) {
+    /** The name the screen leads with. */
+    val nameShown: String get() = hangul ?: romanised ?: english
+
     override fun toString() = "Move"
 }
 

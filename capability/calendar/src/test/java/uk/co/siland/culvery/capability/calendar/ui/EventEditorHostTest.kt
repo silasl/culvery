@@ -111,12 +111,12 @@ class EventEditorHostTest {
     /** Focus and the keyboard behave as on the tablet only in touch mode, set before the activity launches. */
     @get:Rule(order = 0) val touchMode = TouchModeRule()
 
-    @get:Rule(order = 0) val closing = AfterTheScreen {
+    @get:Rule(order = 1) val closing = AfterTheScreen {
         scope.cancel()
         calendar.close()
         householdDb.close()
     }
-    @get:Rule(order = 1) val compose = createComposeRule()
+    @get:Rule(order = 2) val compose = createComposeRule()
 
     private lateinit var calendar: CalendarDatabase
     private lateinit var householdDb: HouseholdDatabase

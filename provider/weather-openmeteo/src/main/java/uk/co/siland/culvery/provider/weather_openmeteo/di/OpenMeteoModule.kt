@@ -22,17 +22,8 @@ import uk.co.siland.culvery.provider.weather_openmeteo.OpenMeteoLocationSearch
 private val SEARCH_CONNECT_TIMEOUT: Duration = Duration.ofSeconds(10)
 private val SEARCH_READ_TIMEOUT: Duration = Duration.ofSeconds(15)
 
-// The forecast runs in the background, as the calendar's sync does: its timeouts, and a whole-call limit, so a body
-// that drips in inside the read timeout can't hold the loop (plan review 2).
-private val FORECAST_CONNECT_TIMEOUT: Duration = Duration.ofSeconds(15)
-private val FORECAST_READ_TIMEOUT: Duration = Duration.ofSeconds(30)
-private val FORECAST_CALL_TIMEOUT: Duration = Duration.ofSeconds(60)
-
-internal fun forecastClient(): OkHttpClient = internetHttpClient()
-    .connectTimeout(FORECAST_CONNECT_TIMEOUT)
-    .readTimeout(FORECAST_READ_TIMEOUT)
-    .callTimeout(FORECAST_CALL_TIMEOUT)
-    .build()
+// The forecast runs in the background on the shared client's timeouts, whole-call limit included (plan review 2).
+internal fun forecastClient(): OkHttpClient = internetHttpClient().build()
 
 internal fun searchClient(): OkHttpClient =
     internetHttpClient().connectTimeout(SEARCH_CONNECT_TIMEOUT).readTimeout(SEARCH_READ_TIMEOUT).build()

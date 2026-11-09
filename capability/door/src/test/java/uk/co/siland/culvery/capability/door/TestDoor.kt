@@ -13,12 +13,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
 import uk.co.siland.culvery.core.access.test.FakeAccess
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -31,6 +28,7 @@ import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.ShowingTheme
+import uk.co.siland.culvery.core.ui.test.awaiting
 
 internal fun doorDb(): DoorDatabase =
     Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), DoorDatabase::class.java)
@@ -145,15 +143,6 @@ internal class FakeChime : Chime {
     override fun stopPreview() {
         stopPreviews++
         previewing.value = null
-    }
-}
-
-/** [block] on a real dispatcher, as DataStore's writes need, failing after 5 s with [what] it waited for. */
-internal suspend fun <T> awaiting(what: String, block: suspend () -> T): T = withContext(Dispatchers.Default) {
-    try {
-        withTimeout(5_000) { block() }
-    } catch (e: TimeoutCancellationException) {
-        throw AssertionError("Waited 5 s for $what", e)
     }
 }
 

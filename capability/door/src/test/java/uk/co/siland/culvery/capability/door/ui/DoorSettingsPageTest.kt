@@ -75,6 +75,7 @@ import uk.co.siland.culvery.core.ui.SETTINGS_HOLD_MS
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** 5 §5.4, §5.5: the chime, quiet hours, Ring's status and steps, and the capture switch. */
 @RunWith(AndroidJUnit4::class)
@@ -97,12 +98,6 @@ class DoorSettingsPageTest {
         io.cancel()
     }
 
-    /** Robolectric's main looper runs only when the test idles it, so each check lets the UI and its effects run first. */
-    private fun waitFor(condition: () -> Boolean) = compose.waitUntil(5_000) {
-        compose.waitForIdle()
-        condition()
-    }
-
     private fun shows(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     private fun prefs(): DoorPrefs = runBlocking { settings.prefs.first() }
@@ -117,7 +112,7 @@ class DoorSettingsPageTest {
                 }
             }
         }
-        waitFor { shows("settings_door") }
+        compose.waitFor { shows("settings_door") }
     }
 
     /** Fails with "Vertically scrollable component was measured with an infinity maximum height" if the page nests a scroll of its own inside Settings'. */
@@ -132,7 +127,7 @@ class DoorSettingsPageTest {
     @Test
     fun theStepsTickAsTheyAreDone() {
         showHost()
-        waitFor { shows("door_step_app_done") }
+        compose.waitFor { shows("door_step_app_done") }
         compose.onNodeWithTag("door_step_access_done", useUnmergedTree = true).assertDoesNotExist()
         compose.assertAccessible()
     }
@@ -152,7 +147,7 @@ class DoorSettingsPageTest {
     fun playChimePlaysAtTheChosenVolume() {
         runBlocking { settings.setVolume(0.4f) }
         showHost()
-        waitFor { compose.onAllNodesWithTag("door_volume").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("door_volume").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("door_play_chime").performClick()
         assertThat(chime.volumes).containsExactly(0.4f)
     }
@@ -179,7 +174,7 @@ class DoorSettingsPageTest {
     fun everyChoiceIsOffered() {
         tabletSound(sounds, "Test Honk.wav")
         showHost()
-        waitFor { shows("door_doorbell_file:Test Honk.wav") }
+        compose.waitFor { shows("door_doorbell_file:Test Honk.wav") }
         val follow = compose.onNodeWithTag("door_doorbell_follow").getBoundsInRoot().top
         val offered = listOf(BuiltInSound.CLASSIC, BuiltInSound.ORGAN, BuiltInSound.CHRISTMAS_MUSIC_BOX).map { sound ->
             compose.onNodeWithTag("door_doorbell_${sound.id}").assertTextContains(sound.label)
@@ -200,7 +195,7 @@ class DoorSettingsPageTest {
     fun aThemeSoundNamesItsTheme() {
         tabletSound(sounds, "halloween/Test Howl.ogg")
         showHost()
-        waitFor { shows("door_doorbell_file:halloween/Test Howl.ogg") }
+        compose.waitFor { shows("door_doorbell_file:halloween/Test Howl.ogg") }
         compose.onNodeWithTag("door_doorbell_file:halloween/Test Howl.ogg_note", useUnmergedTree = true).assertTextEquals("On this tablet · Halloween")
     }
 
@@ -209,7 +204,7 @@ class DoorSettingsPageTest {
     fun aGoneChoiceSaysSo() {
         runBlocking { settings.setDoorbell("file:halloween/Gone Howl.ogg") }
         showHost()
-        waitFor { shows("door_doorbell_file:halloween/Gone Howl.ogg") }
+        compose.waitFor { shows("door_doorbell_file:halloween/Gone Howl.ogg") }
         compose.onNodeWithTag("door_doorbell_file:halloween/Gone Howl.ogg").assertIsSelected().assertTextContains("Gone Howl")
         compose.onNodeWithTag("door_doorbell_file:halloween/Gone Howl.ogg_note", useUnmergedTree = true).assertTextEquals("Not on this tablet any more")
         compose.onNodeWithTag("door_doorbell_follow").assertIsNotSelected()
@@ -226,13 +221,13 @@ class DoorSettingsPageTest {
         val held = SoundLibrary({ release.await(); sounds }, CoroutineScope(Dispatchers.Unconfined), Dispatchers.IO)
         try {
             showHost(library = held)
-            waitFor { shows("door_doorbell_$id") }
+            compose.waitFor { shows("door_doorbell_$id") }
             compose.onNodeWithTag("door_doorbell_$id").assertIsSelected().assertTextContains("Gone Howl")
             assertThat(shows("door_doorbell_${id}_note")).isFalse()
         } finally {
             release.countDown()
         }
-        waitFor { shows("door_doorbell_${id}_note") }
+        compose.waitFor { shows("door_doorbell_${id}_note") }
         compose.onNodeWithTag("door_doorbell_${id}_note", useUnmergedTree = true).assertTextEquals("Not on this tablet any more")
     }
 
@@ -240,8 +235,8 @@ class DoorSettingsPageTest {
     fun choosingASoundSavesIt() {
         showHost()
         compose.onNodeWithTag("door_doorbell_builtin:organ_choose").performClick()
-        waitFor { prefs().doorbell == BuiltInSound.ORGAN.id }
-        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:organ_choose").assertIsSelected() }.isSuccess }
+        compose.waitFor { prefs().doorbell == BuiltInSound.ORGAN.id }
+        compose.waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:organ_choose").assertIsSelected() }.isSuccess }
         assertThat(chime.previews).isEmpty()
     }
 
@@ -252,8 +247,8 @@ class DoorSettingsPageTest {
         compose.onNodeWithTag("door_play_chime").performClick()
         assertThat(chime.plays).containsExactly(BuiltInSound.ORGAN.id to 1.0f)
         compose.onNodeWithTag("door_doorbell_builtin:classic_choose").performClick()
-        waitFor { prefs().doorbell == BuiltInSound.CLASSIC.id }
-        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:classic_choose").assertIsSelected() }.isSuccess }
+        compose.waitFor { prefs().doorbell == BuiltInSound.CLASSIC.id }
+        compose.waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:classic_choose").assertIsSelected() }.isSuccess }
         compose.onNodeWithTag("door_play_chime").performClick()
         assertThat(chime.plays.last()).isEqualTo(BuiltInSound.CLASSIC.id to 1.0f)
     }
@@ -264,11 +259,11 @@ class DoorSettingsPageTest {
         chime.starts = false
         showHost()
         compose.onNodeWithTag("door_play_chime").performClick()
-        waitFor { toaster.messages.isNotEmpty() }
+        compose.waitFor { toaster.messages.isNotEmpty() }
         assertThat(toaster.messages.last()).isEqualTo(couldntPlay(BuiltInSound.CLASSIC.asSound()))
 
         compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
-        waitFor { toaster.messages.size == 2 }
+        compose.waitFor { toaster.messages.size == 2 }
         assertThat(toaster.messages.last()).isEqualTo(couldntPlay(BuiltInSound.ORGAN.asSound()))
     }
 
@@ -280,7 +275,7 @@ class DoorSettingsPageTest {
 
         compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
         compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
-        waitFor { chime.previews.size == 2 }
+        compose.waitFor { chime.previews.size == 2 }
         compose.waitForIdle()
 
         assertThat(toaster.messages).isEmpty()
@@ -291,9 +286,9 @@ class DoorSettingsPageTest {
     fun aPreviewDuringThePlayedChimeSaysSo() {
         showHost()
         compose.onNodeWithTag("door_play_chime").performClick()
-        waitFor { chime.plays.isNotEmpty() }
+        compose.waitFor { chime.plays.isNotEmpty() }
         compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
-        waitFor { toaster.messages.isNotEmpty() }
+        compose.waitFor { toaster.messages.isNotEmpty() }
 
         assertThat(toaster.messages.single()).isEqualTo(DOORBELL_PLAYING)
     }
@@ -302,7 +297,7 @@ class DoorSettingsPageTest {
     @Test
     fun playChimePlaysHappyBirthdayOnABirthday() {
         showHost(SeasonalTheme.HALLOWEEN, birthday = true)
-        waitFor { shows("door_play_chime") }
+        compose.waitFor { shows("door_play_chime") }
         compose.onNodeWithTag("door_play_chime").performClick()
         assertThat(chime.plays).containsExactly(BuiltInSound.HAPPY_BIRTHDAY.id to 1.0f)
     }
@@ -312,24 +307,24 @@ class DoorSettingsPageTest {
     fun tappingARowPreviewsAndTappingAgainStops() {
         runBlocking { settings.setVolume(0.4f) }
         showHost()
-        waitFor { shows("door_doorbell_builtin:organ") }
+        compose.waitFor { shows("door_doorbell_builtin:organ") }
         compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
-        waitFor { chime.previews.isNotEmpty() }
+        compose.waitFor { chime.previews.isNotEmpty() }
         assertThat(chime.previews).containsExactly(BuiltInSound.ORGAN.id to 0.4f)
         assertThat(prefs().doorbell).isEqualTo(FOLLOW_THEME_ID)
-        waitFor { shows("door_doorbell_builtin:organ_pause") }
+        compose.waitFor { shows("door_doorbell_builtin:organ_pause") }
         assertThat(shows("door_doorbell_builtin:classic_play")).isTrue()
 
         compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
-        waitFor { chime.stopPreviews == 1 }
-        waitFor { shows("door_doorbell_builtin:organ_play") }
+        compose.waitFor { chime.stopPreviews == 1 }
+        compose.waitFor { shows("door_doorbell_builtin:organ_play") }
     }
 
     /** Fails if a row's radio isn't named "Choose" and its sound, or any control has no role or name. */
     @Test
     fun theRowsAreAccessible() {
         showHost()
-        waitFor { shows("door_doorbell_builtin:organ_choose") }
+        compose.waitFor { shows("door_doorbell_builtin:organ_choose") }
         compose.onNodeWithTag("door_doorbell_builtin:organ_choose").assertContentDescriptionEquals("Choose Haunted organ")
         compose.assertAccessible()
     }
@@ -405,7 +400,7 @@ class DoorSettingsPageTest {
     fun quietHoursMoveHalfAnHourAtATime() {
         showHost()
         compose.onNodeWithTag("door_from_later").performClick()
-        waitFor { prefs().quietFrom != LocalTime.of(21, 0) }
+        compose.waitFor { prefs().quietFrom != LocalTime.of(21, 0) }
         assertThat(prefs().quietFrom).isEqualTo(LocalTime.of(21, 30))
     }
 
@@ -414,9 +409,9 @@ class DoorSettingsPageTest {
     fun theCaptureSwitchRunsForThirtyMinutes() {
         showHost()
         compose.onNodeWithTag("door_capture").assertIsOff().performScrollTo().performClick()
-        waitFor { prefs().captureUntilMillis != 0L }
+        compose.waitFor { prefs().captureUntilMillis != 0L }
         assertThat(prefs().captureUntilMillis).isEqualTo(NOW + CAPTURE_MS)
-        waitFor { runCatching { compose.onNodeWithTag("door_capture").assertIsOn() }.isSuccess }
+        compose.waitFor { runCatching { compose.onNodeWithTag("door_capture").assertIsOn() }.isSuccess }
     }
 
     private fun chooseKeep(days: Int) = compose.onNodeWithTag("door_keep_$days").performScrollTo().performClick()
@@ -430,10 +425,10 @@ class DoorSettingsPageTest {
         compose.onNodeWithTag("door_keep_30").assertIsNotSelected().assertTextContains("30 days")
         compose.onNodeWithContentDescription("Keep door history for").assertExists()
         chooseKeep(7)
-        waitFor { prefs().keep == KeepDays.SEVEN }
-        waitFor { runCatching { compose.onNodeWithTag("door_keep_7").assertIsSelected() }.isSuccess }
+        compose.waitFor { prefs().keep == KeepDays.SEVEN }
+        compose.waitFor { runCatching { compose.onNodeWithTag("door_keep_7").assertIsSelected() }.isSuccess }
         chooseKeep(30)
-        waitFor { prefs().keep == KeepDays.THIRTY }
+        compose.waitFor { prefs().keep == KeepDays.THIRTY }
         assertThat(access.asked).isEmpty()
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -444,31 +439,31 @@ class DoorSettingsPageTest {
         runBlocking { settings.setKeep(KeepDays.THIRTY) }
         access.session.value = signedIn(Role.ADMIN)
         showHost()
-        waitFor { runCatching { compose.onNodeWithTag("door_keep_30").assertIsSelected() }.isSuccess }
+        compose.waitFor { runCatching { compose.onNodeWithTag("door_keep_30").assertIsSelected() }.isSuccess }
         chooseKeep(2)
-        waitFor { shows("door_keep_confirm") }
+        compose.waitFor { shows("door_keep_confirm") }
         compose.onNodeWithText("Delete door events older than 2 days?").assertExists()
         compose.onNodeWithTag("door_keep_30").assertIsSelected()
         assertThat(access.asked).isEmpty()
 
         compose.onNodeWithTag("door_keep_as_is").performScrollTo().performClick()
-        waitFor { !shows("door_keep_confirm") }
+        compose.waitFor { !shows("door_keep_confirm") }
         assertThat(prefs().keep).isEqualTo(KeepDays.THIRTY)
         assertThat(access.asked).isEmpty()
 
         chooseKeep(2)
-        waitFor { shows("door_keep_confirm") }
+        compose.waitFor { shows("door_keep_confirm") }
         access.role = null
         compose.onNodeWithTag("door_keep_delete").performScrollTo().performClick()
-        waitFor { access.asked.size == 1 }
+        compose.waitFor { access.asked.size == 1 }
         compose.waitForIdle()
         assertThat(prefs().keep).isEqualTo(KeepDays.THIRTY)
         assertThat(shows("door_keep_confirm")).isTrue()
 
         access.role = Role.ADULT
         compose.onNodeWithTag("door_keep_delete").performScrollTo().performClick()
-        waitFor { prefs().keep == KeepDays.TWO }
-        waitFor { !shows("door_keep_confirm") }
+        compose.waitFor { prefs().keep == KeepDays.TWO }
+        compose.waitFor { !shows("door_keep_confirm") }
         assertThat(access.asked).containsExactly(listOf("door.clear"), listOf("door.clear"))
     }
 
@@ -477,12 +472,12 @@ class DoorSettingsPageTest {
     fun aChildCantShorten() {
         runBlocking { settings.setKeep(KeepDays.SEVEN) }
         showHost()
-        waitFor { runCatching { compose.onNodeWithTag("door_keep_7").assertIsSelected() }.isSuccess }
+        compose.waitFor { runCatching { compose.onNodeWithTag("door_keep_7").assertIsSelected() }.isSuccess }
         access.role = Role.CHILD
         chooseKeep(2)
-        waitFor { shows("door_keep_confirm") }
+        compose.waitFor { shows("door_keep_confirm") }
         compose.onNodeWithTag("door_keep_delete").performScrollTo().performClick()
-        waitFor { access.asked.size == 1 }
+        compose.waitFor { access.asked.size == 1 }
         compose.waitForIdle()
         assertThat(prefs().keep).isEqualTo(KeepDays.SEVEN)
     }
@@ -493,6 +488,6 @@ class DoorSettingsPageTest {
         showHost()
         compose.onNodeWithTag("door_last_heard").assertTextEquals("Culvery hasn’t heard from Ring yet.")
         runBlocking { settings.heard(NOW) }
-        waitFor { runCatching { compose.onNodeWithTag("door_last_heard").assertTextEquals("Last heard from Ring: Wednesday 14:02") }.isSuccess }
+        compose.waitFor { runCatching { compose.onNodeWithTag("door_last_heard").assertTextEquals("Last heard from Ring: Wednesday 14:02") }.isSuccess }
     }
 }

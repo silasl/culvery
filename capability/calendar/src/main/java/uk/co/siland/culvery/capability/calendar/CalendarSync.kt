@@ -432,7 +432,8 @@ class CalendarSync internal constructor(
     private fun withoutStrays(result: SyncResult): SyncResult {
         val strays = undone.strayCreates.keys
         if (strays.isEmpty()) return result
-        val (left, kept) = result.upserts.partition { e -> strays.any { e.remoteId == it || e.seriesId == it || e.remoteId.startsWith("${it}_") } }
+        val prefixes = strays.map { "${it}_" }
+        val (left, kept) = result.upserts.partition { e -> e.remoteId in strays || e.seriesId?.let { it in strays } == true || prefixes.any { e.remoteId.startsWith(it) } }
         return if (left.isEmpty()) result else result.copy(upserts = kept, removedIds = result.removedIds + left.map { it.remoteId })
     }
 

@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
@@ -31,6 +30,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.ConscryptMode
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.net.homeHttpClient
+import uk.co.siland.culvery.core.ui.test.awaiting
 
 /** The test plays Home Assistant's end of the socket: each `after…` says what the server sends next. */
 @RunWith(AndroidJUnit4::class)
@@ -81,11 +81,11 @@ class HomeAssistantSocketTest {
         server.shutdown()
     }
 
-    private suspend fun Flow<Map<String, EntityState?>>.firstReads(count: Int) = withTimeout(5_000) { take(count).toList() }
+    private suspend fun Flow<Map<String, EntityState?>>.firstReads(count: Int) = awaiting("$count reads") { take(count).toList() }
 
     private suspend fun failureOf(flow: Flow<*>): HomeAssistantException {
         var caught: HomeAssistantException? = null
-        withTimeout(5_000) { flow.catch { caught = it as HomeAssistantException }.collect {} }
+        awaiting("the flow to fail") { flow.catch { caught = it as HomeAssistantException }.collect {} }
         return checkNotNull(caught) { "the flow ended without failing" }
     }
 
@@ -148,7 +148,7 @@ class HomeAssistantSocketTest {
         }
         val seen = mutableListOf<Map<String, EntityState?>>()
         var failure: HomeAssistantException? = null
-        withTimeout(5_000) { api.follow(link, ids).onEach { seen += it }.catch { failure = it as HomeAssistantException }.collect {} }
+        awaiting("the follow to fail") { api.follow(link, ids).onEach { seen += it }.catch { failure = it as HomeAssistantException }.collect {} }
         assertThat(seen).hasSize(1)
         assertThat(failure?.problem).isEqualTo(HaProblem.UNREACHABLE)
         assertThat(failure?.cause).isNull()
@@ -216,7 +216,7 @@ class HomeAssistantSocketTest {
     @Test
     fun registryAsksAndCloses() = runBlocking<Unit> {
         afterSubscribe = { it.send(HaFixtures.REGISTRY) }
-        val entries = withTimeout(5_000) { api.registry(link) }
+        val entries = awaiting("the registry") { api.registry(link) }
         assertThat(entries).hasSize(6)
         assertThat(server.takeRequest().path).isEqualTo("/api/websocket")
         assertThat(received.toList()).containsExactly(
@@ -229,14 +229,14 @@ class HomeAssistantSocketTest {
     @Test
     fun aRefusedRegistryIsRefused() = runBlocking<Unit> {
         afterSubscribe = { it.send("""{"id":1,"type":"result","success":false,"error":{"code":"unauthorized"}}""") }
-        val failure = runCatching { withTimeout(5_000) { api.registry(link) } }.exceptionOrNull() as HomeAssistantException
+        val failure = runCatching { awaiting("the registry") { api.registry(link) } }.exceptionOrNull() as HomeAssistantException
         assertThat(failure.problem).isEqualTo(HaProblem.REFUSED)
     }
 
     @Test
     fun aSocketClosedBeforeTheRegistryIsUnreachable() = runBlocking<Unit> {
         afterSubscribe = { it.close(1001, null) }
-        val failure = runCatching { withTimeout(5_000) { api.registry(link) } }.exceptionOrNull() as HomeAssistantException
+        val failure = runCatching { awaiting("the registry") { api.registry(link) } }.exceptionOrNull() as HomeAssistantException
         assertThat(failure.problem).isEqualTo(HaProblem.UNREACHABLE)
     }
 
@@ -244,7 +244,7 @@ class HomeAssistantSocketTest {
     fun aRegistryThatNeverComesIsUnreachableAfterTheCommandTimeout() = runBlocking<Unit> {
         val quick = HomeAssistantClient(homeHttpClient(COMMAND_TIMEOUT_MS), { true }, registryTimeoutMs = 200) { _, _ -> }
         afterSubscribe = {}
-        val failure = runCatching { withTimeout(5_000) { quick.registry(link) } }.exceptionOrNull() as HomeAssistantException
+        val failure = runCatching { awaiting("the registry") { quick.registry(link) } }.exceptionOrNull() as HomeAssistantException
         assertThat(failure.problem).isEqualTo(HaProblem.UNREACHABLE)
     }
 
@@ -266,7 +266,7 @@ class HomeAssistantSocketTest {
             }
             Thread.sleep(500)
             release.countDown()
-            withTimeout(5_000) { collecting.join() }
+            awaiting("the collector to finish") { collecting.join() }
             assertThat(failure?.problem).isEqualTo(HaProblem.UNREACHABLE)
             assertThat(serverClosed.await(5, TimeUnit.SECONDS)).isTrue()
         } finally {
@@ -296,7 +296,7 @@ class HomeAssistantSocketTest {
             }
             Thread.sleep(500)
             release.countDown()
-            withTimeout(5_000) { collecting.join() }
+            awaiting("the collector to finish") { collecting.join() }
             assertThat(failure?.problem).isEqualTo(HaProblem.UNREACHABLE)
         } finally {
             release.countDown()
@@ -304,6 +304,7 @@ class HomeAssistantSocketTest {
         }
     }
 
+    /** Regression guard: an entity Home Assistant sends that was not asked for must not reach a follower. */
     @Test
     fun onlyFollowedEntitiesAreKept() = runBlocking<Unit> {
         val read = api.follow(link, ids).firstReads(1).single()
@@ -349,7 +350,7 @@ class HomeAssistantSocketTest {
     fun aChangedKeyIsCertificateChangedOverTheSocket() = overTls("other") { pinned, tls ->
         ShadowLog.clear()
         assertThat(failureOf(api.follow(pinned, ids)).problem).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
-        val registry = runCatching { withTimeout(5_000) { api.registry(pinned) } }.exceptionOrNull() as HomeAssistantException
+        val registry = runCatching { awaiting("the registry") { api.registry(pinned) } }.exceptionOrNull() as HomeAssistantException
         assertThat(registry.problem).isEqualTo(HaProblem.CERTIFICATE_CHANGED)
         assertThat(tls.requestCount).isEqualTo(0)
         assertThat(received).isEmpty()

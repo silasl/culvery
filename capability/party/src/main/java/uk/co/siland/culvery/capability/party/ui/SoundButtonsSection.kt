@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,7 +90,7 @@ internal fun SoundButtonsSection(sounds: SoundButtons, toaster: Toaster) {
         val value = when {
             id == null -> ModesWords.NONE
             sound != null -> sound.name
-            else -> soundNameFromId(id)?.let { if (folderRead) ModesWords.goneSound(it) else it } ?: ModesWords.NONE
+            else -> remember(id) { soundNameFromId(id) }?.let { if (folderRead) ModesWords.goneSound(it) else it } ?: ModesWords.NONE
         }
         HhListRow(
             ModesWords.padName(pad), Modifier.testTag("sound_pad_$pad").semantics {

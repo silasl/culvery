@@ -166,7 +166,7 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
                     onPlay = { actions.onPreview(sound) }, onChoose = { actions.onDoorbell(sound.id) },
                 )
             }
-            soundNameFromId(ui.doorbell)?.takeIf { ui.sounds.none { it.id == ui.doorbell } }?.let { name ->
+            remember(ui.doorbell) { soundNameFromId(ui.doorbell) }?.takeIf { ui.sounds.none { it.id == ui.doorbell } }?.let { name ->
                 HhRadioRow(name, NOT_ON_THIS_TABLET.takeIf { ui.folderRead }, selected = true, "door_doorbell_${ui.doorbell}") {}
             }
         }

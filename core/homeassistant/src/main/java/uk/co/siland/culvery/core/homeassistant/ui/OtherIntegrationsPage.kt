@@ -238,7 +238,7 @@ internal fun OtherIntegrationsHost(
         OtherIntegrationsUi(
             linked = isLinked, status = problem?.let(::pageProblemLine), checking = checking, checkLine = checkLine,
             devices = deviceUis.map { it.copy(choices = choices[it.domain]) },
-            fingerprint = link?.pin?.let(::fingerprint),
+            fingerprint = remember(link?.pin) { link?.pin?.let(::fingerprint) },
         ),
         address = address, onAddress = { address = it },
         token = token, onToken = { token = it },

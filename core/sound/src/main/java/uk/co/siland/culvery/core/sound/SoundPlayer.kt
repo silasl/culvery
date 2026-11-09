@@ -109,7 +109,7 @@ class SoundPlayer internal constructor(
         return start(sound, volume, capMs, pad, epochBefore, null)
     }
 
-    /** Stops any pad sound, and any pad still opening won't start. */
+    /** A ring started: the pads stop. */
     fun ringStarted() {
         synchronized(lock) {
             rings++
@@ -117,7 +117,7 @@ class SoundPlayer internal constructor(
         }
     }
 
-    /** Stops the pad sound; a pad still opening won't start. */
+    /** Stops any pad sound, and any pad still opening won't start. */
     fun stopPads() {
         synchronized(lock) {
             padEpoch++

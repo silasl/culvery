@@ -19,7 +19,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -39,6 +38,7 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.OUTBOX_BACKOFF_MS
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.test.awaiting
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -194,7 +194,7 @@ class CalendarEditorTest {
 
     /** Waits, in bounded real time, for the PIN pad: the editor reads Room on its own threads before asking. */
     private suspend fun waitForThePad(access: TestAccess) =
-        withContext(Dispatchers.Default) { withTimeout(5_000) { while (access.requests.isEmpty()) delay(10) } }
+        awaiting("the PIN pad") { while (access.requests.isEmpty()) delay(10) }
 
     /** 4e: the week's Update now asks for a pass at once, without a PIN (it changes nothing). */
     @Test
@@ -465,7 +465,7 @@ class CalendarEditorTest {
         sheet.cancel()
         gate.complete(Unit)
         // Room applies the delete on its own thread; wait (in real time, bounded) for the mirror to show it.
-        withContext(Dispatchers.Default) { withTimeout(5_000) { store.event(ref("dinner")).first { it == null } } }
+        awaiting("the delete to show in the mirror") { store.event(ref("dinner")).first { it == null } }
         assertThat(store.pendingNow()).isEmpty()
         assertThat(writer.calls).containsExactly("delete:dinner")
     }
@@ -778,7 +778,7 @@ class CalendarEditorTest {
         sheet.cancel()
         writer.gate?.complete(Unit)
         // Nothing shows the failure card any more, so the editor says it.
-        withContext(Dispatchers.Default) { withTimeout(5_000) { while (access.toasts.messages.isEmpty()) delay(10) } }
+        awaiting("the editor to say it failed") { while (access.toasts.messages.isEmpty()) delay(10) }
         assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Refused("calendar is full")))
         assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
     }
@@ -871,7 +871,7 @@ class CalendarEditorTest {
         writer.entered.await()
         sheet.cancel()
         writer.gate?.complete(Unit)
-        withContext(Dispatchers.Default) { withTimeout(5_000) { while (access.toasts.messages.isEmpty()) delay(10) } }
+        awaiting("the editor to say it failed") { while (access.toasts.messages.isEmpty()) delay(10) }
         assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Refused("event is locked")))
     }
 
@@ -1180,7 +1180,7 @@ class CalendarEditorTest {
 
     /** Waits, in bounded real time, for [done]: the writes run on Room's and the app scope's threads. */
     private suspend fun waitUntil(done: () -> Boolean) =
-        withContext(Dispatchers.Default) { withTimeout(5_000) { while (!done()) delay(10) } }
+        awaiting("the writes to finish") { while (!done()) delay(10) }
 
     private val sample = "Sample calendar"
 

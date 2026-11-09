@@ -24,17 +24,8 @@ import uk.co.siland.culvery.core.sound.SoundPlayer
 
 private const val COULDNT_PLAY_MS = 4_000L
 
-/** What the pads know of the gate: nothing before its first read, then why they are blocked, if they are. */
-sealed interface GateState {
-    val block: PadBlock?
-    val read: Boolean get() = this is Read
-
-    data object Unread : GateState {
-        override val block: PadBlock? = null
-    }
-
-    data class Read(override val block: PadBlock?) : GateState
-}
+/** What the pads know of the gate: whether it has been [read] yet, and then why they are blocked, if they are. */
+data class GateState(val read: Boolean, val block: PadBlock?)
 
 /**
  * What a pad's tap does (18 §4.4) and the line under the pads' row (Ruling 6): the first pad shown carries the reason the
@@ -54,8 +45,8 @@ class PadTaps internal constructor(
     constructor(player: SoundPlayer, gate: PadGate, door: Optional<DoorQuiet>, @ApplicationScope scope: CoroutineScope) :
         this(player::playPad, player::stopPads, player.padPlaying, gate, { door.map { it.volume }.orElse(1f) }, scope)
 
-    /** [GateState.Unread] until the gate's first read; the pads' blocked and faded looks both come from this one value. */
-    val gateState: StateFlow<GateState> = gate.blocked.map<PadBlock?, GateState> { GateState.Read(it) }.stateIn(scope, SharingStarted.Eagerly, GateState.Unread)
+    /** Unread until the gate's first read; the pads' blocked and faded looks both come from this one value. */
+    val gateState: StateFlow<GateState> = gate.blocked.map { GateState(read = true, block = it) }.stateIn(scope, SharingStarted.Eagerly, GateState(read = false, block = null))
 
     private val previewed = MutableStateFlow<String?>(null)
 

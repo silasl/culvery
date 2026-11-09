@@ -202,9 +202,9 @@ private fun MoveView(s: RunState.Moving) {
     val move = s.move
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(move.number, style = HhType.headerValue.copy(fontSize = 48.sp), color = Culvery.colors.accent, modifier = Modifier.testTag("move_number"))
-        val big = move.hangul ?: move.romanised ?: move.english
+        val big = move.nameShown
         Text(
-            keepWords(big), style = hangulStyle(big), color = Culvery.colors.ink, textAlign = TextAlign.Center,
+            remember(big) { keepWords(big) }, style = remember(big) { hangulStyle(big) }, color = Culvery.colors.ink, textAlign = TextAlign.Center,
             modifier = Modifier.testTag("move_korean").clearAndSetSemantics { text = AnnotatedString(big) },
         )
         if (move.hangul != null && move.romanised != null) {

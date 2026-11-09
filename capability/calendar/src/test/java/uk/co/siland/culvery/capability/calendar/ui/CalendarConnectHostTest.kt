@@ -71,6 +71,7 @@ import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.AfterTheScreen
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** settings.manage's name on the PIN pad. */
 private const val SETTINGS_LABEL = "Change settings"
@@ -119,12 +120,6 @@ class CalendarConnectHostTest {
         review = CalendarReview(store, setup, connections, household, access.control, access.toasts, HouseholdZone(household), clock, testCalendarSettings(), testBinColours())
     }
 
-    /** Robolectric's main looper runs only when the test idles it, so each check lets the UI and its effects run first. */
-    private fun waitFor(condition: () -> Boolean) = compose.waitUntil(5_000) {
-        compose.waitForIdle()
-        condition()
-    }
-
     private fun show(existing: Connection?) {
         compose.setContent {
             CompositionLocalProvider(LocalOverlayHost provides overlay) {
@@ -140,7 +135,7 @@ class CalendarConnectHostTest {
         access.answer(TestAccess.ALEX)
         show(existing = null)
         assertThat(overlay.closesWhenIdle).isFalse()
-        waitFor { access.toasts.messages.isNotEmpty() }
+        compose.waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly("Google Calendar connected.")
         assertThat(overlay.dismissed).isEqualTo(1)
         runBlocking { assertThat(store.master().first()?.source?.id).isEqualTo("family@example.com") }
@@ -154,7 +149,7 @@ class CalendarConnectHostTest {
         access.answer(TestAccess.ALEX, TestAccess.ALEX)
         runBlocking { access.control.authorise(CorePermissions.SETTINGS_MANAGE) }
         show(existing = null)
-        waitFor { access.toasts.messages.isNotEmpty() }
+        compose.waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.requests.map { it.label }).containsExactly(SETTINGS_LABEL, CONNECT_LABEL).inOrder()
         assertThat(access.toasts.messages).containsExactly("Google Calendar connected.")
     }
@@ -173,9 +168,9 @@ class CalendarConnectHostTest {
                 }
             }
         }
-        waitFor { compose.onAllNodesWithText("Connect Google Calendar").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithText("Connect Google Calendar").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Connect Google Calendar").performClick()
-        waitFor { access.toasts.messages.isNotEmpty() }
+        compose.waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
         assertThat(access.toasts.messages).containsExactly("Google Calendar connected.")
     }
@@ -185,9 +180,9 @@ class CalendarConnectHostTest {
         google.connectsAs = googleConnection
         access.answer(TestAccess.ALEX)
         showSettingsCalendars()
-        waitFor { compose.onAllNodesWithTag("settings_connect_calendar.google").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("settings_connect_calendar.google").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("settings_connect_calendar.google").performClick()
-        waitFor { access.toasts.messages.isNotEmpty() }
+        compose.waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
         assertThat(access.toasts.messages).containsExactly("Google Calendar connected.")
     }
@@ -201,9 +196,9 @@ class CalendarConnectHostTest {
         google.connectsAs = googleConnection
         access.answer(TestAccess.ALEX)
         showSettingsCalendars()
-        waitFor { compose.onAllNodesWithTag("settings_reconnect").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("settings_reconnect").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("settings_reconnect").performClick()
-        waitFor { access.toasts.messages.isNotEmpty() }
+        compose.waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
         assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected.")
     }
@@ -214,7 +209,7 @@ class CalendarConnectHostTest {
         val clock = HouseholdClock(HouseholdZone(household).zone, WallClock { System.currentTimeMillis() }, scope)
         val step = ReviewCalendarsStep(CalendarRepository(store, household, HouseholdZone(household), setOf(google), emptySet(), testCalendarSettings(), testBinColours()), review, connections, clock)
         compose.setContent { CulveryTheme(dark = true) { CompositionLocalProvider(LocalOverlayHost provides overlay, LocalShellNavigator provides RecordingNavigator()) { step.Content(onNext = {}) } } }
-        waitFor { compose.onAllNodesWithText(YOUR_CALENDARS_LINE).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithText(YOUR_CALENDARS_LINE).fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun showSettingsCalendars() {
@@ -239,7 +234,7 @@ class CalendarConnectHostTest {
         compose.onAllNodesWithText("Calendars").assertCountEquals(0)
         compose.onAllNodesWithTag("review_none").assertCountEquals(0)
         compose.mainClock.autoAdvance = true
-        waitFor { compose.onAllNodesWithTag("review_none").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("review_none").fetchSemanticsNodes().isNotEmpty() }
     }
 
     @Test
@@ -251,7 +246,7 @@ class CalendarConnectHostTest {
             store.markReadRefused(googleConnection.id, swim.id)
         }
         showSettingsCalendars()
-        waitFor { compose.onAllNodesWithTag("review_read_problem_swim").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("review_read_problem_swim").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Can’t read this calendar. Check it’s still shared with family@example.com.").assertExists()
         assertThat(access.toasts.messages).isEmpty()
     }
@@ -270,9 +265,9 @@ class CalendarConnectHostTest {
                 }
             }
         }
-        waitFor { compose.onAllNodesWithText("Connect Google Calendar").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithText("Connect Google Calendar").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Connect Google Calendar").performClick()
-        waitFor { compose.onAllNodesWithText("Google Calendar · family@example.com").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithText("Google Calendar · family@example.com").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Connected").assertExists()
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
         compose.onAllNodesWithText("Connect a calendar").assertCountEquals(0)
@@ -290,7 +285,7 @@ class CalendarConnectHostTest {
         // The first frame, before the store has answered.
         compose.onAllNodesWithText("Open settings").assertCountEquals(0)
         compose.mainClock.autoAdvance = true
-        waitFor { compose.onAllNodesWithText("Connect Google Calendar").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithText("Connect Google Calendar").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("Open settings").assertCountEquals(0)
     }
 
@@ -300,7 +295,7 @@ class CalendarConnectHostTest {
         // Sam's PIN is refused in the pad, which asks again; then Cancel.
         access.answer(TestAccess.SAM, null)
         show(existing = null)
-        waitFor { overlay.dismissed == 1 }
+        compose.waitFor { overlay.dismissed == 1 }
         runBlocking { assertThat(store.connectionsNow()).isEmpty() }
         assertThat(access.toasts.messages).isEmpty()
         // One connections.manage check: its pad, then the same pad again saying that PIN can’t.
@@ -314,9 +309,9 @@ class CalendarConnectHostTest {
     fun cancelClosesTheCardWithNothingSaid() {
         access.answer(TestAccess.ALEX)
         show(existing = null)
-        waitFor { compose.onAllNodesWithText("Connecting to Google Calendar…").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithText("Connecting to Google Calendar…").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("connecting_cancel").performClick()
-        waitFor { overlay.dismissed == 1 }
+        compose.waitFor { overlay.dismissed == 1 }
         assertThat(access.toasts.messages).isEmpty()
         runBlocking { assertThat(store.connectionsNow()).isEmpty() }
     }
@@ -330,7 +325,7 @@ class CalendarConnectHostTest {
         google.connectsAs = googleConnection
         access.answer(TestAccess.ALEX)
         show(existing = googleConnection)
-        waitFor { access.toasts.messages.isNotEmpty() }
+        compose.waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected.")
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
         runBlocking { assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.Ok) }
@@ -342,7 +337,7 @@ class CalendarConnectHostTest {
         google.sourcesFailWith = UnreachableException("offline")
         access.answer(TestAccess.ALEX)
         show(existing = null)
-        waitFor { access.toasts.messages.isNotEmpty() }
+        compose.waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly(couldNotConnect("Google Calendar", unreachable = true))
         assertThat(overlay.dismissed).isEqualTo(1)
         runBlocking { assertThat(store.connectionsNow()).isEmpty() }
@@ -376,9 +371,9 @@ class CalendarConnectHostTest {
                 }
             }
         }
-        waitFor { compose.onAllNodesWithText("Google needs reconnecting").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithText("Google needs reconnecting").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Google needs reconnecting").performClick()
-        waitFor { access.toasts.messages.isNotEmpty() }
+        compose.waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected.")
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
         runBlocking {

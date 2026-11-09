@@ -83,6 +83,7 @@ import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.AfterTheScreen
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 @RunWith(AndroidJUnit4::class)
 class DoorTabTest {
@@ -106,12 +107,6 @@ class DoorTabTest {
         DoorAlerts(alertHost, {}, { DoorPrefs() }, FakeChime(), { london }, WallClock { NOW }, appScope, NightHours { false }, { null }, { null }, testSounds())
     }
     private val opened = mutableListOf<DoorEvent>()
-
-    /** Robolectric's main looper runs only when the test idles it, so each check lets the UI and its effects run first. */
-    private fun waitFor(condition: () -> Boolean) = compose.waitUntil(5_000) {
-        compose.waitForIdle()
-        condition()
-    }
 
     private fun unseenRings() = runBlocking { store.unseen(startOfYesterday(october14, london)).first().rings }
 
@@ -288,9 +283,9 @@ class DoorTabTest {
     fun theHostOpensTheSnapshotSheet() {
         runBlocking { store.record(ring(snapshot = aPicture)) }
         compose.setContent { CulveryTheme(dark = true) { host(flowOf(october14)) } }
-        waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("door_thumb_1").performClick()
-        waitFor { compose.onAllNodesWithTag("door_snapshot_sheet").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("door_snapshot_sheet").fetchSemanticsNodes().isNotEmpty() }
     }
 
     /** 5 §4.7: fails if opening the tab leaves an event unseen. */
@@ -298,7 +293,7 @@ class DoorTabTest {
     fun openingTheTabMarksEverythingSeen() {
         runBlocking { store.record(ring()) }
         compose.setContent { CulveryTheme(dark = true) { host(flowOf(october14)) } }
-        waitFor { unseenRings() == 0 }
+        compose.waitFor { unseenRings() == 0 }
     }
 
     /** 9 §6.8: fails if the rings unseen on opening carry no NEW, or opening leaves them unseen so the badge stays. */
@@ -309,7 +304,7 @@ class DoorTabTest {
             store.record(ring(key = "b", at = NOW - 60_000))
         }
         compose.setContent { CulveryTheme(dark = true) { host(flowOf(october14)) } }
-        waitFor { unseenRings() == 0 && exists("door_row_1") && exists("door_row_2") }
+        compose.waitFor { unseenRings() == 0 && exists("door_row_1") && exists("door_row_2") }
         listOf(1, 2).forEach { compose.onNodeWithTag("door_row_${it}_new").assertTextEquals("NEW").assert(hasContentDescription("new")) }
         compose.assertAccessible()
     }
@@ -320,7 +315,7 @@ class DoorTabTest {
         compose.setContent { CulveryTheme(dark = true) { host(flowOf(october14)) } }
         compose.waitForIdle()
         runBlocking { store.record(ring()) }
-        waitFor { exists("door_row_1") }
+        compose.waitFor { exists("door_row_1") }
         compose.waitForIdle()
         assertThat(unseenRings()).isEqualTo(1)
         compose.onNodeWithTag("door_row_1_new").assertExists()
@@ -336,10 +331,10 @@ class DoorTabTest {
         compose.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) { CulveryTheme(dark = true) { host(flowOf(october14)) } }
         }
-        waitFor { unseenRings() == 0 && exists("door_row_1_new") }
+        compose.waitFor { unseenRings() == 0 && exists("door_row_1_new") }
         compose.runOnUiThread { owner.lifecycle.currentState = Lifecycle.State.STARTED }
         compose.runOnUiThread { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
-        waitFor { !exists("door_row_1_new") }
+        compose.waitFor { !exists("door_row_1_new") }
         compose.onNodeWithTag("door_row_1").assertExists()
     }
 
@@ -349,11 +344,11 @@ class DoorTabTest {
         val reselected = MutableSharedFlow<Unit>()
         runBlocking { store.record(ring(key = "a", at = NOW - 60_000)) }
         compose.setContent { CulveryTheme(dark = true) { CompositionLocalProvider(LocalTabReselected provides reselected) { host(flowOf(october14)) } } }
-        waitFor { unseenRings() == 0 && exists("door_row_1_new") }
+        compose.waitFor { unseenRings() == 0 && exists("door_row_1_new") }
         runBlocking { store.record(ring(key = "b")) }
-        waitFor { exists("door_row_2") }
+        compose.waitFor { exists("door_row_2") }
         runBlocking { reselected.emit(Unit) }
-        waitFor { unseenRings() == 0 }
+        compose.waitFor { unseenRings() == 0 }
         compose.onNodeWithTag("door_row_1_new").assertExists()
         compose.onNodeWithTag("door_row_2_new").assertExists()
     }
@@ -370,12 +365,12 @@ class DoorTabTest {
                 CulveryTheme(dark = true) { host(flowOf(october14)) }
             }
         }
-        waitFor { exists("door_row_1") }
+        compose.waitFor { exists("door_row_1") }
         compose.runOnUiThread {
             owner.lifecycle.currentState = Lifecycle.State.RESUMED
             assertThat(reselected.tryEmit(Unit)).isTrue()
         }
-        waitFor { unseenRings() == 0 }
+        compose.waitFor { unseenRings() == 0 }
         compose.waitForIdle()
         compose.onNodeWithTag("door_row_1_new").assertExists()
     }
@@ -387,11 +382,11 @@ class DoorTabTest {
         compose.setContent { CulveryTheme(dark = true) { CompositionLocalProvider(LocalTabReselected provides reselected) { host(flowOf(october14)) } } }
         compose.waitForIdle()
         runBlocking { store.record(ring()) }
-        waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
         compose.waitForIdle()
         assertThat(unseenRings()).isEqualTo(1)
         runBlocking { reselected.emit(Unit) }
-        waitFor { unseenRings() == 0 }
+        compose.waitFor { unseenRings() == 0 }
     }
 
     /** Fails if a tab merely STARTED (behind another app) marks events seen, or if it never marks them once RESUMED. */
@@ -403,10 +398,10 @@ class DoorTabTest {
         compose.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) { CulveryTheme(dark = true) { host(flowOf(october14)) } }
         }
-        waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
         assertThat(unseenRings()).isEqualTo(1)
         compose.runOnUiThread { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
-        waitFor { unseenRings() == 0 }
+        compose.waitFor { unseenRings() == 0 }
     }
 
     private fun openHost() {
@@ -415,9 +410,9 @@ class DoorTabTest {
 
     private fun openConfirm() {
         openHost()
-        waitFor { exists("door_clear") }
+        compose.waitFor { exists("door_clear") }
         compose.onNodeWithTag("door_clear").performClick()
-        waitFor { exists("door_clear_confirm") }
+        compose.waitFor { exists("door_clear_confirm") }
     }
 
     private fun threeEventsTwoWithPictures() = runBlocking {
@@ -433,7 +428,7 @@ class DoorTabTest {
         compose.waitForIdle()
         compose.onNodeWithTag("door_clear").assertDoesNotExist()
         runBlocking { store.record(ring()) }
-        waitFor { exists("door_clear") }
+        compose.waitFor { exists("door_clear") }
         compose.onNodeWithTag("door_clear").assertHeightIsAtLeast(48.dp)
         compose.assertAccessible()
     }
@@ -447,7 +442,7 @@ class DoorTabTest {
         compose.onNodeWithText(clearQuestion(3)).assertIsDisplayed()
         assertThat(access.asked).isEmpty()
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
-        waitFor { toaster.messages.isNotEmpty() }
+        compose.waitFor { toaster.messages.isNotEmpty() }
         assertThat(access.asked).containsExactly(listOf("door.clear"))
         assertThat(toaster.messages).containsExactly("Door history cleared")
         assertThat(runBlocking { store.events.first() }).isEmpty()
@@ -460,7 +455,7 @@ class DoorTabTest {
         threeEventsTwoWithPictures()
         openConfirm()
         compose.onNodeWithTag("door_clear_confirm_keep").performClick()
-        waitFor { !exists("door_clear_confirm") }
+        compose.waitFor { !exists("door_clear_confirm") }
         assertThat(access.asked).isEmpty()
         assertThat(runBlocking { store.events.first() }).hasSize(3)
         assertThat(dir.listFiles()).hasLength(2)
@@ -474,7 +469,7 @@ class DoorTabTest {
         access = TestAccess(null)
         openConfirm()
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
-        waitFor { access.asked.isNotEmpty() }
+        compose.waitFor { access.asked.isNotEmpty() }
         appScope.settled()
         compose.waitForIdle()
         assertThat(runBlocking { store.events.first() }).hasSize(3)
@@ -489,7 +484,7 @@ class DoorTabTest {
         access = TestAccess(Role.CHILD)
         openConfirm()
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
-        waitFor { access.asked.isNotEmpty() }
+        compose.waitFor { access.asked.isNotEmpty() }
         appScope.settled()
         compose.waitForIdle()
         assertThat(runBlocking { store.events.first() }).hasSize(3)
@@ -513,23 +508,23 @@ class DoorTabTest {
         val release = CountDownLatch(1)
         val slow = Snapshot { it.writeBytes(byteArrayOf(1)); started.countDown(); release.await() }
         openHost()
-        waitFor { exists("door_clear") }
+        compose.waitFor { exists("door_clear") }
         appScope.launch(Dispatchers.IO) { alerts.onRecorded(store.record(ring(key = "new", snapshot = slow))) }
         started.await()
         // The record's prune is the next dispatch; the clear's is the one held.
         gated.holdDispatch(2)
         compose.onNodeWithTag("door_clear").performClick()
-        waitFor { exists("door_clear_confirm") }
+        compose.waitFor { exists("door_clear_confirm") }
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
-        waitFor { access.asked.isNotEmpty() }
-        waitFor { alertHost.dismissed == 1 }
+        compose.waitFor { access.asked.isNotEmpty() }
+        compose.waitFor { alertHost.dismissed == 1 }
         release.countDown()
         assertThat(gated.held.await(5, TimeUnit.SECONDS)).isTrue()
-        waitFor { alerts.showing.value != null }
+        compose.waitFor { alerts.showing.value != null }
         // The new row reads its picture once it shows; on Windows a read still open would stop the clear deleting it.
-        waitFor { compose.onAllNodesWithTag("door_thumb_image", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("door_thumb_image", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         gated.release()
-        waitFor { toaster.messages.isNotEmpty() }
+        compose.waitFor { toaster.messages.isNotEmpty() }
         assertThat(toaster.messages).containsExactly("Door history cleared")
         assertThat(alerts.showing.value).isNull()
         assertThat(dir.listFiles()).isEmpty()
@@ -542,11 +537,11 @@ class DoorTabTest {
         access.padGate = CompletableDeferred()
         openConfirm()
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
-        waitFor { access.asked.isNotEmpty() }
+        compose.waitFor { access.asked.isNotEmpty() }
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
         compose.waitForIdle()
         access.padGate?.complete(Unit)
-        waitFor { toaster.messages.isNotEmpty() }
+        compose.waitFor { toaster.messages.isNotEmpty() }
         assertThat(access.asked).hasSize(1)
     }
 
@@ -557,7 +552,7 @@ class DoorTabTest {
         File(dir, "stuck.jpg").apply { mkdirs() }.also { File(it, "inside").writeBytes(byteArrayOf(1)) }
         openConfirm()
         compose.onNodeWithTag("door_clear_confirm_yes").performClick()
-        waitFor { toaster.messages.isNotEmpty() }
+        compose.waitFor { toaster.messages.isNotEmpty() }
         assertThat(toaster.messages).containsExactly("Couldn’t clear the door history. Try again.")
         assertThat(runBlocking { store.events.first() }).hasSize(3)
     }
@@ -568,10 +563,10 @@ class DoorTabTest {
         runBlocking { store.record(ring(at = LocalDateTime.of(2026, 10, 14, 23, 59).atZone(london).toInstant().toEpochMilli())) }
         val today = MutableStateFlow(october14)
         compose.setContent { CulveryTheme(dark = true) { host(today) } }
-        waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("door_yesterday").assertDoesNotExist()
         today.value = october14.plusDays(1)
-        waitFor { compose.onAllNodesWithTag("door_yesterday").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodesWithTag("door_yesterday").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("door_empty").assertExists()
     }
 }

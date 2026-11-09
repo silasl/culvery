@@ -14,6 +14,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.settingsDataStore
@@ -116,8 +117,7 @@ class HomeAssistantSettingsTest {
     /** Fails if an http address saved with a pin is written. */
     @Test
     fun httpWithAPinCannotBeSaved() = runBlocking {
-        runCatching { settings.save(HomeAssistantLink(url, "test-token", "test-pin")) }
-            .also { assertThat(it.exceptionOrNull()).isInstanceOf(IllegalArgumentException::class.java) }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { settings.save(HomeAssistantLink(url, "test-token", "test-pin")) } }
         assertThat(settings.link.first()).isNull()
     }
 

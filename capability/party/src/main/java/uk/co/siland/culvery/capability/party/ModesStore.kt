@@ -73,7 +73,7 @@ class ModesStore(private val store: DataStore<Preferences>, scope: CoroutineScop
     /** Null until the file is first read, so nothing takes "off" for the saved answer. */
     val record: StateFlow<ModeRecord?> = data.map { it.toRecord() }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, null)
 
-    /** Replaces the modes and Holiday's place on Home; the record's keys stay. A mode stored as needing a PIN still does: only [setNeedsPin] turns that off. */
+    /** Replaces the modes and Holiday's place on Home; a mode that needs a PIN still does, as only [setNeedsPin] turns that off. */
     suspend fun update(change: (ModesPrefs) -> ModesPrefs) {
         store.edit {
             val before = it.toModesPrefs()

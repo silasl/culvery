@@ -99,13 +99,13 @@ class PadTapsTest {
         player.starts = false
         taps.tap(pad2)
 
-        assertThat(taps.gateState.value).isEqualTo(GateState.Unread)
+        assertThat(taps.gateState.value).isEqualTo(GateState(read = false, block = null))
         assertThat(taps.line(2, first = false).first()).isNull()
 
         rig.night = true
         runCurrent()
 
-        assertThat(taps.gateState.value).isEqualTo(GateState.Read(PadBlock.NIGHT))
+        assertThat(taps.gateState.value).isEqualTo(GateState(read = true, block = PadBlock.NIGHT))
         assertThat(taps.line(1, first = true).first()).isEqualTo("Night")
         assertThat(taps.line(2, first = false).first()).isEqualTo("Couldn’t play")
     }
