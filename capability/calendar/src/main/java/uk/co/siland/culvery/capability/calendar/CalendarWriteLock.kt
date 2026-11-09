@@ -16,4 +16,6 @@ class CalendarWriteLock @Inject constructor() {
     private val mutex = Mutex()
 
     suspend fun <T> withLock(block: suspend () -> T): T = mutex.withLock { block() }
+
+    internal val held: Boolean get() = mutex.isLocked
 }

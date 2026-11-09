@@ -436,6 +436,9 @@ interface CalendarDao {
     @Query("SELECT * FROM outbox ORDER BY id")
     suspend fun outboxNow(): List<OutboxEntity>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE id = :id)")
+    suspend fun outboxHas(id: Long): Boolean
+
     @Query("SELECT MIN(nextAttemptMillis) FROM outbox")
     suspend fun nextAttemptMillis(): Long?
 

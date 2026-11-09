@@ -24,6 +24,19 @@ class UndoneKeys @Inject constructor() {
 
     internal operator fun get(key: String): Undone? = keys[key]
 
+    // Creates the drain is sending: an Undo of one leaves its key for the drain to settle (20 §4.3).
+    private val onTheirWay = ConcurrentHashMap.newKeySet<String>()
+
+    fun sending(key: String) {
+        onTheirWay += key
+    }
+
+    fun isSending(key: String): Boolean = key in onTheirWay
+
+    fun sent(key: String) {
+        onTheirWay -= key
+    }
+
     /** Nothing can bring [key]'s event back any more. */
     fun done(key: String) {
         keys -= key

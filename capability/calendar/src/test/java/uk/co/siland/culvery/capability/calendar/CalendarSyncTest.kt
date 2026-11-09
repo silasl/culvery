@@ -9,16 +9,21 @@ import java.net.UnknownHostException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -82,9 +87,11 @@ class CalendarSyncTest {
         timeoutMillis: Long = 1_000,
         lock: CalendarWriteLock = CalendarWriteLock(),
         store: CalendarStore = this.store,
+        undone: UndoneKeys = UndoneKeys(),
+        clock: WallClock = this.clock,
     ): CalendarSync {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
-        return testSync(store, setOf(a, b), HouseholdZone(household), clock, writers, toaster, io, timeoutMillis, lock)
+        return testSync(store, setOf(a, b), HouseholdZone(household), clock, writers, toaster, io, timeoutMillis, lock, undone = undone)
     }
 
     private suspend fun engine(): CalendarSync = engineWith(emptySet(), SilentToaster)
@@ -892,14 +899,25 @@ class CalendarSyncTest {
         queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
         w.failWith = WriteRejectedException("calendar is full")
         a.failWith = UnreachableException("reads are down")
-        // The editor holds the lock while it queues a change behind the create.
+        w.createGate = CompletableDeferred()
+        val pass = launch { sync.syncAll() }
+        withContext(Dispatchers.Default) { withTimeout(5_000) { w.entered.await() } }
+        // The editor asks for the lock while the drain settles the refusal under it (20 §4.3), so it holds the lock
+        // when the drain comes to drop the create, and queues a change behind it.
         val holding = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
-        val editor = launch(Dispatchers.Default) { lock.withLock { holding.complete(Unit); release.await() } }
-        withContext(Dispatchers.Default) { withTimeout(5_000) { holding.await() } }
-        val pass = launch { sync.syncAll() }
+        lateinit var editor: Job
         withContext(Dispatchers.Default) {
-            withTimeout(5_000) { w.entered.await() }
+            lock.withLock {
+                w.createGate?.complete(Unit)
+                // Real time for the drain to wait for the lock first, then the editor behind it.
+                delay(200)
+                editor = this@runTest.launch(Dispatchers.Default) { lock.withLock { holding.complete(Unit); release.await() } }
+                delay(200)
+            }
+        }
+        withContext(Dispatchers.Default) {
+            withTimeout(5_000) { holding.await() }
             // Real time for a drop outside the lock to go ahead, so such a drop fails this test every time.
             delay(200)
         }
@@ -1148,6 +1166,200 @@ class CalendarSyncTest {
         queue(ChangeKind.DELETE, draft = null)
         sync.syncAll()
         assertThat(toaster.messages).containsExactly(changesLost("C1", listOf(null)))
+    }
+
+    // Undo against the drain's create (20 §4.3). Writes run on real threads, as the app's do, with the app's timeout.
+    private val undone = UndoneKeys()
+    private val writeLock = CalendarWriteLock()
+    private val swimRef = EventRef("c1", "s1", key)
+
+    private fun added(access: TestAccess) = AddedEvent(key, "c1", "s1", "Swim", series = false, access.alex.id.value, "Service A")
+
+    private suspend fun TestScope.undoing(writer: CalendarWriter = w): Pair<TestAccess, CalendarEditor> {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = testEditor(
+            store, setOf(writer), access.control, access.toasts, HouseholdZone(household), clock, backgroundScope,
+            io = Dispatchers.Default, writeLock = writeLock, undone = undone,
+        )
+        return access to editor
+    }
+
+    private suspend fun undoingEngine(writer: CalendarWriter = w, clock: WallClock = this.clock): CalendarSync =
+        engineWith(setOf(writer), toaster, io = Dispatchers.Default, timeoutMillis = PROVIDER_TIMEOUT_MS, lock = writeLock, undone = undone, clock = clock)
+
+    private suspend fun queueSwimCreate() =
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), attempts = 0, clientKey = key)
+
+    /** Starts [sync]'s pass and returns once its create is on its way, held there until the test opens the gate. */
+    private suspend fun TestScope.passSendingTheCreate(sync: CalendarSync): Job {
+        w.createGate = CompletableDeferred()
+        val pass = launch { sync.syncAll() }
+        withContext(Dispatchers.Default) { withTimeout(5_000) { w.entered.await() } }
+        return pass
+    }
+
+    @Test
+    fun anUndoBetweenTheReplyAndTheStoreIsSettled() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        queueSwimCreate()
+        val undo = CompletableDeferred<Job>()
+        val tapped = AtomicReference<Job?>()
+        // Undo is tapped as the service's reply comes back.
+        val replying = object : CalendarWriter by w {
+            override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent =
+                w.create(conn, source, draft, clientKey).also {
+                    val job = launch(Dispatchers.Default) { editor.undoAdd(added(access)) }
+                    tapped.set(job)
+                    undo.complete(job)
+                }
+        }
+        // The drain next reads the clock to store the event: Undo finishes first, unless the drain holds the lock.
+        val storing = WallClock {
+            tapped.getAndSet(null)?.let { if (!writeLock.held) runBlocking { it.join() } }
+            clock.nowMillis()
+        }
+        withContext(Dispatchers.Default) { undoingEngine(replying, storing).syncAll() }
+        undo.await().join()
+        assertThat(store.eventNow(swimRef)).isNull()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(undone.pending).isEmpty()
+        assertThat(access.toasts.messages).containsExactly(removed("Swim"))
+    }
+
+    /** Regression guard: the other order, Undo once the event is stored, is the normal delete. */
+    @Test
+    fun anUndoAfterTheCreateLandedDeletesTheEvent() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        queueSwimCreate()
+        undoingEngine().syncAll()
+        assertThat(store.eventNow(swimRef)).isNotNull()
+        assertThat(editor.undoAdd(added(access))).isEqualTo(EditResult.Done)
+        assertThat(store.eventNow(swimRef)).isNull()
+        assertThat(w.deleted).containsExactly(key)
+        assertThat(undone.pending).isEmpty()
+    }
+
+    @Test
+    fun anUndoOfAQueuedCreateLetsTheKeyGo() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        queueSwimCreate()
+        assertThat(editor.undoAdd(added(access))).isEqualTo(EditResult.Done)
+        assertThat(undone.pending).isEmpty()
+        undoingEngine().syncAll()
+        assertThat(w.calls).doesNotContain("create:Swim")
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    /** Regression guard (20 §4.3): no call the drain makes to the service holds the editor's lock; Undo's own delete does. */
+    @Test
+    fun noDrainWriterCallRunsUnderTheLock() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val drainCalls = CopyOnWriteArrayList<Pair<String, Boolean>>()
+        val undoCalls = CopyOnWriteArrayList<Pair<String, Boolean>>()
+        fun probing(calls: MutableList<Pair<String, Boolean>>) = object : CalendarWriter by w {
+            override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent {
+                calls += "create" to writeLock.held
+                return w.create(conn, source, draft, clientKey)
+            }
+
+            override suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft, fields: Set<EventField>): RemoteEvent {
+                calls += "update" to writeLock.held
+                return w.update(conn, source, remoteId, draft, fields)
+            }
+
+            override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
+                calls += "delete" to writeLock.held
+                w.delete(conn, source, remoteId)
+            }
+
+            override suspend fun deleteSeries(conn: Connection, source: CalendarSource, seriesId: String) {
+                calls += "deleteSeries" to writeLock.held
+                w.deleteSeries(conn, source, seriesId)
+            }
+
+            override suspend fun assignSeries(conn: Connection, source: CalendarSource, seriesId: String, draft: EventDraft) {
+                calls += "assignSeries" to writeLock.held
+                w.assignSeries(conn, source, seriesId, draft)
+            }
+
+            override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? {
+                calls += "find" to writeLock.held
+                return w.find(conn, source, remoteId)
+            }
+        }
+        val (access, editor) = undoing(probing(undoCalls))
+        val sync = undoingEngine(probing(drainCalls))
+        // A create undone on its way, so the drain deletes what lands.
+        queueSwimCreate()
+        val pass = passSendingTheCreate(sync)
+        assertThat(editor.undoAdd(added(access))).isEqualTo(EditResult.Done)
+        w.createGate?.complete(Unit)
+        pass.join()
+        // An update, a delete, a series assign, and an aged create the drain looks up.
+        w.findable["k2"] = RemoteEvent("k2", "Swim", swim().start, swim().end, recurring = false, "mia-id", "alex-id")
+        queue(ChangeKind.UPDATE)
+        queue(ChangeKind.ASSIGN_SERIES, remoteId = "series")
+        queue(ChangeKind.DELETE, draft = null)
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = "k2", created = now.minusMillis(OUTBOX_MAX_AGE_MS + 1))
+        sync.syncAll()
+        assertThat(drainCalls.map { it.first }).containsExactly("create", "delete", "update", "assignSeries", "delete", "find").inOrder()
+        assertThat(drainCalls.filter { it.second }).isEmpty()
+        assertThat(undoCalls).containsExactly("delete" to true)
+    }
+
+    /** Regression guard: a stray whose delete fails is deleted on the next pass. */
+    @Test
+    fun aFailedStrayDeleteIsTriedNextPass() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        val sync = undoingEngine()
+        queueSwimCreate()
+        val pass = passSendingTheCreate(sync)
+        assertThat(editor.undoAdd(added(access))).isEqualTo(EditResult.Done)
+        w.failNextDelete = UnreachableException("offline")
+        w.createGate?.complete(Unit)
+        pass.join()
+        assertThat(w.calls.count { it == "delete:$key" }).isEqualTo(2)
+        assertThat(undone.strayCreates.keys).containsExactly(key)
+
+        sync.syncAll()
+        assertThat(w.calls.count { it == "delete:$key" }).isEqualTo(3)
+        assertThat(undone.strayCreates).isEmpty()
+        assertThat(undone.pending).isEmpty()
+        assertThat(store.eventNow(swimRef)).isNull()
+    }
+
+    /** Regression guard (Review Focus 5): a create the service refuses after Undo leaves nothing to delete later. */
+    @Test
+    fun anUndoneCreateTheServiceRefusedLeavesNoStray() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        val sync = undoingEngine()
+        queueSwimCreate()
+        val pass = passSendingTheCreate(sync)
+        assertThat(editor.undoAdd(added(access))).isEqualTo(EditResult.Done)
+        w.failWith = WriteRejectedException("calendar is full")
+        w.createGate?.complete(Unit)
+        pass.join()
+        assertThat(undone.strayCreates).isEmpty()
+        assertThat(undone.pending).isEmpty()
+
+        w.failWith = null
+        sync.syncAll()
+        // Undo's own delete only.
+        assertThat(w.calls.count { it == "delete:$key" }).isEqualTo(1)
+        assertThat(store.eventNow(swimRef)).isNull()
+        assertThat(toaster.messages).isEmpty()
     }
 
     private companion object {

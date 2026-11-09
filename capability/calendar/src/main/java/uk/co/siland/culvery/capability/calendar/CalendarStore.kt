@@ -484,6 +484,8 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     suspend fun dropChange(id: Long) = dao.deleteOutbox(id)
 
+    suspend fun isQueued(id: Long): Boolean = dao.outboxHas(id)
+
     /**
      * Drops the create for [ref] and every change queued for that event, in one statement, so a change queued after
      * the caller read the queue goes too. Returns how many changes went.

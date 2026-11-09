@@ -1253,8 +1253,8 @@ class CalendarEditorTest {
         assertThat(store.pendingNow()).isEmpty()
         assertThat(writer.calls).containsExactly("create:Swimming", "deleteSeries:key-s").inOrder()
         assertThat(access.toasts.messages.last()).isEqualTo("Removed Swimming.")
-        // Kept in case a drain had it on its way; nothing lands, so it goes at restart.
-        assertThat(undone.pending).containsExactly("key-s")
+        // Not on its way, so nothing can land: let go at once (20 §4.3).
+        assertThat(undone.pending).isEmpty()
 
         writer.failWith = null
         drain(access, aheadMillis = OUTBOX_BACKOFF_MS.first()).syncAll()
