@@ -39,6 +39,7 @@ class HomeAssistantSocketTest {
     private val server = MockWebServer()
     private val received = CopyOnWriteArrayList<String>()
     private val serverClosed = CountDownLatch(1)
+    private val serverEnded = CountDownLatch(1)
     private val serverCloseCode = AtomicInteger(0)
     private lateinit var link: HomeAssistantLink
     private lateinit var api: HomeAssistantClient
@@ -64,7 +65,13 @@ class HomeAssistantSocketTest {
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
             serverCloseCode.set(code)
             serverClosed.countDown()
+            serverEnded.countDown()
             webSocket.close(code, null)
+        }
+
+        /** The client cancels a socket that is already closing, so its close frame can be cut off and the server sees a failure. */
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            serverEnded.countDown()
         }
     }
 
@@ -268,7 +275,7 @@ class HomeAssistantSocketTest {
             release.countDown()
             withTimeout(5_000) { collecting.join() }
             assertThat(failure?.problem).isEqualTo(HaProblem.UNREACHABLE)
-            assertThat(serverClosed.await(5, TimeUnit.SECONDS)).isTrue()
+            assertThat(serverEnded.await(5, TimeUnit.SECONDS)).isTrue()
         } finally {
             release.countDown()
             scope.cancel()
