@@ -33,8 +33,27 @@ private const val MAX_PAGE_BYTES = 2L * 1024 * 1024
 /** A plain browser User-Agent, as the council's site expects; [interceptors] are the debug build's sample council. */
 internal fun councilHttpClient(version: String, interceptors: Set<Interceptor>): OkHttpClient = internetHttpClient()
     .withUserAgent("Mozilla/5.0 (Linux; Android) Culvery/$version")
+    .addNetworkInterceptor(::stayOnTheSite)
     .apply { interceptors.forEach(::addInterceptor) }
     .build()
+
+/** A redirect off the request's own scheme, host and port. */
+internal class LeftTheSite : IOException()
+
+private val REDIRECTS = setOf(301, 302, 303, 307, 308)
+
+private fun stayOnTheSite(chain: Interceptor.Chain): Response {
+    val response = chain.proceed(chain.request())
+    if (response.code in REDIRECTS) {
+        val from = response.request.url
+        val to = response.header("Location")?.let(from::resolve)
+        if (to != null && (to.scheme != from.scheme || to.host != from.host || to.port != from.port)) {
+            response.close()
+            throw LeftTheSite()
+        }
+    }
+    return response
+}
 
 /**
  * The council's three pages (spec 4.1). Each read or search is its own session, its start page's cookie kept only for
@@ -74,6 +93,7 @@ class CouncilClient(private val baseUrl: HttpUrl, private val client: Lazy<OkHtt
                 http.newCall(request.newBuilder().tag(Heard::class.java, heard).build()).await(MAX_PAGE_BYTES)
             } catch (e: IOException) {
                 currentCoroutineContext().ensureActive()
+                if (e is LeftTheSite) throw BinsReadFailed(BinsFailure.NO_ADDRESS_LIST)
                 val neverAnswered = !heard.answered &&
                     (e is ConnectException || e is NoRouteToHostException || heard.connectFailed)
                 throw if (neverAnswered) CouncilUnanswered(e) else e.asUnreachable(COUNCIL_SITE, offlineOnUnknownHost = true)

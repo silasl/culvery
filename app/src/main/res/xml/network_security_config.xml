@@ -8,5 +8,6 @@
         <domain includeSubdomains="true">googleapis.com</domain>
         <domain includeSubdomains="true">google.com</domain>
         <domain includeSubdomains="true">open-meteo.com</domain>
+        <domain includeSubdomains="true">midsussex.gov.uk</domain>
     </domain-config>
 </network-security-config>

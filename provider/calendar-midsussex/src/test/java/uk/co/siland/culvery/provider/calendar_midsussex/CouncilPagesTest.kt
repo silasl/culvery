@@ -128,4 +128,40 @@ class CouncilPagesTest {
 
         assertThat(collections(html)).containsExactly(BinDay(LocalDate.of(2031, 1, 9), listOf("garden")))
     }
+
+    private fun startPage(href: String) = """<a href="$href">View my collections</a>"""
+
+    private fun list(vararg hrefs: String) =
+        """<div id="property_list">${hrefs.joinToString("") { """<a href="$it">A house</a>""" }}</div>"""
+
+    @Test
+    fun councilBaseUrlIsHttps() {
+        assertThat(COUNCIL_BASE_URL.toHttpUrl().scheme).isEqualTo("https")
+    }
+
+    @Test
+    fun aStartLinkToAnotherSchemeOrHostFails() {
+        listOf("http://waste.services.midsussex.gov.uk/mop.php?Track=1", "https://example.org/mop.php?Track=1").forEach {
+            assertThat(failure { searchUrl(startPage(it), base) }).isEqualTo(BinsFailure.NO_START_LINK)
+        }
+    }
+
+    @Test
+    fun aStartLinkOnTheBaseHostIsKept() {
+        assertThat(searchUrl(startPage("/mop.php?Track=1"), base).host).isEqualTo("waste.services.midsussex.gov.uk")
+    }
+
+    @Test
+    fun anAddressLinkOffTheBaseIsDropped() {
+        val kept = addresses(list("mop.php?pIndex=1", "https://example.org/mop.php?pIndex=2", "http://waste.services.midsussex.gov.uk/mop.php?pIndex=3"), base)
+
+        assertThat(kept.map { it.url.queryParameter("pIndex") }).containsExactly("1")
+    }
+
+    @Test
+    fun addressLinksAllOffTheBaseFail() {
+        val html = list("https://example.org/mop.php?pIndex=1", "http://waste.services.midsussex.gov.uk/mop.php?pIndex=2")
+
+        assertThat(failure { addresses(html, base) }).isEqualTo(BinsFailure.NO_ADDRESS_LIST)
+    }
 }

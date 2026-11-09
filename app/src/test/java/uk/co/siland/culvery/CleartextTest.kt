@@ -29,7 +29,7 @@ class CleartextTest {
         val internet = config.single { it.tagName == "domain-config" }
         assertThat(internet.getAttribute("cleartextTrafficPermitted")).isEqualTo("false")
         val domains = internet.children().filter { it.tagName == "domain" }
-        assertThat(domains.map { it.textContent.trim() }).containsExactly("googleapis.com", "google.com", "open-meteo.com")
+        assertThat(domains.map { it.textContent.trim() }).containsExactly("googleapis.com", "google.com", "open-meteo.com", "midsussex.gov.uk")
         assertThat(domains.map { it.getAttribute("includeSubdomains") }.toSet()).containsExactly("true")
     }
 }

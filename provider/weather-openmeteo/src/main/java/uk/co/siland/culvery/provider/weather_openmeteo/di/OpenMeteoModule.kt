@@ -10,6 +10,7 @@ import javax.inject.Singleton
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import uk.co.siland.culvery.capability.weather.WeatherProvider
+import uk.co.siland.culvery.core.net.internetHttpClient
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.setup.LocationSearch
 import uk.co.siland.culvery.provider.weather_openmeteo.OPEN_METEO_FORECAST_URL
@@ -27,11 +28,14 @@ private val FORECAST_CONNECT_TIMEOUT: Duration = Duration.ofSeconds(15)
 private val FORECAST_READ_TIMEOUT: Duration = Duration.ofSeconds(30)
 private val FORECAST_CALL_TIMEOUT: Duration = Duration.ofSeconds(60)
 
-internal fun forecastClient(): OkHttpClient = OkHttpClient.Builder()
+internal fun forecastClient(): OkHttpClient = internetHttpClient()
     .connectTimeout(FORECAST_CONNECT_TIMEOUT)
     .readTimeout(FORECAST_READ_TIMEOUT)
     .callTimeout(FORECAST_CALL_TIMEOUT)
     .build()
+
+internal fun searchClient(): OkHttpClient =
+    internetHttpClient().connectTimeout(SEARCH_CONNECT_TIMEOUT).readTimeout(SEARCH_READ_TIMEOUT).build()
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -41,7 +45,7 @@ object OpenMeteoModule {
     @Singleton
     fun locationSearch(): LocationSearch = OpenMeteoLocationSearch(
         OPEN_METEO_GEOCODING_URL.toHttpUrl(),
-        OkHttpClient.Builder().connectTimeout(SEARCH_CONNECT_TIMEOUT).readTimeout(SEARCH_READ_TIMEOUT).build(),
+        searchClient(),
     )
 
     @Provides

@@ -83,4 +83,14 @@ class HttpTest {
         }
         return false
     }
+
+    /** Fails if an internet client follows a redirect that changes the scheme. */
+    @Test
+    fun anInternetClientDoesNotFollowASchemeRedirect() {
+        server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", "https://localhost:${server.port}/next"))
+        val internet = internetHttpClient().build()
+        val code = internet.newCall(Request.Builder().url(server.url("/")).build()).execute().use { it.code }
+        assertThat(code).isEqualTo(302)
+        assertThat(server.requestCount).isEqualTo(1)
+    }
 }

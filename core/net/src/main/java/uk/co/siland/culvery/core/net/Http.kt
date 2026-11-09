@@ -29,9 +29,11 @@ fun homeHttpClient(timeoutMs: Long, pool: ConnectionPool? = null): OkHttpClient 
 
 /**
  * A client for a service on the internet. OkHttp's own timeouts sit inside the engines' (10 s editor, 60 s drain and
- * sync), so the engines decide; the 60 s call timeout ends a body that drips in.
+ * sync), so the engines decide; the 60 s call timeout ends a body that drips in. A redirect that changes the scheme
+ * is not followed.
  */
 fun internetHttpClient(): OkHttpClient.Builder = OkHttpClient.Builder()
+    .followSslRedirects(false)
     .connectTimeout(Duration.ofSeconds(15))
     .readTimeout(Duration.ofSeconds(30))
     .callTimeout(Duration.ofSeconds(60))

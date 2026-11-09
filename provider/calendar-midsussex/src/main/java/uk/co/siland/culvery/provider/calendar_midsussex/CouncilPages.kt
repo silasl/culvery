@@ -48,20 +48,25 @@ const val COUNCIL_DATE_PATTERN = "dd/MM/uuuu"
 
 private val DATE = DateTimeFormatter.ofPattern(COUNCIL_DATE_PATTERN).withResolverStyle(ResolverStyle.STRICT)
 
+private fun HttpUrl.onSiteOf(base: HttpUrl) = scheme == base.scheme && host == base.host
+
 fun searchUrl(startHtml: String, baseUrl: HttpUrl): HttpUrl {
     val href = Jsoup.parse(startHtml).select("a[href]")
         .firstOrNull { it.text().contains(START_LINK_TEXT, ignoreCase = true) }
         ?.attr("href")
-    val link = href?.let(baseUrl::resolve) ?: throw BinsReadFailed(BinsFailure.NO_START_LINK)
+    val link = href?.let(baseUrl::resolve)?.takeIf { it.onSiteOf(baseUrl) } ?: throw BinsReadFailed(BinsFailure.NO_START_LINK)
     return link.newBuilder().setQueryParameter("seq", "2").build()
 }
 
 fun addresses(listHtml: String, baseUrl: HttpUrl): List<Address> {
     val list = Jsoup.parse(listHtml).selectFirst("div#property_list")
         ?: throw BinsReadFailed(BinsFailure.NO_ADDRESS_LIST)
-    return list.select("a[href]").mapNotNull { link ->
-        baseUrl.resolve(link.attr("href"))?.let { Address(link.text().trim(), it) }
+    val links = list.select("a[href]")
+    val kept = links.mapNotNull { link ->
+        baseUrl.resolve(link.attr("href"))?.takeIf { it.onSiteOf(baseUrl) }?.let { Address(link.text().trim(), it) }
     }
+    if (kept.isEmpty() && links.isNotEmpty()) throw BinsReadFailed(BinsFailure.NO_ADDRESS_LIST)
+    return kept
 }
 
 fun pick(addresses: List<Address>, line: String): Address =

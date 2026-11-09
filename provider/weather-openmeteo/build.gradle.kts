@@ -5,6 +5,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":core:net"))
     implementation(project(":core:setup"))
     implementation(project(":capability:weather"))
     implementation(libs.okhttp)

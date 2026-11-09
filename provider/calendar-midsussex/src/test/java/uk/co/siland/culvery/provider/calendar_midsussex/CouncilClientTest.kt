@@ -10,6 +10,10 @@ import okhttp3.Dns
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -153,5 +157,80 @@ class CouncilClientTest {
         val e = failure { routed.read(HOUSE, POSTCODE, LINE) }
         assertThat(e).isInstanceOf(UnreachableException::class.java)
         assertThat(e).isNotInstanceOf(CouncilUnanswered::class.java)
+    }
+
+    private fun startBody(site: MockWebServer) =
+        fixture("start.html").replace("https://waste.services.midsussex.gov.uk", site.url("/").toString().trimEnd('/'))
+
+    private fun councilAt(site: MockWebServer) = CouncilClient(site.url("/"), lazy { councilHttpClient("test", emptySet()) })
+
+    private fun searchRedirectedTo(code: Int, target: (MockWebServer, MockWebServer) -> String): Pair<Throwable, MockWebServer> {
+        val first = MockWebServer().apply { start() }
+        val second = MockWebServer().apply {
+            dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest) = MockResponse().setBody("")
+            }
+            start()
+        }
+        try {
+            first.enqueue(MockResponse().setBody(startBody(first)))
+            first.enqueue(MockResponse().setResponseCode(code).setHeader("Location", target(first, second)))
+            val e = failure { councilAt(first).search(HOUSE, POSTCODE) }
+            assertThat(first.requestCount).isEqualTo(2)
+            return e to second
+        } finally {
+            first.shutdown()
+            second.shutdown()
+        }
+    }
+
+    private fun MockWebServer.onAnotherHost(): String = url("/mop.php").newBuilder().host("127.0.0.1").build().toString()
+
+    @Test
+    fun aSearchRedirectedToAnotherHostIsNotFollowed() {
+        listOf(307, 308).forEach { code ->
+            val (e, second) = searchRedirectedTo(code) { _, other -> other.onAnotherHost() }
+
+            assertThat((e as BinsReadFailed).kind).isEqualTo(BinsFailure.NO_ADDRESS_LIST)
+            assertThat(second.requestCount).isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun aSearchRedirectedToAnotherSchemeIsNotFollowed() {
+        val (e, second) = searchRedirectedTo(307) { _, other -> "https://localhost:${other.port}/mop.php" }
+
+        assertThat((e as BinsReadFailed).kind).isEqualTo(BinsFailure.NO_ADDRESS_LIST)
+        assertThat(second.requestCount).isEqualTo(0)
+    }
+
+    @Test
+    fun aSearchRedirectedToAnotherPortIsNotFollowed() {
+        val (e, second) = searchRedirectedTo(307) { _, other -> other.url("/mop.php").toString() }
+
+        assertThat((e as BinsReadFailed).kind).isEqualTo(BinsFailure.NO_ADDRESS_LIST)
+        assertThat(second.requestCount).isEqualTo(0)
+    }
+
+    /** Regression guard. */
+    @Test
+    fun aRedirectToTheSameHostIsFollowed() = runTest {
+        val site = MockWebServer().apply { start() }
+        try {
+            site.enqueue(MockResponse().setBody(startBody(site)))
+            site.enqueue(MockResponse().setResponseCode(302).setHeader("Location", "/list"))
+            site.enqueue(MockResponse().setBody(fixture("addresses_two.html")))
+
+            assertThat(councilAt(site).search(HOUSE, POSTCODE).addresses).hasSize(2)
+        } finally {
+            site.shutdown()
+        }
+    }
+
+    @Test
+    fun theSearchIsPostedOnlyToTheBasesHost() = runTest {
+        subject.search(HOUSE, POSTCODE)
+
+        repeat(2) { assertThat(council.takeRequest().requestUrl?.host).isEqualTo(base.host) }
     }
 }
