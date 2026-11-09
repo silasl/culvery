@@ -6,12 +6,14 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Log
 import android.util.Range
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.nio.ByteBuffer
@@ -25,6 +27,29 @@ internal fun smallestSize(sizes: List<Pair<Int, Int>>): Pair<Int, Int> =
 
 /** The range with the lowest top rate, then the lowest bottom rate (8 §4.3). */
 internal fun slowestRange(ranges: List<IntRange>): IntRange = ranges.minWith(compareBy({ it.last }, { it.first }))
+
+/** What a camera does to a frame that the motion test doesn't need: each with the characteristic listing its modes, the request key and the off value (19 §4.1). */
+internal enum class QuietMode(
+    val available: CameraCharacteristics.Key<IntArray>,
+    val key: CaptureRequest.Key<Int>,
+    val off: Int,
+) {
+    NOISE_REDUCTION(
+        CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES,
+        CaptureRequest.NOISE_REDUCTION_MODE,
+        CameraMetadata.NOISE_REDUCTION_MODE_OFF,
+    ),
+    EDGE(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES, CaptureRequest.EDGE_MODE, CameraMetadata.EDGE_MODE_OFF),
+    AUTOFOCUS(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES, CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF),
+}
+
+/** The modes whose off value the camera lists. */
+internal fun quietModes(available: (QuietMode) -> IntArray?): Set<QuietMode> =
+    QuietMode.entries.filter { mode -> available(mode)?.contains(mode.off) == true }.toSet()
+
+/** The mode names in enum order, or `none`. */
+internal fun quietNames(modes: Set<QuietMode>): String =
+    QuietMode.entries.filter { it in modes }.joinToString(", ").ifEmpty { "none" }
 
 /** The Y plane averaged in blocks down to [DIFF_WIDTH] × [DIFF_HEIGHT], into a new array each time. */
 internal fun lumaOf(plane: ByteBuffer, rowStride: Int, pixelStride: Int, width: Int, height: Int): Luma {
@@ -129,19 +154,22 @@ internal class Camera2Frames internal constructor(
         }
 
         private fun configure(camera: CameraDevice, chosen: CameraCharacteristics) {
-            val (width, height) = smallestSize(
+            val size = smallestSize(
                 checkNotNull(chosen.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP))
                     .getOutputSizes(ImageFormat.YUV_420_888).map { it.width to it.height },
             )
             val rates = slowestRange(
                 checkNotNull(chosen.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)).map { it.lower..it.upper },
             )
-            val images = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 2).also { reader = it }
+            val off = quietModes { chosen.get(it.available) }
+            val images = ImageReader.newInstance(size.first, size.second, ImageFormat.YUV_420_888, 2).also { reader = it }
             images.setOnImageAvailableListener({ frame(it) }, handler)
             val request = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
                 addTarget(images.surface)
                 set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(rates.first, rates.last))
+                off.forEach { set(it.key, it.off) }
             }.build()
+            Log.w(TAG, "The camera opened at ${size.first}x${size.second}, ${rates.first}-${rates.last} fps, off: ${quietNames(off)}")
             val sessionCallback = object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(configured: CameraCaptureSession) = guarded(configured) {
                     session = it

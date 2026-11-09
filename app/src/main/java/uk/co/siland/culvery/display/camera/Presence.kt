@@ -16,7 +16,7 @@ import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.display.DisplayState
 import uk.co.siland.culvery.display.Screen
 
-private const val TAG = "Presence"
+internal const val TAG = "Presence"
 
 internal const val LOOK_EVERY_MS = 1_000L
 internal const val CAMERA_RETRY_MS = 300_000L

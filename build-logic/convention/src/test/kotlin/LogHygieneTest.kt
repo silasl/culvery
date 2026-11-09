@@ -57,6 +57,8 @@ class LogHygieneTest {
         assertThat(sources.map { it.name }).contains("PlugActions.kt")
         assertThat(sources.map { it.name }).contains("PlugsSection.kt")
         assertThat(sources.map { it.name }).contains("MidSussexBinsProvider.kt")
+        assertThat(sources.map { it.name }).contains("Camera2Frames.kt")
+        assertThat(sources.map { it.name }).contains("Presence.kt")
         // 77 calls when written; a floor well below that still fails if the scan stops finding them.
         assertThat(sources.sumOf { LogHygiene.callCount(it.readText()) }).isAtLeast(50)
     }
@@ -96,6 +98,19 @@ class LogHygieneTest {
         assertThat(LogHygiene.problems("""Log.i(TAG, "Bins read: ${'$'}{collections.size} collections")""")).isEmpty()
         assertThat(LogHygiene.problems("""Log.w(TAG, "Bins read failed: ${'$'}{failed.kind.name}")""")).isEmpty()
         assertThat(LogHygiene.problems("""Log.i(TAG, "Bins read for ${'$'}{conn.config}")""")).hasSize(1)
+    }
+
+    @Test
+    fun theCameraLinesPass() {
+        val d = "$"
+        assertThat(
+            LogHygiene.problems(
+                """Log.w(TAG, "The camera opened at ${d}{size.first}x${d}{size.second}, ${d}{rates.first}-${d}{rates.last} fps, off: ${d}{quietNames(off)}")""",
+            ),
+        ).isEmpty()
+        assertThat(LogHygiene.problems("""Log.w(TAG, "The camera stopped (CameraError ${d}{e.code})")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.w(TAG, "The camera stopped (${d}{e::class.simpleName})")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.w(TAG, "The camera opened, off: ${d}{off}")""")).hasSize(1)
     }
 
     @Test
@@ -153,6 +168,8 @@ internal object LogHygiene {
      * `e.reasonWord()` is Google's fixed reason word, such as rateLimitExceeded, or null; never free text (19 §5).
      *
      * `mark.elapsedNow().inWholeMilliseconds` is how long the doorbell's layout read took (19 §3.2).
+     *
+     * `size.first`, `size.second`, `rates.first` and `rates.last` are the camera's size and frame-rate range, and `quietNames(off)` the modes turned off: the camera's size, rate range and the modes turned off (19 §4.1).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
@@ -161,6 +178,7 @@ internal object LogHygiene {
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
         "step.name", "own.logName", "source.sound.key", "after.screen.name", "names.size",
         "collections.size", "failed.kind.name", "failedInARow", "e.reasonWord()", "mark.elapsedNow().inWholeMilliseconds",
+        "size.first", "size.second", "rates.first", "rates.last", "quietNames(off)",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|i|wtf|println)\(""")

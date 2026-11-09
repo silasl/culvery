@@ -39,11 +39,14 @@ class CameraSealTest {
         assertWithMessage(found.joinToString("\n")).that(found).isEmpty()
     }
 
-    /** Fails if the camera package logs anything but the one warning naming the exception's class. */
+    /** Fails if the camera package logs anything but the stopped warning and the opened line (numbers and mode names). */
     @Test
-    fun theCameraPackageLogsOnlyTheOneWarning() {
+    fun theCameraPackageLogsOnlyTheStoppedAndOpenedLines() {
         val calls = cameraFiles().flatMap { file -> LOG_CALL.findAll(file.readText()).map { it.value.trim() } }
-        assertThat(calls).containsExactly("Log.w(TAG, \"The camera stopped (\${e::class.simpleName})\")")
+        assertThat(calls).containsExactly(
+            "Log.w(TAG, \"The camera stopped (\${e::class.simpleName})\")",
+            "Log.w(TAG, \"The camera opened at \${size.first}x\${size.second}, \${rates.first}-\${rates.last} fps, off: \${quietNames(off)}\")",
+        )
     }
 
     /** Fails if a top-level declaration in the camera package is visible outside `:app`. */

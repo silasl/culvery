@@ -76,6 +76,33 @@ class Camera2FramesTest {
         assertThat(slowestRange(listOf(5..30, 10..15, 7..15))).isEqualTo(7..15)
     }
 
+    /** Fails if a mode is turned off where the camera doesn't list its off mode, or left on where it does. */
+    @Test
+    fun onlyListedOffModesAreTurnedOff() {
+        val listed = quietModes {
+            when (it) {
+                QuietMode.NOISE_REDUCTION -> intArrayOf(0, 1, 2)
+                QuietMode.EDGE -> intArrayOf(1, 2)
+                QuietMode.AUTOFOCUS -> null
+            }
+        }
+        assertThat(listed).containsExactly(QuietMode.NOISE_REDUCTION)
+    }
+
+    @Test
+    fun allThreeOffWhenListed() {
+        assertThat(quietModes { intArrayOf(it.off) }).containsExactly(
+            QuietMode.NOISE_REDUCTION, QuietMode.EDGE, QuietMode.AUTOFOCUS,
+        )
+    }
+
+    /** Fails if the line carries anything but the mode names, in enum order. */
+    @Test
+    fun theQuietNamesAreModeNames() {
+        assertThat(quietNames(setOf(QuietMode.EDGE, QuietMode.NOISE_REDUCTION))).isEqualTo("NOISE_REDUCTION, EDGE")
+        assertThat(quietNames(emptySet())).isEqualTo("none")
+    }
+
     /** Fails if the row or pixel stride is ignored, which reads the padding or the chroma bytes between samples. */
     @Test
     fun lumaReadsThePlaneWithItsStrides() {
