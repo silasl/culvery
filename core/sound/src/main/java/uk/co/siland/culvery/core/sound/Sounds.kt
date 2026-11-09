@@ -20,9 +20,9 @@ internal val SOUND_EXTENSIONS = setOf("wav", "mp3", "ogg")
 const val UNNAMED_SOUND = "Unnamed sound"
 const val SOUND_NAME_MAX = 40
 
-/** [raw] with line breaks and tabs as spaces, other control and formatting characters dropped, and spaces collapsed; not cut. */
 private val RUN_OF_SPACES = Regex(" +")
 
+/** [raw] with line breaks and tabs as spaces, other control and formatting characters dropped, and spaces collapsed; not cut. */
 private fun tidySoundName(raw: String): String {
     val kept = StringBuilder()
     raw.codePoints().forEach { cp ->
