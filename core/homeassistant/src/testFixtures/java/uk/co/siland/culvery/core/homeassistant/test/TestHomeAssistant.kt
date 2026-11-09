@@ -12,7 +12,7 @@ import uk.co.siland.culvery.core.homeassistant.HomeAssistantLink
 import uk.co.siland.culvery.core.homeassistant.homeAssistantUrl
 import uk.co.siland.culvery.core.plugin.WallClock
 
-val TEST_LINK = HomeAssistantLink(checkNotNull(homeAssistantUrl("http://192.168.1.20:8123/")), "test-token")
+val TEST_LINK = HomeAssistantLink(checkNotNull(homeAssistantUrl("http://192.168.1.20:8123/")), "test-token", pin = null)
 
 /** A started [HomeAssistant] over [api]; pass the test's `backgroundScope`. */
 fun testHomeAssistant(

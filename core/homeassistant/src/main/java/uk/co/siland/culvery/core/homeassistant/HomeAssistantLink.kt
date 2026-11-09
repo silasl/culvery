@@ -10,13 +10,13 @@ const val HOME_ASSISTANT_ID = "home.homeassistant"
 /** Home Assistant's own port, assumed when none is typed (11 §4.1). */
 const val HOME_ASSISTANT_PORT = 8123
 
-/** The saved address and long-lived token; [toString] names neither. */
-data class HomeAssistantLink(val baseUrl: HttpUrl, val token: String) {
+/** The saved address, long-lived token and certificate pin (the https certificate's fingerprint, null for http); [toString] names none of them. */
+data class HomeAssistantLink(val baseUrl: HttpUrl, val token: String, val pin: String?) {
     override fun toString() = "HomeAssistantLink"
 }
 
 /**
- * A typed address as the URL Culvery will contact, or null (11 §4.1). No scheme means `http`; no port means 8123; `http`
+ * A typed address as the URL Culvery will contact, or null (11 §4.1). No scheme means `http`; no port means 8123 for `http` and 443 for `https`; `http`
  * only to a home-network host, so the token never leaves the home Wi-Fi in clear; `https` to any host. No user info,
  * path, query or fragment.
  */
@@ -30,7 +30,7 @@ fun homeAssistantUrl(typed: String): HttpUrl? {
     val path = rest.substring(authority.length)
     if (authority.isEmpty() || authority.endsWith(':') || (path.isNotEmpty() && path != "/")) return null
     // Read before parsing: OkHttp drops a typed port that is the scheme's default (80, 443).
-    val port = if (':' in authority) "" else ":$HOME_ASSISTANT_PORT"
+    val port = if (':' in authority || scheme == "https") "" else ":$HOME_ASSISTANT_PORT"
     val url = "$scheme://$authority$port/".toHttpUrlOrNull() ?: return null
     return url.takeIf { it.encodedPath == "/" && (scheme == "https" || isHomeNetworkHost(it.host)) }
 }

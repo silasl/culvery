@@ -56,4 +56,4 @@ internal fun hoover(chosen: String? = null) = FakeDevice("vacuum", "Hoover", 10,
 
 internal fun thermostat(chosen: String? = null) = FakeDevice("climate", "Thermostat", 20, "Home Assistant has no thermostat.", chosen)
 
-internal val SAVED = HomeAssistantLink(checkNotNull(homeAssistantUrl("192.168.1.20")), "test-token")
+internal val SAVED = HomeAssistantLink(checkNotNull(homeAssistantUrl("192.168.1.20")), "test-token", pin = null)

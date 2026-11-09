@@ -53,7 +53,7 @@ class HomeAssistantLinking internal constructor(
         if (typed.any { it !in '!'..'~' }) return CheckOutcome.Failed(TOKEN_CANT_BE_SENT)
         val secret = typed.ifEmpty { saved?.takeIf { it.baseUrl == base }?.token }
             ?: return CheckOutcome.Failed(PASTE_A_TOKEN)
-        val link = HomeAssistantLink(base, secret)
+        val link = HomeAssistantLink(base, secret, pin = null)
         try {
             ha.check(link)
         } catch (e: HomeAssistantException) {

@@ -20,10 +20,20 @@ class HomeAssistantAddressTest {
         assertThat(homeAssistantUrl("https://ha.example.com:443")!!.port).isEqualTo(443)
     }
 
-    /** Fails if an https address with no port isn't given 8123. */
+    /** Fails if an https address with no port isn't left on 443, https' own default port. */
     @Test
-    fun httpsWithNoPortGets8123() {
-        assertThat(homeAssistantUrl("https://ha.example.com").toString()).isEqualTo("https://ha.example.com:8123/")
+    fun httpsWithNoPortIs443() {
+        assertThat(homeAssistantUrl("https://ha.example.com").toString()).isEqualTo("https://ha.example.com/")
+        assertThat(homeAssistantUrl("https://ha.example.com")!!.port).isEqualTo(443)
+    }
+
+    /** Fails if the scheme is read case-sensitively, or an http address with no port isn't given 8123. */
+    @Test
+    fun theSchemeIsReadWhateverItsCase() {
+        listOf("HTTPS://h", "Https://H/", "https://h").forEach {
+            assertThat(homeAssistantUrl(it).toString()).isEqualTo("https://h/")
+        }
+        assertThat(homeAssistantUrl("HTTP://192.168.1.20").toString()).isEqualTo("http://192.168.1.20:8123/")
     }
 
     /** Fails if clear text may leave the home network, or any other scheme, path, query or user info is accepted. */

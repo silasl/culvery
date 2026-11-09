@@ -1,6 +1,8 @@
 package uk.co.siland.culvery.core.homeassistant
 
 import android.content.Context
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -21,8 +23,13 @@ import uk.co.siland.culvery.core.plugin.settingsDataStore
 class HomeAssistantSettingsTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val dir = File(ApplicationProvider.getApplicationContext<Context>().filesDir, "ha-settings-test").apply { mkdirs() }
-    private val settings = HomeAssistantSettings(settingsDataStore(scope) { File(dir, "homeassistant_settings.preferences_pb") })
+    private val store = settingsDataStore(scope) { File(dir, "homeassistant_settings.preferences_pb") }
+    private val settings = HomeAssistantSettings(store)
     private val url = homeAssistantUrl("192.168.1.20")!!
+    private val secureUrl = homeAssistantUrl("https://ha.example.com")!!
+    private val address = stringPreferencesKey("address")
+    private val token = stringPreferencesKey("token")
+    private val certificatePin = stringPreferencesKey("certificate_pin")
 
     @After
     fun tearDown() {
@@ -33,16 +40,16 @@ class HomeAssistantSettingsTest {
     /** Fails if a saved link doesn't come back equal. */
     @Test
     fun aSavedLinkComesBack() = runBlocking {
-        settings.save(HomeAssistantLink(url, "test-token"))
-        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(url, "test-token"))
+        settings.save(HomeAssistantLink(url, "test-token", pin = null))
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(url, "test-token", pin = null))
     }
 
     /** Fails if a new token for the same address doesn't replace the old one. */
     @Test
     fun aNewTokenReplacesTheOld() = runBlocking {
-        settings.save(HomeAssistantLink(url, "test-token"))
-        settings.save(HomeAssistantLink(url, "new-token"))
-        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(url, "new-token"))
+        settings.save(HomeAssistantLink(url, "test-token", pin = null))
+        settings.save(HomeAssistantLink(url, "new-token", pin = null))
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(url, "new-token", pin = null))
     }
 
     /** Fails if there is a link before one is saved. */
@@ -51,11 +58,79 @@ class HomeAssistantSettingsTest {
         assertThat(settings.link.first()).isNull()
     }
 
-    /** Fails if the link's text holds the address or the token. */
+    /** Fails if the link's text holds the address, the token or the pin. */
     @Test
-    fun theLinkNamesNeitherAddressNorToken() {
-        val text = HomeAssistantLink(url, "test-token").toString()
-        assertThat(text).doesNotContain("192.168")
+    fun theLinkNamesNeitherAddressNorTokenNorPin() {
+        val text = HomeAssistantLink(secureUrl, "test-token", "test-pin").toString()
+        assertThat(text).doesNotContain("ha.example")
         assertThat(text).doesNotContain("test-token")
+        assertThat(text).doesNotContain("test-pin")
+    }
+
+    /** Fails if a pin saved with the address and token isn't read back with them. */
+    @Test
+    fun thePinRoundTrips() = runBlocking {
+        settings.save(HomeAssistantLink(secureUrl, "test-token", "test-pin"))
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(secureUrl, "test-token", "test-pin"))
+        assertThat(settings.storedPin.first()).isEqualTo("test-pin")
+    }
+
+    /** Fails if saving a link without a pin leaves the earlier pin behind. */
+    @Test
+    fun savingWithoutAPinRemovesTheOldOne() = runBlocking {
+        settings.save(HomeAssistantLink(secureUrl, "test-token", "test-pin"))
+        settings.save(HomeAssistantLink(url, "test-token", pin = null))
+        assertThat(settings.storedPin.first()).isNull()
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(url, "test-token", pin = null))
+    }
+
+    /** Fails if an http address with a pin, as a hand edit could leave, reads as a link. */
+    @Test
+    fun httpWithAPinReadsAsNotLinked() = runBlocking {
+        store.edit {
+            it[address] = url.toString()
+            it[token] = "test-token"
+            it[certificatePin] = "test-pin"
+        }
+        assertThat(settings.link.first()).isNull()
+        assertThat(settings.storedPin.first()).isEqualTo("test-pin")
+    }
+
+    /** Fails if an http address saved with a pin is written. */
+    @Test
+    fun httpWithAPinCannotBeSaved() = runBlocking {
+        runCatching { settings.save(HomeAssistantLink(url, "test-token", "test-pin")) }
+            .also { assertThat(it.exceptionOrNull()).isInstanceOf(IllegalArgumentException::class.java) }
+        assertThat(settings.link.first()).isNull()
+    }
+
+    /** Fails if the stored pin is read through the link, so a record missing its address hides it. */
+    @Test
+    fun storedPinReadsTheKeyWhateverTheRest() = runBlocking {
+        store.edit { it[certificatePin] = "test-pin" }
+        assertThat(settings.storedPin.first()).isEqualTo("test-pin")
+        assertThat(settings.link.first()).isNull()
+    }
+
+    /** Fails if forgetting leaves the address, the token or the pin. */
+    @Test
+    fun forgetClearsAllThree() = runBlocking {
+        settings.save(HomeAssistantLink(secureUrl, "test-token", "test-pin"))
+        settings.forget()
+        assertThat(settings.link.first()).isNull()
+        assertThat(settings.storedPin.first()).isNull()
+        val kept = store.data.first()
+        assertThat(kept[address]).isNull()
+        assertThat(kept[token]).isNull()
+    }
+
+    /** Regression guard: a record with only an address and a token, as Plan 19 wrote it, still links, with no pin. */
+    @Test
+    fun aLinkSavedBeforePlan20StillLinks() = runBlocking {
+        store.edit {
+            it[address] = url.toString()
+            it[token] = "test-token"
+        }
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(url, "test-token", pin = null))
     }
 }

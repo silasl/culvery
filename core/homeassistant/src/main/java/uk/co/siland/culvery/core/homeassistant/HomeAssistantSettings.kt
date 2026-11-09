@@ -20,7 +20,7 @@ import uk.co.siland.culvery.core.plugin.settingsDataStore
 private const val FILE = "homeassistant_settings"
 private const val TAG = "HomeAssistantSettings"
 
-/** The saved [HomeAssistantLink] in a small DataStore file under `files/datastore/`, which backup and transfer already leave alone. Writes throw `IOException`. */
+/** The saved [HomeAssistantLink], pin included, in a small DataStore file under `files/datastore/`, which backup and transfer already leave alone. Writes throw `IOException`. */
 @Singleton
 class HomeAssistantSettings(private val store: DataStore<Preferences>) {
     @Inject
@@ -32,21 +32,42 @@ class HomeAssistantSettings(private val store: DataStore<Preferences>) {
         .map { it.toLink() }
         .distinctUntilChanged()
 
+    /** The pin as stored, whatever the rest of the record holds. */
+    val storedPin: Flow<String?> = store.data
+        .retryWithBackoff { Log.w(TAG, "Couldn't read the Home Assistant link (${it::class.simpleName}); retrying") }
+        .map { it[PIN] }
+        .distinctUntilChanged()
+
+    /** A pin goes only with an https address; saving one with http throws `IllegalArgumentException`. */
     suspend fun save(link: HomeAssistantLink) {
+        require(link.pin == null || link.baseUrl.isHttps) { "A pin needs an https address" }
         store.edit {
             it[ADDRESS] = link.baseUrl.toString()
             it[TOKEN] = link.token
+            if (link.pin == null) it.remove(PIN) else it[PIN] = link.pin
+        }
+    }
+
+    /** Removes the address, token and pin in one write. */
+    suspend fun forget() {
+        store.edit {
+            it.remove(ADDRESS)
+            it.remove(TOKEN)
+            it.remove(PIN)
         }
     }
 
     private fun Preferences.toLink(): HomeAssistantLink? {
         val url = this[ADDRESS]?.toHttpUrlOrNull() ?: return null
         val token = this[TOKEN] ?: return null
-        return HomeAssistantLink(url, token)
+        val pin = this[PIN]
+        if (pin != null && !url.isHttps) return null
+        return HomeAssistantLink(url, token, pin)
     }
 
     private companion object {
         val ADDRESS = stringPreferencesKey("address")
         val TOKEN = stringPreferencesKey("token")
+        val PIN = stringPreferencesKey("certificate_pin")
     }
 }

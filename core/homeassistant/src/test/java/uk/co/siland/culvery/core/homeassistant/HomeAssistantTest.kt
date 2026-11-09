@@ -110,7 +110,7 @@ class HomeAssistantTest {
         ha.read("vacuum.hoover")
         api.failNext = HaProblem.UNREACHABLE
         refusal { ha.read("vacuum.hoover") }
-        link.value = HomeAssistantLink(TEST_LINK.baseUrl, "new-token")
+        link.value = HomeAssistantLink(TEST_LINK.baseUrl, "new-token", pin = null)
         runCurrent()
         assertThat(ha.link.value).isEqualTo(link.value)
         assertThat(ha.entities.value).isEmpty()
@@ -456,7 +456,7 @@ class HomeAssistantTest {
         runCurrent()
         api.dropSocket(HaProblem.TOKEN_REFUSED)
         runCurrent()
-        ha.check(HomeAssistantLink(TEST_LINK.baseUrl, "new-token"))
+        ha.check(HomeAssistantLink(TEST_LINK.baseUrl, "new-token", pin = null))
         runCurrent()
         assertThat(ha.problem.value).isEqualTo(HaProblem.TOKEN_REFUSED)
         assertThat(api.follows).hasSize(1)

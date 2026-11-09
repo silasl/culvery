@@ -71,7 +71,7 @@ class HomeAssistantSocketTest {
             ),
         )
         server.start()
-        link = HomeAssistantLink(server.url("/"), "test-token")
+        link = HomeAssistantLink(server.url("/"), "test-token", pin = null)
         api = HomeAssistantClient(homeHttpClient(COMMAND_TIMEOUT_MS), { true }) { _, _ -> }
     }
 

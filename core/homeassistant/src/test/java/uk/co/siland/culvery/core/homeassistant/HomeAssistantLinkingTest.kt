@@ -47,7 +47,7 @@ class HomeAssistantLinkingTest {
         val linking = linking()
         assertThat(linking.check("192.168.1.20", "new-token")).isEqualTo(CheckOutcome.Linked)
         assertThat(access.asked).containsExactly(listOf("connections.manage"))
-        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(checkNotNull(homeAssistantUrl("192.168.1.20")), "new-token"))
+        assertThat(settings.link.first()).isEqualTo(HomeAssistantLink(checkNotNull(homeAssistantUrl("192.168.1.20")), "new-token", pin = null))
         assertThat(hoover.picks).containsExactly("vacuum.hoover")
         assertThat(thermostat.picks).containsExactly("climate.hall")
     }

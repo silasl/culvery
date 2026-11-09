@@ -33,7 +33,7 @@ class HomeAssistantClientTest {
     @Before
     fun setUp() {
         server.start()
-        link = HomeAssistantLink(server.url("/"), "test-token")
+        link = HomeAssistantLink(server.url("/"), "test-token", pin = null)
         api = HomeAssistantClient(homeHttpClient(COMMAND_TIMEOUT_MS), { true }) { what, text -> captured += what to text }
     }
 
@@ -183,7 +183,7 @@ class HomeAssistantClientTest {
     /** Fails if a token OkHttp can't put in a header crashes the call, or anything reaches the server. */
     @Test
     fun aTokenThatCantBeAHeaderIsAProblemNotACrash() = runBlocking<Unit> {
-        val odd = HomeAssistantLink(link.baseUrl, "abc\u200Bdef")
+        val odd = HomeAssistantLink(link.baseUrl, "abc\u200Bdef", pin = null)
         assertThat(problemOf { api.check(odd) }).isEqualTo(HaProblem.TOKEN_REFUSED)
         assertThat(problemOf { api.states(odd) }).isEqualTo(HaProblem.TOKEN_REFUSED)
         assertThat(server.requestCount).isEqualTo(0)
