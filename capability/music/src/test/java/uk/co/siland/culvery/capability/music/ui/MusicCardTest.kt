@@ -142,6 +142,14 @@ class MusicCardTest {
         compose.onNodeWithTag("music_card_shuffle").assertDoesNotExist()
     }
 
+    /** Regression guard: Shuffle everything sits in the card's row at its own width, not stretched across the card. */
+    @Test
+    fun shuffleEverythingKeepsItsOwnWidth() {
+        show(HomePick(group("k", "Kitchen", state = PlayState.PAUSED, nowPlaying = SONG), nothingPlaying = true))
+        val shuffle = compose.onNodeWithTag("music_card_shuffle").getUnclippedBoundsInRoot()
+        assertThat((shuffle.right - shuffle.left).value).isLessThan(rightHalfSize.width.value)
+    }
+
     /** 6 §4.3: Next greyed for a stream. */
     @Test
     fun nextIsGreyedForRadio() {

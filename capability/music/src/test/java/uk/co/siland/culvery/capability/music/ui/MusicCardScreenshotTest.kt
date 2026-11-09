@@ -68,7 +68,7 @@ class MusicCardScreenshotTest {
             CulveryTheme(dark = true) {
                 Column {
                     Box(Modifier.size(rightHalfSize)) { MusicCard(HomePick(kitchen.copy(state = PlayState.PAUSED), nothingPlaying = true), null, null, GroupActions.None) }
-                    Box(Modifier.wrapContentSize()) { ShuffleButton(kitchen, "free", ButtonSurface.Surf, GroupActions.None, compact = true) }
+                    Box(Modifier.wrapContentSize()) { ShuffleButton(kitchen, "free", ButtonSurface.Surf, GroupActions.None) }
                 }
             }
         }

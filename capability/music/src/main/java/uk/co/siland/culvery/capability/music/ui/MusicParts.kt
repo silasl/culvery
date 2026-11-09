@@ -88,9 +88,9 @@ internal fun NextButton(group: SpeakerGroup, tag: String, actions: GroupActions)
     )
 
 @Composable
-internal fun ShuffleButton(group: SpeakerGroup, tag: String, on: ButtonSurface, actions: GroupActions, compact: Boolean = false) = HhButton(
+internal fun ShuffleButton(group: SpeakerGroup, tag: String, on: ButtonSurface, actions: GroupActions) = HhButton(
     SHUFFLE_EVERYTHING, { actions.onShuffle(group) }, Modifier.testTag("${tag}_shuffle"),
-    icon = Icons.SHUFFLE, on = on, spokenName = shuffleSpoken(group.name), compact = compact,
+    icon = Icons.SHUFFLE, on = on, spokenName = shuffleSpoken(group.name),
 )
 
 /** Art, the group's name, and what it plays, read by TalkBack as one sentence (6 §5.5). */
