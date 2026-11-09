@@ -93,5 +93,15 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
+/** v10 (Plan 20): the creates Undo removed while they might still land. The SQL must match schemas/…/10.json exactly. */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `undone_creates` (`clientKey` TEXT NOT NULL, `connectionId` TEXT NOT NULL, " +
+                "`sourceId` TEXT NOT NULL, `series` INTEGER NOT NULL, `stray` INTEGER NOT NULL, PRIMARY KEY(`clientKey`))",
+        )
+    }
+}
+
 /** Every migration, oldest first: the database builder and the tests add these. */
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)

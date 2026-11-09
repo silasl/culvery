@@ -23,6 +23,7 @@ import uk.co.siland.culvery.capability.calendar.HouseholdFollower
 import uk.co.siland.culvery.capability.calendar.StoredSeries
 import uk.co.siland.culvery.capability.calendar.db.ALL_MIGRATIONS
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.capability.calendar.db.UndoneCreateDao
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.house.MultiDayEvents
 import uk.co.siland.culvery.core.house.TodaysBirthdays
@@ -75,5 +76,8 @@ abstract class CalendarModule {
             Room.databaseBuilder(context, CalendarDatabase::class.java, "calendar.db")
                 .addMigrations(*ALL_MIGRATIONS)
                 .build()
+
+        @Provides
+        fun undoneCreates(db: CalendarDatabase): UndoneCreateDao = db.undoneCreateDao()
     }
 }

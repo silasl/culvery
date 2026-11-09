@@ -72,6 +72,7 @@ class CalendarSync internal constructor(
      * fails the pass, and the loop logs it and tries again.
      */
     suspend fun syncAll() = passLock.withLock {
+        undone.load()
         val window = currentWindow()
         val connections = store.connectionsNow()
         try {
@@ -413,9 +414,20 @@ class CalendarSync internal constructor(
         val read = DateRange(window.start, window.endExclusive.plusDays(SYNC_AHEAD_DAYS), window.zone)
         val result = callReader(io, timeoutMillis) { provider.sync(conn, source, read, cursor) }
             .getOrElse { return healthAfter(it, conn, source.id) }
-        store.applySync(conn.id, source.id, read, result, todayIn(window.zone))
+        store.applySync(conn.id, source.id, read, withoutStrays(result), todayIn(window.zone))
         store.prune(conn.id, source.id, window)
         return ConnectionHealth.Ok
+    }
+
+    /**
+     * [result] without the undone creates waiting to be deleted, or any instance of one that is a series (20 §4.3), so
+     * none is shown or remembered.
+     */
+    private fun withoutStrays(result: SyncResult): SyncResult {
+        val strays = undone.strayCreates.keys
+        if (strays.isEmpty()) return result
+        val (left, kept) = result.upserts.partition { e -> strays.any { e.remoteId == it || e.seriesId == it || e.remoteId.startsWith("${it}_") } }
+        return if (left.isEmpty()) result else result.copy(upserts = kept, removedIds = result.removedIds + left.map { it.remoteId })
     }
 
     /**

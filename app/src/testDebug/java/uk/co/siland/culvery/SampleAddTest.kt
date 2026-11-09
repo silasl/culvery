@@ -113,7 +113,7 @@ class SampleAddTest {
             FakeUserActivity(),
         )
         val lock = CalendarWriteLock()
-        val undone = UndoneKeys()
+        val undone = UndoneKeys(calendarDb.undoneCreateDao())
         val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock, SourceRefresher(store, household, clock, toasts), undone)
         val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake), CalendarSettings(ApplicationProvider.getApplicationContext(), backgroundScope), BinColours(ApplicationProvider.getApplicationContext(), backgroundScope))
         val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, FirstDraw().also { it.markDrawn() }, backgroundScope), lock, household, setOf(fake), undone, repo, UpdateRequests())

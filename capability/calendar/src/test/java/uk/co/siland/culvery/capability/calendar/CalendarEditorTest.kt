@@ -58,7 +58,7 @@ class CalendarEditorTest {
     private val writer = ScriptedWriter("calendar.a")
     private var syncRequests = 0
     private val lock = CalendarWriteLock()
-    private val undone = UndoneKeys()
+    private val undone = UndoneKeys(InMemoryUndoneCreates())
 
     @Before
     fun setUp() = runTest {

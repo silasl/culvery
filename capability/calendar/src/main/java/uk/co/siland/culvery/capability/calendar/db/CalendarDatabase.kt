@@ -140,6 +140,19 @@ data class OutboxEntity(
     val fields: String? = null,
 )
 
+/**
+ * v10 (Plan 20, §4.3): a create Undo removed while it might still land, so a restart doesn't forget it. [stray]: it
+ * may have landed and is waiting to be deleted.
+ */
+@Entity(tableName = "undone_creates")
+data class UndoneCreateEntity(
+    @PrimaryKey val clientKey: String,
+    val connectionId: String,
+    val sourceId: String,
+    val series: Boolean,
+    val stray: Boolean,
+)
+
 data class EventRow(
     @Embedded val event: EventEntity,
     val sourcePersonId: String,
@@ -461,14 +474,28 @@ interface CalendarDao {
  * every version bump ships a Migration (see Migrations.kt) with a MigrationTestHelper test, never a destructive
  * fallback. The schema JSON under schemas/ is committed.
  */
+@Dao
+interface UndoneCreateDao {
+    @Query("SELECT * FROM undone_creates")
+    suspend fun all(): List<UndoneCreateEntity>
+
+    @Upsert
+    suspend fun upsert(e: UndoneCreateEntity)
+
+    @Query("DELETE FROM undone_creates WHERE clientKey = :key")
+    suspend fun delete(key: String)
+}
+
 @Database(
     entities = [
         ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class,
-        RememberedTitleEntity::class,
+        RememberedTitleEntity::class, UndoneCreateEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class CalendarDatabase : RoomDatabase() {
     abstract fun calendarDao(): CalendarDao
+
+    abstract fun undoneCreateDao(): UndoneCreateDao
 }

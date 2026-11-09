@@ -82,7 +82,7 @@ class SampleRollbackTest {
         ) {}.create()
         val sync = CalendarSync(
             store, setOf(fake), setOf(fake), toasts, zone, WallClock { System.currentTimeMillis() }, CalendarWriteLock(),
-            SourceRefresher(store, household, WallClock { System.currentTimeMillis() }, toasts), UndoneKeys(),
+            SourceRefresher(store, household, WallClock { System.currentTimeMillis() }, toasts), UndoneKeys(calendarDb.undoneCreateDao()),
         )
         val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake), CalendarSettings(ApplicationProvider.getApplicationContext(), backgroundScope), BinColours(ApplicationProvider.getApplicationContext(), backgroundScope))
         sync.syncAll()

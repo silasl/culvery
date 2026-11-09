@@ -36,6 +36,7 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDao
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.EventEntity
 import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
+import uk.co.siland.culvery.capability.calendar.db.UndoneCreateEntity
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
@@ -87,7 +88,7 @@ class CalendarSyncTest {
         timeoutMillis: Long = 1_000,
         lock: CalendarWriteLock = CalendarWriteLock(),
         store: CalendarStore = this.store,
-        undone: UndoneKeys = UndoneKeys(),
+        undone: UndoneKeys = UndoneKeys(InMemoryUndoneCreates()),
         clock: WallClock = this.clock,
     ): CalendarSync {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
@@ -1169,7 +1170,7 @@ class CalendarSyncTest {
     }
 
     // Undo against the drain's create (20 §4.3). Writes run on real threads, as the app's do, with the app's timeout.
-    private val undone = UndoneKeys()
+    private val undone by lazy { UndoneKeys(calendar.undoneCreateDao()) }
     private val writeLock = CalendarWriteLock()
     private val swimRef = EventRef("c1", "s1", key)
 
@@ -1360,6 +1361,59 @@ class CalendarSyncTest {
         assertThat(w.calls.count { it == "delete:$key" }).isEqualTo(1)
         assertThat(store.eventNow(swimRef)).isNull()
         assertThat(toaster.messages).isEmpty()
+    }
+
+    @Test
+    fun aStoredStraySurvivesARestartAndIsDeletedOnTheNextPass() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        queueSwimCreate()
+        val pass = passSendingTheCreate(undoingEngine())
+        assertThat(editor.undoAdd(added(access))).isEqualTo(EditResult.Done)
+        // No reply, so it may have landed.
+        w.failWith = UnreachableException("connection reset")
+        w.createGate?.complete(Unit)
+        pass.join()
+        assertThat(undone.strayCreates.keys).containsExactly(key)
+
+        // A restart reads what Undo left from the database.
+        w.failWith = null
+        val restarted = UndoneKeys(calendar.undoneCreateDao())
+        engineWith(setOf(w), toaster, undone = restarted).syncAll()
+        // It never landed: the service answers that it's gone, which counts as done.
+        assertThat(w.created).doesNotContainKey(key)
+        assertThat(w.calls.count { it == "delete:$key" }).isEqualTo(2)
+        assertThat(restarted.strayCreates).isEmpty()
+        assertThat(calendar.undoneCreateDao().all()).isEmpty()
+    }
+
+    @Test
+    fun aStrayIsNotShownBySync() = runTest {
+        connect("c1", "calendar.a", s1)
+        calendar.undoneCreateDao().upsert(UndoneCreateEntity(key, "c1", "s1", series = false, stray = true))
+        a.events = { listOf(swim(), at("2026-09-23T17:00:00Z", "Piano").copy(remoteId = key)) }
+        // Its delete can't get through, so it's still waiting.
+        w.failWith = UnreachableException("offline")
+        engineWith(setOf(w), toaster, undone = UndoneKeys(calendar.undoneCreateDao())).syncAll()
+        assertThat(cachedTitles()).containsExactly("Swim")
+    }
+
+    @Test
+    fun aStraySeriesInstancesAreNotShown() = runTest {
+        now = Instant.parse("2026-12-30T11:00:00Z")
+        connect("c1", "calendar.a", s1)
+        calendar.undoneCreateDao().upsert(UndoneCreateEntity(key, "c1", "s1", series = true, stray = true))
+        a.events = {
+            listOf(
+                at("2027-01-01T09:00:00Z", "Piano").copy(remoteId = "${key}_20270101T090000Z", recurring = true),
+                at("2027-01-02T10:00:00Z", "Piano").copy(remoteId = "moved", recurring = true, seriesId = key),
+                at("2027-01-01T15:00:00Z", "Swim"),
+            )
+        }
+        w.failWith = UnreachableException("offline")
+        engineWith(setOf(w), toaster, undone = UndoneKeys(calendar.undoneCreateDao())).syncAll()
+        assertThat(store.eventsBetween(Long.MIN_VALUE, Long.MAX_VALUE).first().map { it.remoteId }).containsExactly("swim")
     }
 
     private companion object {

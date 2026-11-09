@@ -28,6 +28,7 @@ import uk.co.siland.culvery.capability.calendar.db.MIGRATION_5_6
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_6_7
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_7_8
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_8_9
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_9_10
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -493,6 +494,68 @@ class CalendarMigrationTest {
             assertThat(scalar(v9, "SELECT length(bins) FROM event WHERE remoteId = 'piano_1'")).isEqualTo("10")
         } finally {
             v9.close()
+        }
+    }
+
+    /** v10 (20 §4.3): the undone creates' table, empty, with everything a version 9 database held kept. */
+    @Test
+    fun migrate9To10() = runTest {
+        file.parentFile?.mkdirs()
+        file.delete()
+
+        val v9 = helper.createDatabase(9)
+        v9.execSQL(
+            "INSERT INTO connection (id, providerId, label, configJson, health, healthMessage, lastSyncMillis, sourcesCheckedMillis, " +
+                "needsSignInSinceMillis) VALUES ('c1', 'calendar.test', 'Google', '{}', 'OK', NULL, 1234, 1000, NULL)",
+        )
+        v9.execSQL(
+            "INSERT INTO source (connectionId, sourceId, name, writable, visible, personId, isMaster, shownInService, readProblem) " +
+                "VALUES ('c1', 's1', 'Family', 1, 1, 'family', 1, 1, NULL)",
+        )
+        v9.execSQL(
+            "INSERT INTO event (connectionId, sourceId, remoteId, title, startInstant, startDate, endInstant, endDate, " +
+                "recurring, forPerson, createdBy, startSort, endSort, recurrenceRule, seriesId, bins) " +
+                "VALUES ('c1', 's1', 'piano_1', 'Piano', 1000, NULL, 2000, NULL, 1, 'alex-id', 'sam-id', 1000, 2000, 'RRULE:FREQ=WEEKLY', 'piano', NULL)",
+        )
+        v9.execSQL(
+            "INSERT INTO outbox (connectionId, sourceId, remoteId, kind, draftJson, attempts, nextAttemptMillis, createdMillis, clientKey, fields) " +
+                "VALUES ('c1', 's1', 'e1', 'UPDATE', '$DRAFT_JSON', 2, 5000, 4000, NULL, 'TITLE')",
+        )
+        v9.close()
+
+        val v10 = helper.runMigrationsAndValidate(10, listOf(MIGRATION_9_10))
+        try {
+            assertThat(tableNames(v10)).contains("undone_creates")
+            assertThat(columnNames(v10, "undone_creates")).containsExactly("clientKey", "connectionId", "sourceId", "series", "stray")
+            assertThat(scalar(v10, "SELECT COUNT(*) FROM undone_creates")).isEqualTo("0")
+        } finally {
+            v10.close()
+        }
+
+        val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
+            .addMigrations(*ALL_MIGRATIONS)
+            .setDriver(AndroidSQLiteDriver())
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val store = CalendarStore(db)
+            assertThat(store.connectionsNow().single().lastSyncMillis).isEqualTo(1234L)
+            assertThat(store.eventNow(EventRef("c1", "s1", "piano_1"))!!.title).isEqualTo("Piano")
+            assertThat(store.pendingNow().single().let { it.kind to it.remoteId }).isEqualTo(ChangeKind.UPDATE to "e1")
+            assertThat(db.undoneCreateDao().all()).isEmpty()
+        } finally {
+            db.close()
+        }
+    }
+
+    private fun columnNames(connection: SQLiteConnection, table: String): List<String> {
+        val statement = connection.prepare("SELECT name FROM pragma_table_info('$table')")
+        try {
+            val names = mutableListOf<String>()
+            while (statement.step()) names += statement.getText(0)
+            return names
+        } finally {
+            statement.close()
         }
     }
 
