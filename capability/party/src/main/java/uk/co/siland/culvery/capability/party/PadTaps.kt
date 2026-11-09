@@ -10,19 +10,31 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.sound.PREVIEW_PAD
+import uk.co.siland.culvery.core.sound.PadStart
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundPlayer
 
 private const val COULDNT_PLAY_MS = 4_000L
+
+/** What the pads know of the gate: nothing before its first read, then why they are blocked, if they are. */
+sealed interface GateState {
+    val block: PadBlock?
+    val read: Boolean get() = this is Read
+
+    data object Unread : GateState {
+        override val block: PadBlock? = null
+    }
+
+    data class Read(override val block: PadBlock?) : GateState
+}
 
 /**
  * What a pad's tap does (18 §4.4) and the line under the pads' row (Ruling 6): the first pad shown carries the reason the
@@ -30,7 +42,7 @@ private const val COULDNT_PLAY_MS = 4_000L
  */
 @Singleton
 class PadTaps internal constructor(
-    private val play: suspend (pad: Int, sound: Sound, volume: Float) -> Boolean,
+    private val play: suspend (pad: Int, sound: Sound, volume: Float) -> PadStart,
     private val stop: () -> Unit,
     /** The pad playing, or null. */
     val playing: StateFlow<Int?>,
@@ -42,11 +54,8 @@ class PadTaps internal constructor(
     constructor(player: SoundPlayer, gate: PadGate, door: Optional<DoorQuiet>, @ApplicationScope scope: CoroutineScope) :
         this(player::playPad, player::stopPads, player.padPlaying, gate, { door.map { it.volume }.orElse(1f) }, scope)
 
-    /** False until the gate has been read once. */
-    private val read = MutableStateFlow(false)
-    val gateRead: StateFlow<Boolean> = read.asStateFlow()
-
-    val blocked: StateFlow<PadBlock?> = gate.blocked.onEach { read.value = true }.stateIn(scope, SharingStarted.Eagerly, null)
+    /** [GateState.Unread] until the gate's first read; the pads' blocked and faded looks both come from this one value. */
+    val gateState: StateFlow<GateState> = gate.blocked.map<PadBlock?, GateState> { GateState.Read(it) }.stateIn(scope, SharingStarted.Eagerly, GateState.Unread)
 
     private val previewed = MutableStateFlow<String?>(null)
 
@@ -71,18 +80,18 @@ class PadTaps internal constructor(
         val volume = volume()
         opening = pad.pad
         var stopped = false
-        val started = try {
+        val result = try {
             play(pad.pad, pad.sound, volume)
         } finally {
             stopped = opening != pad.pad
             if (!stopped) opening = null
         }
         // A tap that stopped the opening, or a ring that arrived meanwhile, is not a failure.
-        if (!started && !stopped && gate.blockedNow() != PadBlock.DOORBELL) failedNow(pad.pad)
+        if (result == PadStart.FAILED && !stopped && gate.blockedNow() != PadBlock.DOORBELL) failedNow(pad.pad)
     }
 
-    /** Plays [sound] for Settings at the doorbell's volume, whatever the time or mode. False when it didn't start. */
-    suspend fun preview(sound: Sound): Boolean {
+    /** Plays [sound] for Settings at the doorbell's volume, whatever the time or mode; says whether it started. */
+    suspend fun preview(sound: Sound): PadStart {
         val volume = volume()
         previewed.value = sound.id
         return play(PREVIEW_PAD, sound, volume)
@@ -107,11 +116,11 @@ class PadTaps internal constructor(
     }
 
     /** The line under [pad]; the [first] pad shown carries the block. */
-    fun line(pad: Int, first: Boolean): Flow<String?> = combine(failed, blocked, read) { failedPad, block, gateRead ->
+    fun line(pad: Int, first: Boolean): Flow<String?> = combine(failed, gateState) { failedPad, gate ->
         when {
-            !gateRead -> null
+            !gate.read -> null
             failedPad == pad -> ModesWords.COULDNT_PLAY
-            first -> block?.line
+            first -> gate.block?.line
             else -> null
         }
     }

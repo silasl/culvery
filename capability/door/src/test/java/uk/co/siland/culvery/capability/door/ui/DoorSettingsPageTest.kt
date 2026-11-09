@@ -64,6 +64,8 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.DOORBELL_PLAYING
+import uk.co.siland.culvery.core.sound.PadStart
 import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.sound.asSound
 import uk.co.siland.culvery.core.sound.couldntPlay
@@ -268,6 +270,32 @@ class DoorSettingsPageTest {
         compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
         waitFor { toaster.messages.size == 2 }
         assertThat(toaster.messages.last()).isEqualTo(couldntPlay(BuiltInSound.ORGAN.asSound()))
+    }
+
+    /** Fails if two quick taps on a sound, the first stopped by the second, show a toast. */
+    @Test
+    fun twoQuickTapsShowNoToast() {
+        chime.outcomes += listOf(PadStart.STOPPED, PadStart.STARTED)
+        showHost()
+
+        compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
+        compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
+        waitFor { chime.previews.size == 2 }
+        compose.waitForIdle()
+
+        assertThat(toaster.messages).isEmpty()
+    }
+
+    /** Fails if a preview tapped while the chime plays doesn't say so. */
+    @Test
+    fun aPreviewDuringThePlayedChimeSaysSo() {
+        showHost()
+        compose.onNodeWithTag("door_play_chime").performClick()
+        waitFor { chime.plays.isNotEmpty() }
+        compose.onNodeWithTag("door_doorbell_builtin:organ").performClick()
+        waitFor { toaster.messages.isNotEmpty() }
+
+        assertThat(toaster.messages.single()).isEqualTo(DOORBELL_PLAYING)
     }
 
     /** Fails if Play chime stops playing what a ring would on a birthday under Follow the theme. */

@@ -42,6 +42,8 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.DOORBELL_PLAYING
+import uk.co.siland.culvery.core.sound.PadStart
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundSource
 import uk.co.siland.culvery.core.sound.SAD_TROMBONE_ID
@@ -107,6 +109,33 @@ class SoundButtonsSectionTest {
         compose.onNodeWithTag("sound_choice_${HONK.id}").performClick()
         compose.waitFor { toaster.shown.size == 2 }
         assertThat(toaster.shown.last()).isEqualTo(couldntPlay(HONK))
+    }
+
+    /** Fails if two quick taps, the first stopped by the second, show a toast. */
+    @Test
+    fun twoQuickTapsShowNoToast() {
+        player.outcomes += listOf(PadStart.STOPPED, PadStart.STARTED)
+        show(TROMBONE.id, ORGAN.id, null)
+
+        compose.onNodeWithTag("sound_pad_1_play").performClick()
+        compose.onNodeWithTag("sound_pad_1_play").performClick()
+        compose.waitFor { player.plays.size == 2 }
+        compose.waitForIdle()
+
+        assertThat(toaster.shown).isEmpty()
+    }
+
+    /** Fails if a Play refused while the doorbell sounds doesn't say so. */
+    @Test
+    fun aPlayDuringTheDoorbellSaysSo() {
+        player.starts = false
+        player.refusal = PadStart.DOORBELL
+        show(TROMBONE.id, ORGAN.id, null)
+
+        compose.onNodeWithTag("sound_pad_1_play").performClick()
+        compose.waitFor { toaster.shown.isNotEmpty() }
+
+        assertThat(toaster.shown.single()).isEqualTo(DOORBELL_PLAYING)
     }
 
     /** Fails if a pad's row doesn't name its sound or None, hide Play for None, or the birthday note is missing. */

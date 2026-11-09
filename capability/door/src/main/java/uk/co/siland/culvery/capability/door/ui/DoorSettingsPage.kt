@@ -67,6 +67,7 @@ import uk.co.siland.culvery.core.sound.NOT_ON_THIS_TABLET
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.sound.couldntPlay
+import uk.co.siland.culvery.core.sound.sayWhyNotPlayed
 import uk.co.siland.culvery.core.sound.soundFor
 import uk.co.siland.culvery.core.sound.soundNameFromId
 import uk.co.siland.culvery.core.sound.tabletLine
@@ -286,7 +287,7 @@ internal fun DoorSettingsHost(
                 if (previewing == sound.id) {
                     chime.stopPreview()
                 } else {
-                    scope.launch { if (!chime.preview(sound, p.volume)) toaster.show(couldntPlay(sound), urgent = true) }
+                    scope.launch { toaster.sayWhyNotPlayed(sound, chime.preview(sound, p.volume)) }
                 }
             },
             onPlayChime = {

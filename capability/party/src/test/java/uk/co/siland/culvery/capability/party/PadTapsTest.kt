@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import uk.co.siland.culvery.core.sound.PadStart
 
 /** 18 §4.4, Ruling 6: what a tap plays, and each pad's line under the row. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -90,20 +91,36 @@ class PadTapsTest {
         assertThat(player.plays).isEmpty()
     }
 
-    /** Ruling 6: fails if the pads look playable, or carry a line, before the gate's first read. */
+    /** Ruling 6: fails if a pad shows any line, even a failed play's, before the gate's first read. */
     @Test
     fun padsAreFadedWithNoLineUntilTheGateIsRead() = runTest {
         val rig = GateRig()
-        rig.night = true
         val taps = taps(rig)
+        player.starts = false
+        taps.tap(pad2)
 
-        assertThat(taps.gateRead.value).isFalse()
-        assertThat(taps.line(1, first = true).first()).isNull()
+        assertThat(taps.gateState.value).isEqualTo(GateState.Unread)
+        assertThat(taps.line(2, first = false).first()).isNull()
 
+        rig.night = true
         runCurrent()
 
-        assertThat(taps.gateRead.value).isTrue()
+        assertThat(taps.gateState.value).isEqualTo(GateState.Read(PadBlock.NIGHT))
         assertThat(taps.line(1, first = true).first()).isEqualTo("Night")
+        assertThat(taps.line(2, first = false).first()).isEqualTo("Couldn’t play")
+    }
+
+    /** Fails if a refusal for the doorbell, or a stop, shows "Couldn’t play". */
+    @Test
+    fun onlyAFailedPlayShowsCouldntPlay() = runTest {
+        val taps = taps()
+        runCurrent()
+        player.outcomes += listOf(PadStart.DOORBELL, PadStart.STOPPED)
+
+        taps.tap(pad2)
+        taps.tap(pad2)
+
+        assertThat(taps.line(2, first = false).first()).isNull()
     }
 
     /** Ruling 6: fails if a pad but the first shown carries the block, or the first doesn't. */
@@ -124,7 +141,7 @@ class PadTapsTest {
         val taps = taps()
         val release = CompletableDeferred<Unit>()
         player.starts = false
-        player.whilePlaying = { release.await() }
+        player.whilePlaying = { if (player.plays.size == 1) release.await() }
 
         val first = launch { taps.tap(pad2) }
         runCurrent()
@@ -133,6 +150,7 @@ class PadTapsTest {
         first.join()
         runCurrent()
 
+        assertThat(taps.gateState.value.read).isTrue()
         assertThat(player.stops).isEqualTo(1)
         assertThat(player.plays).hasSize(1)
         assertThat(taps.line(2, first = false).first()).isNull()

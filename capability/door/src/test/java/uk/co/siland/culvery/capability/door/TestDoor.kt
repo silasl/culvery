@@ -21,6 +21,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.AlertHost
+import uk.co.siland.culvery.core.sound.PadStart
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
 import uk.co.siland.culvery.core.ui.SeasonalTheme
@@ -110,8 +111,16 @@ internal class FakeChime : Chime {
     /** What [play] reports: false for a chime that couldn't start. */
     var starts = true
 
+    /** True once [play] has started a sound; a preview is then refused as the doorbell's. */
+    var doorbellPlaying = false
+
+    /** What [preview] says when it doesn't start, and the results to give the next previews, in order. */
+    var refusal = PadStart.FAILED
+    val outcomes = ArrayDeque<PadStart>()
+
     override suspend fun play(sound: Sound, volume: Float): Boolean {
         plays += sound.id to volume
+        if (starts) doorbellPlaying = true
         return starts
     }
 
@@ -120,10 +129,12 @@ internal class FakeChime : Chime {
         onHush()
     }
 
-    override suspend fun preview(sound: Sound, volume: Float): Boolean {
+    override suspend fun preview(sound: Sound, volume: Float): PadStart {
         previews += sound.id to volume
-        previewing.value = sound.id
-        return starts
+        if (doorbellPlaying) return PadStart.DOORBELL
+        val result = outcomes.removeFirstOrNull() ?: if (starts) PadStart.STARTED else refusal
+        if (result == PadStart.STARTED) previewing.value = sound.id
+        return result
     }
 
     override fun stopPreview() {

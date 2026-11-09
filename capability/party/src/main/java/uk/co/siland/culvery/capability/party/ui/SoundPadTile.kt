@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -22,13 +23,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.party.ModesWords
 import uk.co.siland.culvery.capability.party.PadTaps
 import uk.co.siland.culvery.capability.party.PadUi
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HouseModeDimens
 import uk.co.siland.culvery.core.ui.HouseModeThirdTile
-import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "SoundPadTile"
 private const val PULSE_MS = 450
@@ -90,8 +92,17 @@ private fun SoundWaves(color: Color, pulsing: Boolean) {
 @Composable
 fun SoundPadTileHost(pad: PadUi, taps: PadTaps) {
     val playing by taps.playing.collectAsState()
-    val blocked by taps.blocked.collectAsState()
-    val gateRead by taps.gateRead.collectAsState()
-    val action = rememberSingleAction(taps) { e -> Log.w(TAG, "A sound pad's tap failed: ${e::class.simpleName}") }
-    SoundPadTile(pad, playing == pad.pad, blocked != null, gateRead) { action.run { taps.tap(pad) } }
+    val gate by taps.gateState.collectAsState()
+    val scope = rememberCoroutineScope()
+    SoundPadTile(pad, playing == pad.pad, gate.block != null, gate.read) {
+        scope.launch {
+            try {
+                taps.tap(pad)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "A sound pad's tap failed: ${e::class.simpleName}")
+            }
+        }
+    }
 }

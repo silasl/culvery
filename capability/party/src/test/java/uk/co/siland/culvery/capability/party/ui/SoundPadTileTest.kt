@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -107,6 +108,25 @@ class SoundPadTileTest {
         assertThat(player.stops).isEqualTo(1)
         compose.assertNothingReadTwice()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the tile swallows a second tap while the first is still opening, so it can't stop the pad. */
+    @Test
+    fun aSecondTapOnAnOpeningPadReachesTheTaps() {
+        val release = CompletableDeferred<Unit>()
+        player.whilePlaying = { if (player.plays.size == 1) release.await() }
+        host(GateRig())
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("sound_pad_2").performClick()
+        compose.waitFor { player.plays.size == 1 }
+        compose.onNodeWithTag("sound_pad_2").performClick()
+        compose.waitFor { player.stops == 1 }
+        release.complete(Unit)
+        compose.waitForIdle()
+
+        assertThat(player.plays).hasSize(1)
+        assertThat(player.stops).isEqualTo(1)
     }
 
     /** 18 §7: fails if a greyed pad can be tapped or plays. */

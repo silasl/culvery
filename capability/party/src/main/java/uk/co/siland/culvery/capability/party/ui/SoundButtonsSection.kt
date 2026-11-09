@@ -31,7 +31,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.sound.Sound
-import uk.co.siland.culvery.core.sound.couldntPlay
+import uk.co.siland.culvery.core.sound.sayWhyNotPlayed
 import uk.co.siland.culvery.core.sound.soundFor
 import uk.co.siland.culvery.core.sound.soundNameFromId
 import uk.co.siland.culvery.core.sound.tabletLine
@@ -104,7 +104,7 @@ internal fun SoundButtonsSection(sounds: SoundButtons, toaster: Toaster) {
             trailing = {
                 if (sound != null) {
                     HhButton(
-                        ModesWords.PLAY_SOUND, { scope.launch { if (!sounds.taps.preview(sound)) toaster.show(couldntPlay(sound), urgent = true) } }, Modifier.testTag("sound_pad_${pad}_play"),
+                        ModesWords.PLAY_SOUND, { scope.launch { toaster.sayWhyNotPlayed(sound, sounds.taps.preview(sound)) } }, Modifier.testTag("sound_pad_${pad}_play"),
                         icon = Icons.PLAY_ARROW, on = ButtonSurface.Surf, spokenName = ModesWords.playSpoken(pad),
                     )
                 }
@@ -153,7 +153,7 @@ private fun SoundSheet(pad: Int, sounds: List<Sound>, chosenId: String?, buttons
                 items(sounds, key = { it.id }) { sound ->
                     HhSoundRow(
                         sound.name, sound.tabletLine, previewing == sound.id, chosenId == sound.id, "sound_choice_${sound.id}",
-                        onPlay = { if (previewing == sound.id) buttons.taps.stopPreview() else scope.launch { if (!buttons.taps.preview(sound)) toaster.show(couldntPlay(sound), urgent = true) } },
+                        onPlay = { if (previewing == sound.id) buttons.taps.stopPreview() else scope.launch { toaster.sayWhyNotPlayed(sound, buttons.taps.preview(sound)) } },
                         onChoose = { onPick(sound) },
                     )
                 }

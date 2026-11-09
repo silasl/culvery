@@ -50,7 +50,7 @@ class HouseModeTileTest {
         compose.mainClock.advanceTimeBy(PRESS_FLASH_MS - 50)
         assertThat(fill()).isEqualTo(DarkColors.accentSoft.toArgb())
 
-        compose.mainClock.advanceTimeBy(PRESS_FLASH_MS)
+        compose.mainClock.advanceTimeBy(50)
         settle()
         assertThat(fill()).isEqualTo(DarkColors.surf2.toArgb())
     }

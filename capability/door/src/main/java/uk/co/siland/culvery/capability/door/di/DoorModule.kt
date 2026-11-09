@@ -26,6 +26,7 @@ import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.sound.PREVIEW_PAD
+import uk.co.siland.culvery.core.sound.PadStart
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundPlayer
 
@@ -63,7 +64,7 @@ abstract class DoorModule {
 
             override val previewing = player.previewing
 
-            override suspend fun preview(sound: Sound, volume: Float) = player.playPad(PREVIEW_PAD, sound, volume, SoundPlayer.DOORBELL_CAP_MS)
+            override suspend fun preview(sound: Sound, volume: Float): PadStart = player.playPad(PREVIEW_PAD, sound, volume, SoundPlayer.DOORBELL_CAP_MS)
 
             override fun stopPreview() = player.stopPads()
         }

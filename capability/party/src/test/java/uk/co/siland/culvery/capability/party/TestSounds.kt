@@ -8,6 +8,7 @@ import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.sound.BuiltInSound
+import uk.co.siland.culvery.core.sound.PadStart
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundSource
 import uk.co.siland.culvery.core.sound.asSound
@@ -50,14 +51,21 @@ internal class FakePlayer {
     @Volatile var stops = 0
     var starts = true
 
+    /** What [play] says when it doesn't start. */
+    var refusal = PadStart.FAILED
+
+    /** Results to give the next plays, in order, before [starts] and [refusal] decide. */
+    val outcomes = ArrayDeque<PadStart>()
+
     /** Runs as a play begins, as a ring arriving while the sound opens would. */
     var whilePlaying: suspend () -> Unit = {}
 
-    suspend fun play(pad: Int, sound: Sound, volume: Float): Boolean {
+    suspend fun play(pad: Int, sound: Sound, volume: Float): PadStart {
         plays += pad to volume
         whilePlaying()
-        if (starts) playing.value = pad
-        return starts
+        val result = outcomes.removeFirstOrNull() ?: if (starts) PadStart.STARTED else refusal
+        if (result == PadStart.STARTED) playing.value = pad
+        return result
     }
 
     fun stop() {
