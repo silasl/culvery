@@ -197,6 +197,7 @@ class DisplayWiringTest {
         var pins = 0
         val prompt = CameraPrompt(
             access,
+            mayUnpin = { true },
             openSystemScreen = { line, launch ->
                 missing += line
                 launch()
