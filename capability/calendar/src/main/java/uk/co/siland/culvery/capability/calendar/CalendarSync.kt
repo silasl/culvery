@@ -123,7 +123,10 @@ class CalendarSync internal constructor(
             val count = if (change.kind == ChangeKind.CREATE && ref != null) {
                 droppedCreates += ref
                 // Under the editor's lock: an edit being queued behind this create goes with it, or finds it gone.
-                writeLock.withLock { store.dropCreate(ref) }
+                val went = writeLock.withLock { store.dropCreate(ref) }
+                // Undo got there first and has spoken.
+                if (went == 0) return
+                went
             } else {
                 store.dropChange(change.id)
                 1
@@ -172,7 +175,7 @@ class CalendarSync internal constructor(
                     drop(change, label, null)
                     continue
                 }
-                val outcome = if (aged) {
+                val sent = if (aged) {
                     // C9: its reply may have been lost after the provider made it; ask before dropping it.
                     val found = callWriter(io, timeoutMillis) { writer.find(stored.connection, source.source, checkNotNull(change.clientKey)) }
                     if (found is WriteOutcome.Accepted && found.event == null) {
@@ -180,16 +183,13 @@ class CalendarSync internal constructor(
                         drop(change, label, null)
                         continue
                     }
-                    if (found is WriteOutcome.Accepted) complete(change, stored.connection, source.source, found, zone) else found
+                    Sent(if (found is WriteOutcome.Accepted) complete(change, stored.connection, source.source, found, zone) else found)
                 } else {
                     deliver(change, stored.connection, source.source, writer, zone)
                 }
-                if (outcome == null) {
-                    // Undo took the create, with the changes queued behind it, after this pass read the queue.
-                    ref?.let { droppedCreates += it }
-                    continue
-                }
-                when (outcome) {
+                // Undo took the create with the changes queued behind it, which this pass read before it did.
+                if (sent.byUndo && ref != null) droppedCreates += ref
+                when (val outcome = sent.outcome) {
                     is WriteOutcome.Accepted -> if (aged && ref != null) foundCreates += ref
                     is WriteOutcome.Rejected -> drop(change, label, outcome.reason)
                     is WriteOutcome.Retry -> {
@@ -223,20 +223,24 @@ class CalendarSync internal constructor(
 
     /**
      * Sends a queued create in 20 §4.3's four steps, so Undo, which holds [writeLock], finds it either queued or on its
-     * way, and no call to the service holds the lock. Null: Undo took it before it went.
+     * way, and no call to the service holds the lock.
      */
-    private suspend fun sendCreate(change: PendingChange, conn: Connection, source: CalendarSource, writer: CalendarWriter, zone: ZoneId): WriteOutcome? {
+    private suspend fun sendCreate(change: PendingChange, conn: Connection, source: CalendarSource, writer: CalendarWriter, zone: ZoneId): Sent {
         val draft = checkNotNull(change.draft)
         val key = checkNotNull(change.clientKey)
         val queued = writeLock.withLock { store.isQueued(change.id).also { if (it) undone.sending(key) } }
-        if (!queued) return null
+        if (!queued) return Sent(WriteOutcome.Accepted(null), byUndo = true)
         var stray: UndoneKeys.Undone? = null
+        var settled = false
+        var byUndo = false
         val outcome = try {
             // The key makes a retry safe: if an earlier attempt did create the event, the provider returns it.
             val created = callWriter(io, timeoutMillis) { writer.create(conn, source, draft, key) }
             writeLock.withLock {
                 undone.sent(key)
+                settled = true
                 val taken = undone[key]
+                byUndo = taken != null
                 when {
                     taken == null -> if (created is WriteOutcome.Accepted) complete(change, conn, source, created, zone) else created
                     created is WriteOutcome.Rejected -> WriteOutcome.Accepted(null).also { undone.done(key) }
@@ -254,9 +258,11 @@ class CalendarSync internal constructor(
             }
         } finally {
             undone.sent(key)
+            // Cancelled on its way after Undo took it: it may have landed, so the next pass deletes it.
+            if (!settled) undone.strayIfUndone(key)
         }
         stray?.let { deleteUndone(key, it, conn, source, writer) }
-        return outcome
+        return Sent(outcome, byUndo)
     }
 
     /**
@@ -284,17 +290,14 @@ class CalendarSync internal constructor(
         ChangeKind.ASSIGN, ChangeKind.DELETE -> remoteId != null
     }
 
-    /**
-     * Sends one change and, when the provider accepts it, applies the result to the mirror and completes it. Null: a
-     * create Undo took first.
-     */
+    /** Sends one change and, when the provider accepts it, applies the result to the mirror and completes it. */
     private suspend fun deliver(
         change: PendingChange,
         conn: Connection,
         source: CalendarSource,
         writer: CalendarWriter,
         zone: ZoneId,
-    ): WriteOutcome? {
+    ): Sent {
         // Checked outside callWriter, so a malformed change fails the drain instead of being retried as a write.
         val ref = change.ref
         val outcome = when (change.kind) {
@@ -315,8 +318,8 @@ class CalendarSync internal constructor(
                 } else {
                     // m3: out of the mirror's window, not necessarily gone. Never PATCH blind: it could bring a deleted event back.
                     val found = callWriter(io, timeoutMillis) { writer.find(conn, source, remoteId) }
-                    if (found !is WriteOutcome.Accepted) return found
-                    val event = found.event ?: return WriteOutcome.Rejected(EVENT_GONE)
+                    if (found !is WriteOutcome.Accepted) return Sent(found)
+                    val event = found.event ?: return Sent(WriteOutcome.Rejected(EVENT_GONE))
                     assignDraft(event, forPerson, color)
                 }
                 callWriter(io, timeoutMillis) { writer.update(conn, source, remoteId, draft, fieldsFor(ChangeKind.ASSIGN, null)) }
@@ -337,8 +340,11 @@ class CalendarSync internal constructor(
                 }
             }
         }
-        return if (outcome is WriteOutcome.Accepted) complete(change, conn, source, outcome, zone) else outcome
+        return Sent(if (outcome is WriteOutcome.Accepted) complete(change, conn, source, outcome, zone) else outcome)
     }
+
+    /** What sending a change came to; [byUndo]: Undo took its create, and with it the changes queued behind it. */
+    private class Sent(val outcome: WriteOutcome, val byUndo: Boolean = false)
 
     /** Stores a write the provider accepted and completes its row; a store failure is retried later (C2). */
     private suspend fun complete(

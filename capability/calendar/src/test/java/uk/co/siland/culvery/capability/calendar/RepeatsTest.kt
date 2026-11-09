@@ -123,6 +123,12 @@ class RepeatsTest {
         assertThat(label("DTSTART:20280229\nRRULE:FREQ=YEARLY;COUNT=10000", leapDay)).endsWith(" · 10,000 times")
     }
 
+    /** Regression guard (20 §4.4): a series worked out directly still names its last date at COUNT 10,000. */
+    @Test
+    fun aLongDailySeriesNamesItsLastDate() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=DAILY;COUNT=10000")).isEqualTo("Every day · 10,000 times · last on Tue 10 Feb")
+    }
+
     /** Regression guard: a short series still names its last date. */
     @Test
     fun aTwelveTimeSeriesStillSaysItsLastDate() {

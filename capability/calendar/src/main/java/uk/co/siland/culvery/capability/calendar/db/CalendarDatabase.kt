@@ -469,11 +469,6 @@ interface CalendarDao {
     suspend fun deleteOutboxFor(connectionId: String, sourceId: String, key: String): Int
 }
 
-/**
- * Holds user configuration (connections, source mappings, the master flag, queued writes), not just a cache:
- * every version bump ships a Migration (see Migrations.kt) with a MigrationTestHelper test, never a destructive
- * fallback. The schema JSON under schemas/ is committed.
- */
 @Dao
 interface UndoneCreateDao {
     @Query("SELECT * FROM undone_creates")
@@ -486,6 +481,11 @@ interface UndoneCreateDao {
     suspend fun delete(key: String)
 }
 
+/**
+ * Holds user configuration (connections, source mappings, the master flag, queued writes), not just a cache:
+ * every version bump ships a Migration (see Migrations.kt) with a MigrationTestHelper test, never a destructive
+ * fallback. The schema JSON under schemas/ is committed.
+ */
 @Database(
     entities = [
         ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class,

@@ -70,6 +70,11 @@ class UndoneKeys @Inject constructor(private val dao: UndoneCreateDao) {
         dao.upsert(undone.row(key, stray = true))
     }
 
+    /** Marks [key] a stray if Undo took it; in memory only, for a send cancelled where nothing may suspend. */
+    internal fun strayIfUndone(key: String) {
+        keys[key]?.let { strays[key] = it }
+    }
+
     /** [key]'s stray is deleted, or can't be: nothing more to try. */
     internal suspend fun letGo(key: String) {
         strays -= key

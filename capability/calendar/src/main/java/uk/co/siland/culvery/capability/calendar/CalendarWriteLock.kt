@@ -1,9 +1,9 @@
 package uk.co.siland.culvery.capability.calendar
 
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * The one lock around calendar writes (3a design §3.12): the editor holds it while it reads the queue and writes or
@@ -15,7 +15,24 @@ import kotlinx.coroutines.sync.withLock
 class CalendarWriteLock @Inject constructor() {
     private val mutex = Mutex()
 
-    suspend fun <T> withLock(block: suspend () -> T): T = mutex.withLock { block() }
+    private val queued = AtomicInteger()
+
+    suspend fun <T> withLock(block: suspend () -> T): T {
+        queued.incrementAndGet()
+        try {
+            mutex.lock()
+        } finally {
+            queued.decrementAndGet()
+        }
+        try {
+            return block()
+        } finally {
+            mutex.unlock()
+        }
+    }
 
     internal val held: Boolean get() = mutex.isLocked
+
+    /** How many callers are waiting for the lock, for tests. */
+    internal val waiting: Int get() = queued.get()
 }

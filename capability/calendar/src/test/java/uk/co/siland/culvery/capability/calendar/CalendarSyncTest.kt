@@ -27,6 +27,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -911,17 +912,15 @@ class CalendarSyncTest {
         withContext(Dispatchers.Default) {
             lock.withLock {
                 w.createGate?.complete(Unit)
-                // Real time for the drain to wait for the lock first, then the editor behind it.
-                delay(200)
+                // The drain waits for the lock first, then the editor behind it.
+                awaitWaiting(lock, 1)
                 editor = this@runTest.launch(Dispatchers.Default) { lock.withLock { holding.complete(Unit); release.await() } }
-                delay(200)
+                awaitWaiting(lock, 2)
             }
         }
-        withContext(Dispatchers.Default) {
-            withTimeout(5_000) { holding.await() }
-            // Real time for a drop outside the lock to go ahead, so such a drop fails this test every time.
-            delay(200)
-        }
+        withContext(Dispatchers.Default) { withTimeout(5_000) { holding.await() } }
+        // The drain's drop waits for the lock; one that didn't take it would time out here.
+        awaitWaiting(lock, 1)
         queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
         release.complete(Unit)
         editor.join()
@@ -1200,6 +1199,10 @@ class CalendarSyncTest {
         return pass
     }
 
+    /**
+     * The clock gate joins Undo only while the drain doesn't hold the lock: Undo needs the lock, so joining it from inside
+     * step 3 would deadlock. Then Undo waits and runs once the event is stored, the other order, which is also settled.
+     */
     @Test
     fun anUndoBetweenTheReplyAndTheStoreIsSettled() = runTest {
         connect("c1", "calendar.a", s1)
@@ -1414,6 +1417,83 @@ class CalendarSyncTest {
         w.failWith = UnreachableException("offline")
         engineWith(setOf(w), toaster, undone = UndoneKeys(calendar.undoneCreateDao())).syncAll()
         assertThat(store.eventsBetween(Long.MIN_VALUE, Long.MAX_VALUE).first().map { it.remoteId }).containsExactly("swim")
+    }
+
+    /** Returns once [n] callers wait for [lock]. */
+    private suspend fun awaitWaiting(lock: CalendarWriteLock, n: Int) =
+        withContext(Dispatchers.Default) { withTimeout(5_000) { while (lock.waiting != n) yield() } }
+
+    /** Fix round 1: what was queued behind an undone create went with it, so the pass doesn't send it. */
+    @Test
+    fun whatWasQueuedBehindAnUndoneCreateIsNotSent() = runTest {
+        whatWasQueuedBehind(strayDeleteFails = false)
+    }
+
+    @Test
+    fun whatWasQueuedBehindAnUndoneCreateIsNotSentWhenTheStrayDeleteFails() = runTest {
+        whatWasQueuedBehind(strayDeleteFails = true)
+    }
+
+    private suspend fun TestScope.whatWasQueuedBehind(strayDeleteFails: Boolean) {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        queueSwimCreate()
+        queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
+        val pass = passSendingTheCreate(undoingEngine())
+        assertThat(editor.undoAdd(added(access))).isEqualTo(EditResult.Done)
+        if (strayDeleteFails) w.failNextDelete = UnreachableException("offline")
+        w.createGate?.complete(Unit)
+        pass.join()
+        assertThat(w.calls.filter { it.startsWith("update:") }).isEmpty()
+        assertThat(toaster.messages).isEmpty()
+        assertThat(store.eventNow(swimRef)).isNull()
+    }
+
+    /** Fix round 1: a refused create Undo dropped before the drain could is not told as lost; Undo has spoken. */
+    @Test
+    fun aRefusedCreateUndoneFirstIsNotToldAsLost() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        queueSwimCreate()
+        val pass = passSendingTheCreate(undoingEngine())
+        w.failWith = WriteRejectedException("calendar is full")
+        lateinit var undo: Job
+        withContext(Dispatchers.Default) {
+            writeLock.withLock {
+                w.createGate?.complete(Unit)
+                // The drain waits to settle the refusal, then Undo behind it, so Undo comes before the drain's drop.
+                awaitWaiting(writeLock, 1)
+                undo = this@runTest.launch(Dispatchers.Default) { editor.undoAdd(added(access)) }
+                awaitWaiting(writeLock, 2)
+            }
+        }
+        undo.join()
+        pass.join()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(access.toasts.messages).containsExactly(removed("Swim"))
+        assertThat(toaster.messages).isEmpty()
+    }
+
+    /** Fix round 1: a pass cancelled with an undone create on its way leaves it a stray, deleted on the next pass. */
+    @Test
+    fun anUndoneCreateCancelledOnItsWayIsAStray() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.failWith = UnreachableException("reads are down")
+        val (access, editor) = undoing()
+        val sync = undoingEngine()
+        queueSwimCreate()
+        val pass = passSendingTheCreate(sync)
+        assertThat(editor.undoAdd(added(access))).isEqualTo(EditResult.Done)
+        pass.cancelAndJoin()
+        assertThat(undone.strayCreates.keys).containsExactly(key)
+
+        w.createGate = null
+        sync.syncAll()
+        assertThat(w.calls.count { it == "delete:$key" }).isEqualTo(2)
+        assertThat(undone.strayCreates).isEmpty()
+        assertThat(undone.pending).isEmpty()
     }
 
     private companion object {
