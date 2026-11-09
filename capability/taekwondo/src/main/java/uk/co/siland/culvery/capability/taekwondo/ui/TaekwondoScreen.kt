@@ -23,6 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
@@ -63,6 +66,16 @@ private val AgainStyle = CountStyle.copy(fontSize = 96.sp, lineHeight = 112.sp)
 private val HangulStyle = HhType.screenTitle.copy(
     lineBreak = LineBreak(LineBreak.Strategy.Balanced, LineBreak.Strictness.Normal, LineBreak.WordBreak.Phrase),
 )
+
+private const val WORD_JOINER = '⁠'
+
+/** [text] with a word joiner between neighbouring Hangul syllables, so a line breaks only at the spaces between words. */
+internal fun keepWords(text: String): String = buildString {
+    text.forEachIndexed { i, c ->
+        if (i > 0 && c in '가'..'힣' && text[i - 1] in '가'..'힣') append(WORD_JOINER)
+        append(c)
+    }
+}
 
 /** The long moves (9, 21, 24) get smaller type so they wrap between words and still fit above Cancel. */
 private fun hangulStyle(text: String): TextStyle {
@@ -191,8 +204,8 @@ private fun MoveView(s: RunState.Moving) {
         Text(move.number, style = HhType.headerValue.copy(fontSize = 48.sp), color = Culvery.colors.accent, modifier = Modifier.testTag("move_number"))
         val big = move.hangul ?: move.romanised ?: move.english
         Text(
-            big, style = hangulStyle(big), color = Culvery.colors.ink, textAlign = TextAlign.Center,
-            modifier = Modifier.testTag("move_korean"),
+            keepWords(big), style = hangulStyle(big), color = Culvery.colors.ink, textAlign = TextAlign.Center,
+            modifier = Modifier.testTag("move_korean").clearAndSetSemantics { text = AnnotatedString(big) },
         )
         if (move.hangul != null && move.romanised != null) {
             Text(move.romanised, style = HhType.sectionTitle, color = Culvery.colors.mute, textAlign = TextAlign.Center, modifier = Modifier.testTag("move_romanised"))
