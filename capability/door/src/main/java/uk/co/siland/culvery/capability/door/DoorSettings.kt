@@ -59,10 +59,11 @@ private val OLD_DOORBELL_CHOICES = mapOf("FOLLOW_THEME" to FOLLOW_THEME_ID, "CLA
 private val SOUND_ID = Regex("(builtin|file):.+")
 
 /**
- * What a ring plays now: following the theme, Happy Birthday on a [birthday] and else the [showing] theme's sound; a chosen file that has gone
- * plays the classic chime.
+ * What a ring plays now: following the theme, Happy Birthday on a [birthday] and else the [showing] theme's sound; a chosen file that has gone,
+ * or a stored Happy Birthday (the birthday's own sound, never a choice), plays the classic chime.
  */
 fun DoorPrefs.doorbellSound(library: SoundLibrary, showing: SeasonalTheme?, birthday: Boolean): Sound = when {
+    doorbell == BuiltInSound.HAPPY_BIRTHDAY.id -> library.forTheme(null)
     doorbell != FOLLOW_THEME_ID -> library.byId(doorbell) ?: library.forTheme(null)
     birthday -> library.byId(BuiltInSound.HAPPY_BIRTHDAY.id) ?: library.forTheme(showing)
     else -> library.forTheme(showing)

@@ -131,6 +131,20 @@ class DoorSettingsTest {
             .isEqualTo(BuiltInSound.CHRISTMAS_MUSIC_BOX.id)
     }
 
+    /** 18 §6.2: Happy Birthday is the birthday's sound, so a stored choice of it plays the classic chime. */
+    @Test
+    fun aStoredHappyBirthdayChoicePlaysTheClassicChime() {
+        val prefs = DoorPrefs(doorbell = BuiltInSound.HAPPY_BIRTHDAY.id)
+        assertThat(prefs.doorbellSound(testSounds(), null, birthday = false).id).isEqualTo(BuiltInSound.CLASSIC.id)
+    }
+
+    /** Regression guard: Follow the theme still plays Happy Birthday on a birthday. */
+    @Test
+    fun aBirthdayStillPlaysHappyBirthday() {
+        val prefs = DoorPrefs(doorbell = FOLLOW_THEME_ID)
+        assertThat(prefs.doorbellSound(testSounds(), null, birthday = true).id).isEqualTo(BuiltInSound.HAPPY_BIRTHDAY.id)
+    }
+
     /** 15a §3.1: two days until the family picks more. */
     @Test
     fun keepDefaultsToTwoDays() = runTest {
