@@ -22,7 +22,7 @@ class MusicCapabilityTest {
 
     private fun capability(speakers: Speakers) = MusicCapability(
         speakers, MusicView(speakers, settings, scope), MusicActions({ speakers.system.value }, scope),
-        MusicChecks(speakers.system, MutableStateFlow(true), scope), ArtCache { null },
+        MusicChecks(speakers.system, MutableStateFlow(true), { 0L }, scope), ArtCache { null },
         settings, MusicConnect(speakers.connectable) { id, link -> settings.connect(id, link) }, RecordingToaster(),
     )
 

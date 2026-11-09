@@ -222,7 +222,7 @@ class MusicTabTest {
         }
         val system = provider.systems.single()
         system.groups.value = listOf(kitchen, lounge)
-        val checks = MusicChecks(speakers.system, MutableStateFlow(true), scope).also { it.start() }
+        val checks = MusicChecks(speakers.system, MutableStateFlow(true), { 0L }, scope).also { it.start() }
         checks.watch()
         runBlocking { withTimeout(5_000) { while ("checkLayout" !in system.calls) delay(10) } }
         system.calls.clear()
@@ -254,7 +254,7 @@ class MusicTabTest {
         }
         val live = provider.systems.single()
         live.groups.value = groups
-        val checks = MusicChecks(speakers.system, MutableStateFlow(true), scope).also { it.start() }
+        val checks = MusicChecks(speakers.system, MutableStateFlow(true), { 0L }, scope).also { it.start() }
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides TestOverlay()) {

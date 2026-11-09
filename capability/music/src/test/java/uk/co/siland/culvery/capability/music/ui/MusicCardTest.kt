@@ -268,7 +268,7 @@ class MusicCardTest {
         val speakers = Speakers(setOf(provider), settings, scope)
         runBlocking { settings.connect("music.sonos", MusicLink("Sonos_home", "192.168.1.20:1400")) }
         val view = MusicView(speakers, settings, scope)
-        val checks = MusicChecks(speakers.system, MutableStateFlow(true), scope).also { it.start() }
+        val checks = MusicChecks(speakers.system, MutableStateFlow(true), { 0L }, scope).also { it.start() }
         var shown by mutableStateOf(true)
         compose.setContent { CulveryTheme(dark = true) { if (shown) MusicCardHost(view, MusicActions({ null }, scope), checks) } }
         compose.waitFor { provider.systems.singleOrNull()?.calls?.contains("checkLayout") == true }

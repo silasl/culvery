@@ -1,13 +1,14 @@
 package uk.co.siland.culvery.capability.music
 
 import android.util.Log
+import android.os.SystemClock
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -16,8 +17,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.FailureRun
+import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.attempt
 
@@ -27,24 +29,35 @@ const val PLAYBACK_CHECK_MS = 2_000L
 /** Rooms, groups and room volumes (6 §4.2). */
 const val LAYOUT_CHECK_MS = 30_000L
 
+/** A failing playback check is retried this often at most (19 §5). */
+const val PLAYBACK_BACKOFF_CAP_MS = 60_000L
+
+/** A failing layout read is retried this often at most (19 §5). */
+const val LAYOUT_BACKOFF_CAP_MS = 300_000L
+
 private const val TAG = "MusicChecks"
+private const val NEVER = Long.MIN_VALUE
 
 /**
- * Checks the speakers on a timer rather than subscribing (6 §4.2): only while Culvery is in front and a screen that shows
+ * Checks the speakers on a timer rather than subscribing (6 §4.2): only while the screen is lit and a screen that shows
  * music (Home's card, the Music tab) is on, which [watch] counts. The layout first, then playback every 2 seconds and the
- * layout every 30, or at once when the Music tab opens.
+ * layout every 30, or at once when the Music tab opens. A failing check waits longer each time (19 §5).
  */
 @Singleton
 class MusicChecks internal constructor(
     private val system: StateFlow<MusicSystem?>,
-    private val inFront: StateFlow<Boolean>,
+    private val lit: StateFlow<Boolean>,
+    private val elapsed: () -> Long,
     private val scope: CoroutineScope,
 ) : Startable {
     @Inject
-    constructor(speakers: Speakers, host: AlertHost, @ApplicationScope scope: CoroutineScope) : this(speakers.system, host.inFront, scope)
+    constructor(speakers: Speakers, lit: ScreenLit, @ApplicationScope scope: CoroutineScope) :
+        this(speakers.system, lit.lit, SystemClock::elapsedRealtime, scope)
 
     private val watchers = MutableStateFlow(0)
     private val layoutAsked = Channel<Unit>(Channel.CONFLATED)
+    private val playbackAsked = Channel<Unit>(Channel.CONFLATED)
+    private val lastLayoutAt = AtomicLong(NEVER)
 
     /** How many music screens are on, for the screens' tests. */
     internal val watching: Int get() = watchers.value
@@ -57,33 +70,69 @@ class MusicChecks internal constructor(
         return { if (stopped.compareAndSet(false, true)) watchers.update { it - 1 } }
     }
 
+    /** Reads the layout unless a read by these checks succeeded within [ageMs]; true when it read. Throws what the read throws. */
+    suspend fun layoutIfOlderThan(s: MusicSystem, ageMs: Long): Boolean {
+        val at = lastLayoutAt.get()
+        if (at != NEVER && elapsed() - at < ageMs) return false
+        readLayout(s)
+        return true
+    }
+
     override fun start() {
         scope.launch {
-            combine(system, inFront, watchers) { s, front, n -> s.takeIf { front && n > 0 } }
+            combine(system, lit, watchers) { s, isLit, n -> s.takeIf { isLit && n > 0 } }
                 .distinctUntilChanged()
-                .collectLatest { s -> if (s != null) checking(s) }
+                .collectLatest { s ->
+                    if (s != null) {
+                        Log.d(TAG, "Polling on")
+                        try {
+                            checking(s)
+                        } finally {
+                            Log.d(TAG, "Polling off")
+                        }
+                    }
+                }
         }
+    }
+
+    private suspend fun readLayout(s: MusicSystem) {
+        s.checkLayout()
+        lastLayoutAt.set(elapsed())
     }
 
     private suspend fun checking(s: MusicSystem) = coroutineScope {
-        safely { s.checkLayout() }
-        layoutAsked.tryReceive()
+        playbackAsked.tryReceive()
         launch {
+            val run = FailureRun()
+            playbackAsked.receive()
             while (true) {
-                safely { s.checkPlayback() }
-                delay(PLAYBACK_CHECK_MS)
+                attempt({
+                    s.checkPlayback()
+                    val failedInARow = run.succeeded()
+                    if (failedInARow > 0) Log.i(TAG, "Music playback checks work again after ${failedInARow} failures")
+                }) { e ->
+                    if (run.failed()) Log.w(TAG, "A music playback check failed (${e::class.simpleName})")
+                }
+                val asked = withTimeoutOrNull(run.waitMillis(PLAYBACK_CHECK_MS, PLAYBACK_BACKOFF_CAP_MS)) { playbackAsked.receive() }
+                if (asked != null) run.resetWaits()
             }
         }
         launch {
+            val run = FailureRun()
+            layoutAsked.tryReceive()
+            var asked = true
             while (true) {
-                withTimeoutOrNull(LAYOUT_CHECK_MS) { layoutAsked.receive() }
-                safely { s.checkLayout() }
+                if (asked) run.resetWaits()
+                attempt({
+                    readLayout(s)
+                    val failedInARow = run.succeeded()
+                    if (failedInARow > 0) Log.i(TAG, "Music layout reads work again after ${failedInARow} failures")
+                }) { e ->
+                    if (run.failed()) Log.w(TAG, "A music layout read failed (${e::class.simpleName})")
+                }
+                if (asked) playbackAsked.trySend(Unit)
+                asked = withTimeoutOrNull(run.waitMillis(LAYOUT_CHECK_MS, LAYOUT_BACKOFF_CAP_MS)) { layoutAsked.receive() } != null
             }
         }
-    }
-
-    /** A failed check shows in the system's problem; the next one tries again. */
-    private suspend fun safely(check: suspend () -> Unit) = attempt({ check() }) { e ->
-        Log.w(TAG, "A music check failed (${e::class.simpleName})")
     }
 }
