@@ -6,6 +6,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import uk.co.siland.culvery.core.plugin.NightHours
+import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.ui.ShowingTheme
 import uk.co.siland.culvery.display.AndroidAnimatorsOn
@@ -13,6 +14,8 @@ import uk.co.siland.culvery.display.AndroidTabletHeat
 import uk.co.siland.culvery.display.AnimatorsOn
 import uk.co.siland.culvery.display.DisplayState
 import uk.co.siland.culvery.display.HeatLog
+import uk.co.siland.culvery.display.ScreenLitFeed
+import uk.co.siland.culvery.display.ScreenLitState
 import uk.co.siland.culvery.display.SeasonalThemes
 import uk.co.siland.culvery.display.TabletHeat
 
@@ -34,4 +37,11 @@ abstract class DisplayModule {
     @Binds
     @IntoSet
     abstract fun heatLog(impl: HeatLog): Startable
+
+    @Binds
+    abstract fun screenLit(impl: ScreenLitState): ScreenLit
+
+    @Binds
+    @IntoSet
+    abstract fun screenLitFeed(impl: ScreenLitFeed): Startable
 }

@@ -33,6 +33,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.NightHours
+import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -272,6 +273,8 @@ class DisplayWiringTest {
             "animatorsOn" to Binding(AndroidAnimatorsOn::class.java, AnimatorsOn::class.java, intoSet = false),
             "showingTheme" to Binding(SeasonalThemes::class.java, ShowingTheme::class.java, intoSet = false),
             "heatLog" to Binding(HeatLog::class.java, Startable::class.java, intoSet = true),
+            "screenLit" to Binding(ScreenLitState::class.java, ScreenLit::class.java, intoSet = false),
+            "screenLitFeed" to Binding(ScreenLitFeed::class.java, Startable::class.java, intoSet = true),
         )
         assertThat(bindings(CameraModule::class.java)).containsExactly(
             "frames" to Binding(Camera2Frames::class.java, FrameSource::class.java, intoSet = false),

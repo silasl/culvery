@@ -38,7 +38,9 @@ private class Wall(
     val inFront = MutableStateFlow(inFront)
     val camera = MutableStateFlow(camera)
     val holiday = MutableStateFlow<Boolean?>(null)
+    val resumed = MutableStateFlow(inFront)
     val display = DisplayState(this.prefs, now, touches, this.inFront, this.camera, holiday, test.backgroundScope)
+    val lit = ScreenLitState().also { ScreenLitFeed(resumed, display.screen, it, test.backgroundScope).start() }
     var wakes = 0
         private set
 
@@ -649,5 +651,58 @@ class DisplayStateTest {
         wall.away(null)
         wall.after(FIVE_MINUTES - 1)
         assertThat(wall.screen).isEqualTo(AWAKE)
+    }
+
+    /** 19 §3.1: Fails if an awake screen with Culvery resumed isn't lit. */
+    @Test
+    fun litWhenAwakeInFront() = runTest {
+        val wall = wall()
+        assertThat(wall.lit.lit.value).isTrue()
+    }
+
+    /** Fails if the dark screen counts as lit. */
+    @Test
+    fun notLitOnTheDarkScreen() = runTest {
+        val wall = wall()
+        wall.asleep()
+        assertThat(wall.lit.lit.value).isFalse()
+    }
+
+    /** Fails if the night clock counts as lit. */
+    @Test
+    fun notLitOnTheNightClock() = runTest {
+        val wall = wall(at = DAY.atTime(22, 0))
+        wall.after(THIRTY_MINUTES)
+        assertThat(wall.screen).isEqualTo(NIGHT_CLOCK)
+        assertThat(wall.lit.lit.value).isFalse()
+    }
+
+    /** Fails if Holiday's dark screen counts as lit. */
+    @Test
+    fun notLitOnHolidaysDarkScreen() = runTest {
+        val wall = wall()
+        wall.away(true)
+        wall.after(FIVE_MINUTES)
+        assertThat(wall.screen).isEqualTo(ASLEEP)
+        assertThat(wall.lit.lit.value).isFalse()
+    }
+
+    /** Fails if Culvery not resumed counts as lit while the screen is still awake. */
+    @Test
+    fun notLitWhenNotResumed() = runTest {
+        val wall = wall()
+        wall.resumed.value = false
+        wall.after(0)
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        assertThat(wall.lit.lit.value).isFalse()
+    }
+
+    /** Fails if a wake from the dark screen doesn't light again. */
+    @Test
+    fun litAgainOnAWake() = runTest {
+        val wall = wall()
+        wall.asleep()
+        wall.tap()
+        assertThat(wall.lit.lit.value).isTrue()
     }
 }

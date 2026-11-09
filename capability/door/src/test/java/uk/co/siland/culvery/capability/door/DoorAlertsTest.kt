@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.door.ui.DoorCardUi
 import uk.co.siland.culvery.core.plugin.NightHours
+import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.sound.BuiltInSound
 import uk.co.siland.culvery.core.sound.id
@@ -54,6 +55,8 @@ class DoorAlertsTest {
         assertThat(alerts.showing.value).isEqualTo(ShowingRing(1, DoorCardUi(false, "Front Door", "14:02", null)))
         assertThat(chime.volumes).containsExactly(0.4f)
         assertThat(chime.plays.single().first).isEqualTo(BuiltInSound.CLASSIC.id)
+        val takesScreenLit = DoorAlerts::class.java.declaredConstructors.any { c -> c.parameterTypes.any { it == ScreenLit::class.java } }
+        assertThat(takesScreenLit).isFalse() // regression guard: Ring alerts work with the screen dark
     }
 
     /** 18 §7: Fails if the pads are hushed after the music is turned down, or not at all for a ring that is too soon for a chime. */
