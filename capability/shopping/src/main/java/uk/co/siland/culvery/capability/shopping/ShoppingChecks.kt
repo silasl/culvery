@@ -16,31 +16,36 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.FailureRun
+import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.reasonWord
 
 /** How often the list is read while a screen that shows it is on (10 §4.4). */
 const val SHOPPING_CHECK_MS = 60_000L
 
+/** A failing check is retried this often at most (19 §5). */
+const val SHOPPING_BACKOFF_CAP_MS = 300_000L
+
 private const val TAG = "ShoppingChecks"
 
 /**
- * Reads the list on a timer rather than subscribing (10 §4.4): only while a list is connected, Culvery is in front and a
+ * Reads the list on a timer rather than subscribing (10 §4.4): only while a list is connected, the screen is lit and a
  * screen that shows it (Home's card, the Shopping tab) is on, which [watch] counts. A read is also made at once when such
- * a screen opens or [askNow] is called.
+ * a screen opens or [askNow] is called. A failing check waits longer each time (19 §5).
  */
 @Singleton
 class ShoppingChecks internal constructor(
     private val connected: Flow<Boolean>,
-    private val inFront: StateFlow<Boolean>,
+    private val lit: StateFlow<Boolean>,
     private val check: suspend () -> Unit,
     private val scope: CoroutineScope,
 ) : Startable {
     @Inject
-    constructor(store: ShoppingStore, sync: ShoppingSync, host: AlertHost, @ApplicationScope scope: CoroutineScope) :
-        this(store.connection.map { it != null }, host.inFront, sync::check, scope)
+    constructor(store: ShoppingStore, sync: ShoppingSync, lit: ScreenLit, @ApplicationScope scope: CoroutineScope) :
+        this(store.connection.map { it != null }, lit.lit, sync::check, scope)
 
     private val watchers = MutableStateFlow(0)
     private val asked = Channel<Unit>(Channel.CONFLATED)
@@ -63,23 +68,36 @@ class ShoppingChecks internal constructor(
 
     override fun start() {
         scope.launch {
-            combine(connected, inFront, watchers) { c, front, n -> c && front && n > 0 }
+            combine(connected, lit, watchers) { c, isLit, n -> c && isLit && n > 0 }
                 .distinctUntilChanged()
-                .collectLatest { on -> if (on) checking() }
+                .collectLatest { on ->
+                    if (on) {
+                        Log.d(TAG, "Polling on")
+                        try {
+                            checking()
+                        } finally {
+                            Log.d(TAG, "Polling off")
+                        }
+                    }
+                }
         }
     }
 
     private suspend fun checking() {
         // The read about to be made answers any request already waiting.
         asked.tryReceive()
+        val run = FailureRun()
         while (true) {
-            safely()
-            withTimeoutOrNull(SHOPPING_CHECK_MS) { asked.receive() }
+            // A failed check shows in the list's problem line; the next one tries again.
+            attempt({
+                check()
+                val failedInARow = run.succeeded()
+                if (failedInARow > 0) Log.i(TAG, "Shopping checks work again after ${failedInARow} failures")
+            }) { e ->
+                if (run.failed()) Log.w(TAG, "A shopping check failed (${e::class.simpleName}, ${e.reasonWord()})")
+            }
+            val wasAsked = withTimeoutOrNull(run.waitMillis(SHOPPING_CHECK_MS, SHOPPING_BACKOFF_CAP_MS)) { asked.receive() }
+            if (wasAsked != null) run.resetWaits()
         }
-    }
-
-    /** A failed check shows in the list's problem line; the next one tries again. */
-    private suspend fun safely() {
-        attempt({ check() }) { e -> Log.w(TAG, "A shopping check failed (${e::class.simpleName})") }
     }
 }

@@ -119,7 +119,7 @@ class ShoppingSync @Inject constructor(
 
     /**
      * Sends what is due, then reads the list and the items ticked since (10 §4.4). When the read finds the list again
-     * after it couldn't, what waited out a backoff goes straight away.
+     * after it couldn't, what waited out a backoff goes straight away. Throws what a failed read threw, after setting the health.
      */
     suspend fun check() {
         drain()
@@ -292,7 +292,7 @@ class ShoppingSync @Inject constructor(
     /**
      * Reads the list and the items ticked since the last read without the lock, so a tap never waits on the network,
      * then learns from them and keeps the read under it, unless something was sent or the connection changed meanwhile
-     * (the next check reads again). True when the read found the list after it couldn't, and the queue was made due.
+     * (the next check reads again). Throws what the provider threw. True when the read found the list after it couldn't, and the queue was made due.
      */
     private suspend fun read(): Boolean {
         val noted = writes.get()
@@ -305,24 +305,21 @@ class ShoppingSync @Inject constructor(
         } else {
             (stored.lastHistoryMillis ?: now) - HISTORY_OVERLAP_MS
         }
-        var what = Step.ITEMS
         val (items, ticked) = attempt({
-            // Both reads go at once; a failure is named as the one-after-the-other reads would name it.
+            // Both reads go at once; the items read's failure wins, as in one-after-the-other reads.
             supervisorScope {
                 val reading = async { provider.items(stored.connection) }
                 val history = async { provider.history(stored.connection, Instant.ofEpochMilli(since)) }
                 try {
                     val open = reading.await()
-                    what = Step.HISTORY
                     open to history.await()
                 } finally {
                     history.cancel()
                 }
             }
         }) { e ->
-            Log.w(TAG, "Shopping check: the ${what.label} failed (${e::class.simpleName})")
             lock.withLock { if (writes.get() == noted) store.setHealth(healthOf(e)) }
-            return false
+            throw e
         }
         return lock.withLock {
             if (!writes.compareAndSet(noted, noted + 1)) return@withLock false

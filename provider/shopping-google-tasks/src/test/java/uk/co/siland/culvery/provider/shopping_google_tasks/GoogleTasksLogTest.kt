@@ -16,6 +16,8 @@ import uk.co.siland.culvery.core.google.test.FakeGoogleAccounts
 import uk.co.siland.culvery.core.google.test.FakeTokenSource
 import uk.co.siland.culvery.core.google.test.assertLogsHoldNoPersonalData
 import uk.co.siland.culvery.core.google.test.failureOf
+import uk.co.siland.culvery.core.plugin.UnreachableException
+import uk.co.siland.culvery.core.plugin.reasonWord
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 
 @RunWith(AndroidJUnit4::class)
@@ -49,5 +51,30 @@ class GoogleTasksLogTest {
         logs.forEach { log ->
             assertWithMessage(log.msg).that(listOf("tasks.insert", "tasks.list", "tasks.patch").any { it in log.msg }).isTrue()
         }
+    }
+
+    /** A read that fails is one line for the whole run, written by the shopping checks; the provider says nothing. */
+    @Test
+    fun aFailedReadLogsNothingAndThrowsGoogleReason() = runTest {
+        val path = "/tasks/v1/lists/L1/tasks"
+        google.on("GET", path, google.json("""{"error":{"errors":[{"reason":"rateLimitExceeded"}]}}""", 403))
+        val failure = failureOf { provider.items(CONNECTION) }
+        assertThat(failure).isInstanceOf(UnreachableException::class.java)
+        assertThat(failure!!.reasonWord()).isEqualTo("rateLimitExceeded")
+        google.on("GET", path, google.json("{}", 503))
+        failureOf { provider.history(CONNECTION, java.time.Instant.EPOCH) }
+        assertThat(ShadowLog.getLogs()).isEmpty()
+    }
+
+    @Test
+    fun aFailedWriteStillLogs() = runTest {
+        google.on("POST", "/tasks/v1/lists/L1/tasks", google.json("""{"error":{"code":400,"errors":[{"reason":"invalid"}]}}""", 400), once = true)
+        failureOf { provider.add(CONNECTION, "Milk", "k") }
+        google.on("POST", "/tasks/v1/lists/L1/tasks", google.json("{}", 503), once = true)
+        failureOf { provider.add(CONNECTION, "Milk", "k") }
+        assertThat(ShadowLog.getLogs().map { it.msg }).containsExactly(
+            "tasks.insert: Google Tasks answered 400 (invalid)",
+            "tasks.insert: Google Tasks said try later: 503 (null)",
+        ).inOrder()
     }
 }

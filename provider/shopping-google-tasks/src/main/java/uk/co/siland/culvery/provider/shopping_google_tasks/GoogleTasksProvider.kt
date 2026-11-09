@@ -140,7 +140,7 @@ class GoogleTasksProvider @Inject constructor(
         when (answer.code) {
             404, 410 -> throw ItemGoneException("The item is gone")
             400 -> throw ShoppingRejectedException("Google Tasks refused the change")
-            else -> throw UnreachableException("Google Tasks answered ${answer.code}")
+            else -> throw UnreachableException("Google Tasks answered ${answer.code}", reason = answer.reason)
         }
     }
 
@@ -163,7 +163,7 @@ class GoogleTasksProvider @Inject constructor(
     }
 
     private fun logAnswer(what: TasksCall, answer: GoogleAnswer) {
-        Log.w(TAG, "${what.label}: Google Tasks answered ${answer.code} (${answer.reason})")
+        if (!what.isRead) Log.w(TAG, "${what.label}: Google Tasks answered ${answer.code} (${answer.reason})")
     }
 
     /** A URL under the connection's own list, never "@default"; a connection without a list has none to read. */

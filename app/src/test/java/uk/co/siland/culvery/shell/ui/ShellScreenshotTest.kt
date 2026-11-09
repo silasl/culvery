@@ -108,6 +108,7 @@ import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.RailBadge
+import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.TrayButton
@@ -349,7 +350,9 @@ class ShellScreenshotTest {
 
             override fun dismiss() = Unit
         }
-        val checks = ShoppingChecks(store, sync, host, shoppingScope)
+        val checks = ShoppingChecks(store, sync, object : ScreenLit {
+            override val lit = MutableStateFlow(false)
+        }, shoppingScope)
         val actions = ShoppingActions(store, learning, lock, loop, checks, toaster, wall, shoppingScope)
         val access = NoAccess()
         val capability = ShoppingCapability(

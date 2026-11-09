@@ -46,6 +46,9 @@ internal value class TasksCall(override val label: String) : GoogleCallLabel {
     }
 }
 
+/** A read's failure is logged once per run by the shopping checks (19 §5); the other calls log their own. */
+internal val TasksCall.isRead: Boolean get() = this == TasksCall.TASKS_LIST || this == TasksCall.TASKS_HISTORY
+
 private val SERVICE = GoogleService(TAG, "Google Tasks")
 
 internal fun <T> GoogleAnswer.decode(deserializer: DeserializationStrategy<T>, what: TasksCall): T = decode(deserializer, SERVICE, what)
@@ -83,17 +86,17 @@ class TasksApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, cl
         } catch (e: IOException) {
             // A cancelled caller gets its cancellation, never "unreachable".
             currentCoroutineContext().ensureActive()
-            Log.w(TAG, "${what.label}: Couldn't reach Google Tasks (${e::class.simpleName})")
+            if (!what.isRead) Log.w(TAG, "${what.label}: Couldn't reach Google Tasks (${e::class.simpleName})")
             throw e.asUnreachable(SERVICE, offlineOnUnknownHost = true)
         }
         when (answer.fault()) {
             GoogleFault.SCOPE_MISSING -> {
-                Log.w(TAG, "${what.label}: Google Tasks says the grant lacks the Tasks scope (${answer.reason})")
-                throw NeedsSignInException("Google Tasks needs the Tasks scope approved again")
+                if (!what.isRead) Log.w(TAG, "${what.label}: Google Tasks says the grant lacks the Tasks scope (${answer.reason})")
+                throw NeedsSignInException("Google Tasks needs the Tasks scope approved again", reason = answer.reason)
             }
             GoogleFault.TRY_LATER -> {
-                Log.w(TAG, "${what.label}: Google Tasks said try later: ${answer.code} (${answer.reason})")
-                throw UnreachableException("Google Tasks asked to try later (${answer.code})")
+                if (!what.isRead) Log.w(TAG, "${what.label}: Google Tasks said try later: ${answer.code} (${answer.reason})")
+                throw UnreachableException("Google Tasks asked to try later (${answer.code})", reason = answer.reason)
             }
             null -> return answer
         }

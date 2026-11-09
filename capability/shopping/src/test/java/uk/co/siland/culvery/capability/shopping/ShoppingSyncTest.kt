@@ -6,7 +6,9 @@ import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
@@ -315,7 +317,7 @@ class ShoppingSyncTest : ShoppingTestBase() {
         rig.sync.check()
         rig.provider.failAll = UnreachableException()
         advanceTimeBy(60_000)
-        rig.sync.check()
+        assertThat(runCatching { rig.sync.check() }.exceptionOrNull()).isInstanceOf(UnreachableException::class.java)
         assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.CANT_REACH)
         assertThat(rig.store.items.first().map { it.text }).containsExactly("Milk")
         assertThat(rig.store.connectionNow()!!.lastReadMillis).isEqualTo(0)
@@ -535,7 +537,7 @@ class ShoppingSyncTest : ShoppingTestBase() {
         rig.connect()
         rig.provider.tickedOn("Milk", Instant.ofEpochMilli(currentTime))
         rig.provider.failNext = UnreachableException()
-        rig.sync.check()
+        assertThat(runCatching { rig.sync.check() }.exceptionOrNull()).isInstanceOf(UnreachableException::class.java)
         assertThat(rig.store.connectionNow()!!.seeded).isFalse()
         assertThat(rig.store.learned.first()).isEmpty()
         advanceTimeBy(60_000)
@@ -677,5 +679,24 @@ class ShoppingSyncTest : ShoppingTestBase() {
         assertThat(rig.store.queueNow()).isEmpty()
         assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)
         assertThat(rig.openTexts()).containsExactly("Eggs")
+    }
+
+    @Test
+    fun aFailedReadBacksOffThroughARealSync() = runTest {
+        val rig = rig()
+        rig.connect()
+        rig.provider.failAll = UnreachableException()
+        ShoppingChecks(flowOf(true), MutableStateFlow(true), rig.sync::check, backgroundScope).also {
+            it.start()
+            it.watch()
+        }
+        runCurrent()
+        advanceTimeBy(180_000)
+        runCurrent()
+        assertThat(rig.provider.calls.filter { it == "items" }).hasSize(3)
+        assertThat(rig.store.connectionNow()?.health).isEqualTo(ShoppingHealth.CANT_REACH)
+        advanceTimeBy(239_000)
+        runCurrent()
+        assertThat(rig.provider.calls.filter { it == "items" }).hasSize(3)
     }
 }

@@ -49,13 +49,20 @@ sealed interface ConnectionHealth {
 }
 
 /** The connection's sign-in has expired or been revoked (Google: 401, or a refused token refresh). */
-class NeedsSignInException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+class NeedsSignInException(message: String? = null, cause: Throwable? = null, val reason: String? = null) : Exception(message, cause)
 
 /**
  * The provider couldn't be reached, or asked to be tried later: network errors, and for Google 429, 403
  * rate-limit reasons (rateLimitExceeded, userRateLimitExceeded) and every 5xx. The engine retries with backoff.
  */
-open class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+open class UnreachableException(message: String? = null, cause: Throwable? = null, val reason: String? = null) : Exception(message, cause)
+
+/** Google's fixed reason word, such as rateLimitExceeded, from a sign-in or try-later failure; null for any other. Never free text (19 §5). */
+fun Throwable.reasonWord(): String? = when (this) {
+    is UnreachableException -> reason
+    is NeedsSignInException -> reason
+    else -> null
+}
 
 /** The tablet itself has no network (5 §A.3): what a provider throws when it knows, rather than leaving it to a cause. */
 class OfflineException(message: String? = null, cause: Throwable? = null) : UnreachableException(message, cause)

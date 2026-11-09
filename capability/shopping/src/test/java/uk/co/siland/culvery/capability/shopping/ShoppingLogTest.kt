@@ -38,7 +38,8 @@ class ShoppingLogTest : ShoppingTestBase() {
             rig.enqueue(QueuedKind.TICK, "t1", "Tea bags", itemId = "g1")
             rig.enqueue(QueuedKind.ADD, "k1", "Bin bags")
             rig.sync.drain()
-            rig.sync.check()
+            // A failed read throws; what it says is the checks' to log.
+            runCatching { rig.sync.check() }
             advanceTimeBy(300_000)
         }
         val logged = ShadowLog.getLogs().map { it.msg.orEmpty() }

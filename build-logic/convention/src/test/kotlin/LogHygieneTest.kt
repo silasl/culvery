@@ -150,6 +150,8 @@ internal object LogHygiene {
      *
      * `failedInARow` is the count `FailureRun.succeeded()` returned, always named so at the call site (19 §5).
      *
+     * `e.reasonWord()` is Google's fixed reason word, such as rateLimitExceeded, or null; never free text (19 §5).
+     *
      * `mark.elapsedNow().inWholeMilliseconds` is how long the doorbell's layout read took (19 §3.2).
      */
     val ALLOWED = setOf(
@@ -158,7 +160,7 @@ internal object LogHygiene {
         "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
         "step.name", "own.logName", "source.sound.key", "after.screen.name", "names.size",
-        "collections.size", "failed.kind.name", "failedInARow", "mark.elapsedNow().inWholeMilliseconds",
+        "collections.size", "failed.kind.name", "failedInARow", "e.reasonWord()", "mark.elapsedNow().inWholeMilliseconds",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|i|wtf|println)\(""")
