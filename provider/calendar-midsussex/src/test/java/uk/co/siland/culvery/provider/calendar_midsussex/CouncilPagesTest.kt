@@ -27,6 +27,13 @@ class CouncilPagesTest {
     }
 
     @Test
+    fun addressTextNamesNoAddress() {
+        val text = Address("1 Example Road, ZZ1 1ZZ", "https://waste.services.midsussex.gov.uk/mop.php?Track=2031/01/01/ABCDEF123".toHttpUrl()).toString()
+
+        assertThat(text).isEqualTo("Address")
+    }
+
+    @Test
     fun noStartLinkFails() {
         assertThat(failure { searchUrl(page("collections_missing.html"), base) })
             .isEqualTo(BinsFailure.NO_START_LINK)

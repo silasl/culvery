@@ -32,7 +32,9 @@ data class Connection(
     val providerId: String,
     val label: String,
     val config: Map<String, String>,
-)
+) {
+    override fun toString() = "Connection(id=$id, provider=$providerId)"
+}
 
 sealed interface ConnectionHealth {
     data object Ok : ConnectionHealth

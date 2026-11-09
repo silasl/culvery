@@ -24,7 +24,9 @@ enum class BinsFailure { NO_START_LINK, NO_ADDRESS_LIST, ADDRESS_GONE, NO_COLLEC
 
 class BinsReadFailed(val kind: BinsFailure) : Exception(kind.name)
 
-data class Address(val line: String, val url: HttpUrl)
+data class Address(val line: String, val url: HttpUrl) {
+    override fun toString() = "Address"
+}
 
 /** [kinds] are keys (food, garden, recycling, waste) or the council's own words for a bin we don't know. */
 @Serializable

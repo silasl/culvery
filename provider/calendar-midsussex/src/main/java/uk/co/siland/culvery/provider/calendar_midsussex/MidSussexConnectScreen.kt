@@ -45,15 +45,21 @@ internal const val WHICH_ADDRESS = "Which address?"
 
 private val GAP = 12.dp
 
-private sealed interface Step {
+internal sealed interface Step {
     data object Idle : Step
     data object Working : Step
     data object NoAddress : Step
     /** [house] and [postcode] are what was searched, whatever the fields hold now. */
-    data class Pick(val house: String, val postcode: String, val found: CouncilClient.Found) : Step
-    data class Ready(val house: String, val postcode: String, val line: String, val next: String) : Step
+    data class Pick(val house: String, val postcode: String, val found: CouncilClient.Found) : Step {
+        override fun toString() = "Pick"
+    }
+    data class Ready(val house: String, val postcode: String, val line: String, val next: String) : Step {
+        override fun toString() = "Ready"
+    }
     /** [ready] has gone to onConnected and is still shown; a second tap adds nothing. */
-    data class Done(val ready: Ready) : Step
+    data class Done(val ready: Ready) : Step {
+        override fun toString() = "Done"
+    }
     data object Failed : Step
 }
 

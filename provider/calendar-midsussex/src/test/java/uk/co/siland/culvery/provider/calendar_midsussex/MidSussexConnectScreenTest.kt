@@ -269,4 +269,15 @@ class MidSussexConnectScreenTest {
         waitFor("Next: ")
         compose.onNodeWithText("Next: Thursday 9 January — Food, Garden, Recycling, Waste").assertExists()
     }
+
+    @Test
+    fun pickReadyAndDoneNameNoAddress() {
+        val address = Address("1 Example Road", base.resolve("/mop.php?Track=2031/01/01/ABCDEF123")!!)
+        val pick = Step.Pick("1", "ZZ1 1ZZ", CouncilClient.Found(listOf(address), testCouncil(base).Session()))
+        val ready = Step.Ready("1", "ZZ1 1ZZ", "1 Example Road", "Next: Thursday 2 January — Food")
+
+        assertThat(pick.toString()).isEqualTo("Pick")
+        assertThat(ready.toString()).isEqualTo("Ready")
+        assertThat(Step.Done(ready).toString()).isEqualTo("Done")
+    }
 }
