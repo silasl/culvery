@@ -430,6 +430,20 @@
 - [ ] **Step 4:** Run `./gradlew :capability:music:testDebugUnitTest verifyRoborazziDebug`. Expect PASS.
 - [ ] **Step 5:** Commit: `Give Shuffle everything its full padding on the Music card`.
 
+### Task 24b: Taekwondo, the instructor's answers and move 21's line break
+
+**Files:** `capability/taekwondo/.../Moves.kt` (`romanised: String?`; move 11 `romanised = null`, no "?"; End `"Baro"`, Hangul `"바로"`; move 21's Hangul `"니은자 서 등주먹 바로 옆뒤 때리기와 팔목 낮은데 반대 막기"`; the KDoc no longer says "until the instructor fills it in"), `TaekwondoRun.kt` (a move with neither Hangul nor romanised is read from `english` in the English voice; Detailed then adds only the description), `ui/TaekwondoScreen.kt` (big line `hangul ?: romanised ?: english`; the romanised line only when `romanised != null`); tests `MovesTest.kt`, `TaekwondoRunTest.kt`, `ui/` screen test, the Taekwondo screenshot test.
+
+- [ ] **Step 1:** Write:
+  - `MovesTest.everyMoveMatchesTheInstructorsList`: all 32 entries' number, romanised, English and description, in order (replaces the 5-entry check).
+  - `MovesTest.move11HasNoKoreanName` (romanised and Hangul null), `MovesTest.endIsBaro` ("Baro", "바로"), `MovesTest.move21KeepsWaWithTheWordBefore` (Hangul contains "때리기와 팔목" and no " 와 ").
+  - `TaekwondoRunTest.aMoveWithNoKoreanNameIsReadInEnglish` (move 11: one English say of its English name; Detailed: then its description, the name not said twice).
+  - Screen test `aMoveWithNoKoreanNameShowsItsEnglishName` (move 11: big line is the English name; no `move_romanised` node).
+- [ ] **Step 2:** Run `./gradlew :capability:taekwondo:testDebugUnitTest`. Expect FAIL.
+- [ ] **Step 3:** Implement. Re-record only the Taekwondo baselines that show move 11, End or 21 (restore any other).
+- [ ] **Step 4:** Run `./gradlew :capability:taekwondo:testDebugUnitTest verifyRoborazziDebug`. Expect PASS.
+- [ ] **Step 5:** Commit: `Use the instructor's answers for Choong-Moo's move 11 and End, and keep move 21's 와 with its word`.
+
 ### Task 25: Calendar M2, an Undo that races a create
 
 **Files:** `capability/calendar/.../CalendarSync.kt` (`deliver`, `undoneCreate`), `CalendarEditor.kt` (`undo`), `UndoneKeys.kt`, `CalendarWriteLock.kt`; tests `CalendarSyncTest.kt`, `CalendarEditorTest.kt`.
@@ -538,6 +552,7 @@ Walk-through rule: collect faults and put them to the user before fixing any. Cl
   3. Allow the camera: after Android's dialog, Allow and then Deny, the wall pins again.
   4. Choose home app: back from Android's chooser, the next Settings action asks the PIN.
   5. The companion's tablet checks that don't need https, and the user's hand check for I1 (its "Plan 20 tasks", Task 32).
+  6. Taekwondo, Choong-Moo: every move's Hangul wraps between words, move 21 never breaks before "와", move 11 shows and reads its English name, and End reads "바로".
 - [ ] **Step 3:** Put any faults to the user before fixing any.
 
 ### Task 33: Home Assistant over https, with the user

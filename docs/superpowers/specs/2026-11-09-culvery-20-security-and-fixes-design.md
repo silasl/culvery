@@ -185,6 +185,15 @@ Closed apart from one change (the user, 2026-11-09). Since 51766191 the volume p
 
 What's left: "Shuffle everything" loses its narrow padding (`compact`), now that the row has room, and keeps its own width rather than stretching across the card. The card's screenshots and `theCardFitsTheSideBySideRow` are re-recorded and still pass.
 
+### 4.6 Taekwondo: the instructor's answers and Korean line breaks (the user, 2026-11-09)
+The instructor answered the two flagged moves in Choong-Moo, and asked for one line-break change.
+
+- **Move 11 has no Korean name** and needs none. `Move.romanised` becomes nullable; move 11's is null and its Hangul stays null. The screen's big line shows the English name, with no romanised line under it. The voice reads the English name in the English voice; Detailed adds the description, without reading the English name twice. Its "?" goes.
+- **End is "Baro"** as suggested: the "?" goes and its Hangul is "바로", read in the Korean voice like the others.
+- **Move 21's "와" stays with the word before it:** the Hangul is written "옆뒤 때리기와 팔목" (joined, as Korean writes it), shown and spoken. The romanised line keeps "taerigi wa" as the instructor's list has it. Hangul lines keep breaking only between words.
+- The moves test checks all 32 entries against the instructor's list (Plan 15b's minor), and no entry is marked for the instructor any more.
+- Checked on the tablet: every move's Hangul wraps between words, and move 21 never breaks before "와".
+
 ## 5. Checks
 
 ### 5.1 Tests
