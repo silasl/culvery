@@ -7,6 +7,8 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -84,5 +86,25 @@ class AddModeSheetTest {
 
         val typed = compose.onNodeWithTag("mode_name").fetchSemanticsNode().config[SemanticsProperties.EditableText].text
         assertThat(typed).isEqualTo("Film night")
+    }
+
+    /** Regression guard: the keyboard stayed up after Save name, as the field left the screen still focused. */
+    @Test
+    fun savingANameLetsGoOfTheField() {
+        var saved: String? = null
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalOverlayHost provides TestOverlay()) {
+                    RenameModeSheet("Film night", listOf("Party mode"), { saved = it }, {})
+                }
+            }
+        }
+        compose.onNodeWithTag("mode_name").performClick()
+        compose.onNodeWithTag("mode_name").assertIsFocused()
+
+        compose.onNodeWithTag("mode_rename_save").performClick()
+
+        compose.onNodeWithTag("mode_name").assertIsNotFocused()
+        assertThat(saved).isEqualTo("Film night")
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -110,6 +111,7 @@ private fun ModeSheet(title: String, tag: String, onClose: () -> Unit, content: 
 @Composable
 private fun NameStep(name: String, onName: (String) -> Unit, taken: List<String>, action: String, actionTag: String, onGo: () -> Unit) {
     val overlay = LocalOverlayHost.current
+    val focusManager = LocalFocusManager.current
     val problem = ModesWords.nameProblem(name, taken)
     HhTextField(
         value = name,
@@ -121,7 +123,8 @@ private fun NameStep(name: String, onName: (String) -> Unit, taken: List<String>
         error = problem.takeIf { name.isNotEmpty() },
         onDone = { if (problem == null) onGo() },
     )
-    HhButton(action, onGo, Modifier.testTag(actionTag), tone = ButtonTone.Primary, enabled = problem == null, on = ButtonSurface.Bg)
+    // The field leaving the screen doesn't close the keyboard; losing focus does.
+    HhButton(action, { focusManager.clearFocus(); onGo() }, Modifier.testTag(actionTag), tone = ButtonTone.Primary, enabled = problem == null, on = ButtonSurface.Bg)
 }
 
 /** The icons as a grid of radios, four to a row, with [chosen] selected. */
