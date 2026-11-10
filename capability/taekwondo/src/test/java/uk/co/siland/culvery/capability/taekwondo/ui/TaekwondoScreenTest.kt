@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
@@ -32,6 +33,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.taekwondo.CHOONG_MOO
 import uk.co.siland.culvery.capability.taekwondo.FakeAlerts
 import uk.co.siland.culvery.capability.taekwondo.FakeSpeaker
+import uk.co.siland.culvery.capability.taekwondo.Language
 import uk.co.siland.culvery.capability.taekwondo.RunState
 import uk.co.siland.culvery.capability.taekwondo.TaekwondoSettings
 import uk.co.siland.culvery.capability.taekwondo.move
@@ -137,7 +139,7 @@ class TaekwondoScreenTest {
     fun aMoveWithNoKoreanNameShowsItsEnglishName() {
         compose.setContent {
             CulveryTheme(dark = true) {
-                TaekwondoPanel(RunState.Moving(11, move("11")), CHOONG_MOO, detailed = false, noKorean = false, onDetailed = {}, onPattern = {}, onCancel = {}, onClose = {})
+                TaekwondoPanel(RunState.Moving(11, move("11")), CHOONG_MOO, detailed = false, Language.KOREAN, noKorean = false, onDetailed = {}, onLanguage = {}, onPattern = {}, onCancel = {}, onClose = {})
             }
         }
 
@@ -151,7 +153,7 @@ class TaekwondoScreenTest {
         val plain = move("1").copy(hangul = null, spokenHangul = null)
         compose.setContent {
             CulveryTheme(dark = true) {
-                TaekwondoPanel(RunState.Moving(1, plain), CHOONG_MOO, detailed = false, noKorean = false, onDetailed = {}, onPattern = {}, onCancel = {}, onClose = {})
+                TaekwondoPanel(RunState.Moving(1, plain), CHOONG_MOO, detailed = false, Language.KOREAN, noKorean = false, onDetailed = {}, onLanguage = {}, onPattern = {}, onCancel = {}, onClose = {})
             }
         }
 
@@ -217,6 +219,42 @@ class TaekwondoScreenTest {
             "Parallel ready stance" to false,
             "Feet parallel, shoulder width apart; calm and ready to begin." to false,
         ).inOrder()
+    }
+
+    @Test
+    fun theLanguageIsRemembered() {
+        content()
+        tag("taekwondo_language_1").assertIsSelected()
+        tag("taekwondo_language_2").performClick()
+        compose.waitUntil(5_000) { runBlocking { settings.language.first() } == Language.PHONETIC }
+
+        compose.runOnIdle { showing = false }
+        compose.runOnIdle { showing = true }
+
+        compose.waitUntil(5_000) { runCatching { tag("taekwondo_language_2").assertIsSelected() }.isSuccess }
+    }
+
+    @Test
+    fun aRunReadsNamesInTheChosenLanguage() {
+        runBlocking { settings.setLanguage(Language.ENGLISH) }
+        content()
+        compose.waitUntil(5_000) { runCatching { tag("taekwondo_language_0").assertIsSelected() }.isSuccess }
+        compose.mainClock.autoAdvance = false
+        start()
+
+        after(10_000)
+
+        assertThat(speaker.calls).containsExactly("Parallel ready stance" to false)
+    }
+
+    @Test
+    fun theNoKoreanVoiceLineShowsOnlyWhileKoreanIsChosen() {
+        speaker.korean.value = false
+        runBlocking { settings.setLanguage(Language.PHONETIC) }
+        content()
+        compose.waitUntil(5_000) { runCatching { tag("taekwondo_language_2").assertIsSelected() }.isSuccess }
+
+        assertThat(open("taekwondo_no_korean")).isFalse()
     }
 
     @Test

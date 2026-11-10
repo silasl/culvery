@@ -6,6 +6,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -35,7 +36,18 @@ class TaekwondoSettings(private val store: DataStore<Preferences>) {
         store.edit { it[DETAILED] = on }
     }
 
+    /** How each move's name is read aloud; Korean until chosen. */
+    val language: Flow<Language> = store.data
+        .retryWithBackoff { Log.w(TAG, "Couldn't read the Taekwondo settings (${it::class.simpleName}); retrying") }
+        .map { prefs -> Language.entries.firstOrNull { it.name == prefs[LANGUAGE] } ?: Language.KOREAN }
+        .distinctUntilChanged()
+
+    suspend fun setLanguage(language: Language) {
+        store.edit { it[LANGUAGE] = language.name }
+    }
+
     private companion object {
         val DETAILED = booleanPreferencesKey("detailed")
+        val LANGUAGE = stringPreferencesKey("language")
     }
 }

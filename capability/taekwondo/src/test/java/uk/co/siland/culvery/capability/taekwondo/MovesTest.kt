@@ -83,6 +83,15 @@ class MovesTest {
         assertThat(six.spokenHangul).isEqualTo("구부려 준비 서기")
     }
 
+    /** Fails if a move with a Korean name has no respelling, or one the English voice would read as anything but letters, hyphens and pauses. */
+    @Test
+    fun everyKoreanNameHasARespelling() {
+        CHOONG_MOO.moves.filter { it.romanised != null }.forEach {
+            assertThat(it.phonetic).matches("[a-z]+(-[a-z]+)*(,? [a-z]+(-[a-z]+)*)*")
+        }
+        assertThat(move("11").phonetic).isNull()
+    }
+
     /** 15b M6: fails if a move, the pattern or a run's state prints move text in its toString. */
     @Test
     fun toStringLeavesOutTheMoves() {

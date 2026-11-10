@@ -135,30 +135,98 @@ class TaekwondoRunTest {
     }
 
     @Test
-    fun noKoreanVoiceReadsTheRomanisedInEnglish() = runTest {
+    fun englishReadsTheEnglishName() = runTest {
+        val rig = Rig(this)
+
+        rig.run.start(CHOONG_MOO, detailed = false, Language.ENGLISH)
+        passes(10_000)
+
+        assertThat(rig.speaker.calls).containsExactly("Parallel ready stance" to false)
+    }
+
+    @Test
+    fun englishInDetailedModeReadsTheNameOnceThenTheDescription() = runTest {
+        val rig = Rig(this)
+
+        rig.run.start(CHOONG_MOO, detailed = true, Language.ENGLISH)
+        passes(12_000)
+
+        assertThat(rig.speaker.calls).containsExactly(
+            "Parallel ready stance" to false,
+            "Feet parallel, shoulder width apart; calm and ready to begin." to false,
+        ).inOrder()
+    }
+
+    @Test
+    fun phoneticReadsTheRespellingInTheEnglishVoice() = runTest {
+        val rig = Rig(this)
+
+        rig.run.start(CHOONG_MOO, detailed = false, Language.PHONETIC)
+        passes(10_000)
+
+        assertThat(rig.speaker.calls).containsExactly(move("Start").phonetic!! to false)
+    }
+
+    @Test
+    fun phoneticInDetailedModeAddsTheEnglishNameAndDescription() = runTest {
+        val rig = Rig(this)
+
+        rig.run.start(CHOONG_MOO, detailed = true, Language.PHONETIC)
+        passes(13_000)
+
+        assertThat(rig.speaker.calls).containsExactly(
+            move("Start").phonetic!! to false,
+            "Parallel ready stance" to false,
+            "Feet parallel, shoulder width apart; calm and ready to begin." to false,
+        ).inOrder()
+    }
+
+    @Test
+    fun aMoveWithNoKoreanNameIsReadInEnglishWhateverTheLanguage() = runTest {
+        Language.entries.forEach { language ->
+            val rig = Rig(this)
+            rig.run.start(pattern("11"), detailed = false, language)
+            passes(10_000)
+            assertThat(rig.speaker.calls).containsExactly("Walking stance, grab the opponent's head" to false)
+            rig.run.stop()
+        }
+    }
+
+    @Test
+    fun koreanWithNoKoreanVoiceReadsThePhonetic() = runTest {
         val rig = Rig(this, hasKorean = false)
 
         rig.run.start(CHOONG_MOO, detailed = false)
         passes(10_000)
 
-        assertThat(rig.speaker.calls).containsExactly("Narani junbi sogi" to false)
+        assertThat(rig.speaker.calls).containsExactly(move("Start").phonetic!! to false)
     }
 
     @Test
-    fun aVoiceNotKnownYetReadsTheRomanisedInEnglish() = runTest {
+    fun koreanWithAVoiceNotKnownYetReadsThePhonetic() = runTest {
         val rig = Rig(this, hasKorean = null)
 
         rig.run.start(CHOONG_MOO, detailed = false)
         passes(10_000)
 
-        assertThat(rig.speaker.calls).containsExactly("Narani junbi sogi" to false)
+        assertThat(rig.speaker.calls).containsExactly(move("Start").phonetic!! to false)
     }
 
     @Test
-    fun noHangulReadsTheRomanisedInEnglish() = runTest {
+    fun noHangulReadsThePhonetic() = runTest {
         val rig = Rig(this)
 
         rig.run.start(Pattern("Test", listOf(move("1").copy(hangul = null, spokenHangul = null))), detailed = false)
+        passes(10_000)
+
+        assertThat(rig.speaker.calls).containsExactly(move("1").phonetic!! to false)
+    }
+
+    @Test
+    fun noRespellingReadsTheRomanisedInEnglish() = runTest {
+        val rig = Rig(this)
+
+        rig.run.start(Pattern("Test", listOf(move("1").copy(phonetic = null))), detailed = false, Language.PHONETIC)
         passes(10_000)
 
         assertThat(rig.speaker.calls).containsExactly("Niunja so sang sonkal makgi" to false)

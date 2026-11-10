@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import uk.co.siland.culvery.capability.taekwondo.Language
 import uk.co.siland.culvery.capability.taekwondo.PATTERNS
 import uk.co.siland.culvery.capability.taekwondo.Pattern
 import uk.co.siland.culvery.capability.taekwondo.RunState
@@ -43,6 +44,8 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhListRow
+import uk.co.siland.culvery.core.ui.HhSegmented
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhType
@@ -53,7 +56,10 @@ object TaekwondoWords {
     const val TITLE = "Taekwondo"
     const val DETAILED = "Detailed mode"
     const val DETAILED_LINE = "Also reads the English name and description aloud."
-    const val NO_KOREAN = "This tablet has no Korean voice, so it reads the Korean names in English. To add one, go to Settings › General management › Text-to-speech and install the Korean voice data."
+    const val LANGUAGE = "Language"
+    const val LANGUAGE_LINE = "How each move's name is read aloud."
+    val LANGUAGES = listOf("English", "Korean", "Phonetic Korean")
+    const val NO_KOREAN = "This tablet has no Korean voice, so it reads the names in Phonetic Korean. To add one, go to Settings › General management › Text-to-speech and install the Korean voice data."
     const val CANCEL = "Cancel"
     const val CLOSE = "Close"
     const val OPEN = "Open"
@@ -99,6 +105,7 @@ fun TaekwondoScreen(settings: TaekwondoSettings, speaker: Speaker, onClose: () -
     val run = remember(speaker) { TaekwondoRun(speaker, scope) }
     val state by run.state.collectAsState()
     val detailed by settings.detailed.collectAsState(initial = false)
+    val language by settings.language.collectAsState(initial = Language.KOREAN)
     val korean by speaker.korean.collectAsState()
     val running = state != RunState.Idle
     var chosen by remember { mutableStateOf(PATTERNS.first()) }
@@ -109,12 +116,13 @@ fun TaekwondoScreen(settings: TaekwondoSettings, speaker: Speaker, onClose: () -
     DisposableEffect(run) { onDispose { run.stop() } }
 
     TaekwondoPanel(
-        state = state, pattern = chosen, detailed = detailed, noKorean = korean == false,
+        state = state, pattern = chosen, detailed = detailed, language = language, noKorean = korean == false,
         onDetailed = { on -> scope.launch { settings.setDetailed(on) } },
+        onLanguage = { chosenLanguage -> scope.launch { settings.setLanguage(chosenLanguage) } },
         onPattern = {
             if (!alerts.showing.value) {
                 chosen = it
-                run.start(it, detailed)
+                run.start(it, detailed, language)
             }
         },
         onCancel = run::stop,
@@ -122,14 +130,16 @@ fun TaekwondoScreen(settings: TaekwondoSettings, speaker: Speaker, onClose: () -
     )
 }
 
-/** What the screen draws for [state]; [pattern] is the one chosen. [noKorean] adds a line on how to install a Korean voice. */
+/** What the screen draws for [state]; [pattern] is the one chosen. [noKorean] adds a line on how to install a Korean voice while Korean is chosen. */
 @Composable
 internal fun TaekwondoPanel(
     state: RunState,
     pattern: Pattern,
     detailed: Boolean,
+    language: Language,
     noKorean: Boolean,
     onDetailed: (Boolean) -> Unit,
+    onLanguage: (Language) -> Unit,
     onPattern: (Pattern) -> Unit,
     onCancel: () -> Unit,
     onClose: () -> Unit,
@@ -148,7 +158,7 @@ internal fun TaekwondoPanel(
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             when (state) {
-                RunState.Idle -> Grid(detailed, noKorean, onDetailed, onPattern)
+                RunState.Idle -> Grid(detailed, language, noKorean && language == Language.KOREAN, onDetailed, onLanguage, onPattern)
                 is RunState.Counting -> Big(state.seconds.toString(), "count", CountStyle)
                 is RunState.Again -> Big(TaekwondoWords.again(state.seconds), "again", AgainStyle)
                 is RunState.Moving -> MoveView(state)
@@ -164,9 +174,19 @@ internal fun TaekwondoPanel(
 }
 
 @Composable
-private fun Grid(detailed: Boolean, noKorean: Boolean, onDetailed: (Boolean) -> Unit, onPattern: (Pattern) -> Unit) {
+private fun Grid(
+    detailed: Boolean,
+    language: Language,
+    noKorean: Boolean,
+    onDetailed: (Boolean) -> Unit,
+    onLanguage: (Language) -> Unit,
+    onPattern: (Pattern) -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(24.dp), modifier = Modifier.fillMaxSize()) {
         HhSwitchRow(TaekwondoWords.DETAILED, TaekwondoWords.DETAILED_LINE, detailed, "taekwondo_detailed", onDetailed)
+        HhListRow(TaekwondoWords.LANGUAGE, subtitle = TaekwondoWords.LANGUAGE_LINE, trailing = {
+            HhSegmented(TaekwondoWords.LANGUAGES, language.ordinal, { onLanguage(Language.entries[it]) }, "taekwondo_language")
+        })
         if (noKorean) HhStatusLine(TaekwondoWords.NO_KOREAN, "taekwondo_no_korean")
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp), modifier = Modifier.fillMaxWidth()) {
             PATTERNS.forEachIndexed { i, pattern ->

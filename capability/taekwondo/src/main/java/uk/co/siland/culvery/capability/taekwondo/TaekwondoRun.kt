@@ -28,6 +28,9 @@ sealed interface RunState {
     data class Again(val seconds: Int) : RunState
 }
 
+/** How a move's name is read aloud. Phonetic is the English voice reading [Move.phonetic]. */
+enum class Language { ENGLISH, KOREAN, PHONETIC }
+
 /**
  * Reads a pattern's moves aloud until [stop]: a 10 s countdown, each move, 3 s of quiet after all but the last, then 10 s
  * and the pattern again. Only that a run started or stopped is logged, never a move.
@@ -38,7 +41,7 @@ class TaekwondoRun(private val speaker: Speaker, private val scope: CoroutineSco
 
     private var job: Job? = null
 
-    fun start(pattern: Pattern, detailed: Boolean) {
+    fun start(pattern: Pattern, detailed: Boolean, language: Language = Language.KOREAN) {
         if (job?.isActive == true) return
         Log.i(TAG, "A run started")
         _state.value = RunState.Counting(COUNTDOWN_SECONDS)
@@ -50,7 +53,7 @@ class TaekwondoRun(private val speaker: Speaker, private val scope: CoroutineSco
             while (true) {
                 pattern.moves.forEachIndexed { index, move ->
                     _state.value = RunState.Moving(index, move)
-                    speak(move, detailed)
+                    speak(move, detailed, language)
                     if (index != pattern.moves.lastIndex) delay(GAP_MS)
                 }
                 for (second in COUNTDOWN_SECONDS downTo 1) {
@@ -70,9 +73,14 @@ class TaekwondoRun(private val speaker: Speaker, private val scope: CoroutineSco
         if (running) Log.i(TAG, "A run stopped")
     }
 
-    private suspend fun speak(move: Move, detailed: Boolean) {
-        val hangul = move.spokenHangul?.takeIf { speaker.korean.value == true }
-        val name = hangul ?: move.romanised ?: move.english
+    private suspend fun speak(move: Move, detailed: Boolean, language: Language) {
+        // Korean falls back to the phonetic name while the tablet has no Korean voice.
+        val hangul = move.spokenHangul?.takeIf { language == Language.KOREAN && speaker.korean.value == true }
+        val name = when {
+            hangul != null -> hangul
+            language == Language.ENGLISH -> move.english
+            else -> move.phonetic ?: move.romanised ?: move.english
+        }
         speaker.say(name, korean = hangul != null)
         if (detailed) {
             if (name != move.english) speaker.say(move.english, korean = false)

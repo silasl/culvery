@@ -22,6 +22,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.taekwondo.CHOONG_MOO
 import uk.co.siland.culvery.capability.taekwondo.FakeSpeaker
+import uk.co.siland.culvery.capability.taekwondo.Language
 import uk.co.siland.culvery.capability.taekwondo.RunState
 import uk.co.siland.culvery.capability.taekwondo.TaekwondoSettings
 import uk.co.siland.culvery.capability.taekwondo.move
@@ -47,7 +48,7 @@ class TaekwondoScreenshotTest {
 
     private fun snap(name: String, state: RunState, detailed: Boolean = false, noKorean: Boolean = false) =
         compose.snap(name, dark = true, Modifier) {
-            TaekwondoPanel(state, CHOONG_MOO, detailed, noKorean, onDetailed = {}, onPattern = {}, onCancel = {}, onClose = {})
+            TaekwondoPanel(state, CHOONG_MOO, detailed, Language.KOREAN, noKorean, onDetailed = {}, onLanguage = {}, onPattern = {}, onCancel = {}, onClose = {})
         }
 
     @Test
