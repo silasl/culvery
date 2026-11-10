@@ -58,13 +58,18 @@ object TaekwondoWords {
     const val DETAILED_LINE = "Also reads the English name and description aloud."
     const val LANGUAGE = "Language"
     const val LANGUAGE_LINE = "How each move's name is read aloud."
-    val LANGUAGES = listOf("English", "Korean", "Phonetic Korean")
     const val NO_KOREAN = "This tablet has no Korean voice, so it reads the names in Phonetic Korean. To add one, go to Settings › General management › Text-to-speech and install the Korean voice data."
     const val CANCEL = "Cancel"
     const val CLOSE = "Close"
     const val OPEN = "Open"
 
     fun again(seconds: Int) = "Again in $seconds"
+
+    fun language(language: Language) = when (language) {
+        Language.ENGLISH -> "English"
+        Language.KOREAN -> "Korean"
+        Language.PHONETIC -> "Phonetic Korean"
+    }
 }
 
 private val CountStyle = HhType.clock.copy(fontSize = 240.sp, lineHeight = 260.sp, letterSpacing = 0.sp)
@@ -158,7 +163,7 @@ internal fun TaekwondoPanel(
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             when (state) {
-                RunState.Idle -> Grid(detailed, language, noKorean && language == Language.KOREAN, onDetailed, onLanguage, onPattern)
+                RunState.Idle -> Grid(detailed, language, noKorean, onDetailed, onLanguage, onPattern)
                 is RunState.Counting -> Big(state.seconds.toString(), "count", CountStyle)
                 is RunState.Again -> Big(TaekwondoWords.again(state.seconds), "again", AgainStyle)
                 is RunState.Moving -> MoveView(state)
@@ -185,9 +190,9 @@ private fun Grid(
     Column(verticalArrangement = Arrangement.spacedBy(24.dp), modifier = Modifier.fillMaxSize()) {
         HhSwitchRow(TaekwondoWords.DETAILED, TaekwondoWords.DETAILED_LINE, detailed, "taekwondo_detailed", onDetailed)
         HhListRow(TaekwondoWords.LANGUAGE, subtitle = TaekwondoWords.LANGUAGE_LINE, trailing = {
-            HhSegmented(TaekwondoWords.LANGUAGES, language.ordinal, { onLanguage(Language.entries[it]) }, "taekwondo_language")
+            HhSegmented(Language.entries.map(TaekwondoWords::language), language.ordinal, { onLanguage(Language.entries[it]) }, "taekwondo_language")
         })
-        if (noKorean) HhStatusLine(TaekwondoWords.NO_KOREAN, "taekwondo_no_korean")
+        if (noKorean && language == Language.KOREAN) HhStatusLine(TaekwondoWords.NO_KOREAN, "taekwondo_no_korean")
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp), modifier = Modifier.fillMaxWidth()) {
             PATTERNS.forEachIndexed { i, pattern ->
                 Box(

@@ -38,7 +38,7 @@ class TaekwondoRunTest {
     fun countsDownTenThenSaysTheFirstMove() = runTest {
         val rig = Rig(this)
 
-        rig.run.start(CHOONG_MOO, detailed = false)
+        rig.run.start(CHOONG_MOO, detailed = false, Language.KOREAN)
         passes(9_999)
         assertThat(rig.states).containsExactlyElementsIn(listOf(RunState.Idle) + (10 downTo 1).map { RunState.Counting(it) }).inOrder()
         assertThat(rig.speaker.calls).isEmpty()
@@ -53,7 +53,7 @@ class TaekwondoRunTest {
     fun detailedAddsTheEnglishNameAndDescription() = runTest {
         val rig = Rig(this)
 
-        rig.run.start(CHOONG_MOO, detailed = true)
+        rig.run.start(CHOONG_MOO, detailed = true, Language.KOREAN)
         passes(18_001)
 
         assertThat(rig.speaker.calls.take(6)).containsExactly(
@@ -70,7 +70,7 @@ class TaekwondoRunTest {
     fun notDetailedReadsOnlyTheTerm() = runTest {
         val rig = Rig(this)
 
-        rig.run.start(CHOONG_MOO, detailed = false)
+        rig.run.start(CHOONG_MOO, detailed = false, Language.KOREAN)
         passes(17_000)
 
         assertThat(rig.speaker.calls).containsExactly("나란히 준비 서기" to true, "니은자 서 쌍 손칼 막기" to true).inOrder()
@@ -80,7 +80,7 @@ class TaekwondoRunTest {
     fun threeSecondsOfQuietBetweenMoves() = runTest {
         val rig = Rig(this)
 
-        rig.run.start(CHOONG_MOO, detailed = false)
+        rig.run.start(CHOONG_MOO, detailed = false, Language.KOREAN)
         passes(30_000)
 
         // Spoken at 10 s for 1 s, quiet until 14 s, then the next.
@@ -90,13 +90,13 @@ class TaekwondoRunTest {
     @Test
     fun aMoveWithNoKoreanNameIsReadInEnglish() = runTest {
         val plain = Rig(this)
-        plain.run.start(pattern("11"), detailed = false)
+        plain.run.start(pattern("11"), detailed = false, Language.KOREAN)
         passes(10_000)
         assertThat(plain.speaker.calls).containsExactly("Walking stance, grab the opponent's head" to false)
         plain.run.stop()
 
         val detailed = Rig(this)
-        detailed.run.start(pattern("11"), detailed = true)
+        detailed.run.start(pattern("11"), detailed = true, Language.KOREAN)
         passes(12_000)
         assertThat(detailed.speaker.calls).containsExactly(
             "Walking stance, grab the opponent's head" to false,
@@ -108,7 +108,7 @@ class TaekwondoRunTest {
     fun stepSixSpeaksWithoutTheA() = runTest {
         val rig = Rig(this)
 
-        rig.run.start(pattern("6"), detailed = false)
+        rig.run.start(pattern("6"), detailed = false, Language.KOREAN)
         passes(10_000)
 
         assertThat(rig.states.last()).isEqualTo(RunState.Moving(0, move("6")))
@@ -119,7 +119,7 @@ class TaekwondoRunTest {
     fun afterTheLastTenSecondsThenTheFirstAgain() = runTest {
         val rig = Rig(this)
 
-        rig.run.start(pattern("Start", "1"), detailed = false)
+        rig.run.start(pattern("Start", "1"), detailed = false, Language.KOREAN)
         // The last move is spoken at 14 s, so it ends at 15 s with no quiet after it.
         passes(14_999)
         assertThat(rig.states.last()).isEqualTo(RunState.Moving(1, move("1")))
@@ -196,7 +196,7 @@ class TaekwondoRunTest {
     fun koreanWithNoKoreanVoiceReadsThePhonetic() = runTest {
         val rig = Rig(this, hasKorean = false)
 
-        rig.run.start(CHOONG_MOO, detailed = false)
+        rig.run.start(CHOONG_MOO, detailed = false, Language.KOREAN)
         passes(10_000)
 
         assertThat(rig.speaker.calls).containsExactly(move("Start").phonetic!! to false)
@@ -206,7 +206,7 @@ class TaekwondoRunTest {
     fun koreanWithAVoiceNotKnownYetReadsThePhonetic() = runTest {
         val rig = Rig(this, hasKorean = null)
 
-        rig.run.start(CHOONG_MOO, detailed = false)
+        rig.run.start(CHOONG_MOO, detailed = false, Language.KOREAN)
         passes(10_000)
 
         assertThat(rig.speaker.calls).containsExactly(move("Start").phonetic!! to false)
@@ -216,7 +216,7 @@ class TaekwondoRunTest {
     fun noHangulReadsThePhonetic() = runTest {
         val rig = Rig(this)
 
-        rig.run.start(Pattern("Test", listOf(move("1").copy(hangul = null, spokenHangul = null))), detailed = false)
+        rig.run.start(Pattern("Test", listOf(move("1").copy(hangul = null, spokenHangul = null))), detailed = false, Language.KOREAN)
         passes(10_000)
 
         assertThat(rig.speaker.calls).containsExactly(move("1").phonetic!! to false)
@@ -235,7 +235,7 @@ class TaekwondoRunTest {
     @Test
     fun stopEndsAtOnceAndStopsTheSpeaker() = runTest {
         val rig = Rig(this)
-        rig.run.start(CHOONG_MOO, detailed = true)
+        rig.run.start(CHOONG_MOO, detailed = true, Language.KOREAN)
         passes(10_500)
 
         rig.run.stop()
@@ -250,11 +250,11 @@ class TaekwondoRunTest {
     @Test
     fun aRunStartedAgainAfterAStopCountsFromTen() = runTest {
         val rig = Rig(this)
-        rig.run.start(CHOONG_MOO, detailed = false)
+        rig.run.start(CHOONG_MOO, detailed = false, Language.KOREAN)
         passes(12_000)
         rig.run.stop()
 
-        rig.run.start(CHOONG_MOO, detailed = false)
+        rig.run.start(CHOONG_MOO, detailed = false, Language.KOREAN)
 
         assertThat(rig.run.state.value).isEqualTo(RunState.Counting(10))
     }
@@ -264,7 +264,7 @@ class TaekwondoRunTest {
         ShadowLog.clear()
         val rig = Rig(this)
 
-        rig.run.start(CHOONG_MOO, detailed = true)
+        rig.run.start(CHOONG_MOO, detailed = true, Language.KOREAN)
         passes(20_000)
         rig.run.stop()
 

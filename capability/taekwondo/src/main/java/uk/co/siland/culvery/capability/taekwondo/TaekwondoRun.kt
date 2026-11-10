@@ -41,7 +41,7 @@ class TaekwondoRun(private val speaker: Speaker, private val scope: CoroutineSco
 
     private var job: Job? = null
 
-    fun start(pattern: Pattern, detailed: Boolean, language: Language = Language.KOREAN) {
+    fun start(pattern: Pattern, detailed: Boolean, language: Language) {
         if (job?.isActive == true) return
         Log.i(TAG, "A run started")
         _state.value = RunState.Counting(COUNTDOWN_SECONDS)
@@ -74,12 +74,13 @@ class TaekwondoRun(private val speaker: Speaker, private val scope: CoroutineSco
     }
 
     private suspend fun speak(move: Move, detailed: Boolean, language: Language) {
+        val phonetic = move.phonetic ?: move.romanised ?: move.english
         // Korean falls back to the phonetic name while the tablet has no Korean voice.
         val hangul = move.spokenHangul?.takeIf { language == Language.KOREAN && speaker.korean.value == true }
-        val name = when {
-            hangul != null -> hangul
-            language == Language.ENGLISH -> move.english
-            else -> move.phonetic ?: move.romanised ?: move.english
+        val name = when (language) {
+            Language.ENGLISH -> move.english
+            Language.KOREAN -> hangul ?: phonetic
+            Language.PHONETIC -> phonetic
         }
         speaker.say(name, korean = hangul != null)
         if (detailed) {

@@ -26,20 +26,19 @@ class TaekwondoSettings(private val store: DataStore<Preferences>) {
     @Inject
     constructor(@ApplicationContext context: Context) : this(settingsDataStore { context.preferencesDataStoreFile(FILE) })
 
-    /** Whether each move's description is read after its name; off until switched on. */
-    val detailed: Flow<Boolean> = store.data
+    private val prefs: Flow<Preferences> = store.data
         .retryWithBackoff { Log.w(TAG, "Couldn't read the Taekwondo settings (${it::class.simpleName}); retrying") }
-        .map { it[DETAILED] ?: false }
-        .distinctUntilChanged()
+
+    /** Whether each move's description is read after its name; off until switched on. */
+    val detailed: Flow<Boolean> = prefs.map { it[DETAILED] ?: false }.distinctUntilChanged()
 
     suspend fun setDetailed(on: Boolean) {
         store.edit { it[DETAILED] = on }
     }
 
     /** How each move's name is read aloud; Korean until chosen. */
-    val language: Flow<Language> = store.data
-        .retryWithBackoff { Log.w(TAG, "Couldn't read the Taekwondo settings (${it::class.simpleName}); retrying") }
-        .map { prefs -> Language.entries.firstOrNull { it.name == prefs[LANGUAGE] } ?: Language.KOREAN }
+    val language: Flow<Language> = prefs
+        .map { p -> Language.entries.firstOrNull { it.name == p[LANGUAGE] } ?: Language.KOREAN }
         .distinctUntilChanged()
 
     suspend fun setLanguage(language: Language) {
