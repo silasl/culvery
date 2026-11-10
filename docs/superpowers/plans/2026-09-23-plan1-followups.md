@@ -8,46 +8,15 @@ The open work, one number each; the details are in the sections below. Numbers n
 
 **From the November 2026 review and Plan 18**
 1. Camera wake-up's cost: the fixes (P1, P2, P9) are built; left is re-running runs B and C against decision 9's bar. See "November 2026 review" below.
-3. Security fixes N1–N10 and M2 (rulings in the private notes). Built and checked on the tablet, HTTPS on the NAS included (2026-11-10); comes off when merged.
-5. A shorter pause after ticking off a shopping item. Built, not merged; comes off after the tablet checks.
 6. A new name for Settings › Modes, at the end-of-v1 review.
 7. Sound pads played on Sonos.
 8. A Christmas seasonal theme.
 9. A real sleigh-bell recording for Christmas.
 10. Whether birthdays override a doorbell set to one sound.
-11. Plan 18's deferred minors (details under "Plan 18 deferred minors"). All 25 built, not merged; they come off after the tablet checks (11w–11y are in the private sounds folder, done):
-   - 11a. Sound generators: the WAV normalise-and-write code is copied across `tools/sound/*.py`.
-   - 11b. Happy Birthday plays at about 92% of the chime's loudness (the peak cap beats the loudness target).
-   - 11c. Sound library: the first folder read can overwrite a faster refresh.
-   - 11d. Sound library: until that first read lands, a chosen tablet sound shows "Not on this tablet any more".
-   - 11e. Sound library: a read failure while starting up isn't handled.
-   - 11f. Sound library: the shared-name check is case-sensitive.
-   - 11g. Sound library: a capitalised `Halloween/` folder is ignored.
-   - 11h. Sound library: two files with the same name drop the one in the subfolder.
-   - 11i. Sound player: a tablet doorbell sound that fails after starting gets no classic chime instead.
-   - 11j. Sound player: `prepare()` runs on the caller's thread.
-   - 11k. Sound player: a stop tap while a pad is opening is ignored, and the sound then starts (a few ms).
-   - 11l. Sound player: a pad tapped while the doorbell's own sound is opening relies on the pad gate.
-   - 11m. Pads: whether they're blocked can be up to 60 s out of date (the ticker isn't on the minute).
-   - 11n. Pads: they look playable before the first gate read.
-   - 11o. Pads: no 150 ms press flash (they match the other tiles).
-   - 11p. Settings: a sound that fails on Play says nothing.
-   - 11q. A hand-edited `builtin:happy_birthday` would ring at the door.
-   - 11r. `goneName` duplicates the door's `goneFileName`.
-   - 11s. Tests: the door module's tests and StoredModePageTest are flaky under full-project load.
-   - 11t. Tests: some fixtures (`testSounds()` file reads, `DoorQuietnessTest` waits) want timeouts.
-   - 11u. Tests: `home_tray_full` passes 4 modes and is silently cut to 2.
-   - 11v. Tests: small style nits (import order, a fully qualified Context, a long lock comment).
-   - 11w. `prepare.sh` (private sounds folder): hard-coded chime path.
-   - 11x. `prepare.sh`: stops silently on an empty source.
-   - 11y. `prepare.sh`: single-pass loudness normalising (±0.5 LU).
 
 **Bugs** (see "Bugs (2026-10-23)")
-12. Calendar M2: an Undo racing a drain create leaves the event on the week; `UndoneKeys` is lost on restart. Built, not merged; comes off after the tablet checks.
-13. Calendar M3: a phone's counted series is expanded in full on every detail update. Built, not merged; comes off after the tablet checks.
 14. Home slow to fill (2.2–2.9 s from a cold start).
 15. Accented letters garbled on the Music card.
-16. Hide the Music card's volume pill while nothing plays (no mute button). Built, not merged; comes off after the tablet checks.
 17. Not tried yet: "Use for new events" with real calendars, and a new Sonos playlist appearing.
 32. Culvery started while the tablet was on its lock screen (after an update) didn't pin once unlocked; a normal open asks to pin.
 33. The sample house's Music card says "Nothing playing" while a room plays.
@@ -58,7 +27,6 @@ The open work, one number each; the details are in the sections below. Numbers n
 38. Tidy-up: one shared set of test certificates for Home Assistant and Hue (two copies today).
 39. Tidy-up: Undo's bookkeeping in the calendar is kept in several places at once; fold it into one.
 40. Opening Culvery from outside the home screen (seen with `am start` after a force-stop on the emulator) can leave the app that was open before in front; Home brings Culvery back. Culvery starts its home screen and closes the other copy, and that hand-over is older than Plans 19 and 20. Check on the tablet whether a launcher or Settings' Open does the same.
-41. Check on the tablet: the Needs a PIN switch on a mode took about 3 s to flip after the PIN on the emulator. Done 2026-11-10: fine on the tablet.
 42. Taekwondo: a choice of Korean, English or phonetic Korean (the user, 2026-11-10). To settle before building: whether it picks what's shown, what's read aloud, or both.
 
 **To check on the tablet** (see "To check when the tablet is next plugged in")
