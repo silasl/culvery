@@ -27,7 +27,6 @@ The open work, one number each; the details are in the sections below. Numbers n
 38. Tidy-up: one shared set of test certificates for Home Assistant and Hue (two copies today).
 39. Tidy-up: Undo's bookkeeping in the calendar is kept in several places at once; fold it into one.
 40. Opening Culvery from outside the home screen (seen with `am start` after a force-stop on the emulator) can leave the app that was open before in front; Home brings Culvery back. Culvery starts its home screen and closes the other copy, and that hand-over is older than Plans 19 and 20. Check on the tablet whether a launcher or Settings' Open does the same.
-42. Taekwondo: a choice of Korean, English or phonetic Korean (the user, 2026-11-10). **Done, tablet-checked 2026-11-10:** a Language row picks how each move's name is read aloud (the screen is unchanged); Korean falls back to Phonetic with no Korean voice. The respellings are a best guess from the Hangul; the user is judging them in normal use.
 
 **To check on the tablet** (see "To check when the tablet is next plugged in")
 18. Taps that seemed lost on the emulator.
