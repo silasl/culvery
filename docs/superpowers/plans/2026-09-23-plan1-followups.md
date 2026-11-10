@@ -58,7 +58,7 @@ The open work, one number each; the details are in the sections below. Numbers n
 38. Tidy-up: one shared set of test certificates for Home Assistant and Hue (two copies today).
 39. Tidy-up: Undo's bookkeeping in the calendar is kept in several places at once; fold it into one.
 40. Opening Culvery from outside the home screen (seen with `am start` after a force-stop on the emulator) can leave the app that was open before in front; Home brings Culvery back. Culvery starts its home screen and closes the other copy, and that hand-over is older than Plans 19 and 20. Check on the tablet whether a launcher or Settings' Open does the same.
-41. Check on the tablet: the Needs a PIN switch on a mode took about 3 s to flip after the PIN on the emulator.
+41. Check on the tablet: the Needs a PIN switch on a mode took about 3 s to flip after the PIN on the emulator. Done 2026-11-10: fine on the tablet.
 
 **To check on the tablet** (see "To check when the tablet is next plugged in")
 18. Taps that seemed lost on the emulator.
