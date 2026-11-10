@@ -8,7 +8,7 @@ The open work, one number each; the details are in the sections below. Numbers n
 
 **From the November 2026 review and Plan 18**
 1. Camera wake-up's cost: the fixes (P1, P2, P9) are built; left is re-running runs B and C against decision 9's bar. See "November 2026 review" below.
-3. Security fixes N1–N10 and M2 (rulings in the private notes). Built, not merged; comes off after the tablet checks. N1 also needs HTTPS set up on the NAS.
+3. Security fixes N1–N10 and M2 (rulings in the private notes). Built and checked on the tablet, HTTPS on the NAS included (2026-11-10); comes off when merged.
 5. A shorter pause after ticking off a shopping item. Built, not merged; comes off after the tablet checks.
 6. A new name for Settings › Modes, at the end-of-v1 review.
 7. Sound pads played on Sonos.
