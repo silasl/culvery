@@ -57,7 +57,7 @@ object TaekwondoWords {
     const val DETAILED = "Detailed mode"
     const val DETAILED_LINE = "Also reads the English name and description aloud."
     const val LANGUAGE = "Language"
-    const val LANGUAGE_LINE = "How each move's name is read aloud."
+    const val LANGUAGE_LINE = "How each move’s name is read aloud."
     const val NO_KOREAN = "This tablet has no Korean voice, so it reads the names in Phonetic Korean. To add one, go to Settings › General management › Text-to-speech and install the Korean voice data."
     const val CANCEL = "Cancel"
     const val CLOSE = "Close"

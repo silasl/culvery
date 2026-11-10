@@ -83,7 +83,7 @@ class MovesTest {
         assertThat(six.spokenHangul).isEqualTo("구부려 준비 서기")
     }
 
-    /** Fails if a move with a Korean name has no respelling, or one the English voice would read as anything but letters, hyphens and pauses. */
+    /** Fails if a move with a Korean name has no respelling the English voice can read. */
     @Test
     fun everyKoreanNameHasARespelling() {
         CHOONG_MOO.moves.filter { it.romanised != null }.forEach {

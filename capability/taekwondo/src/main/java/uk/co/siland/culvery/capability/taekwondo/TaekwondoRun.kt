@@ -75,7 +75,6 @@ class TaekwondoRun(private val speaker: Speaker, private val scope: CoroutineSco
 
     private suspend fun speak(move: Move, detailed: Boolean, language: Language) {
         val phonetic = move.phonetic ?: move.romanised ?: move.english
-        // Korean falls back to the phonetic name while the tablet has no Korean voice.
         val hangul = move.spokenHangul?.takeIf { language == Language.KOREAN && speaker.korean.value == true }
         val name = when (language) {
             Language.ENGLISH -> move.english
