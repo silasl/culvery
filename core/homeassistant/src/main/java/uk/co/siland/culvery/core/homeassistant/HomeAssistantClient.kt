@@ -9,7 +9,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.net.ssl.X509TrustManager
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -110,6 +112,7 @@ class HomeAssistantClient internal constructor(
     internal val http: OkHttpClient,
     private val online: () -> Boolean,
     private val registryTimeoutMs: Long = COMMAND_TIMEOUT_MS,
+    private val io: CoroutineDispatcher = Dispatchers.IO,
     private val capture: (HaCall, String) -> Unit,
 ) : HomeAssistantApi {
     @Inject
@@ -155,7 +158,8 @@ class HomeAssistantClient internal constructor(
             val providers = withContext(Dispatchers.Default) { HaJson.authProviders(answer.text) }
             if (!providers) refuse(HaCall.CERTIFICATE, answer, HaProblem.NOT_HOME_ASSISTANT)
         } finally {
-            probeHttp.connectionPool.evictAll()
+            // Closing a TLS connection writes to it, which Android refuses on the main thread.
+            withContext(NonCancellable + io) { probeHttp.connectionPool.evictAll() }
         }
         return seen.pin ?: run {
             val what = HaCall.CERTIFICATE

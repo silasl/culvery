@@ -5,11 +5,15 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -278,6 +282,32 @@ class HomeAssistantClientTest {
             assertThat(tls.requestCount).isEqualTo(0)
         }
         assertThat(api.pinnedHttp(bridgePin).connectionPool).isNotSameInstanceAs(api.probeHttp.connectionPool)
+    }
+
+    /** Regression guard: closing the read's TLS connection on the caller's (main) thread crashed the app on the tablet. */
+    @Test
+    fun theCertificateReadClosesItsConnectionOnTheIoDispatcher() = runBlocking<Unit> {
+        val pool = Executors.newSingleThreadExecutor()
+        val io = object : CoroutineDispatcher() {
+            val inner = pool.asCoroutineDispatcher()
+            var dispatched = 0
+
+            override fun dispatch(context: CoroutineContext, block: Runnable) {
+                dispatched++
+                inner.dispatch(context, block)
+            }
+        }
+        val probing = HomeAssistantClient(homeHttpClient(COMMAND_TIMEOUT_MS), { true }, io = io) { _, _ -> }
+        try {
+            tlsServer("bridge").use { tls ->
+                tls.enqueue(MockResponse().setBody(HaFixtures.AUTH_PROVIDERS))
+                assertThat(probing.certificate(tls.url("/"))).isEqualTo(bridgePin)
+            }
+            assertThat(io.dispatched).isAtLeast(1)
+            assertThat(probing.probeHttp.connectionPool.connectionCount()).isEqualTo(0)
+        } finally {
+            pool.shutdown()
+        }
     }
 
     @Test
