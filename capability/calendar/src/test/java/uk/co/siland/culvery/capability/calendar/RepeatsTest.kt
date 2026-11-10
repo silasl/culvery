@@ -13,7 +13,7 @@ class RepeatsTest {
     // Saturday 26 September 2026.
     private val saturday = LocalDate.of(2026, 9, 26)
 
-    private fun label(rule: String?, day: LocalDate = saturday) = repeatsLabel(rule, EventTime.AllDay(day), london)
+    private fun label(rule: String?, day: LocalDate = saturday, today: LocalDate = saturday) = repeatsLabel(rule, EventTime.AllDay(day), london, today)
 
     @Test
     fun rulesReadInTheEditorsWords() {
@@ -92,6 +92,14 @@ class RepeatsTest {
     }
 
     @Test
+    fun aLastDateInAnotherYearHasItsYear() {
+        assertThat(label("RRULE:FREQ=WEEKLY;UNTIL=20270302")).isEqualTo("Every Saturday · until Tue 2 Mar 2027")
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=WEEKLY;COUNT=12", today = LocalDate.of(2025, 12, 31)))
+            .isEqualTo("Every Saturday · 12 times · last on Sat 12 Dec 2026")
+        assertThat(label("RRULE:FREQ=WEEKLY;UNTIL=20261212", today = LocalDate.of(2026, 1, 1))).isEqualTo("Every Saturday · until Sat 12 Dec")
+    }
+
+    @Test
     fun anythingElseIsYes() {
         listOf(
             null,
@@ -109,7 +117,7 @@ class RepeatsTest {
     @Test
     fun aTimedStartIsReadInTheHouseholdZone() {
         // 23:30 UTC on Friday 25 September is 00:30 on Saturday 26 September in London.
-        assertThat(repeatsLabel("RRULE:FREQ=WEEKLY;BYDAY=SA", EventTime.Timed(Instant.parse("2026-09-25T23:30:00Z")), london))
+        assertThat(repeatsLabel("RRULE:FREQ=WEEKLY;BYDAY=SA", EventTime.Timed(Instant.parse("2026-09-25T23:30:00Z")), london, saturday))
             .isEqualTo("Every Saturday")
     }
 
@@ -126,7 +134,7 @@ class RepeatsTest {
     /** Regression guard (20 §4.4): a series worked out directly still names its last date at COUNT 10,000. */
     @Test
     fun aLongDailySeriesNamesItsLastDate() {
-        assertThat(label("DTSTART:20260926\nRRULE:FREQ=DAILY;COUNT=10000")).isEqualTo("Every day · 10,000 times · last on Tue 10 Feb")
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=DAILY;COUNT=10000")).isEqualTo("Every day · 10,000 times · last on Tue 10 Feb 2054")
     }
 
     /** Regression guard: a short series still names its last date. */
@@ -152,7 +160,7 @@ class RepeatsTest {
     fun theReadBackAgreesWithTheEditor() {
         for (choice in EDITOR_REPEATS - RepeatChoice.Never) {
             val rule = recurrenceRule(choice, RepeatEnd.Never, day = saturday)
-            assertThat(repeatsLabel(rule, EventTime.AllDay(saturday), london)).isEqualTo(choice.wording(saturday))
+            assertThat(repeatsLabel(rule, EventTime.AllDay(saturday), london, saturday)).isEqualTo(choice.wording(saturday))
         }
     }
 }

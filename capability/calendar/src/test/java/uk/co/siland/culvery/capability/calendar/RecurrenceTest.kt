@@ -149,7 +149,7 @@ class RecurrenceTest {
         for (start in starts) {
             for (choice in RepeatChoice.entries - RepeatChoice.Never) {
                 for (end in listOf(RepeatEnd.Never, RepeatEnd.After(5))) {
-                    assertThat(repeatsLabel(rule(choice, end, day), start, london)).startsWith(choice.wording(day))
+                    assertThat(repeatsLabel(rule(choice, end, day), start, london, day)).startsWith(choice.wording(day))
                 }
             }
         }

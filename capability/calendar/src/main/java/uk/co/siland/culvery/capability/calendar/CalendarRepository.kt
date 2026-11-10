@@ -153,7 +153,7 @@ class CalendarRepository @Inject constructor(
         if (s == null) return@map null
         val e = s.shown.event
         val day = e.start.instantIn(s.zone).atZone(s.zone).toLocalDate()
-        val event = e.toUi(day, s.zone, s.people, s.order, s.catalog, s.shown.syncing, s.binInks).copy(repeats = repeatsLabel(e.recurrenceRule, e.start, s.zone))
+        val event = e.toUi(day, s.zone, s.people, s.order, s.catalog, s.shown.syncing, s.binInks).copy(repeats = repeatsLabel(e.recurrenceRule, e.start, s.zone, today))
         EventDetailUi(event, whenLabel(e.start, e.end, s.zone, today))
     }
 

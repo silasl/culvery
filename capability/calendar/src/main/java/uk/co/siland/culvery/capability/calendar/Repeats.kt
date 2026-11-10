@@ -15,10 +15,10 @@ private val UNITS = mapOf("DAILY" to "day", "WEEKLY" to "week", "MONTHLY" to "mo
  * The detail sheet's Repeats row (9 §3.4), in the editor's words from the series' first date (else [start]): "Every
  * Saturday", "Every month, on the last Thursday", "Every month, on the 22nd"; another interval reads "Every 3 months".
  * Then " · 12 times · last on Sat 12 Dec" (" · 12 times" when the rule has no first date, or past the count
- * [lastOccurrence] works out) or " · until Sat 12 Dec".
+ * [lastOccurrence] works out) or " · until Sat 12 Dec"; that last date has its year when it isn't [today]'s.
  * Anything else is "Yes".
  */
-fun repeatsLabel(rule: String?, start: EventTime, zone: ZoneId): String {
+fun repeatsLabel(rule: String?, start: EventTime, zone: ZoneId, today: LocalDate): String {
     val parts = rule?.let(::ruleParts) ?: return REPEATS_YES
     val first = seriesStart(rule)
     val day = first ?: start.instantIn(zone).atZone(zone).toLocalDate()
@@ -27,10 +27,10 @@ fun repeatsLabel(rule: String?, start: EventTime, zone: ZoneId): String {
     val words = if (choice != null) choice.wording(day, nth) else otherInterval(parts, day) ?: return REPEATS_YES
     val count = parts["COUNT"]?.toIntOrNull()?.takeIf { it >= 1 }?.let { n ->
         val lastDay = if (choice != null && first != null) lastOccurrence(choice, first, n, nth) else null
-        val last = lastDay?.let { " · last on ${it.format(SHORT_DAY)}" }.orEmpty()
+        val last = lastDay?.let { " · last on ${shortDay(it, today)}" }.orEmpty()
         " · ${"%,d".format(Locale.UK, n)} ${if (n == 1) "time" else "times"}$last"
     }.orEmpty()
-    val until = parts["UNTIL"]?.let { untilDay(it, zone) }?.let { " · until ${it.format(SHORT_DAY)}" }.orEmpty()
+    val until = parts["UNTIL"]?.let { untilDay(it, zone) }?.let { " · until ${shortDay(it, today)}" }.orEmpty()
     return words + count + until
 }
 

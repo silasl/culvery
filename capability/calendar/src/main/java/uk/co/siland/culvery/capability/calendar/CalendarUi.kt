@@ -163,6 +163,10 @@ fun problemLine(problem: SyncProblem): String = when (problem) {
 internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 // ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
 internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
+private val SHORT_DAY_AND_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.ENGLISH)
+
+/** "Sat 12 Dec", or "Tue 2 Mar 2027" when [date] isn't in [today]'s year. */
+internal fun shortDay(date: LocalDate, today: LocalDate): String = date.format(if (date.year == today.year) SHORT_DAY else SHORT_DAY_AND_YEAR)
 internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 /** "Sun 27": a day and its date. */
 internal val DAY_AND_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH)
