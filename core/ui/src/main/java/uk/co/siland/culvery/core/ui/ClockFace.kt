@@ -43,9 +43,10 @@ val CherryBombClock: TextStyle = HhType.clock.copy(
     letterSpacing = 0.sp,
 )
 
+/** Mountains of Christmas Bold, bundled whole (21 §4.5). */
 val MountainsOfChristmas: FontFamily = FontFamily(Font(R.font.mountains_of_christmas_bold, FontWeight.Bold))
 
-/** Christmas's clock: the normal clock's size and line height in Mountains of Christmas Bold (21 �4.5). */
+/** Christmas's clock: the normal clock's size and line height in Mountains of Christmas Bold (21 §4.5). */
 val MountainsOfChristmasClock: TextStyle = HhType.clock.copy(
     fontFamily = MountainsOfChristmas,
     fontWeight = FontWeight.Bold,

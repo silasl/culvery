@@ -67,6 +67,7 @@ class ThemedClockTest(private val look: Look) {
         fun looks() = listOf(
             Look("halloween", SeasonalTheme.HALLOWEEN, null, Creepster, HalloweenNight),
             Look("birthday", null, Birthday(pink, listOf("Sam")), CherryBombOne, birthdayLook(pink)!!.night),
+            // Pins for christmas: width, height, date and accent hold under the stub face too, since SlotClock fixes the slots; only the face case fails without the font.
             Look("christmas", SeasonalTheme.CHRISTMAS, null, MountainsOfChristmas, ChristmasNight),
         ).map { arrayOf<Any>(it) }
     }

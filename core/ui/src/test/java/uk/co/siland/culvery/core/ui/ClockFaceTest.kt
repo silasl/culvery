@@ -27,6 +27,7 @@ class ClockFaceTest {
 
     @Test
     fun everyDigitGetsTheSameSlot() {
+        // The "mountains" entry is a pin: SlotClock fixes the slots, so it holds for any face.
         val faces = mapOf("creepster" to CreepsterClock, "cherry" to CherryBombClock, "mountains" to MountainsOfChristmasClock)
         compose.setContent {
             Column {
