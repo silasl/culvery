@@ -150,16 +150,20 @@ class SeasonalThemesTest {
     @Test
     fun nextIsTheSoonestStart() {
         val defaults = defaultSeasonDates()
-        assertThat(nextTheme(date(2026, 11, 5), defaults)).isEqualTo(SeasonalTheme.HALLOWEEN to date(2027, 10, 24))
+        assertThat(nextTheme(date(2026, 11, 5), defaults)).isEqualTo(SeasonalTheme.CHRISTMAS to date(2026, 12, 1))
         assertThat(nextTheme(date(2026, 10, 1), defaults)).isEqualTo(SeasonalTheme.HALLOWEEN to date(2026, 10, 24))
+        assertThat(nextTheme(date(2027, 1, 7), defaults)).isEqualTo(SeasonalTheme.HALLOWEEN to date(2027, 10, 24))
     }
 
     /** Fails if a start across the new year is placed in the wrong year. */
     @Test
     fun nextWrapsTheNewYear() {
-        val christmas = halloweenOn(MonthDay.of(12, 20), MonthDay.of(1, 2))
-        assertThat(nextTheme(date(2026, 12, 1), christmas)?.second).isEqualTo(date(2026, 12, 20))
-        assertThat(nextTheme(date(2027, 1, 3), christmas)?.second).isEqualTo(date(2027, 12, 20))
+        val dates = mapOf(
+            SeasonalTheme.CHRISTMAS to SeasonDates(MonthDay.of(12, 20), MonthDay.of(1, 2)),
+            SeasonalTheme.HALLOWEEN to SeasonDates(MonthDay.of(12, 22), MonthDay.of(12, 23)),
+        )
+        assertThat(nextTheme(date(2026, 12, 1), dates)).isEqualTo(SeasonalTheme.CHRISTMAS to date(2026, 12, 20))
+        assertThat(nextTheme(date(2027, 1, 3), dates)).isEqualTo(SeasonalTheme.CHRISTMAS to date(2027, 12, 20))
     }
 
     /** Fails if `next` shows while a theme is in its dates or the clock is unread, or doesn't follow the clock. */
@@ -171,7 +175,7 @@ class SeasonalThemesTest {
         moveTo(now, at(10, 29, 12, 0))
         assertThat(themes.next.value).isNull()
         moveTo(now, at(11, 5, 12, 0))
-        assertThat(themes.next.value).isEqualTo(SeasonalTheme.HALLOWEEN to date(2027, 10, 24))
+        assertThat(themes.next.value).isEqualTo(SeasonalTheme.CHRISTMAS to date(2026, 12, 1))
     }
 
     /** Fails if `next` keeps the default dates after the household edits them. */

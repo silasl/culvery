@@ -137,7 +137,7 @@ class AppSettingsPageTest {
     fun displayRowsOpenTheirSubPages() {
         show()
         compose.onNodeWithTag("app_display_display").assertTextEquals("Brightness and night", "Night clock 22:00–07:00 · Sleep after 5 min")
-        compose.onNodeWithTag("app_display_seasonal").assertTextEquals("Seasonal looks", "Halloween 24–31 Oct")
+        compose.onNodeWithTag("app_display_seasonal").assertTextEquals("Seasonal looks", "Halloween 24–31 Oct · Christmas 1 Dec–6 Jan")
         compose.onNodeWithTag("app_display_display").performScrollTo().performClick()
         compose.onNodeWithTag("display_brightness").assertExists()
         compose.onNodeWithTag("app_back").performClick()

@@ -18,7 +18,9 @@ class SeasonalSourceTest {
             .filter { it.isFile && it.extension == "kt" && main in it.path }
             .toList()
         assertThat(sources).isNotEmpty()
-        val naming = sources.filter { "HALLOWEEN" in it.readText() }.map { it.name }.sorted()
-        assertWithMessage("Files naming HALLOWEEN").that(naming - setOf("HalloweenLook.kt", "Seasonal.kt", "BuiltInSound.kt")).isEmpty()
+        SeasonalTheme.entries.forEach { theme ->
+            val naming = sources.filter { theme.name in it.readText() }.map { it.name }.sorted()
+            assertWithMessage("Files naming ${theme.name}").that(naming - setOf("${theme.label}Look.kt", "Seasonal.kt", "BuiltInSound.kt")).isEmpty()
+        }
     }
 }

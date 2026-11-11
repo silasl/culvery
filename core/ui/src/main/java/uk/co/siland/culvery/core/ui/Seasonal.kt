@@ -16,12 +16,14 @@ import kotlinx.coroutines.flow.StateFlow
 /** The seasonal themes, in the order that settles overlapping dates: the first one whose dates hold today wins (14 §4.1). */
 enum class SeasonalTheme(val label: String, val defaultDates: SeasonDates) {
     HALLOWEEN("Halloween", SeasonDates(MonthDay.of(10, 24), MonthDay.of(10, 31))),
+    CHRISTMAS("Christmas", SeasonDates(MonthDay.of(12, 1), MonthDay.of(1, 6))),
 }
 
 /** A theme's only description; a new theme must name its look here (14 §3). */
 val SeasonalTheme.look: SeasonalLook
     get() = when (this) {
         SeasonalTheme.HALLOWEEN -> HalloweenLook
+        SeasonalTheme.CHRISTMAS -> ChristmasLook
     }
 
 /** The days a theme shows, both ends included; an end before the start runs over the new year (14 §4.1). */

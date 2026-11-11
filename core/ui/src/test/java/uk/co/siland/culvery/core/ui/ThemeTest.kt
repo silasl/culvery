@@ -204,4 +204,41 @@ class ThemeTest {
         assertThat(seen!!.first).isSameInstanceAs(HalloweenLook)
         assertThat(seen!!.second).isNull()
     }
+
+    @Test
+    fun christmasProvidesItsSets() {
+        var night: Pair<HhColors, SeasonalLook?>? = null
+        var day: HhColors? = null
+        compose.setContent {
+            if (nightOn) CulveryTheme(dark = true, seasonal = SeasonalTheme.CHRISTMAS) { night = Culvery.colors to Culvery.look }
+            else CulveryTheme(dark = false, seasonal = SeasonalTheme.CHRISTMAS) { day = Culvery.colors }
+        }
+        compose.waitForIdle()
+        assertThat(night!!.first).isEqualTo(ChristmasNight)
+        assertThat(night!!.second).isSameInstanceAs(ChristmasLook)
+        nightOn = false
+        compose.waitForIdle()
+        assertThat(day).isEqualTo(ChristmasDay)
+    }
+
+    /** Both ends of a contrast step stay amber and ice blue, so a value can move without leaving its colour (21 §3.3). */
+    @Test
+    fun christmasWarningsAreAmberAndItsWeatherIceBlue() {
+        listOf(ChristmasNight, ChristmasDay).forEach { t ->
+            assertThat(hueGap(t.danger, Color(0xFFF2A33A))).isAtMost(10f)
+            assertThat(hueGap(t.weather, Color(0xFF9FD3EA))).isAtMost(10f)
+        }
+        assertThat(ChristmasNight.border).isEqualTo(Color.Transparent)
+    }
+
+    /** **pin**: a birthday wins over Christmas as over Halloween. */
+    @Test
+    fun aBirthdayStillBeatsChristmas() {
+        var seen: SeasonalLook? = null
+        compose.setContent {
+            CulveryTheme(dark = true, seasonal = SeasonalTheme.CHRISTMAS, birthday = Birthday(PersonPalette.colors[0], listOf("Sam"))) { seen = Culvery.look }
+        }
+        compose.waitForIdle()
+        assertThat(seen).isSameInstanceAs(birthdayLook(PersonPalette.colors[0]))
+    }
 }

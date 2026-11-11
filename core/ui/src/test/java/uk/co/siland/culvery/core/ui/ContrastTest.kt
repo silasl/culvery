@@ -37,7 +37,11 @@ class ContrastTest {
         listOf(true, false).map { dark -> "${PersonPalette.nameOf(c)} birthday ${if (dark) "night" else "day"}" to (c to colorsOf(birthdayLook(c), dark)) }
     }
 
-    private val halloween = SeasonalTheme.entries.flatMap { listOf("${it.label} night" to colorsFor(it, true), "${it.label} day" to colorsFor(it, false)) }
+    private fun setsOf(theme: SeasonalTheme): List<Pair<String, HhColors>> =
+        listOf("${theme.label} night" to theme.look.night, "${theme.label} day" to theme.look.day)
+
+    private val halloween = setsOf(SeasonalTheme.HALLOWEEN)
+    private val christmas = setsOf(SeasonalTheme.CHRISTMAS)
 
     private fun surfaceOf(on: ButtonSurface, t: HhColors) = when (on) {
         ButtonSurface.Bg -> t.bg
@@ -200,6 +204,44 @@ class ContrastTest {
     fun dangerAndAccentStayApart() {
         themes.forEach { (name, t) ->
             assertWithMessage("$name: the hue gap between danger and accent").that(hueGap(t.danger, t.accent)).isAtLeast(35f)
+        }
+    }
+
+    /** Warnings must not read as the weather (21 §3.3). */
+    @Test
+    fun dangerAndWeatherStayApart() {
+        SeasonalTheme.entries.flatMap { setsOf(it) }.forEach { (name, t) ->
+            assertWithMessage("$name: the hue gap between danger and weather").that(hueGap(t.danger, t.weather)).isAtLeast(35f)
+        }
+    }
+
+    /**
+     * **pin** (21 §3.3): the normal and birthday sets keep the gap they measure today, rounded down to 0.1 degree; Christmas
+     * does not widen them. The end-of-v1 design review decides whether they move.
+     */
+    @Test
+    fun theNormalAndBirthdayWarningGapsStayWhereTheyAre() {
+        val today = mapOf(
+            "normal night" to 34.2f, "normal day" to 35.9f,
+            "Green birthday night" to 34.2f, "Green birthday day" to 35.9f,
+            "Blue birthday night" to 34.2f, "Blue birthday day" to 35.9f,
+            "Pink birthday night" to 22.4f, "Pink birthday day" to 26.7f,
+            "Lime birthday night" to 34.2f, "Lime birthday day" to 35.9f,
+            "Orange birthday night" to 72.6f, "Orange birthday day" to 75.5f,
+            "Yellow birthday night" to 34.2f, "Yellow birthday day" to 35.9f,
+        )
+        themes.filter { it.first in today }.forEach { (name, t) ->
+            assertWithMessage("$name: the hue gap between danger and weather").that(hueGap(t.danger, t.weather)).isAtLeast(today.getValue(name))
+        }
+        assertWithMessage("every normal and birthday set is pinned").that(themes.map { it.first }.filter { it.startsWith("normal") || "birthday" in it })
+            .containsExactlyElementsIn(today.keys)
+    }
+
+    /** **pin**: rain and the weather's ice blue are told apart in every set (21 §3.3). It passes against the stub. */
+    @Test
+    fun rainAndWeatherStayApart() {
+        themes.forEach { (name, t) ->
+            assertWithMessage("$name: the hue gap between rain and weather").that(hueGap(t.rain, t.weather)).isAtLeast(35f)
         }
     }
 

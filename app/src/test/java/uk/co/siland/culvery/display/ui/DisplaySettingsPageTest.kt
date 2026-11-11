@@ -152,18 +152,18 @@ class DisplaySettingsPageTest {
         assertThat(brightnessSummary(DisplayPrefs())).isEqualTo("Night clock 22:00–07:00 · Sleep after 5 min")
         assertThat(brightnessSummary(DisplayPrefs(nightFrom = LocalTime.of(21, 30), nightUntil = LocalTime.of(6, 0), sleepAfterMinutes = 10)))
             .isEqualTo("Night clock 21:30–06:00 · Sleep after 10 min")
-        assertThat(seasonalSummary(defaultSeasonDates())).isEqualTo("Halloween 24–31 Oct")
+        assertThat(seasonalSummary(defaultSeasonDates())).isEqualTo("Halloween 24–31 Oct · Christmas 1 Dec–6 Jan")
         assertThat(seasonalSummary(mapOf(SeasonalTheme.HALLOWEEN to SeasonDates(MonthDay.of(10, 28), MonthDay.of(11, 2)))))
-            .isEqualTo("Halloween 28 Oct–2 Nov")
+            .isEqualTo("Halloween 28 Oct–2 Nov · Christmas 1 Dec–6 Jan")
     }
 
     /** Fails if a row doesn't open its own sub-page, or its summary waits on nothing. */
     @Test
     fun theDisplayRowsOpenTheirSubPages() {
         val opened = mutableListOf<String>()
-        compose.setContent { CulveryTheme(dark = true) { InSettingsPane { DisplayRows("Night clock 22:00–07:00 · Sleep after 5 min", "Halloween 24–31 Oct") { opened += it } } } }
+        compose.setContent { CulveryTheme(dark = true) { InSettingsPane { DisplayRows("Night clock 22:00–07:00 · Sleep after 5 min", "Halloween 24–31 Oct · Christmas 1 Dec–6 Jan") { opened += it } } } }
         compose.onNodeWithTag("app_display_display").assertTextEquals("Brightness and night", "Night clock 22:00–07:00 · Sleep after 5 min").performClick()
-        compose.onNodeWithTag("app_display_seasonal").assertTextEquals("Seasonal looks", "Halloween 24–31 Oct").performClick()
+        compose.onNodeWithTag("app_display_seasonal").assertTextEquals("Seasonal looks", "Halloween 24–31 Oct · Christmas 1 Dec–6 Jan").performClick()
         assertThat(opened).containsExactly("display", "seasonal").inOrder()
         compose.assertClickablesHaveRoleAndLabel()
     }

@@ -16,6 +16,28 @@ class SeasonalTest {
         assertThat(LocalDate.of(2026, 11, 1) in halloween).isFalse()
     }
 
+    /** **pin**: the entry's dates exist with the stub look. */
+    @Test
+    fun christmasRunsFrom1DecemberTo6January() {
+        val dates = SeasonalTheme.CHRISTMAS.defaultDates
+        assertThat(LocalDate.of(2026, 11, 30) in dates).isFalse()
+        assertThat(LocalDate.of(2026, 12, 1) in dates).isTrue()
+        assertThat(LocalDate.of(2026, 12, 31) in dates).isTrue()
+        assertThat(LocalDate.of(2027, 1, 1) in dates).isTrue()
+        assertThat(LocalDate.of(2027, 1, 6) in dates).isTrue()
+        assertThat(LocalDate.of(2027, 1, 7) in dates).isFalse()
+    }
+
+    /** **pin**: no day holds two themes by default, so the order in the enum never has to settle one. */
+    @Test
+    fun theThemesDontOverlap() {
+        listOf(2026, 2028).forEach { year ->
+            generateSequence(LocalDate.of(year, 1, 1)) { it.plusDays(1) }.takeWhile { it.year == year }.forEach { day ->
+                assertThat(SeasonalTheme.entries.count { day in it.defaultDates }).isAtMost(1)
+            }
+        }
+    }
+
     @Test
     fun aWrappedRangeCoversBothEnds() {
         val christmas = SeasonDates(MonthDay.of(12, 20), MonthDay.of(1, 2))
@@ -39,6 +61,7 @@ class SeasonalTest {
         val defaults = defaultSeasonDates()
         assertThat(defaults.keys).containsExactlyElementsIn(SeasonalTheme.entries)
         assertThat(defaults.getValue(SeasonalTheme.HALLOWEEN)).isEqualTo(SeasonDates(MonthDay.of(10, 24), MonthDay.of(10, 31)))
+        assertThat(defaults.getValue(SeasonalTheme.CHRISTMAS)).isEqualTo(SeasonDates(MonthDay.of(12, 1), MonthDay.of(1, 6)))
     }
 
     @Test
