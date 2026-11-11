@@ -34,11 +34,13 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.ui.Birthday
 import uk.co.siland.culvery.core.ui.CherryBombOne
+import uk.co.siland.culvery.core.ui.ChristmasNight
 import uk.co.siland.culvery.core.ui.Creepster
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DmSans
 import uk.co.siland.culvery.core.ui.HalloweenNight
 import uk.co.siland.culvery.core.ui.HhColors
+import uk.co.siland.culvery.core.ui.MountainsOfChristmas
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.birthdayLook
@@ -65,6 +67,7 @@ class ThemedClockTest(private val look: Look) {
         fun looks() = listOf(
             Look("halloween", SeasonalTheme.HALLOWEEN, null, Creepster, HalloweenNight),
             Look("birthday", null, Birthday(pink, listOf("Sam")), CherryBombOne, birthdayLook(pink)!!.night),
+            Look("christmas", SeasonalTheme.CHRISTMAS, null, MountainsOfChristmas, ChristmasNight),
         ).map { arrayOf<Any>(it) }
     }
 

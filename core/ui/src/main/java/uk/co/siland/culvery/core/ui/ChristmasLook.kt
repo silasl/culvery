@@ -43,7 +43,7 @@ val ChristmasDay = HhColors(
     border = Color(0xFFDCD2C2),
 )
 
-val ChristmasLook = SeasonalLook(night = ChristmasNight, day = ChristmasDay, sky = { drifting, m -> ChristmasSky(drifting, m) })
+val ChristmasLook = SeasonalLook(night = ChristmasNight, day = ChristmasDay, clockFace = MountainsOfChristmasClock, sky = { drifting, m -> ChristmasSky(drifting, m) })
 
 object ChristmasInks {
     val NIGHT_SNOW = Color(0xFF2C4034)

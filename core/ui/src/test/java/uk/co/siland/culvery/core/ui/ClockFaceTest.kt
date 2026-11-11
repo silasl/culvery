@@ -27,7 +27,7 @@ class ClockFaceTest {
 
     @Test
     fun everyDigitGetsTheSameSlot() {
-        val faces = mapOf("creepster" to CreepsterClock, "cherry" to CherryBombClock)
+        val faces = mapOf("creepster" to CreepsterClock, "cherry" to CherryBombClock, "mountains" to MountainsOfChristmasClock)
         compose.setContent {
             Column {
                 faces.forEach { (name, style) ->

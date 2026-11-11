@@ -75,6 +75,9 @@ class ThemeTest {
         val cherryBomb = res.openRawResource(R.font.cherry_bomb_one).use { it.readBytes().size }
         assertThat(cherryBomb).isGreaterThan(100_000)
         assertThat(cherryBomb).isLessThan(500_000)
+        val mountains = res.openRawResource(R.font.mountains_of_christmas_bold).use { it.readBytes().size }
+        assertThat(mountains).isGreaterThan(10_000)
+        assertThat(mountains).isLessThan(500_000)
     }
 
     @Test

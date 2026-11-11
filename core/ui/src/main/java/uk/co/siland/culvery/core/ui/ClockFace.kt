@@ -43,6 +43,16 @@ val CherryBombClock: TextStyle = HhType.clock.copy(
     letterSpacing = 0.sp,
 )
 
+val MountainsOfChristmas: FontFamily = FontFamily(Font(R.font.mountains_of_christmas_bold, FontWeight.Bold))
+
+/** Christmas's clock: the normal clock's size and line height in Mountains of Christmas Bold (21 ง4.5). */
+val MountainsOfChristmasClock: TextStyle = HhType.clock.copy(
+    fontFamily = MountainsOfChristmas,
+    fontWeight = FontWeight.Bold,
+    fontFeatureSettings = null,
+    letterSpacing = 0.sp,
+)
+
 /** Each character in a box as wide as the widest digit, so the time never changes width (14 ยง4.4). */
 @Composable
 fun SlotClock(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
