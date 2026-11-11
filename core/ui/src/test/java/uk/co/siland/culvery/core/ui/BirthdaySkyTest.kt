@@ -79,11 +79,11 @@ class BirthdaySkyTest {
 
     @Test
     fun flagsFillTheBand() {
-        val d = Density(1f)
-        assertThat(flagCount(280f, d)).isEqualTo(10)
-        assertThat(flagCount(83f, d)).isEqualTo(0)
-        assertThat(flagCount(84f, d)).isEqualTo(3)
-        assertThat(flagCount(560f, Density(2f))).isEqualTo(10)
+        val pitch = BirthdayDimens.flagPitch.value
+        assertThat(fitCount(280f, pitch, 3)).isEqualTo(10)
+        assertThat(fitCount(83f, pitch, 3)).isEqualTo(0)
+        assertThat(fitCount(84f, pitch, 3)).isEqualTo(3)
+        assertThat(fitCount(560f, pitch * 2, 3)).isEqualTo(10)
     }
 
     @Test

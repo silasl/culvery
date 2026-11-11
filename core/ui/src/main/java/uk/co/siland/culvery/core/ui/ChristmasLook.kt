@@ -43,4 +43,23 @@ val ChristmasDay = HhColors(
     border = Color(0xFFDCD2C2),
 )
 
-val ChristmasLook = SeasonalLook(night = ChristmasNight, day = ChristmasDay)
+val ChristmasLook = SeasonalLook(night = ChristmasNight, day = ChristmasDay, sky = { drifting, m -> ChristmasSky(drifting, m) })
+
+object ChristmasInks {
+    val NIGHT_SNOW = Color(0xFF2C4034)
+    val DAY_SNOW = Color(0xFFD3DCD4)
+
+    /** Red, gold, green and white; by day each is deeper so it stands off the cream. */
+    val NIGHT_BULBS = listOf(Color(0xFFEE6A6E), Color(0xFFF2C14E), Color(0xFF5FBF7A), Color(0xFFF4F1E8))
+    val DAY_BULBS = listOf(Color(0xFFB3262C), Color(0xFFB8860B), Color(0xFF2E7D46), Color(0xFFFFFFFF))
+
+    /** How dim a bulb gets in its twinkle, as an alpha. */
+    const val BULB_DIM = 0.5f
+
+    fun snow(c: HhColors): Color = if (c.isLight) DAY_SNOW else NIGHT_SNOW
+    fun wire(c: HhColors): Color = c.mute
+    fun bulbs(c: HhColors): List<Color> = if (c.isLight) DAY_BULBS else NIGHT_BULBS
+
+    /** By day every bulb is outlined so the white one shows on cream; by night none is. */
+    fun bulbOutline(c: HhColors): Color? = if (c.isLight) c.mute else null
+}

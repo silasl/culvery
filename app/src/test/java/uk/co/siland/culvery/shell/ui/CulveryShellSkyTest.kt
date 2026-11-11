@@ -34,14 +34,19 @@ import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.ui.Birthday
+import uk.co.siland.culvery.core.ui.ChristmasDay
+import uk.co.siland.culvery.core.ui.ChristmasInks
+import uk.co.siland.culvery.core.ui.ChristmasNight
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HalloweenDay
 import uk.co.siland.culvery.core.ui.HalloweenDimens
 import uk.co.siland.culvery.core.ui.HalloweenInks
 import uk.co.siland.culvery.core.ui.HalloweenNight
+import uk.co.siland.culvery.core.ui.HomeSkyBand
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.moonIn
+import uk.co.siland.culvery.core.ui.skyBand
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.shell.ShellUiState
 import uk.co.siland.culvery.shell.TabItem
@@ -203,6 +208,75 @@ class CulveryShellSkyTest {
     fun noSkyWithoutATheme() {
         show(fullHome(dark = true), null)
         compose.onAllNodesWithTag("halloween_sky").assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun headerBounds(): Rect {
+        val clock = bounds("home_clock")
+        val date = bounds("home_date")
+        val items = bounds("home_header_items")
+        return Rect(clock.left, clock.top, items.right, maxOf(date.bottom, items.bottom))
+    }
+
+    /** Snow falls behind the clock, the date and the header items, so the sky is the whole header (21 §4.4). */
+    @Test
+    fun theSnowFallsBehindTheWholeHeader() {
+        show(fullHome(dark = true), SeasonalTheme.CHRISTMAS)
+        val header = headerBounds()
+        val sky = bounds("christmas_sky")
+        listOf(sky.left to header.left, sky.top to header.top, sky.right to header.right, sky.bottom to header.bottom).forEach { (actual, want) ->
+            assertThat(actual).isWithin(1f).of(want)
+        }
+        val reading = listOf("home_clock", "home_date", "home_header_items").map {
+            compose.onNodeWithTag(it).fetchSemanticsNode().config.getOrNull(SemanticsProperties.TraversalIndex)
+        }
+        assertThat(reading).containsExactly(0f, 1f, 2f).inOrder()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** The bulbs and the wire keep to the open band; only the snow goes behind the text. */
+    private fun theLightsKeepToTheOpenBand(dark: Boolean) {
+        show(fullHome(dark), SeasonalTheme.CHRISTMAS)
+        val density = Density(compose.density.density)
+        val clock = bounds("home_clock")
+        val date = bounds("home_date")
+        val items = bounds("home_header_items")
+        val header = headerBounds()
+        val measured = HomeSkyBand().apply {
+            headerWidth = header.width.toInt()
+            headerHeight = header.height.toInt()
+            clockWidth = clock.width.toInt()
+            dateWidth = date.width.toInt()
+            itemsWidth = items.width.toInt()
+        }
+        val band = skyBand(measured, header.size, density).translate(header.topLeft)
+        val colours = ChristmasInks.bulbs(if (dark) ChristmasNight else ChristmasDay).map { it.toArgb() }
+        val image = snapshot()
+        val texts = listOf(clock, date, items)
+        var drawn = 0
+        for (y in header.top.toInt() until header.bottom.toInt()) {
+            for (x in header.left.toInt() until header.right.toInt()) {
+                val here = Offset(x.toFloat(), y.toFloat())
+                if (image.getPixel(x, y) in colours && !texts.any { it.contains(here) }) {
+                    drawn++
+                    assertThat(band.inflate(1f).contains(here)).isTrue()
+                }
+            }
+        }
+        assertThat(drawn).isGreaterThan(0)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theLightsKeepToTheOpenBandAtNight() = theLightsKeepToTheOpenBand(dark = true)
+
+    @Test
+    fun theLightsKeepToTheOpenBandByDay() = theLightsKeepToTheOpenBand(dark = false)
+
+    @Test
+    fun noChristmasSkyOffHome() {
+        show(fullHome(dark = true, tab = "door"), SeasonalTheme.CHRISTMAS)
+        compose.onAllNodesWithTag("christmas_sky").assertCountEquals(0)
         compose.assertClickablesHaveRoleAndLabel()
     }
 

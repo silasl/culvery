@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
-import kotlin.math.floor
 import kotlin.math.sin
 
 // The cake's viewport has the Culvery mark's aspect, so it takes the mark's place without moving anything.
@@ -88,30 +87,18 @@ fun balloonPositions(elapsedMillis: Long, band: Rect, density: Density): List<Of
 
 private const val BUNTING_MIN_FLAGS = 3
 
-/** How many flags fit [bandWidthPx] a pitch apart; none for a band narrower than three pitches. */
-internal fun flagCount(bandWidthPx: Float, density: Density): Int {
-    val pitch = with(density) { BirthdayDimens.flagPitch.toPx() }
-    return if (bandWidthPx < BUNTING_MIN_FLAGS * pitch) 0 else floor(bandWidthPx / pitch).toInt()
-}
-
-/** The string's height at [x]: a parabola from [BirthdayDimens.buntingTop] at both ends to the sag at the middle. */
-private fun stringY(band: Rect, x: Float, density: Density): Float = with(density) {
-    val t = (x - band.left) / band.width
-    band.top + BirthdayDimens.buntingTop.toPx() + BirthdayDimens.buntingSag.toPx() * 4f * t * (1f - t)
-}
-
 /** Where each flag hangs from the string (the middle of its top edge), the row centred in [band]. */
 internal fun flagAnchors(band: Rect, density: Density): List<Offset> {
-    val n = flagCount(band.width, density)
     val pitch = with(density) { BirthdayDimens.flagPitch.toPx() }
+    val n = fitCount(band.width, pitch, BUNTING_MIN_FLAGS)
     val first = band.left + (band.width - n * pitch) / 2 + pitch / 2
-    return List(n) { i -> (first + i * pitch).let { x -> Offset(x, stringY(band, x, density)) } }
+    return List(n) { i -> (first + i * pitch).let { x -> Offset(x, hangingY(band, x, BirthdayDimens.buntingTop, BirthdayDimens.buntingSag, density)) } }
 }
 
 /** The bottom of the lowest flag's point, or of the string's middle where there are no flags. */
 internal fun lowestFlagTip(band: Rect, density: Density): Float = with(density) {
     val anchors = flagAnchors(band, density)
-    if (anchors.isEmpty()) stringY(band, band.center.x, density) else anchors.maxOf { it.y } + BirthdayDimens.flagHeight.toPx()
+    if (anchors.isEmpty()) hangingY(band, band.center.x, BirthdayDimens.buntingTop, BirthdayDimens.buntingSag, density) else anchors.maxOf { it.y } + BirthdayDimens.flagHeight.toPx()
 }
 
 /** The string and a triangular flag in each person colour, in order, hung from it, built once for a band size (16 §4.2). */
@@ -121,12 +108,7 @@ private class Bunting(val string: Path, val stroke: Stroke, val flags: List<Pair
 private fun buntingIn(band: Rect, density: Density): Bunting? = with(density) {
     val anchors = flagAnchors(band, density)
     if (anchors.isEmpty()) return null
-    val ends = stringY(band, band.left, density)
-    // The quadratic's control point is where the parabola through both ends and the middle puts it.
-    val string = Path().apply {
-        moveTo(band.left, ends)
-        quadraticTo(band.center.x, 2 * stringY(band, band.center.x, density) - ends, band.right, ends)
-    }
+    val string = hangingPath(band, BirthdayDimens.buntingTop, BirthdayDimens.buntingSag, density)
     val half = BirthdayDimens.flagWidth.toPx() / 2
     val height = BirthdayDimens.flagHeight.toPx()
     val flags = anchors.mapIndexed { i, at ->

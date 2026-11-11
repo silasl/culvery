@@ -9,11 +9,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.round
+import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
@@ -57,3 +60,37 @@ internal fun Modifier.inSkyBand(measured: HomeSkyBand?): Modifier = this
         val placeable = measurable.measure(Constraints.fixed(width, height))
         layout(width, height) { placeable.place(0, 0) }
     }
+
+/** Home's whole header, from its top-left corner; with nothing measured, all of [size]. */
+fun headerArea(measured: HomeSkyBand?, size: Size): Rect =
+    if (measured == null) Rect(Offset.Zero, size) else Rect(0f, 0f, measured.headerWidth.toFloat(), measured.headerHeight.toFloat())
+
+/** Sizes and places a node as [headerArea] of [measured] inside the room it is given. */
+internal fun Modifier.inHomeHeader(measured: HomeSkyBand?): Modifier = this
+    .offset { headerArea(measured, Size.Zero).topLeft.round() }
+    .layout { measurable, constraints ->
+        val area = headerArea(measured, Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()))
+        val width = area.width.roundToInt().coerceAtLeast(0)
+        val height = area.height.roundToInt().coerceAtLeast(0)
+        val placeable = measurable.measure(Constraints.fixed(width, height))
+        layout(width, height) { placeable.place(0, 0) }
+    }
+
+/** The height at [x] of a string hung across [band]: a parabola from [top] below the band's top at both ends to [sag] more at the middle. */
+internal fun hangingY(band: Rect, x: Float, top: Dp, sag: Dp, density: Density): Float = with(density) {
+    val t = (x - band.left) / band.width
+    band.top + top.toPx() + sag.toPx() * 4f * t * (1f - t)
+}
+
+/** The curve [hangingY] gives, as the quadratic through both ends and the middle. */
+internal fun hangingPath(band: Rect, top: Dp, sag: Dp, density: Density): Path {
+    val ends = hangingY(band, band.left, top, sag, density)
+    return Path().apply {
+        moveTo(band.left, ends)
+        quadraticTo(band.center.x, 2 * hangingY(band, band.center.x, top, sag, density) - ends, band.right, ends)
+    }
+}
+
+/** How many things a [pitchPx] apart fit [widthPx]; none for a width narrower than [min] of them. */
+internal fun fitCount(widthPx: Float, pitchPx: Float, min: Int): Int =
+    if (widthPx < min * pitchPx) 0 else floor(widthPx / pitchPx).toInt()

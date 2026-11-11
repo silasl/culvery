@@ -1,0 +1,221 @@
+package uk.co.siland.culvery.core.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.AccessibilityAction
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
+import kotlin.math.abs
+import kotlin.time.Duration.Companion.days
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.core.ui.test.windowBitmap
+
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class ChristmasSkyTest {
+    @get:Rule val compose = createComposeRule()
+
+    private val area = Rect(0f, 0f, 1000f, 300f)
+    private val one = Density(1f)
+    private val pitch = 26f
+    private val top = BirthdayDimens.buntingTop
+    private val sag = BirthdayDimens.buntingSag
+
+    private fun snow(at: Long, within: Rect = area) = snowFlakes(at, within, one)
+
+    private fun mod(v: Float, m: Float) = ((v % m) + m) % m
+
+    @Test
+    fun snowFallsTheHeaderEveryLap() {
+        val start = snow(0)
+        assertThat(start).hasSize(SNOW_FLAKES)
+        snow(SNOW_FALL_MS).zip(start).forEach { (a, b) ->
+            assertThat(a.centre.x).isWithin(0.01f).of(b.centre.x)
+            assertThat(a.centre.y).isWithin(0.01f).of(b.centre.y)
+        }
+        snow(SNOW_FALL_MS / 4).zip(start).forEach { (a, b) ->
+            val fell = mod(a.centre.y - b.centre.y, area.height)
+            assertThat(minOf(abs(fell - area.height / 4), abs(fell - area.height / 4 - area.height))).isAtMost(0.5f)
+        }
+    }
+
+    @Test
+    fun aFlakeWrapsFromTheBottomToTheTop() {
+        val y0 = snow(0)[3].centre.y
+        val wrap = ((area.bottom - y0) / area.height * SNOW_FALL_MS).toLong()
+        assertThat(wrap).isGreaterThan(10L)
+        assertThat(snow(wrap - 10)[3].centre.y).isWithin(1.5f).of(area.bottom)
+        assertThat(snow(wrap + 10)[3].centre.y).isWithin(1.5f).of(area.top)
+    }
+
+    /** **pin**: the stub's fixed list was inside the area too. */
+    @Test
+    fun theSnowStaysInTheHeader() {
+        val narrow = Rect(40f, 20f, 160f, 90f)
+        for (t in 0L..SNOW_FALL_MS step 500L) {
+            snow(t).forEach { assertThat(area.contains(it.centre)).isTrue() }
+            snow(t, narrow).forEach { assertThat(narrow.contains(it.centre)).isTrue() }
+        }
+    }
+
+    @Test
+    fun theFlakesAreSmallAndSpreadAcrossTheWidth() {
+        val flakes = snow(0)
+        flakes.forEach { assertThat(it.radius).isAtLeast(1.5f) }
+        flakes.forEach { assertThat(it.radius).isAtMost(3f) }
+        assertThat(flakes.map { it.radius }.toSet().size).isGreaterThan(1)
+        assertThat(flakes.map { it.centre.x }.toSet().size).isEqualTo(SNOW_FLAKES)
+    }
+
+    /** **pin** against the stub's fixed list; a time fed into a phase is reduced on the Long first, so a long run draws as the first minutes did (21 §4.4). */
+    @Test
+    fun theSnowRepeatsOverLongRuns() {
+        val forty = 40.days.inWholeMilliseconds
+        for (t in listOf(0L, 7_000L, 23_999L)) {
+            snow(forty + t).zip(snow(t)).forEach { (a, b) ->
+                assertThat(a.centre).isEqualTo(b.centre)
+                assertThat(a.radius).isEqualTo(b.radius)
+            }
+            for (i in 0..3) assertThat(bulbAlpha(forty + t, i)).isEqualTo(bulbAlpha(t, i))
+        }
+    }
+
+    private val band = Rect(100f, 0f, 1100f, 130f)
+
+    @Test
+    fun theLightsHangInTheBand() {
+        val bulbs = bulbCentres(band, one)
+        assertThat(bulbs).isNotEmpty()
+        bulbs.forEach { assertThat(band.contains(it)).isTrue() }
+        assertThat(bulbs.first().x - band.left).isAtLeast(pitch / 2)
+        assertThat(band.right - bulbs.last().x).isAtLeast(pitch / 2)
+        bulbs.zipWithNext().forEach { (a, b) -> assertThat(b.x - a.x).isWithin(0.01f).of(pitch) }
+        assertThat(hangingY(band, band.left, top, sag, one)).isEqualTo(band.top + top.value)
+        assertThat(hangingY(band, band.right, top, sag, one)).isEqualTo(band.top + top.value)
+        bulbs.forEach { assertThat(it.y).isWithin(0.01f).of(hangingY(band, it.x, top, sag, one) + 4f) }
+    }
+
+    @Test
+    fun aNarrowBandHasNoLights() {
+        assertThat(bulbCentres(Rect(0f, 0f, 2.9f * pitch, 100f), one)).isEmpty()
+        assertThat(bulbCentres(Rect(0f, 0f, 3f * pitch, 100f), one)).hasSize(3)
+    }
+
+    @Test
+    fun theBulbsTwinkleOutOfStep() {
+        for (i in 0..3) {
+            val seen = (0L until TWINKLE_MS step 50L).map { bulbAlpha(it, i) }
+            seen.forEach { assertThat(it).isAtLeast(0.5f) }
+            seen.forEach { assertThat(it).isAtMost(1f) }
+            assertThat(seen.max()).isAtLeast(0.95f)
+            assertThat(seen.min()).isAtMost(0.55f)
+            assertThat(bulbAlpha(TWINKLE_MS, i)).isEqualTo(bulbAlpha(0, i))
+        }
+        assertThat(bulbAlpha(0, 0)).isEqualTo(1f)
+        val quarter = TWINKLE_MS / 4
+        assertThat((0..3).map { bulbAlpha(quarter, it) }.toSet().size).isGreaterThan(1)
+        assertThat(bulbAlpha(quarter, 1)).isWithin(0.0001f).of(bulbAlpha(0, 0))
+        assertThat(bulbAlpha(0, 4)).isEqualTo(bulbAlpha(0, 0))
+    }
+
+    /** **pin**: the frames come from `SkyFrames`, which the stubs already ran. */
+    @Test
+    fun theSkyDriftsWhileAsked() {
+        compose.mainClock.autoAdvance = false
+        val elapsed = mutableLongStateOf(0L)
+        compose.setContent { ChristmasSky(drifting = true, elapsed = elapsed) }
+        compose.mainClock.advanceTimeBy(1_000)
+        assertThat(elapsed.longValue).isAtLeast(900L)
+        assertThat(elapsed.longValue).isAtMost(1_000L)
+    }
+
+    /** **pin**: as above. */
+    @Test
+    fun stillMeansNoFrames() {
+        compose.mainClock.autoAdvance = false
+        val elapsed = mutableLongStateOf(5_000L)
+        var drifting by mutableStateOf(false)
+        compose.setContent { ChristmasSky(drifting, elapsed = elapsed) }
+        compose.mainClock.advanceTimeBy(10_000)
+        assertThat(elapsed.longValue).isEqualTo(5_000L)
+        compose.runOnIdle {
+            drifting = true
+            Snapshot.sendApplyNotifications()
+        }
+        compose.mainClock.advanceTimeBy(500)
+        assertThat(elapsed.longValue).isGreaterThan(5_300L)
+        assertThat(elapsed.longValue).isAtMost(5_500L)
+    }
+
+    /** Still, the snow is where `elapsed` puts it and every bulb is at full, not dimmed. */
+    @Test
+    fun aStillSkyDrawsTheSnowAndTheLightsAtFull() {
+        val elapsed = mutableLongStateOf(TWINKLE_MS / 2)
+        compose.setContent {
+            CulveryTheme(dark = true, seasonal = SeasonalTheme.CHRISTMAS) {
+                Box(Modifier.size(300.dp, 300.dp).testTag("still_frame").background(ChristmasNight.bg)) {
+                    ChristmasSky(drifting = false, modifier = Modifier.fillMaxSize(), elapsed = elapsed)
+                }
+            }
+        }
+        val node = compose.onNodeWithTag("christmas_sky")
+        val bounds = node.fetchSemanticsNode().boundsInWindow
+        val image = windowBitmap(node)
+        val d = Density(compose.density.density)
+        val local = Rect(Offset.Zero, Size(bounds.width, bounds.height))
+        val bulbs = bulbCentres(local, d)
+        assertThat(bulbs).isNotEmpty()
+        val inks = ChristmasInks.bulbs(ChristmasNight)
+        bulbs.forEachIndexed { i, at ->
+            assertThat(image.getPixel((bounds.left + at.x).toInt(), (bounds.top + at.y).toInt())).isEqualTo(inks[i % 4].toArgb())
+        }
+        val stringBottom = hangingY(local, local.center.x, top, sag, d) + (2 * ChristmasDimens.bulbRadius.value + ChristmasDimens.wireStroke.value) * d.density
+        val flake = snowFlakes(TWINKLE_MS / 2, local, d).filter { it.centre.y - it.radius > stringBottom }.maxByOrNull { it.radius }!!
+        val r = flake.radius.toInt()
+        val snow = ChristmasInks.snow(ChristmasNight).toArgb()
+        val found = (-r..r).any { dy ->
+            (-r..r).any { dx ->
+                image.getPixel((bounds.left + flake.centre.x).toInt() + dx, (bounds.top + flake.centre.y).toInt() + dy) == snow
+            }
+        }
+        assertThat(found).isTrue()
+    }
+
+    /** **pin**: the sky is a picture; the stubs were silent too. */
+    @Test
+    fun theSkyIsSilent() {
+        compose.setContent {
+            CulveryTheme(dark = true, seasonal = SeasonalTheme.CHRISTMAS) { ChristmasSky(drifting = false, modifier = Modifier.fillMaxSize()) }
+        }
+        val nodes = listOf(compose.onNodeWithTag("christmas_sky", useUnmergedTree = true).fetchSemanticsNode()) +
+            compose.onAllNodes(hasAnyAncestor(hasTestTag("christmas_sky")), useUnmergedTree = true).fetchSemanticsNodes()
+        nodes.forEach { node ->
+            assertThat(node.config.contains(SemanticsProperties.Text)).isFalse()
+            assertThat(node.config.contains(SemanticsProperties.ContentDescription)).isFalse()
+            assertThat(node.config.filter { it.value is AccessibilityAction<*> }).isEmpty()
+        }
+    }
+}

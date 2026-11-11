@@ -310,4 +310,35 @@ class ContrastTest {
             check("$name black against mute", fill, set.mute, NON_TEXT)
         }
     }
+
+    /** Spec 21 section 4.4: the snow drifts behind the clock, the date and the header items, so each still reads over a flake. **pin** against the stub, which put the snow on `bg`. */
+    @Test
+    fun textReadsOverTheSnow() {
+        christmas.forEach { (name, t) ->
+            val snow = ChristmasInks.snow(t)
+            check("$name clock on the snow", t.accent, snow, NON_TEXT)
+            check("$name ink on the snow", t.ink, snow, TEXT)
+            check("$name mute on the snow", t.mute, snow, TEXT)
+            check("$name weather icon on the snow", t.weather, snow, NON_TEXT)
+            check("$name rain icon on the snow", t.rain, snow, NON_TEXT)
+        }
+    }
+
+    /** The snow, the wire and each bulb, at full and at its dimmest, only have to be seen; an outlined bulb's outline is what stands off. */
+    @Test
+    fun theSnowAndLightsStandOffTheBackground() {
+        christmas.forEach { (name, t) ->
+            check("$name snow on bg", ChristmasInks.snow(t), t.bg, SKY_MIN)
+            check("$name wire on bg", ChristmasInks.wire(t), t.bg, SKY_MIN)
+            val outline = ChristmasInks.bulbOutline(t)
+            ChristmasInks.bulbs(t).forEachIndexed { i, bulb ->
+                if (outline != null) {
+                    check("$name bulb $i outline on bg", outline, t.bg, SKY_MIN)
+                } else {
+                    check("$name bulb $i on bg", bulb, t.bg, SKY_MIN)
+                    check("$name bulb $i dimmed on bg", bulb.over(ChristmasInks.BULB_DIM, t.bg), t.bg, SKY_MIN)
+                }
+            }
+        }
+    }
 }
