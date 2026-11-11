@@ -129,6 +129,21 @@ class SoundLibraryTest {
         assertThat(library().forTheme(SeasonalTheme.HALLOWEEN).id).isEqualTo("file:halloween/Test Howl.ogg")
     }
 
+    /** 21 §3.8: a file in the tablet's christmas folder wins over the built-in music box. */
+    @Test
+    fun aChristmasFileBeatsTheMusicBox() {
+        assertThat(library().forTheme(SeasonalTheme.CHRISTMAS).id).isEqualTo("builtin:christmas_music_box")
+        touch("christmas/Test Bells.ogg")
+        assertThat(library().forTheme(SeasonalTheme.CHRISTMAS).id).isEqualTo("file:christmas/Test Bells.ogg")
+    }
+
+    /** **Pin** (21 F14): themed built-ins stay in the list both Settings pickers read. */
+    @Test
+    fun themedSoundsStayChoices() = runTest {
+        val ids = library().choices.first().map { it.id }
+        assertThat(ids).containsAtLeast("builtin:organ", "builtin:christmas_music_box")
+    }
+
     @Test
     fun noThemeIsTheClassicChime() {
         assertThat(library().forTheme(null).id).isEqualTo(BuiltInSound.CLASSIC.id)

@@ -253,6 +253,23 @@ class DoorSettingsPageTest {
         assertThat(chime.plays.last()).isEqualTo(BuiltInSound.CLASSIC.id to 1.0f)
     }
 
+    /** 21 §3.8: Follow the theme during Christmas plays the music box. */
+    @Test
+    fun playChimeAtChristmasPlaysTheMusicBox() {
+        showHost(SeasonalTheme.CHRISTMAS)
+        compose.onNodeWithTag("door_play_chime").performClick()
+        assertThat(chime.plays).containsExactly(BuiltInSound.CHRISTMAS_MUSIC_BOX.id to 1.0f)
+    }
+
+    /** **Pin** (21 §3.8): the music box is still a doorbell choice all year. */
+    @Test
+    fun theMusicBoxIsStillADoorbellChoice() {
+        showHost()
+        compose.onNodeWithTag("door_doorbell_builtin:christmas_music_box_choose").performClick()
+        compose.waitFor { prefs().doorbell == BuiltInSound.CHRISTMAS_MUSIC_BOX.id }
+        compose.waitFor { runCatching { compose.onNodeWithTag("door_doorbell_builtin:christmas_music_box_choose").assertIsSelected() }.isSuccess }
+    }
+
     /** Fails if a Play that couldn't start says nothing, or doesn't name the fix. */
     @Test
     fun aFailedPlayShowsItsToast() {

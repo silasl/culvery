@@ -18,9 +18,11 @@ class BuiltInSoundTest {
     }
 
     @Test
-    fun onlyTheOrganHasATheme() {
+    fun theOrganAndTheMusicBoxHaveTheirThemes() {
         assertThat(BuiltInSound.ORGAN.theme).isEqualTo(SeasonalTheme.HALLOWEEN)
-        assertThat(BuiltInSound.entries.filter { it != BuiltInSound.ORGAN }.map { it.theme }).containsExactly(null, null, null)
+        assertThat(BuiltInSound.CHRISTMAS_MUSIC_BOX.theme).isEqualTo(SeasonalTheme.CHRISTMAS)
+        assertThat(BuiltInSound.CLASSIC.theme).isNull()
+        assertThat(BuiltInSound.HAPPY_BIRTHDAY.theme).isNull()
     }
 
     @Test

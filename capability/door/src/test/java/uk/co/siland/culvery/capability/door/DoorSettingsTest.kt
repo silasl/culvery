@@ -131,6 +131,16 @@ class DoorSettingsTest {
             .isEqualTo(BuiltInSound.CHRISTMAS_MUSIC_BOX.id)
     }
 
+    /** 21 §3.8: at Christmas the theme's sound is the music box; a birthday still wins; the music box chosen outright plays all year (**pin**). */
+    @Test
+    fun followTheThemeAtChristmasIsTheMusicBox() {
+        val library = testSounds()
+        assertThat(DoorPrefs().doorbellSound(library, SeasonalTheme.CHRISTMAS, birthday = false).id).isEqualTo(BuiltInSound.CHRISTMAS_MUSIC_BOX.id)
+        assertThat(DoorPrefs().doorbellSound(library, SeasonalTheme.CHRISTMAS, birthday = true).id).isEqualTo(BuiltInSound.HAPPY_BIRTHDAY.id)
+        assertThat(DoorPrefs(doorbell = BuiltInSound.CHRISTMAS_MUSIC_BOX.id).doorbellSound(library, null, birthday = false).id)
+            .isEqualTo(BuiltInSound.CHRISTMAS_MUSIC_BOX.id)
+    }
+
     /** 18 §6.2: Happy Birthday is the birthday's sound, so a stored choice of it plays the classic chime. */
     @Test
     fun aStoredHappyBirthdayChoicePlaysTheClassicChime() {

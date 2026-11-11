@@ -111,6 +111,16 @@ class SoundButtonsSectionTest {
         assertThat(toaster.shown.last()).isEqualTo(couldntPlay(HONK))
     }
 
+    /** **Pin** (21 F14): the music box is in the pads' list and can be chosen. */
+    @Test
+    fun theMusicBoxIsAPadChoice() {
+        show(TROMBONE.id, ORGAN.id, null)
+        compose.onNodeWithTag("sound_pad_1").performClick()
+        compose.onNodeWithTag("sound_choice_${BuiltInSound.CHRISTMAS_MUSIC_BOX.id}").assertTextContains("Christmas music box")
+        compose.onNodeWithTag("sound_choice_${BuiltInSound.CHRISTMAS_MUSIC_BOX.id}_choose").performClick()
+        compose.waitFor { saved().first() == BuiltInSound.CHRISTMAS_MUSIC_BOX.id }
+    }
+
     /** Fails if two quick taps, the first stopped by the second, show a toast. */
     @Test
     fun twoQuickTapsShowNoToast() {
