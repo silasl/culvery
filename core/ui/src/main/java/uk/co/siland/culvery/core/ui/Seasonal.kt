@@ -11,6 +11,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import java.time.LocalDate
 import java.time.MonthDay
+import java.time.Year
 import kotlinx.coroutines.flow.StateFlow
 
 /** The seasonal themes, in the order that settles overlapping dates: the first one whose dates hold today wins (14 §4.1). */
@@ -33,6 +34,12 @@ data class SeasonDates(val start: MonthDay, val end: MonthDay) {
         return if (end < start) day >= start || day <= end else day >= start && day <= end
     }
 }
+
+/** The day a range starting on this day starts in [year]: a 29 February start is 1 March in a year without one (21 §4.8). */
+fun MonthDay.firstDayIn(year: Int): LocalDate =
+    if (this == LEAP_DAY && !Year.isLeap(year.toLong())) LocalDate.of(year, 3, 1) else atYear(year)
+
+private val LEAP_DAY: MonthDay = MonthDay.of(2, 29)
 
 fun defaultSeasonDates(): Map<SeasonalTheme, SeasonDates> = SeasonalTheme.entries.associateWith { it.defaultDates }
 

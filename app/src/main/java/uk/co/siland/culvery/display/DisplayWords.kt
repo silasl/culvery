@@ -94,4 +94,8 @@ internal fun lastDayBeforeFirst(first: LocalDate): String = "The last day is bef
 
 internal fun longerThanAYear(limit: LocalDate): String = "A theme can show for a year at most. Tap a last day before ${dayMonthYear(limit)}."
 
+internal fun leapDayLine(first: Boolean, shown: LocalDate): String =
+    if (first) "The saved first day is 29 February, which in ${shown.year} is 1 March."
+    else "The saved last day is 29 February, which in ${shown.year} is 28 February."
+
 internal fun nextLine(theme: SeasonalTheme, date: LocalDate): String = "Next: ${theme.label} from ${date.format(DAY_LONG_MONTH)}"

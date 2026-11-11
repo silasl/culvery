@@ -28,6 +28,7 @@ import uk.co.siland.culvery.core.ui.SeasonDates
 import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.ShowingTheme
 import uk.co.siland.culvery.core.ui.defaultSeasonDates
+import uk.co.siland.culvery.core.ui.firstDayIn
 
 /** One look shown by hand for [day] only (14 §3, 16 §3.2); it counts as off on any other day. */
 sealed interface Preview {
@@ -60,10 +61,11 @@ internal fun showingOn(date: LocalDate, dates: Map<SeasonalTheme, SeasonDates>, 
 /** The theme whose next start is soonest, with that day (today counts); ties go to list order (14 §4.5). */
 internal fun nextTheme(today: LocalDate, dates: Map<SeasonalTheme, SeasonDates>): Pair<SeasonalTheme, LocalDate>? =
     SeasonalTheme.entries
-        .map { theme ->
-            val start = (dates[theme] ?: theme.defaultDates).start
-            val thisYear = start.atYear(today.year)
-            theme to if (thisYear.isBefore(today)) start.atYear(today.year + 1) else thisYear
+        .mapNotNull { theme ->
+            val range = dates[theme] ?: theme.defaultDates
+            (today.year..today.year + 4).firstNotNullOfOrNull { year ->
+                range.start.firstDayIn(year).takeIf { !it.isBefore(today) && it in range }
+            }?.let { theme to it }
         }
         .minByOrNull { it.second }
 

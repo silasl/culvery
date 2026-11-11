@@ -79,4 +79,22 @@ class SeasonalTest {
         assertThat(LocalDate.of(2027, 2, 28) in dates).isTrue()
         assertThat(LocalDate.of(2027, 3, 1) in dates).isFalse()
     }
+
+    /** Fails if a 29 February start in a year without one isn't 1 March, or a leap year or another day moves. */
+    @Test
+    fun firstDayInPutsALeapDayOn1March() {
+        assertThat(MonthDay.of(2, 29).firstDayIn(2027)).isEqualTo(LocalDate.of(2027, 3, 1))
+        assertThat(MonthDay.of(2, 29).firstDayIn(2028)).isEqualTo(LocalDate.of(2028, 2, 29))
+        assertThat(MonthDay.of(12, 1).firstDayIn(2026)).isEqualTo(LocalDate.of(2026, 12, 1))
+    }
+
+    /** Pin: a range starting on 29 February holds 1 March, not the 28th, in a year without one. */
+    @Test
+    fun aLeapDayStartsOn1MarchInACommonYear() {
+        val dates = SeasonDates(MonthDay.of(2, 29), MonthDay.of(3, 10))
+        assertThat(LocalDate.of(2027, 2, 28) in dates).isFalse()
+        assertThat(LocalDate.of(2027, 3, 1) in dates).isTrue()
+        assertThat(LocalDate.of(2028, 2, 28) in dates).isFalse()
+        assertThat(LocalDate.of(2028, 2, 29) in dates).isTrue()
+    }
 }

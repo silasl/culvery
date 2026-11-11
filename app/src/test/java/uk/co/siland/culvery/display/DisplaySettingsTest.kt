@@ -134,6 +134,14 @@ class DisplaySettingsTest {
         assertThat(stored[intPreferencesKey("season_christmas_end")]).isEqualTo(102)
     }
 
+    /** Pin: a 29 February start is stored as 229 and read back as 29 February, never moved to the 28th. */
+    @Test
+    fun aStoredLeapDayStaysALeapDay() = runTest {
+        settings.setSeasonDates(SeasonalTheme.HALLOWEEN, SeasonDates(MonthDay.of(2, 29), MonthDay.of(3, 10)))
+        assertThat(rawStore.data.first()[intPreferencesKey("season_halloween_start")]).isEqualTo(229)
+        assertThat(settings.prefs.first().seasonDates.getValue(SeasonalTheme.HALLOWEEN).start).isEqualTo(MonthDay.of(2, 29))
+    }
+
     /** Fails if edited dates are lost or aren't read back. */
     @Test
     fun editedDatesAreKept() = runTest {

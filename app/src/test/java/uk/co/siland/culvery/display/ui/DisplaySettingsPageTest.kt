@@ -639,6 +639,82 @@ class DisplaySettingsPageTest {
         assertThat(shows("display_dates_sheet")).isFalse()
     }
 
+    private fun dayOn(date: LocalDate) = compose.onNodeWithTag("day_$date")
+
+    private val leapStart = SeasonDates(MonthDay.of(2, 29), MonthDay.of(3, 10))
+
+    /** Fails if a 29 February start isn't shown as 1 March in a year without one, or the end isn't the 28th. */
+    @Test
+    fun shownRangeOfALeapDay() {
+        assertThat(shownRange(LocalDate.of(2027, 1, 10), leapStart)).isEqualTo(LocalDate.of(2027, 3, 1) to LocalDate.of(2027, 3, 10))
+        assertThat(shownRange(LocalDate.of(2028, 1, 10), leapStart)).isEqualTo(LocalDate.of(2028, 2, 29) to LocalDate.of(2028, 3, 10))
+        val leapEnd = SeasonDates(MonthDay.of(2, 20), MonthDay.of(2, 29))
+        assertThat(shownRange(LocalDate.of(2027, 1, 10), leapEnd)).isEqualTo(LocalDate.of(2027, 2, 20) to LocalDate.of(2027, 2, 28))
+        val leapOnly = SeasonDates(MonthDay.of(2, 29), MonthDay.of(2, 29))
+        assertThat(shownRange(LocalDate.of(2027, 1, 10), leapOnly)).isEqualTo(LocalDate.of(2028, 2, 29) to LocalDate.of(2028, 2, 29))
+    }
+
+    /** Fails if opening a saved 29 February start and saving rewrites it, or the sheet doesn't say why 1 March shows. */
+    @Test
+    fun aSavedLeapDayIsntRewrittenByOpeningTheSheet() {
+        val today = LocalDate.of(2027, 1, 10)
+        openHalloweenDates(leapStart, today)
+        dayOn(LocalDate.of(2027, 3, 1)).assertIsSelected()
+        compose.onNodeWithTag("display_dates_leap").assertTextEquals("The saved first day is 29 February, which in 2027 is 1 March.")
+        compose.onNodeWithTag("display_dates_save").assertIsNotEnabled().performClick()
+        assertThat(dated).isEmpty()
+        compose.onNodeWithText("Cancel").performClick()
+        assertThat(dated).isEmpty()
+        compose.waitForIdle()
+        compose.onNodeWithTag("display_dates_halloween").performScrollTo().performClick()
+        compose.waitForIdle()
+        dayOn(LocalDate.of(2027, 3, 2)).performClick()
+        dayOn(LocalDate.of(2027, 3, 9)).performClick()
+        compose.onNodeWithTag("display_dates_save").assertIsEnabled().performClick()
+        assertThat(dated).containsExactly(SeasonalTheme.HALLOWEEN to SeasonDates(MonthDay.of(3, 2), MonthDay.of(3, 9)))
+    }
+
+    /** Fails if a saved 29 February end isn't explained as the 28th, or can be saved untouched. */
+    @Test
+    fun aSavedLeapDayEndSaysSo() {
+        openHalloweenDates(SeasonDates(MonthDay.of(2, 20), MonthDay.of(2, 29)), LocalDate.of(2027, 1, 10))
+        compose.onNodeWithTag("display_dates_leap").assertTextEquals("The saved last day is 29 February, which in 2027 is 28 February.")
+        compose.onNodeWithTag("display_dates_save").assertIsNotEnabled()
+    }
+
+    /** Fails if a range of only 29 February opens on a year without one, shows a line, or can't be saved. */
+    @Test
+    fun aLeapDayOnlyRangeOpensOnALeapYear() {
+        openHalloweenDates(SeasonDates(MonthDay.of(2, 29), MonthDay.of(2, 29)), LocalDate.of(2027, 1, 10))
+        dayOn(LocalDate.of(2028, 2, 29)).assertIsSelected()
+        compose.onNodeWithTag("display_dates_leap").assertTextEquals("")
+        compose.onNodeWithTag("display_dates_save").assertIsEnabled()
+    }
+
+    /** Pin: a 28 February start is an ordinary day: no line, Save on. */
+    @Test
+    fun the28thOfFebruaryIsOrdinary() {
+        openHalloweenDates(SeasonDates(MonthDay.of(2, 28), MonthDay.of(3, 10)), LocalDate.of(2027, 1, 10))
+        compose.onNodeWithTag("display_dates_leap").assertTextEquals("")
+        compose.onNodeWithTag("display_dates_save").assertIsEnabled()
+    }
+
+    /** Pin: in a leap year a 29 February start is itself: no line, Save on. */
+    @Test
+    fun inALeapYearTheSheetIsAsBefore() {
+        openHalloweenDates(leapStart, LocalDate.of(2028, 1, 10))
+        compose.onNodeWithTag("display_dates_leap").assertTextEquals("")
+        compose.onNodeWithTag("display_dates_save").assertIsEnabled()
+    }
+
+    /** Pin: an ordinary range shows no line and Save is on as it opens. */
+    @Test
+    fun anOrdinaryRangeSavesAsBefore() {
+        openHalloweenDates()
+        compose.onNodeWithTag("display_dates_leap").assertTextEquals("")
+        compose.onNodeWithTag("display_dates_save").assertIsEnabled()
+    }
+
     /** Fails if a last day before the first is accepted, goes unexplained, or can be saved. */
     @Test
     fun aLastDayBeforeTheFirstIsRefused() {

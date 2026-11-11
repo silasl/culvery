@@ -209,6 +209,25 @@ class SeasonalThemesTest {
         assertThat(themes.previewing.value).isNull()
     }
 
+    /** Fails if Next names 28 February, or a leap year's 29th, for a range that starts on 29 February. */
+    @Test
+    fun nextSaysTheDayALeapDayStartReallyStarts() {
+        val dates = defaultSeasonDates() + (SeasonalTheme.HALLOWEEN to SeasonDates(MonthDay.of(2, 29), MonthDay.of(3, 10)))
+        assertThat(nextTheme(date(2027, 1, 10), dates)).isEqualTo(SeasonalTheme.HALLOWEEN to date(2027, 3, 1))
+        assertThat(nextTheme(date(2028, 1, 10), dates)).isEqualTo(SeasonalTheme.HALLOWEEN to date(2028, 2, 29))
+        assertThat(nextLine(SeasonalTheme.HALLOWEEN, date(2027, 3, 1))).isEqualTo("Next: Halloween from 1 March")
+    }
+
+    /** Fails if a range of only 29 February is promised in a year without one. */
+    @Test
+    fun aLeapDayOnlyRangeWaitsForALeapYear() {
+        val dates = mapOf(
+            SeasonalTheme.HALLOWEEN to SeasonDates(MonthDay.of(2, 29), MonthDay.of(2, 29)),
+            SeasonalTheme.CHRISTMAS to SeasonDates(MonthDay.of(12, 30), MonthDay.of(12, 31)),
+        )
+        assertThat(nextTheme(date(2027, 12, 31), dates)).isEqualTo(SeasonalTheme.HALLOWEEN to date(2028, 2, 29))
+    }
+
     /** Fails if the next theme isn't the soonest start, this year's or next year's. */
     @Test
     fun nextIsTheSoonestStart() {

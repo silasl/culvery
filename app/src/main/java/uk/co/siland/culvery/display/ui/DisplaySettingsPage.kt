@@ -62,6 +62,7 @@ import uk.co.siland.culvery.core.ui.SettingsTokens
 import uk.co.siland.culvery.core.ui.UNTIL
 import uk.co.siland.culvery.core.ui.clockText
 import uk.co.siland.culvery.core.ui.defaultSeasonDates
+import uk.co.siland.culvery.core.ui.firstDayIn
 import uk.co.siland.culvery.display.ALLOW_THE_CAMERA
 import uk.co.siland.culvery.display.BRIGHTNESS
 import uk.co.siland.culvery.display.BRIGHTNESS_AND_NIGHT
@@ -103,6 +104,7 @@ import uk.co.siland.culvery.display.birthdayPreviewLine
 import uk.co.siland.culvery.display.datesLine
 import uk.co.siland.culvery.display.datesTitle
 import uk.co.siland.culvery.display.lastDayBeforeFirst
+import uk.co.siland.culvery.display.leapDayLine
 import uk.co.siland.culvery.display.longerThanAYear
 import uk.co.siland.culvery.display.minutes
 import uk.co.siland.culvery.display.nextLine
@@ -217,12 +219,16 @@ internal fun checkRange(first: LocalDate, last: LocalDate): String? = when {
 /** The days the dates sheet opens on: the run holding [today], else the next one to start; an end before the start lands in the next year. */
 internal fun shownRange(today: LocalDate, dates: SeasonDates): Pair<LocalDate, LocalDate> {
     val startYear = when {
-        today !in dates -> if (dates.start.atYear(today.year).isBefore(today)) today.year + 1 else today.year
+        today !in dates -> if (dates.start.firstDayIn(today.year).isBefore(today)) today.year + 1 else today.year
         dates.end < dates.start && MonthDay.from(today) <= dates.end -> today.year - 1
         else -> today.year
     }
-    val endYear = if (dates.end < dates.start) startYear + 1 else startYear
-    return dates.start.atYear(startYear) to dates.end.atYear(endYear)
+    fun runStarting(year: Int): Pair<LocalDate, LocalDate> {
+        val endYear = if (dates.end < dates.start) year + 1 else year
+        return dates.start.firstDayIn(year) to dates.end.atYear(endYear)
+    }
+    // A range holding no day that year (29 Feb – 29 Feb in a common year) waits for the next year that does.
+    return (startYear..startYear + 3).map(::runStarting).firstOrNull { it.first in dates } ?: runStarting(startYear)
 }
 
 /** App settings › Brightness and night: the night clock, brightness, sleep and the camera's wake (8 §4.6). */
@@ -297,7 +303,7 @@ internal fun SeasonalLooksScreen(ui: DisplaySettingsUi, actions: DisplaySettings
     }
 }
 
-/** A theme's dates sheet, opened with the saved run picked: a tap after a complete range starts a new pick; Save waits for a last day that passes [checkRange] (14 §4.5). */
+/** A theme's dates sheet, opened with the saved run picked: a tap after a complete range starts a new pick; Save waits for a last day that passes [checkRange], and, when a saved 29 February is shown as another day, for a tap (14 §4.5, 21 §4.8). */
 @Composable
 private fun DatesSheet(
     theme: SeasonalTheme,
@@ -317,7 +323,14 @@ private fun DatesSheet(
     val lastDay = last
     val refusal = if (firstDay != null && lastDay != null) checkRange(firstDay, lastDay) else null
     val range = if (firstDay != null && lastDay != null && refusal == null) firstDay to lastDay else null
+    val leapLine = when {
+        MonthDay.from(shown.first) != saved.start -> leapDayLine(true, shown.first)
+        MonthDay.from(shown.second) != saved.end -> leapDayLine(false, shown.second)
+        else -> null
+    }
+    var tapped by remember { mutableStateOf(false) }
     fun pick(day: LocalDate) {
+        tapped = true
         if (firstDay == null || range != null) {
             first = day
             last = null
@@ -350,6 +363,7 @@ private fun DatesSheet(
                 onPick = ::pick,
             )
             HhMessageLine(refusal, HhType.body, c.danger, "display_dates_refused", gapAbove = DisplayDimens.settingsGap)
+            HhMessageLine(leapLine, HhType.body, c.mute, "display_dates_leap", gapAbove = DisplayDimens.settingsGap)
         }
         HhFooterButton(
             SAVE_DATES,
@@ -358,7 +372,7 @@ private fun DatesSheet(
                 onClose()
             },
             "display_dates_save",
-            enabled = range != null,
+            enabled = range != null && (tapped || leapLine == null),
         )
         HhButton(putBack(theme.defaultDates), { onReset(); onClose() }, Modifier.testTag("display_dates_reset"), on = ButtonSurface.Bg)
         HhButton(CANCEL, onClose, Modifier.testTag("display_dates_cancel"), on = ButtonSurface.Bg)
