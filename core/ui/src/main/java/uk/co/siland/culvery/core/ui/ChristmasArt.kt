@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
@@ -10,11 +11,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.cos
@@ -122,4 +130,35 @@ fun ChristmasSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Muta
                 },
         )
     }
+}
+
+// The cap lies along the roof's top edge from 12 units either side of the apex, with a scalloped lower edge; the wreath hangs above the door arch.
+private const val MARK_CAP =
+    "M39.5,38.2 L49.4,29.72 A3.22,3.22 0 0,1 53.6,29.72 L63.5,38.2 " +
+        "Q61.5,42 59,39.6 Q57,43.6 54,40.4 Q51.5,44.2 49,40.4 Q46,43.6 44,39.6 Q41.5,42 39.5,38.2 Z"
+private const val MARK_WREATH = "M48.5,58.5 A3,3 0 1,1 54.5,58.5 A3,3 0 1,1 48.5,58.5 Z"
+private const val MARK_BOW = "M49.6,55.1 L51.5,56.4 L53.4,55.1 L53.4,57.7 L51.5,56.4 L49.6,57.7 Z"
+private const val MARK_WREATH_STROKE = 1.8f
+private const val MARK_CAP_LINE = 0.7f
+
+/**
+ * The Culvery house, snowed in, taking the mark's place: snow over the roof inside the mark's own viewport with a line of the
+ * page colour between it and the roof, a wreath and bow above the door, and the dove in robin red (21 §3.4).
+ */
+@Composable
+fun ChristmasMark(width: Dp, modifier: Modifier = Modifier) {
+    val c = Culvery.colors
+    val mark = remember(c, width) {
+        val robin = SolidColor(ChristmasInks.robin(c))
+        ImageVector.Builder(name = "ChristmasMark", defaultWidth = width, defaultHeight = width * (MarkViewport.HEIGHT / MarkViewport.WIDTH), viewportWidth = MarkViewport.WIDTH, viewportHeight = MarkViewport.HEIGHT)
+            .addGroup(translationX = -MarkViewport.LEFT, translationY = -MarkViewport.TOP)
+            .addPath(addPathNodes(MARK_HOUSE), fill = SolidColor(c.ink))
+            .addPath(addPathNodes(MARK_CAP), fill = SolidColor(ChristmasInks.markSnow(c)), stroke = SolidColor(c.bg), strokeLineWidth = MARK_CAP_LINE, strokeLineJoin = StrokeJoin.Round)
+            .addPath(addPathNodes(MARK_DOVE), fill = robin)
+            .addPath(addPathNodes(MARK_WREATH), stroke = SolidColor(ChristmasInks.wreath(c)), strokeLineWidth = MARK_WREATH_STROKE)
+            .addPath(addPathNodes(MARK_BOW), fill = robin)
+            .clearGroup()
+            .build()
+    }
+    Image(mark, contentDescription = null, modifier = modifier.testTag("christmas_mark").semantics { hideFromAccessibility() })
 }

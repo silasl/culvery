@@ -43,7 +43,7 @@ val ChristmasDay = HhColors(
     border = Color(0xFFDCD2C2),
 )
 
-val ChristmasLook = SeasonalLook(night = ChristmasNight, day = ChristmasDay, clockFace = MountainsOfChristmasClock, sky = { drifting, m -> ChristmasSky(drifting, m) })
+val ChristmasLook = SeasonalLook(night = ChristmasNight, day = ChristmasDay, clockFace = MountainsOfChristmasClock, mark = { width -> ChristmasMark(width) }, sky = { drifting, m -> ChristmasSky(drifting, m) })
 
 object ChristmasInks {
     val NIGHT_SNOW = Color(0xFF2C4034)
@@ -62,4 +62,14 @@ object ChristmasInks {
 
     /** By day every bulb is outlined so the white one shows on cream; by night none is. */
     fun bulbOutline(c: HhColors): Color? = if (c.isLight) c.mute else null
+
+    /** The snow on the mark's roof, and the wreath: each picked against what it sits on (the page by night, the house by day). */
+    val MARK_SNOW_NIGHT = Color(0xFFFFFFFF)
+    val MARK_SNOW_DAY = Color(0xFFC9D4CB)
+    val WREATH_NIGHT = Color(0xFF3E8E55)
+    val WREATH_DAY = Color(0xFF5FBF7A)
+
+    fun markSnow(c: HhColors): Color = if (c.isLight) MARK_SNOW_DAY else MARK_SNOW_NIGHT
+    fun wreath(c: HhColors): Color = if (c.isLight) WREATH_DAY else WREATH_NIGHT
+    fun robin(c: HhColors): Color = c.accent
 }

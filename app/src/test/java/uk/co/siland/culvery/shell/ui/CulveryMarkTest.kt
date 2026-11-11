@@ -3,6 +3,8 @@ package uk.co.siland.culvery.shell.ui
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import org.junit.Test
+import uk.co.siland.culvery.core.ui.MARK_DOVE
+import uk.co.siland.culvery.core.ui.MARK_HOUSE
 
 /** The rail's mark is the launcher icon's house and dove (5 §A.1): one drawing, so they can't drift apart. */
 class CulveryMarkTest {

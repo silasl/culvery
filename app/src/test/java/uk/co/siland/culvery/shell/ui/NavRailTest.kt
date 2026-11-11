@@ -91,6 +91,17 @@ class NavRailTest {
         assertThat(markBounds()).isEqualTo(normal)
     }
 
+    /** **pin**: the look already carries the mark, so this held against the stub. */
+    @Test
+    fun theChristmasMarkTakesTheMarksPlace() {
+        show()
+        val normal = markBounds()
+        seasonal = SeasonalTheme.CHRISTMAS
+        compose.waitForIdle()
+        compose.onNode(hasTestTag("christmas_mark") and hasAnyAncestor(hasTestTag("culvery_mark")), useUnmergedTree = true).assertExists()
+        assertThat(markBounds()).isEqualTo(normal)
+    }
+
     @Test
     fun theCakeTakesTheMarksPlace() {
         show()

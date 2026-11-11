@@ -341,4 +341,14 @@ class ContrastTest {
             }
         }
     }
+
+    /** **pin**: the inks are fixed values that already pass. */
+    @Test
+    fun theChristmasMarkStandsOffTheBackground() {
+        christmas.forEach { (name, t) ->
+            check("$name snow cap on bg", ChristmasInks.markSnow(t), t.bg, SKY_MIN)
+            check("$name wreath on the house", ChristmasInks.wreath(t), t.ink, NON_TEXT)
+            check("$name robin on bg", ChristmasInks.robin(t), t.bg, NON_TEXT)
+        }
+    }
 }
