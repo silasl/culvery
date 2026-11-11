@@ -55,6 +55,9 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.BinInks
+import uk.co.siland.culvery.core.ui.ChristmasDimens
+import uk.co.siland.culvery.core.ui.ChristmasInks
+import uk.co.siland.culvery.core.ui.ChristmasNight
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HalloweenNight
@@ -355,6 +358,68 @@ class CardsTest {
             val y = bounds.top.toInt() + (d * density).toInt()
             (-1..1).any { differs(x + it, y) }
         }
+    }
+
+    /** The card's pixels in the [ChristmasDimens.hollySpan] boxes that aren't [surf], outside the buttons and the rounded corner. */
+    private inner class HollyCorners(val surf: Color, val berry: Color) {
+        private val card = compose.onNodeWithTag("calendar_today")
+        private val node = card.fetchSemanticsNode()
+        private val image = windowBitmap(card)
+        private val density = node.layoutInfo.density.density
+        private val bounds = node.boundsInWindow
+        private val buttons = listOf(compose.onNodeWithTag("today_add"), compose.onNodeWithText("See the week")).map { it.fetchSemanticsNode().boundsInWindow }
+        private val width = (ChristmasDimens.hollySpan.value * density).toInt()
+        private val height = (ChristmasDimens.hollySpan.value * 25 / 40 * density).toInt()
+        private val arc = (CalendarDimens.cardRadius.value * density).toInt()
+
+        private fun differs(x: Int, y: Int) = image.getPixel(x, y) != surf.toArgb() && buttons.none { it.contains(Offset(x + 0.5f, y + 0.5f)) }
+
+        /** False for the pixels the card's rounded corners cut away. */
+        private fun insideCard(x: Int, y: Int): Boolean {
+            val cx = x + 0.5f
+            val cy = y + 0.5f
+            val dx = maxOf(bounds.left + arc - cx, cx - (bounds.right - arc), 0f)
+            val dy = maxOf(bounds.top + arc - cy, cy - (bounds.bottom - arc), 0f)
+            return dx * dx + dy * dy <= (arc - 1f) * (arc - 1f)
+        }
+
+        private fun topRightBox() = (bounds.top.toInt() until bounds.top.toInt() + height).flatMap { y ->
+            (bounds.right.toInt() - width until bounds.right.toInt()).map { x -> x to y }
+        }.filter { (x, y) -> insideCard(x, y) }
+
+        fun topRight(): Int = topRightBox().count { (x, y) -> differs(x, y) }
+
+        fun berries(): Int = topRightBox().count { (x, y) -> image.getPixel(x, y) == berry.toArgb() }
+
+        fun bottomLeft(): Int = (bounds.bottom.toInt() - height until bounds.bottom.toInt()).sumOf { y ->
+            (bounds.left.toInt() until bounds.left.toInt() + width).count { x -> insideCard(x, y) && differs(x, y) }
+        }
+    }
+
+    @Test
+    fun theHollySitsInTheTopRightCorner() {
+        seasonal = SeasonalTheme.CHRISTMAS
+        showSized { TodayCard(SampleUi.today, onAdd = {}) }
+        val corners = HollyCorners(ChristmasNight.surf, ChristmasInks.hollyBerry(ChristmasNight))
+        assertThat(corners.topRight()).isGreaterThan(0)
+        assertThat(corners.berries()).isGreaterThan(0)
+        assertThat(corners.bottomLeft()).isEqualTo(0)
+    }
+
+    /** **pin**: the holly is drawn behind the content and moves nothing. */
+    @Test
+    fun theButtonsStayWhereTheyAreUnderTheHolly() {
+        var added = 0
+        showSized { TodayCard(SampleUi.today, onAdd = { added++ }) }
+        fun spots() = listOf(compose.onNodeWithTag("today_add"), compose.onNodeWithText("See the week")).map { it.getUnclippedBoundsInRoot() }
+        val normal = spots()
+        seasonal = SeasonalTheme.CHRISTMAS
+        compose.waitForIdle()
+        assertThat(spots()).isEqualTo(normal)
+        compose.onNodeWithTag("today_add").performClick()
+        compose.onNodeWithText("See the week").performClick()
+        assertThat(added).isEqualTo(1)
+        assertThat(navigator.tabs).containsExactly(CALENDAR_TAB_ID)
     }
 
     private fun emptyToday() = showSized { TodayCard(emptyList(), onAdd = {}) }

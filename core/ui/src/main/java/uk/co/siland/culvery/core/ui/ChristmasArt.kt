@@ -11,8 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -39,6 +42,9 @@ object ChristmasDimens {
     val bulbPitch = 26.dp
     val bulbRadius = 4.dp
     val wireStroke = 1.5.dp
+
+    /** The Today card's holly: its width from the card's top-right corner; its height is this times 25 / 40. */
+    val hollySpan = 40.dp
 }
 
 /** How many flakes fall, and how long each takes to cross the header and come back in at the top. */
@@ -161,4 +167,35 @@ fun ChristmasMark(width: Dp, modifier: Modifier = Modifier) {
             .build()
     }
     Image(mark, contentDescription = null, modifier = modifier.testTag("christmas_mark").semantics { hideFromAccessibility() })
+}
+
+// The sprig is laid out in a 40 x 25 box against the card's top-right corner; each point is (x from the box's left, y from its top).
+private const val HOLLY_BOX_W = 40f
+private const val HOLLY_BOX_H = 25f
+private val HOLLY_STEM = Offset(28f, 13f)
+private val HOLLY_TIPS = listOf(Offset(4f, 6f), Offset(9f, 23f))
+private const val HOLLY_LEAF_WIDTH = 4.5f
+private val HOLLY_BERRIES = listOf(Offset(27f, 12f), Offset(31f, 11f), Offset(29f, 15.5f))
+private const val HOLLY_BERRY_RADIUS = 2.6f
+
+/** Two pointed leaves and three berries within [span] by [span] * 25 / 40 of the top-right corner, drawn flat behind the card's content (21 §3.7). */
+fun DrawScope.drawHolly(leaf: Color, berry: Color, span: Dp) {
+    val u = span.toPx() / HOLLY_BOX_W
+    val origin = Offset(size.width - HOLLY_BOX_W * u, 0f)
+    fun at(p: Offset) = origin + p * u
+    val stem = at(HOLLY_STEM)
+    HOLLY_TIPS.forEach { tipUnits ->
+        val tip = at(tipUnits)
+        val along = tip - stem
+        val side = Offset(-along.y, along.x) / along.getDistance() * (HOLLY_LEAF_WIDTH * u)
+        val mid = stem + along * 0.5f
+        val shape = Path().apply {
+            moveTo(stem.x, stem.y)
+            quadraticTo(mid.x + side.x, mid.y + side.y, tip.x, tip.y)
+            quadraticTo(mid.x - side.x, mid.y - side.y, stem.x, stem.y)
+            close()
+        }
+        drawPath(shape, leaf)
+    }
+    HOLLY_BERRIES.forEach { drawCircle(berry, HOLLY_BERRY_RADIUS * u, at(it)) }
 }
