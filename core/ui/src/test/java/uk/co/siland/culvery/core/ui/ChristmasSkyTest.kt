@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.days
 import org.junit.Rule
@@ -199,6 +200,35 @@ class ChristmasSkyTest {
             }
         }
         assertThat(found).isTrue()
+    }
+
+    /** Fails if a sky that stops mid-twinkle leaves a bulb dimmed. */
+    @Test
+    fun aSkyThatStopsLightsItsBulbs() {
+        compose.mainClock.autoAdvance = false
+        val elapsed = mutableLongStateOf(TWINKLE_MS * 3 / 4)
+        var drifting by mutableStateOf(true)
+        compose.setContent {
+            CulveryTheme(dark = true, seasonal = SeasonalTheme.CHRISTMAS) {
+                Box(Modifier.size(300.dp, 300.dp).background(ChristmasNight.bg)) {
+                    ChristmasSky(drifting, modifier = Modifier.fillMaxSize(), elapsed = elapsed)
+                }
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val node = compose.onNodeWithTag("christmas_sky")
+        val bounds = node.fetchSemanticsNode().boundsInWindow
+        val d = Density(compose.density.density)
+        val bulbs = bulbCentres(Rect(Offset.Zero, Size(bounds.width, bounds.height)), d)
+        val inks = ChristmasInks.bulbs(ChristmasNight).map { it.toArgb() }
+        fun pixels() = windowBitmap(node).let { image -> bulbs.map { image.getPixel((bounds.left + it.x).toInt(), (bounds.top + it.y).toInt()) } }
+        assertWithMessage("group 1 is dimmed while twinkling").that(pixels()[1]).isNotEqualTo(inks[1])
+        compose.runOnIdle {
+            drifting = false
+            Snapshot.sendApplyNotifications()
+        }
+        compose.mainClock.advanceTimeByFrame()
+        pixels().forEachIndexed { i, pixel -> assertWithMessage("bulb $i").that(pixel).isEqualTo(inks[i % inks.size]) }
     }
 
     /** **pin**: the sky is a picture; the stubs were silent too. */
