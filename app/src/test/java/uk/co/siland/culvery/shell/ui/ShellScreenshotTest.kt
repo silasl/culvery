@@ -573,6 +573,12 @@ class ShellScreenshotTest {
     fun homeHalloweenLight() = snap("home_halloween_light", dark = false, state = fullHome(dark = false), seasonal = SeasonalTheme.HALLOWEEN)
 
     @Test
+    fun homeChristmasDark() = snap("home_christmas_dark", dark = true, state = fullHome(dark = true), seasonal = SeasonalTheme.CHRISTMAS)
+
+    @Test
+    fun homeChristmasLight() = snap("home_christmas_light", dark = false, state = fullHome(dark = false), seasonal = SeasonalTheme.CHRISTMAS)
+
+    @Test
     fun homeBirthdayPinkDark() = snap("home_birthday_pink_dark", dark = true, state = fullHome(dark = true), birthday = pinkBirthday)
 
     @Test

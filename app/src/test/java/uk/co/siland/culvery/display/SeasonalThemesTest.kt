@@ -146,6 +146,69 @@ class SeasonalThemesTest {
         assertThat(showingOn(date(2026, 10, 29), edited, null)).isNull()
     }
 
+    /** Pin: Christmas starts at 00:00 on 1 December, and the instance is the enum's own. */
+    @Test
+    fun christmasStartsAsDecemberStarts() = runTest {
+        val now = MutableStateFlow<LocalDateTime?>(at(11, 30, 23, 59))
+        val themes = themes(now)
+        assertThat(themes.showing.value).isNull()
+        moveTo(now, at(12, 1, 0, 0))
+        assertThat(themes.showing.value).isSameInstanceAs(SeasonalTheme.CHRISTMAS)
+        moveTo(now, at(12, 12, 12, 0))
+        assertThat(themes.showing.value).isSameInstanceAs(SeasonalTheme.CHRISTMAS)
+    }
+
+    /** Pin: Christmas holds over New Year, to the end of 6 January, and doesn't start again. */
+    @Test
+    fun christmasRunsOverNewYear() = runTest {
+        val now = MutableStateFlow<LocalDateTime?>(LocalDateTime.of(2026, 12, 31, 23, 59))
+        val themes = themes(now)
+        assertThat(themes.showing.value).isEqualTo(SeasonalTheme.CHRISTMAS)
+        moveTo(now, LocalDateTime.of(2027, 1, 1, 0, 0))
+        assertThat(themes.showing.value).isEqualTo(SeasonalTheme.CHRISTMAS)
+        moveTo(now, LocalDateTime.of(2027, 1, 6, 23, 59))
+        assertThat(themes.showing.value).isEqualTo(SeasonalTheme.CHRISTMAS)
+        moveTo(now, LocalDateTime.of(2027, 1, 7, 0, 0))
+        assertThat(themes.showing.value).isNull()
+    }
+
+    /** Pin: in November the next theme is Christmas, and its line says so. */
+    @Test
+    fun nextIsChristmasInNovember() {
+        assertThat(nextTheme(date(2026, 11, 11), defaultSeasonDates())).isEqualTo(SeasonalTheme.CHRISTMAS to date(2026, 12, 1))
+        assertThat(nextLine(SeasonalTheme.CHRISTMAS, date(2026, 12, 1))).isEqualTo("Next: Christmas from 1 December")
+    }
+
+    /** Pin: a birthday in December dresses the wall, while the doorbell keeps Christmas. */
+    @Test
+    fun aBirthdayInDecemberWins() = runTest {
+        assertThat(dressOn(null, null, listOf(sam), SeasonalTheme.CHRISTMAS)).isEqualTo(samDress)
+        val themes = dressed(MutableStateFlow(at(12, 12, 12, 0)), birthdays = listOf(sam))
+        assertThat(themes.dress.value).isEqualTo(samDress)
+        assertThat(themes.showing.value).isEqualTo(SeasonalTheme.CHRISTMAS)
+        assertThat(themes.birthdayShowing.value).isTrue()
+    }
+
+    /** Pin: previewing Christmas replaces a Halloween preview, turning Halloween off leaves it, and midnight ends it. */
+    @Test
+    fun previewingChristmasReplacesHalloween() = runTest {
+        val now = MutableStateFlow<LocalDateTime?>(at(11, 5, 10, 0))
+        val themes = themes(now)
+        themes.preview(SeasonalTheme.HALLOWEEN, true)
+        runCurrent()
+        themes.preview(SeasonalTheme.CHRISTMAS, true)
+        runCurrent()
+        assertThat(themes.showing.value).isEqualTo(SeasonalTheme.CHRISTMAS)
+        assertThat(themes.previewing.value).isEqualTo(SeasonalTheme.CHRISTMAS)
+        themes.preview(SeasonalTheme.HALLOWEEN, false)
+        runCurrent()
+        assertThat(themes.showing.value).isEqualTo(SeasonalTheme.CHRISTMAS)
+        assertThat(themes.previewing.value).isEqualTo(SeasonalTheme.CHRISTMAS)
+        moveTo(now, at(11, 6, 0, 0))
+        assertThat(themes.showing.value).isNull()
+        assertThat(themes.previewing.value).isNull()
+    }
+
     /** Fails if the next theme isn't the soonest start, this year's or next year's. */
     @Test
     fun nextIsTheSoonestStart() {

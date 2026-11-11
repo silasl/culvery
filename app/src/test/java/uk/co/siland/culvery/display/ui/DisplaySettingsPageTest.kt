@@ -589,6 +589,41 @@ class DisplaySettingsPageTest {
         compose.onNodeWithTag("display_dates_halloween_chevron", useUnmergedTree = true).assertExists()
     }
 
+    /** Pin: Christmas has its own dates row and preview switch. */
+    @Test
+    fun christmasHasItsRowAndPreview() {
+        show()
+        compose.onNodeWithTag("display_dates_christmas").performScrollTo().assertTextEquals("Christmas", "1 Dec – 6 Jan")
+        val click = compose.onNodeWithTag("display_dates_christmas").fetchSemanticsNode().config[SemanticsActions.OnClick]
+        assertThat(click.label).isEqualTo("Change the dates")
+        compose.onNodeWithTag("display_preview_christmas").performScrollTo()
+            .assertTextEquals("Preview Christmas", "Shows Christmas on the wall and plays its doorbell until midnight.")
+    }
+
+    /** Pin: the sheet opens on 1 Dec to 6 Jan of the right years before, during and after New Year. */
+    @Test
+    fun christmasDatesOpenOverNewYear() {
+        val christmas = SeasonalTheme.CHRISTMAS.defaultDates
+        val expected = LocalDate.of(2026, 12, 1) to LocalDate.of(2027, 1, 6)
+        assertThat(shownRange(LocalDate.of(2026, 11, 11), christmas)).isEqualTo(expected)
+        assertThat(shownRange(LocalDate.of(2027, 1, 3), christmas)).isEqualTo(expected)
+        assertThat(shownRange(LocalDate.of(2026, 12, 12), christmas)).isEqualTo(expected)
+    }
+
+    /** Pin: a range picked over New Year is handed on as December to January. */
+    @Test
+    fun pickingAChristmasRangeOverNewYearSavesIt() {
+        show(today = LocalDate.of(2026, 11, 11))
+        compose.onNodeWithTag("display_dates_christmas").performScrollTo().performClick()
+        compose.waitForIdle()
+        day(12, 1).assertIsSelected()
+        day(12, 20).performClick()
+        compose.onNodeWithTag("month_next").performClick()
+        compose.onNodeWithTag("day_${LocalDate.of(2027, 1, 2)}").performClick()
+        compose.onNodeWithTag("display_dates_save").assertIsEnabled().performClick()
+        assertThat(dated).containsExactly(SeasonalTheme.CHRISTMAS to SeasonDates(MonthDay.of(12, 20), MonthDay.of(1, 2)))
+    }
+
     /** Fails if two taps don't hand on the two days, or the sheet stays open. */
     @Test
     fun pickingTwoDaysSavesThem() {

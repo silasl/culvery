@@ -56,6 +56,7 @@ class DisplaySettingsScreenshotTest {
         next: Pair<SeasonalTheme, LocalDate>? = null,
         seasonal: Boolean = false,
         birthday: Birthday? = null,
+        today: LocalDate = TODAY,
         beforeShot: () -> Unit = {},
     ) {
         compose.setContent {
@@ -63,7 +64,7 @@ class DisplaySettingsScreenshotTest {
                 CulveryTheme(dark = dark, seasonal = previewing, birthday = birthday) {
                     Box(Modifier.size(960.dp, 1000.dp).background(Culvery.colors.bg)) {
                         InSettingsPane {
-                            val ui = DisplaySettingsUi(DisplayPrefs(), camera, sunKnown = true, today = TODAY, previewing = previewing, next = next, birthdayName = birthday?.names?.first(), previewingBirthday = birthday != null)
+                            val ui = DisplaySettingsUi(DisplayPrefs(), camera, sunKnown = true, today = today, previewing = previewing, next = next, birthdayName = birthday?.names?.first(), previewingBirthday = birthday != null)
                             if (seasonal) SeasonalLooksScreen(ui, actions) else BrightnessAndNightScreen(ui, actions)
                         }
                         Box(Modifier.align(Alignment.CenterEnd)) { overlay.content?.invoke() }
@@ -81,8 +82,13 @@ class DisplaySettingsScreenshotTest {
         compose.waitForIdle()
     }
 
-    private fun datesSheet(name: String, dark: Boolean) = snap(name, dark, CameraState.ALLOWED, seasonal = true) {
-        compose.onNodeWithTag("display_dates_halloween").performScrollTo().performClick()
+    private fun datesSheet(
+        name: String,
+        dark: Boolean,
+        theme: SeasonalTheme = SeasonalTheme.HALLOWEEN,
+        today: LocalDate = TODAY,
+    ) = snap(name, dark, CameraState.ALLOWED, previewing = theme.takeIf { it != SeasonalTheme.HALLOWEEN }, seasonal = true, today = today) {
+        compose.onNodeWithTag("display_dates_${theme.name.lowercase()}").performScrollTo().performClick()
         compose.waitForIdle()
     }
 
@@ -104,6 +110,10 @@ class DisplaySettingsScreenshotTest {
     @Test fun datesSheetDark() = datesSheet("settings_display_dates_sheet_dark", true)
 
     @Test fun datesSheetLight() = datesSheet("settings_display_dates_sheet_light", false)
+
+    @Test fun datesSheetChristmasDark() = datesSheet("settings_display_dates_sheet_christmas_dark", true, SeasonalTheme.CHRISTMAS, LocalDate.of(2026, 11, 11))
+
+    @Test fun datesSheetChristmasLight() = datesSheet("settings_display_dates_sheet_christmas_light", false, SeasonalTheme.CHRISTMAS, LocalDate.of(2026, 11, 11))
 
     @Test fun nextDark() = snap("settings_display_next_dark", true, CameraState.ALLOWED, next = NEXT, seasonal = true, beforeShot = ::scrollToEnd)
 

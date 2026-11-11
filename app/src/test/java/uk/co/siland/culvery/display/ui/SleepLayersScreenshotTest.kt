@@ -84,6 +84,10 @@ class SleepLayersScreenshotTest {
     @Test
     fun nightClockHalloween() = snap("night_clock_halloween", dark = true, screen = Screen.NIGHT_CLOCK, seasonal = SeasonalTheme.HALLOWEEN)
 
+    /** Pin: the night clock is the same under Christmas, so this image is byte-identical to `night_clock`. */
+    @Test
+    fun nightClockChristmas() = snap("night_clock_christmas", dark = true, screen = Screen.NIGHT_CLOCK, seasonal = SeasonalTheme.CHRISTMAS)
+
     @Test
     fun nightClockAtTheLargestFontScale() = snap("night_clock_fs15", dark = true, screen = Screen.NIGHT_CLOCK, fontScale = 1.5f)
 

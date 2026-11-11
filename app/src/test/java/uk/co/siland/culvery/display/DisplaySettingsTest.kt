@@ -115,6 +115,25 @@ class DisplaySettingsTest {
         assertThat(settings.prefs.first().seasonDates.getValue(SeasonalTheme.HALLOWEEN)).isEqualTo(halloweenDefaults)
     }
 
+    /** Pin: a fresh file gives Christmas 1 December to 6 January. */
+    @Test
+    fun christmasDatesDefault() = runTest {
+        assertThat(settings.prefs.first().seasonDates.getValue(SeasonalTheme.CHRISTMAS)).isEqualTo(SeasonDates(day(12, 1), day(1, 6)))
+    }
+
+    /** Pin: Christmas's edited dates are read back, leave Halloween's alone, and sit under their own keys. */
+    @Test
+    fun christmasDatesAreKeptApart() = runTest {
+        val edited = SeasonDates(day(12, 20), day(1, 2))
+        settings.setSeasonDates(SeasonalTheme.CHRISTMAS, edited)
+        val dates = settings.prefs.first().seasonDates
+        assertThat(dates.getValue(SeasonalTheme.CHRISTMAS)).isEqualTo(edited)
+        assertThat(dates.getValue(SeasonalTheme.HALLOWEEN)).isEqualTo(halloweenDefaults)
+        val stored = rawStore.data.first()
+        assertThat(stored[intPreferencesKey("season_christmas_start")]).isEqualTo(1220)
+        assertThat(stored[intPreferencesKey("season_christmas_end")]).isEqualTo(102)
+    }
+
     /** Fails if edited dates are lost or aren't read back. */
     @Test
     fun editedDatesAreKept() = runTest {

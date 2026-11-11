@@ -46,4 +46,6 @@ class DoorCardScreenshotTest {
     @Test fun cardLoweredDark() = snap("door_card_lowered_dark", true, ring, lowered = true)
     @Test fun cardHalloweenDark() = snap("door_card_halloween_dark", true, ring, seasonal = SeasonalTheme.HALLOWEEN)
     @Test fun cardHalloweenLight() = snap("door_card_halloween_light", false, ring, seasonal = SeasonalTheme.HALLOWEEN)
+    @Test fun cardChristmasDark() = snap("door_card_christmas_dark", true, ring, seasonal = SeasonalTheme.CHRISTMAS)
+    @Test fun cardChristmasLight() = snap("door_card_christmas_light", false, ring, seasonal = SeasonalTheme.CHRISTMAS)
 }
