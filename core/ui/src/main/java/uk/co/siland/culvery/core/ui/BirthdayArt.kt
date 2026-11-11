@@ -1,14 +1,11 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -17,11 +14,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
@@ -58,9 +53,6 @@ fun CakeMark(width: Dp, modifier: Modifier = Modifier) {
 }
 
 object BirthdayDimens {
-    /** How far the bunting's string hangs below the band's top, and how far it sags at the middle below that. */
-    val buntingTop = 6.dp
-    val buntingSag = 16.dp
     val buntingStroke = 1.5.dp
     val flagWidth = 18.dp
     val flagHeight = 22.dp
@@ -90,15 +82,13 @@ private const val BUNTING_MIN_FLAGS = 3
 /** Where each flag hangs from the string (the middle of its top edge), the row centred in [band]. */
 internal fun flagAnchors(band: Rect, density: Density): List<Offset> {
     val pitch = with(density) { BirthdayDimens.flagPitch.toPx() }
-    val n = fitCount(band.width, pitch, BUNTING_MIN_FLAGS)
-    val first = band.left + (band.width - n * pitch) / 2 + pitch / 2
-    return List(n) { i -> (first + i * pitch).let { x -> Offset(x, hangingY(band, x, BirthdayDimens.buntingTop, BirthdayDimens.buntingSag, density)) } }
+    return hungRow(band, pitch, BUNTING_MIN_FLAGS).map { x -> Offset(x, hangingY(band, x, density)) }
 }
 
 /** The bottom of the lowest flag's point, or of the string's middle where there are no flags. */
 internal fun lowestFlagTip(band: Rect, density: Density): Float = with(density) {
     val anchors = flagAnchors(band, density)
-    if (anchors.isEmpty()) hangingY(band, band.center.x, BirthdayDimens.buntingTop, BirthdayDimens.buntingSag, density) else anchors.maxOf { it.y } + BirthdayDimens.flagHeight.toPx()
+    if (anchors.isEmpty()) hangingY(band, band.center.x, density) else anchors.maxOf { it.y } + BirthdayDimens.flagHeight.toPx()
 }
 
 /** The string and a triangular flag in each person colour, in order, hung from it, built once for a band size (16 §4.2). */
@@ -108,7 +98,7 @@ private class Bunting(val string: Path, val stroke: Stroke, val flags: List<Pair
 private fun buntingIn(band: Rect, density: Density): Bunting? = with(density) {
     val anchors = flagAnchors(band, density)
     if (anchors.isEmpty()) return null
-    val string = hangingPath(band, BirthdayDimens.buntingTop, BirthdayDimens.buntingSag, density)
+    val string = hangingPath(band, density)
     val half = BirthdayDimens.flagWidth.toPx() / 2
     val height = BirthdayDimens.flagHeight.toPx()
     val flags = anchors.mapIndexed { i, at ->
@@ -148,24 +138,12 @@ private fun DrawScope.drawBalloons(elapsedMillis: Long, band: Rect, c: HhColors,
 @Composable
 fun BirthdaySky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: MutableLongState = remember { mutableLongStateOf(0L) }) {
     val colors = Culvery.colors
-    SkyFrames(drifting, elapsed)
-    val measured = LocalHomeSkyBand.current
-    Box(modifier) {
-        Spacer(
-            Modifier
-                .inSkyBand(measured)
-                .testTag("birthday_sky")
-                .clearAndSetSemantics {}
-                .graphicsLayer { clip = true }
-                .drawWithCache {
-                    val band = Rect(Offset.Zero, size)
-                    val bunting = buntingIn(band, this)
-                    onDrawBehind {
-                        if (size.width <= 0f || size.height <= 0f) return@onDrawBehind
-                        drawBalloons(elapsed.longValue, band, colors, this)
-                        bunting?.let { drawBunting(it, colors.mute) }
-                    }
-                },
-        )
+    SkyLayer("birthday_sky", drifting, elapsed, modifier, { inSkyBand(it) }) {
+        val band = Rect(Offset.Zero, size)
+        val bunting = buntingIn(band, this)
+        return@SkyLayer { now ->
+            drawBalloons(now, band, colors, this)
+            bunting?.let { drawBunting(it, colors.mute) }
+        }
     }
 }

@@ -23,36 +23,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 
+/** The normal clock's size and line height in [family], with no tabular figures to ask for. */
+private fun themedClock(family: FontFamily, weight: FontWeight = FontWeight.Normal) =
+    HhType.clock.copy(fontFamily = family, fontWeight = weight, fontFeatureSettings = null, letterSpacing = 0.sp)
+
 val Creepster = FontFamily(Font(R.font.creepster))
 
-/** Halloween's clock: the normal clock's size and line height in Creepster, with no tabular figures to ask for (14 §4.4). */
-val CreepsterClock: TextStyle = HhType.clock.copy(
-    fontFamily = Creepster,
-    fontWeight = FontWeight.Normal,
-    fontFeatureSettings = null,
-    letterSpacing = 0.sp,
-)
+/** Halloween's clock: the normal clock's size and line height in Creepster (14 §4.4). */
+val CreepsterClock: TextStyle = themedClock(Creepster)
 
 val CherryBombOne = FontFamily(Font(R.font.cherry_bomb_one))
 
 /** The birthday clock: the normal clock's size and line height in Cherry Bomb One (16 §4.2). */
-val CherryBombClock: TextStyle = HhType.clock.copy(
-    fontFamily = CherryBombOne,
-    fontWeight = FontWeight.Normal,
-    fontFeatureSettings = null,
-    letterSpacing = 0.sp,
-)
+val CherryBombClock: TextStyle = themedClock(CherryBombOne)
 
 /** Mountains of Christmas Bold, bundled whole (21 §4.5). */
 val MountainsOfChristmas: FontFamily = FontFamily(Font(R.font.mountains_of_christmas_bold, FontWeight.Bold))
 
 /** Christmas's clock: the normal clock's size and line height in Mountains of Christmas Bold (21 §4.5). */
-val MountainsOfChristmasClock: TextStyle = HhType.clock.copy(
-    fontFamily = MountainsOfChristmas,
-    fontWeight = FontWeight.Bold,
-    fontFeatureSettings = null,
-    letterSpacing = 0.sp,
-)
+val MountainsOfChristmasClock: TextStyle = themedClock(MountainsOfChristmas, FontWeight.Bold)
 
 /** Each character in a box as wide as the widest digit, so the time never changes width (14 §4.4). */
 @Composable

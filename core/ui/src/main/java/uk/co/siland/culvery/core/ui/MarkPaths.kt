@@ -1,5 +1,8 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
+
 /** The launcher icon's house (ic_launcher_foreground.xml), in its 108-unit square. */
 const val MARK_HOUSE =
     "M31.06,53.92 A3.22,3.22 0 0,1 26.86,49.04 L49.4,29.72 A3.22,3.22 0 0,1 53.6,29.72 L76.14,49.04 A3.22,3.22 0 0,1 71.94,53.92 L70.82,52.96 L70.82,74.48 A2.76,2.76 0 0,1 68.06,77.24 L57.94,77.24 L57.94,68.96 A6.44,6.44 0 0,0 45.06,68.96 L45.06,77.24 L34.94,77.24 A2.76,2.76 0 0,1 32.18,74.48 L32.18,52.96 L31.06,53.92 Z"
@@ -15,3 +18,11 @@ object MarkViewport {
     const val WIDTH = 54f
     const val HEIGHT = 49f
 }
+
+/** A mark [width] wide in [MarkViewport], with [paths] drawn in the icon's 108-unit square. */
+fun markVector(name: String, width: Dp, paths: ImageVector.Builder.() -> Unit): ImageVector =
+    ImageVector.Builder(name = name, defaultWidth = width, defaultHeight = width * (MarkViewport.HEIGHT / MarkViewport.WIDTH), viewportWidth = MarkViewport.WIDTH, viewportHeight = MarkViewport.HEIGHT)
+        .addGroup(translationX = -MarkViewport.LEFT, translationY = -MarkViewport.TOP)
+        .apply(paths)
+        .clearGroup()
+        .build()

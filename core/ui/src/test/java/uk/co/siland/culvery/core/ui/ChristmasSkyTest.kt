@@ -40,9 +40,7 @@ class ChristmasSkyTest {
 
     private val area = Rect(0f, 0f, 1000f, 300f)
     private val one = Density(1f)
-    private val pitch = 26f
-    private val top = BirthdayDimens.buntingTop
-    private val sag = BirthdayDimens.buntingSag
+    private val pitch = ChristmasDimens.bulbPitch.value
 
     private fun snow(at: Long, within: Rect = area) = snowFlakes(at, within, one)
 
@@ -84,8 +82,8 @@ class ChristmasSkyTest {
     @Test
     fun theFlakesAreSmallAndSpreadAcrossTheWidth() {
         val flakes = snow(0)
-        flakes.forEach { assertThat(it.radius).isAtLeast(1.5f) }
-        flakes.forEach { assertThat(it.radius).isAtMost(3f) }
+        flakes.forEach { assertThat(it.radius).isAtLeast(ChristmasDimens.flakeRadiusMin.value) }
+        flakes.forEach { assertThat(it.radius).isAtMost(ChristmasDimens.flakeRadiusMax.value) }
         assertThat(flakes.map { it.radius }.toSet().size).isGreaterThan(1)
         assertThat(flakes.map { it.centre.x }.toSet().size).isEqualTo(SNOW_FLAKES)
     }
@@ -113,9 +111,8 @@ class ChristmasSkyTest {
         assertThat(bulbs.first().x - band.left).isAtLeast(pitch / 2)
         assertThat(band.right - bulbs.last().x).isAtLeast(pitch / 2)
         bulbs.zipWithNext().forEach { (a, b) -> assertThat(b.x - a.x).isWithin(0.01f).of(pitch) }
-        assertThat(hangingY(band, band.left, top, sag, one)).isEqualTo(band.top + top.value)
-        assertThat(hangingY(band, band.right, top, sag, one)).isEqualTo(band.top + top.value)
-        bulbs.forEach { assertThat(it.y).isWithin(0.01f).of(hangingY(band, it.x, top, sag, one) + 4f) }
+        listOf(band.left, band.right).forEach { assertThat(hangingY(band, it, one)).isEqualTo(band.top + SkyString.top.value) }
+        bulbs.forEach { assertThat(it.y).isWithin(0.01f).of(hangingY(band, it.x, one) + ChristmasDimens.bulbRadius.value) }
     }
 
     @Test
@@ -128,10 +125,10 @@ class ChristmasSkyTest {
     fun theBulbsTwinkleOutOfStep() {
         for (i in 0..3) {
             val seen = (0L until TWINKLE_MS step 50L).map { bulbAlpha(it, i) }
-            seen.forEach { assertThat(it).isAtLeast(0.5f) }
+            seen.forEach { assertThat(it).isAtLeast(ChristmasInks.BULB_DIM) }
             seen.forEach { assertThat(it).isAtMost(1f) }
             assertThat(seen.max()).isAtLeast(0.95f)
-            assertThat(seen.min()).isAtMost(0.55f)
+            assertThat(seen.min()).isAtMost(ChristmasInks.BULB_DIM + 0.05f)
             assertThat(bulbAlpha(TWINKLE_MS, i)).isEqualTo(bulbAlpha(0, i))
         }
         assertThat(bulbAlpha(0, 0)).isEqualTo(1f)
@@ -190,9 +187,9 @@ class ChristmasSkyTest {
         assertThat(bulbs).isNotEmpty()
         val inks = ChristmasInks.bulbs(ChristmasNight)
         bulbs.forEachIndexed { i, at ->
-            assertThat(image.getPixel((bounds.left + at.x).toInt(), (bounds.top + at.y).toInt())).isEqualTo(inks[i % 4].toArgb())
+            assertThat(image.getPixel((bounds.left + at.x).toInt(), (bounds.top + at.y).toInt())).isEqualTo(inks[i % inks.size].toArgb())
         }
-        val stringBottom = hangingY(local, local.center.x, top, sag, d) + (2 * ChristmasDimens.bulbRadius.value + ChristmasDimens.wireStroke.value) * d.density
+        val stringBottom = hangingY(local, local.center.x, d) + (2 * ChristmasDimens.bulbRadius.value + ChristmasDimens.wireStroke.value) * d.density
         val flake = snowFlakes(TWINKLE_MS / 2, local, d).filter { it.centre.y - it.radius > stringBottom }.maxByOrNull { it.radius }!!
         val r = flake.radius.toInt()
         val snow = ChristmasInks.snow(ChristmasNight).toArgb()

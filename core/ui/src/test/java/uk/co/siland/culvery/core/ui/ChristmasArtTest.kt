@@ -77,15 +77,12 @@ class ChristmasArtTest {
             if (runs.isEmpty() || runs.last().first != name) runs += name to 1 else runs[runs.size - 1] = name to runs.last().second + 1
         }
         val seen = runs.map { it.first }
-        val firstNotBg = runs.first { it.first != "bg" }
-        assertThat(firstNotBg.first).isEqualTo("snow")
+        assertThat(seen.first { it != "bg" }).isEqualTo("snow")
         val cap = seen.indexOf("snow")
         assertThat(seen.getOrNull(cap + 1)).isEqualTo("bg")
-        assertThat(runs[cap + 1].second).isAtLeast(1)
         assertThat(seen.getOrNull(cap + 2)).isEqualTo("ink")
         var top = 0
         while (picture.nameAt(x, top) == "bg") top++
-        assertThat(top).isAtLeast(0)
         assertThat(top).isLessThan(picture.height / 4)
     }
 

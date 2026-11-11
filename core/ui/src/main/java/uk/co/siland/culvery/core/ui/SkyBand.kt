@@ -1,20 +1,27 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.CacheDrawScope
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -50,47 +57,88 @@ internal fun SkyFrames(drifting: Boolean, elapsed: MutableLongState) {
     }
 }
 
-/** Sizes and places a node as [skyBand] of [measured] inside the room it is given. */
-internal fun Modifier.inSkyBand(measured: HomeSkyBand?): Modifier = this
-    .offset { measured?.let { skyBand(it, Size.Zero, this).topLeft.round() } ?: IntOffset.Zero }
+/** Sizes and places a node as [area] of the room it is given; [area] of an empty room gives the node's offset. */
+private fun Modifier.placedAs(area: Density.(Size) -> Rect): Modifier = this
+    .offset { area(Size.Zero).topLeft.round() }
     .layout { measurable, constraints ->
-        val band = skyBand(measured, Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()), this)
-        val width = band.width.roundToInt().coerceAtLeast(0)
-        val height = band.height.roundToInt().coerceAtLeast(0)
+        val rect = area(Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()))
+        val width = rect.width.roundToInt().coerceAtLeast(0)
+        val height = rect.height.roundToInt().coerceAtLeast(0)
         val placeable = measurable.measure(Constraints.fixed(width, height))
         layout(width, height) { placeable.place(0, 0) }
     }
 
+/** Sizes and places a node as [skyBand] of [measured] inside the room it is given. */
+internal fun Modifier.inSkyBand(measured: HomeSkyBand?): Modifier = placedAs { skyBand(measured, it, this) }
+
 /** Home's whole header, from its top-left corner; with nothing measured, all of [size]. */
-fun headerArea(measured: HomeSkyBand?, size: Size): Rect =
+internal fun headerArea(measured: HomeSkyBand?, size: Size): Rect =
     if (measured == null) Rect(Offset.Zero, size) else Rect(0f, 0f, measured.headerWidth.toFloat(), measured.headerHeight.toFloat())
 
 /** Sizes and places a node as [headerArea] of [measured] inside the room it is given. */
-internal fun Modifier.inHomeHeader(measured: HomeSkyBand?): Modifier = this
-    .offset { headerArea(measured, Size.Zero).topLeft.round() }
-    .layout { measurable, constraints ->
-        val area = headerArea(measured, Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()))
-        val width = area.width.roundToInt().coerceAtLeast(0)
-        val height = area.height.roundToInt().coerceAtLeast(0)
-        val placeable = measurable.measure(Constraints.fixed(width, height))
-        layout(width, height) { placeable.place(0, 0) }
-    }
+internal fun Modifier.inHomeHeader(measured: HomeSkyBand?): Modifier = placedAs { headerArea(measured, it) }
 
-/** The height at [x] of a string hung across [band]: a parabola from [top] below the band's top at both ends to [sag] more at the middle. */
-internal fun hangingY(band: Rect, x: Float, top: Dp, sag: Dp, density: Density): Float = with(density) {
+/**
+ * A sky layer: placed by [place] in the room [modifier] gives, silent to TalkBack, clipped, and stepping [elapsed] while
+ * [drifting]. [frame] is built once per size and draws the time it is given; the time is read only when drawing.
+ */
+@Composable
+internal fun SkyLayer(
+    tag: String,
+    drifting: Boolean,
+    elapsed: MutableLongState,
+    modifier: Modifier,
+    place: Modifier.(HomeSkyBand?) -> Modifier,
+    frame: CacheDrawScope.(HomeSkyBand?) -> DrawScope.(Long) -> Unit,
+) {
+    SkyFrames(drifting, elapsed)
+    val measured = LocalHomeSkyBand.current
+    // The box gives the layer its room; the layer's own node is placed inside it, so the box's size can't stretch it.
+    Box(modifier) {
+        Spacer(
+            Modifier
+                .place(measured)
+                .testTag(tag)
+                .clearAndSetSemantics {}
+                .graphicsLayer { clip = true }
+                .drawWithCache {
+                    val draw = frame(measured)
+                    onDrawBehind {
+                        if (size.width > 0f && size.height > 0f) draw(elapsed.longValue)
+                    }
+                },
+        )
+    }
+}
+
+/** Where Birthday's bunting and Christmas's lights hang: [top] below the band's top at both ends, sagging [sag] more at the middle. */
+internal object SkyString {
+    val top = 6.dp
+    val sag = 16.dp
+}
+
+/** The height at [x] of the [SkyString] hung across [band]: a parabola through both ends and the middle. */
+internal fun hangingY(band: Rect, x: Float, density: Density): Float = with(density) {
     val t = (x - band.left) / band.width
-    band.top + top.toPx() + sag.toPx() * 4f * t * (1f - t)
+    band.top + SkyString.top.toPx() + SkyString.sag.toPx() * 4f * t * (1f - t)
 }
 
 /** The curve [hangingY] gives, as the quadratic through both ends and the middle. */
-internal fun hangingPath(band: Rect, top: Dp, sag: Dp, density: Density): Path {
-    val ends = hangingY(band, band.left, top, sag, density)
+internal fun hangingPath(band: Rect, density: Density): Path {
+    val ends = hangingY(band, band.left, density)
     return Path().apply {
         moveTo(band.left, ends)
-        quadraticTo(band.center.x, 2 * hangingY(band, band.center.x, top, sag, density) - ends, band.right, ends)
+        quadraticTo(band.center.x, 2 * hangingY(band, band.center.x, density) - ends, band.right, ends)
     }
 }
 
 /** How many things a [pitchPx] apart fit [widthPx]; none for a width narrower than [min] of them. */
 internal fun fitCount(widthPx: Float, pitchPx: Float, min: Int): Int =
     if (widthPx < min * pitchPx) 0 else floor(widthPx / pitchPx).toInt()
+
+/** The x of each of a row of things [pitchPx] apart, centred in [band]; none for a band too narrow for [min] of them. */
+internal fun hungRow(band: Rect, pitchPx: Float, min: Int): List<Float> {
+    val n = fitCount(band.width, pitchPx, min)
+    val first = band.left + (band.width - n * pitchPx) / 2 + pitchPx / 2
+    return List(n) { i -> first + i * pitchPx }
+}

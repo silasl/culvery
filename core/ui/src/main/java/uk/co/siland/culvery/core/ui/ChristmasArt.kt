@@ -1,14 +1,11 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -17,11 +14,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
@@ -53,6 +47,7 @@ internal const val SNOW_FALL_MS = 24_000L
 
 /** How long a bulb's twinkle takes, and how few bulbs make a string. */
 internal const val TWINKLE_MS = 4_000L
+internal const val TWINKLE_GROUPS = 4
 internal const val BULBS_MIN = 3
 
 class Flake(val centre: Offset, val radius: Float)
@@ -60,81 +55,86 @@ class Flake(val centre: Offset, val radius: Float)
 // Each flake's own fixed place in the fall, its column and its size, spread by steps coprime with SNOW_FLAKES.
 private fun flakeFraction(i: Int, step: Int) = (i * step % SNOW_FLAKES + 0.5f) / SNOW_FLAKES
 
+/** Each flake's column and radius in [area], worked out once per size so a step allocates nothing. */
+private class SnowField(private val area: Rect, density: Density) {
+    private val sway = with(density) { ChristmasDimens.snowSway.toPx() }
+    private val columns = FloatArray(SNOW_FLAKES) { i ->
+        area.left + minOf(sway, area.width / 2) + maxOf(area.width - 2 * sway, 0f) * flakeFraction(i, 11)
+    }
+    val radii = with(density) {
+        val min = ChristmasDimens.flakeRadiusMin.toPx()
+        val max = ChristmasDimens.flakeRadiusMax.toPx()
+        FloatArray(SNOW_FLAKES) { i -> min + (max - min) * flakeFraction(i, 5) }
+    }
+
+    fun fall(t: Float, i: Int) = (flakeFraction(i, 7) + t) % 1f
+    fun x(fall: Float, i: Int) = columns[i] + sway * sin(2f * PI.toFloat() * fall)
+    fun y(fall: Float) = area.top + fall * area.height
+}
+
+private fun fallAt(elapsedMillis: Long) = (elapsedMillis % SNOW_FALL_MS).toFloat() / SNOW_FALL_MS
+
 /**
  * Where the snow is [elapsedMillis] into the drift in [area]. Every flake falls the area's height every [SNOW_FALL_MS], coming
  * back in at the top, and sways once in that time about its column (21 §4.4).
  */
-fun snowFlakes(elapsedMillis: Long, area: Rect, density: Density): List<Flake> = with(density) {
-    val sway = ChristmasDimens.snowSway.toPx()
-    val radiusMin = ChristmasDimens.flakeRadiusMin.toPx()
-    val radiusMax = ChristmasDimens.flakeRadiusMax.toPx()
-    val room = maxOf(area.width - 2 * sway, 0f)
-    val t = (elapsedMillis % SNOW_FALL_MS).toFloat() / SNOW_FALL_MS
-    List(SNOW_FLAKES) { i ->
-        val fall = (flakeFraction(i, 7) + t) % 1f
-        val column = area.left + minOf(sway, area.width / 2) + room * flakeFraction(i, 11)
-        Flake(
-            Offset(column + sway * sin(2f * PI.toFloat() * fall), area.top + fall * area.height),
-            radiusMin + (radiusMax - radiusMin) * flakeFraction(i, 5),
-        )
+fun snowFlakes(elapsedMillis: Long, area: Rect, density: Density): List<Flake> {
+    val field = SnowField(area, density)
+    val t = fallAt(elapsedMillis)
+    return List(SNOW_FLAKES) { i ->
+        val fall = field.fall(t, i)
+        Flake(Offset(field.x(fall, i), field.y(fall)), field.radii[i])
     }
 }
 
 /** The bulbs along the wire, a [ChristmasDimens.bulbPitch] apart and centred in [band], each hanging its radius below the wire. */
 fun bulbCentres(band: Rect, density: Density): List<Offset> = with(density) {
-    val pitch = ChristmasDimens.bulbPitch.toPx()
-    val n = fitCount(band.width, pitch, BULBS_MIN)
-    val first = band.left + (band.width - n * pitch) / 2 + pitch / 2
-    List(n) { i ->
-        val x = first + i * pitch
-        Offset(x, hangingY(band, x, BirthdayDimens.buntingTop, BirthdayDimens.buntingSag, density) + ChristmasDimens.bulbRadius.toPx())
-    }
+    hungRow(band, ChristmasDimens.bulbPitch.toPx(), BULBS_MIN).map { x -> Offset(x, hangingY(band, x, density) + ChristmasDimens.bulbRadius.toPx()) }
 }
 
-/** How lit bulb [index] is [elapsedMillis] in, between [ChristmasInks.BULB_DIM] and 1; each of four groups runs a quarter period behind the last. */
+/** How lit bulb [index] is [elapsedMillis] in, between [ChristmasInks.BULB_DIM] and 1; each of [TWINKLE_GROUPS] groups runs a step behind the last. */
 fun bulbAlpha(elapsedMillis: Long, index: Int): Float {
     val t = (elapsedMillis % TWINKLE_MS).toFloat() / TWINKLE_MS
-    val phase = (t - (index % 4) / 4f + 1f) % 1f
+    val phase = (t - (index % TWINKLE_GROUPS) / TWINKLE_GROUPS.toFloat() + 1f) % 1f
     return ChristmasInks.BULB_DIM + (1f - ChristmasInks.BULB_DIM) * (1f + cos(2f * PI.toFloat() * phase)) / 2f
 }
 
+/**
+ * Snow across Home's whole header, behind the clock, and the lights where the birthday bunting hangs. Nothing in it is read by
+ * TalkBack. While [drifting] the snow falls and the bulbs twinkle; still, it runs no frames and the bulbs stay lit (21 §4.4).
+ */
 @Composable
 fun ChristmasSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: MutableLongState = remember { mutableLongStateOf(0L) }) {
     val colors = Culvery.colors
-    SkyFrames(drifting, elapsed)
-    val measured = LocalHomeSkyBand.current
-    Box(modifier) {
-        Spacer(
-            Modifier
-                .inHomeHeader(measured)
-                .testTag("christmas_sky")
-                .clearAndSetSemantics {}
-                .graphicsLayer { clip = true }
-                .drawWithCache {
-                    val density = this
-                    val band = skyBand(measured, size, density)
-                    val wire = hangingPath(band, BirthdayDimens.buntingTop, BirthdayDimens.buntingSag, density)
-                    val bulbs = bulbCentres(band, density)
-                    val area = Rect(Offset.Zero, size)
-                    val snow = ChristmasInks.snow(colors)
-                    val bulbInks = ChristmasInks.bulbs(colors)
-                    val outline = ChristmasInks.bulbOutline(colors)
-                    val bulbRadius = ChristmasDimens.bulbRadius.toPx()
-                    val stroke = Stroke(ChristmasDimens.wireStroke.toPx())
-                    onDrawBehind {
-                        if (size.width <= 0f || size.height <= 0f) return@onDrawBehind
-                        val now = elapsed.longValue
-                        snowFlakes(now, area, density).forEach { drawCircle(snow, it.radius, it.centre) }
-                        if (bulbs.isEmpty()) return@onDrawBehind
-                        drawPath(wire, ChristmasInks.wire(colors), style = stroke)
-                        bulbs.forEachIndexed { i, at ->
-                            val alpha = if (drifting) bulbAlpha(now, i) else 1f
-                            drawCircle(bulbInks[i % bulbInks.size], bulbRadius, at, alpha)
-                            outline?.let { drawCircle(it, bulbRadius, at, alpha, stroke) }
-                        }
-                    }
-                },
-        )
+    SkyLayer("christmas_sky", drifting, elapsed, modifier, { inHomeHeader(it) }) { measured ->
+        val density = this
+        val band = skyBand(measured, size, density)
+        val wire = hangingPath(band, density)
+        val bulbs = bulbCentres(band, density)
+        val field = SnowField(Rect(Offset.Zero, size), density)
+        val snow = ChristmasInks.snow(colors)
+        val wireInk = ChristmasInks.wire(colors)
+        val bulbInks = ChristmasInks.bulbs(colors)
+        val outline = ChristmasInks.bulbOutline(colors)
+        val bulbRadius = ChristmasDimens.bulbRadius.toPx()
+        val stroke = Stroke(ChristmasDimens.wireStroke.toPx())
+        val alphas = FloatArray(TWINKLE_GROUPS)
+        return@SkyLayer { now ->
+            val t = fallAt(now)
+            for (i in 0 until SNOW_FLAKES) {
+                val fall = field.fall(t, i)
+                drawCircle(snow, field.radii[i], Offset(field.x(fall, i), field.y(fall)))
+            }
+            if (bulbs.isNotEmpty()) {
+                for (g in alphas.indices) alphas[g] = if (drifting) bulbAlpha(now, g) else 1f
+                drawPath(wire, wireInk, style = stroke)
+                for (i in bulbs.indices) {
+                    val alpha = alphas[i % TWINKLE_GROUPS]
+                    drawCircle(bulbInks[i % bulbInks.size], bulbRadius, bulbs[i], alpha)
+                    outline?.let { drawCircle(it, bulbRadius, bulbs[i], alpha, stroke) }
+                }
+            }
+        }
     }
 }
 
@@ -142,10 +142,10 @@ fun ChristmasSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Muta
 private const val MARK_CAP =
     "M39.5,38.2 L49.4,29.72 A3.22,3.22 0 0,1 53.6,29.72 L63.5,38.2 " +
         "Q61.5,42 59,39.6 Q57,43.6 54,40.4 Q51.5,44.2 49,40.4 Q46,43.6 44,39.6 Q41.5,42 39.5,38.2 Z"
-private const val MARK_WREATH = "M48.5,58.5 A3,3 0 1,1 54.5,58.5 A3,3 0 1,1 48.5,58.5 Z"
-private const val MARK_BOW = "M49.6,55.1 L51.5,56.4 L53.4,55.1 L53.4,57.7 L51.5,56.4 L49.6,57.7 Z"
+private const val MARK_WREATH = "M48.5,58 A3,3 0 1,1 54.5,58 A3,3 0 1,1 48.5,58 Z"
+private const val MARK_BOW = "M49.6,54.6 L51.5,55.9 L53.4,54.6 L53.4,57.2 L51.5,55.9 L49.6,57.2 Z"
 private const val MARK_WREATH_STROKE = 1.8f
-private const val MARK_CAP_LINE = 0.7f
+private const val MARK_CAP_LINE = 0.9f
 
 /**
  * The Culvery house, snowed in, taking the mark's place: snow over the roof inside the mark's own viewport with a line of the
@@ -156,15 +156,13 @@ fun ChristmasMark(width: Dp, modifier: Modifier = Modifier) {
     val c = Culvery.colors
     val mark = remember(c, width) {
         val robin = SolidColor(ChristmasInks.robin(c))
-        ImageVector.Builder(name = "ChristmasMark", defaultWidth = width, defaultHeight = width * (MarkViewport.HEIGHT / MarkViewport.WIDTH), viewportWidth = MarkViewport.WIDTH, viewportHeight = MarkViewport.HEIGHT)
-            .addGroup(translationX = -MarkViewport.LEFT, translationY = -MarkViewport.TOP)
-            .addPath(addPathNodes(MARK_HOUSE), fill = SolidColor(c.ink))
-            .addPath(addPathNodes(MARK_CAP), fill = SolidColor(ChristmasInks.markSnow(c)), stroke = SolidColor(c.bg), strokeLineWidth = MARK_CAP_LINE, strokeLineJoin = StrokeJoin.Round)
-            .addPath(addPathNodes(MARK_DOVE), fill = robin)
-            .addPath(addPathNodes(MARK_WREATH), stroke = SolidColor(ChristmasInks.wreath(c)), strokeLineWidth = MARK_WREATH_STROKE)
-            .addPath(addPathNodes(MARK_BOW), fill = robin)
-            .clearGroup()
-            .build()
+        markVector("ChristmasMark", width) {
+            addPath(addPathNodes(MARK_HOUSE), fill = SolidColor(c.ink))
+            addPath(addPathNodes(MARK_CAP), fill = SolidColor(ChristmasInks.markSnow(c)), stroke = SolidColor(c.bg), strokeLineWidth = MARK_CAP_LINE, strokeLineJoin = StrokeJoin.Round)
+            addPath(addPathNodes(MARK_DOVE), fill = robin)
+            addPath(addPathNodes(MARK_WREATH), stroke = SolidColor(ChristmasInks.wreath(c)), strokeLineWidth = MARK_WREATH_STROKE)
+            addPath(addPathNodes(MARK_BOW), fill = robin)
+        }
     }
     Image(mark, contentDescription = null, modifier = modifier.testTag("christmas_mark").semantics { hideFromAccessibility() })
 }

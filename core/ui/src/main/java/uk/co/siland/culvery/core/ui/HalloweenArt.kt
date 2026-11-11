@@ -1,14 +1,11 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -19,12 +16,10 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.toPath
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
@@ -180,29 +175,16 @@ fun HalloweenSky(drifting: Boolean, modifier: Modifier = Modifier, elapsed: Muta
     val colors = Culvery.colors
     val moon = HalloweenInks.moon(colors)
     val bat = HalloweenInks.bat(colors)
-    val measured = LocalHomeSkyBand.current
     val batShape = remember { addPathNodes(BAT_PATH).toPath() }
-    SkyFrames(drifting, elapsed)
-    // The box gives the band its room; the band's own node is placed inside it, so the box's size can't stretch it.
-    Box(modifier) {
-        Spacer(
-            Modifier
-                .inSkyBand(measured)
-                .testTag("halloween_sky")
-                .clearAndSetSemantics {}
-                .graphicsLayer { clip = true }
-                .drawWithCache {
-                    val frame = SkyFrame(size, this)
-                    val bats = frame.track
-                    onDrawBehind {
-                        if (size.width <= 0f || size.height <= 0f) return@onDrawBehind
-                        drawCircle(moon, frame.moon.radius, frame.moon.centre)
-                        val lap = lapAt(elapsed.longValue)
-                        for (i in 0 until BATS) {
-                            translate(bats.left(lap, i), bats.tops[i]) { scale(frame.fit, frame.fit, pivot = Offset.Zero) { drawPath(batShape, bat) } }
-                        }
-                    }
-                },
-        )
+    SkyLayer("halloween_sky", drifting, elapsed, modifier, { inSkyBand(it) }) {
+        val frame = SkyFrame(size, this)
+        val bats = frame.track
+        return@SkyLayer { now ->
+            drawCircle(moon, frame.moon.radius, frame.moon.centre)
+            val lap = lapAt(now)
+            for (i in 0 until BATS) {
+                translate(bats.left(lap, i), bats.tops[i]) { scale(frame.fit, frame.fit, pivot = Offset.Zero) { drawPath(batShape, bat) } }
+            }
+        }
     }
 }
