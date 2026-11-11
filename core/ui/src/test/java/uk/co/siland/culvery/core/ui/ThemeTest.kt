@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -205,6 +206,7 @@ class ThemeTest {
         assertThat(seen!!.second).isNull()
     }
 
+    /** **pin**: it passed against the stub, whose sets were DarkColors and LightColors; it holds the real sets to the theme. */
     @Test
     fun christmasProvidesItsSets() {
         var night: Pair<HhColors, SeasonalLook?>? = null
@@ -224,9 +226,9 @@ class ThemeTest {
     /** Both ends of a contrast step stay amber and ice blue, so a value can move without leaving its colour (21 §3.3). */
     @Test
     fun christmasWarningsAreAmberAndItsWeatherIceBlue() {
-        listOf(ChristmasNight, ChristmasDay).forEach { t ->
-            assertThat(hueGap(t.danger, Color(0xFFF2A33A))).isAtMost(10f)
-            assertThat(hueGap(t.weather, Color(0xFF9FD3EA))).isAtMost(10f)
+        listOf("night" to ChristmasNight, "day" to ChristmasDay).forEach { (name, t) ->
+            assertWithMessage("Christmas $name danger is amber").that(hueGap(t.danger, Color(0xFFF2A33A))).isAtMost(10f)
+            assertWithMessage("Christmas $name weather is ice blue").that(hueGap(t.weather, Color(0xFF9FD3EA))).isAtMost(10f)
         }
         assertThat(ChristmasNight.border).isEqualTo(Color.Transparent)
     }
