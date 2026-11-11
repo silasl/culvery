@@ -998,6 +998,23 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - **Left as is:** opening App settings shows "No town chosen yet" and no people for a moment before they load (not bins).
 - **Design note for later:** the calendar engine treats every answer as fresh, so the bins provider keeps its own copy and re-reports a stored failure; the engine owning read timing (and Update now as a flag on the sync request) would remove that.
 
+## Plan 21 (Christmas): emulator walk-through (2026-11-11)
+- **Set-up:** the debug build of b8f9ce0b on `culvery-5` with `install -r` and the debug sample household; the debug sample Admin PIN for Settings; the clock moved with `DebugClockReceiver`.
+- **Worked:**
+  - Preview Christmas by night and by day (status bar preview): Home, Calendar, Lights, Door, New event, the PIN pad, a toast ("Added …" with Undo in red) and Settings in Christmas's colours; Door's "Clear history" in amber;
+  - the snow behind the clock and the date, the lights twinkling, the Mountains of Christmas clock, the snowed-in mark, the holly;
+  - the preview ended at midnight (23:59 to 00:00) and the switch read off;
+  - inside the dates: 12 December Christmas with no preview; 1 January still Christmas; 6 January 23:59 to 7 January 00:00 ended it with no restart;
+  - outside both themes' dates (11 November): "Next: Christmas from 1 December";
+  - Christmas's dates sheet in January: opens on December with 1 Dec picked, January runs to the 6th; 20 Dec – 2 Jan saved, then "Put back 1 Dec – 6 Jan";
+  - 29 February: Halloween saved as 29 Feb – 10 Mar on a 2028 clock ("Next: Halloween from 29 February"); on a 2027 clock the sheet showed 1 March picked, "The saved first day is 29 February, which in 2027 is 1 March." and Save off; "Next: Halloween from 1 March"; put back to 24 Oct – 31 Oct;
+  - Halloween unchanged under its preview; the birthday preview on 12 December showed the birthday look over Christmas;
+  - frames: Christmas awake about 12 fps (61 in 5 s); 0 with animations off, under Settings, under the PIN pad and asleep; about 12 fps again after each;
+  - Settings › Door's Play chime with Follow the theme: the music box with Christmas showing (105,840 frames, its length), the classic chime without (70,560); the music box is in the sound buttons' list (Settings › Modes).
+- **Note:** the emulator's `animator_duration_scale` was unset after an earlier walk-through, and Android counted animations as off: no sky moved, Halloween's included, until it was set to 1.0. Left at 1.0. If a sky won't move on the emulator, check `adb shell settings get global animator_duration_scale` first.
+- **Note:** restarting the app clears `DebugClockReceiver`'s offset.
+- **Put to the user, not fixed:** the clock face's "0" reads like a small raised "o" ("12:oo"); the Today card's holly is faint by day and barely shows by night; the lights run across most of the header (about 33 bulbs).
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
