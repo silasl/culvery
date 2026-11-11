@@ -2,6 +2,7 @@ package uk.co.siland.culvery.display
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -221,11 +222,10 @@ class SeasonalThemesTest {
     /** Fails if a range of only 29 February is promised in a year without one. */
     @Test
     fun aLeapDayOnlyRangeWaitsForALeapYear() {
-        val dates = mapOf(
-            SeasonalTheme.HALLOWEEN to SeasonDates(MonthDay.of(2, 29), MonthDay.of(2, 29)),
-            SeasonalTheme.CHRISTMAS to SeasonDates(MonthDay.of(12, 30), MonthDay.of(12, 31)),
-        )
-        assertThat(nextTheme(date(2027, 12, 31), dates)).isEqualTo(SeasonalTheme.HALLOWEEN to date(2028, 2, 29))
+        val leapOnly = SeasonDates(MonthDay.of(2, 29), MonthDay.of(2, 29))
+        val dates = mapOf(SeasonalTheme.HALLOWEEN to leapOnly, SeasonalTheme.CHRISTMAS to leapOnly)
+        assertWithMessage("2027-03-01 holds no day of a 29 Feb-only range, so the next start is the leap year's")
+            .that(nextTheme(date(2027, 1, 10), dates)).isEqualTo(SeasonalTheme.HALLOWEEN to date(2028, 2, 29))
     }
 
     /** Fails if the next theme isn't the soonest start, this year's or next year's. */
