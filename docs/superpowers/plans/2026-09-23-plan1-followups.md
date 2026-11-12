@@ -1030,7 +1030,8 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 
   Halving the flakes didn't move the 90th percentile, so the flakes aren't the cost. Christmas has about twice Halloween's slow draw commands (7 after its fix), and its sky covers the whole header, not a band. **Ruling (the user, 2026-11-12): 18 flakes back, 13 ms accepted.** A 13 ms frame at about 12 fps doesn't stutter. If it's ever worth chasing, try trial builds with the lights off, then with the snow off. Heat log at thermal 0, battery 25.3–25.5 °C; no Culvery crash (one Bluetooth crash in the system at 05:16).
 - **The snow's seed:** the scatter test now checks 24 moments across the fall, not three. The first seed (21) lined up at one of them, so the seed is now 94: its worst correlation across the fall is 0.25, with at least 9 up-and-down turns.
-- **Still to do:** 30 s asleep with no new frames; the user's look by day and at night; Play chime with Follow the theme (the user's PIN); the holly's size.
+- **Asleep (3e329513):** Culvery went to sleep on its own after about 4 min untouched; 0 frames in the next 30 s, and the screen stayed dark.
+- **Still to do:** the user's look by day and at night; Play chime with Follow the theme (the user's PIN); the holly's size.
 
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
