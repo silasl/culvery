@@ -1015,6 +1015,23 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - **Note:** restarting the app clears `DebugClockReceiver`'s offset.
 - **Put to the user, not fixed:** the clock face's "0" reads like a small raised "o" ("12:oo"); the Today card's holly is faint by day and barely shows by night; the lights run across most of the header (about 33 bulbs).
 
+## Plan 21 (Christmas): on the tablet (2026-11-12)
+- **Set-up:** release builds on the SM-T510, each installed with `-r`: 99c6fa1e (mapping `culvery-notes/mappings/mapping-99c6fa1.txt`), then 998c903b (`mapping-998c903.txt`), then 3e329513 (`mapping-3e32951.txt`), the build left on it; `grep -c DebugClock` on each mapping gave 0. The user turned on Preview Christmas. An install restarts the app, and the preview doesn't survive that, so the user turned it on again after each one.
+- **Seen:** Home by day in Christmas: snow, lights, the snowed-in mark, the Mountains of Christmas clock, the holly sprig on the Today card's top-right corner.
+- **Frame cost, 60 s awake on Home** (`dumpsys gfxinfo`; pass: 90th percentile ≤ 12 ms and janky frames < 5%):
+
+  | | 18 flakes (99c6fa1e) | 9 flakes (998c903b) |
+  |---|---|---|
+  | Frames | 724 | 724 |
+  | 50th / 90th / 99th percentile | 10 / 13 / 18 ms | 10 / 13 / 17 ms |
+  | Janky frames | 4.1% | 3.0% |
+  | Slow issue draw commands | 17 | 18 |
+  | GPU 90th percentile | 6 ms | 6 ms |
+
+  Halving the flakes didn't move the 90th percentile, so the flakes aren't the cost. Christmas has about twice Halloween's slow draw commands (7 after its fix), and its sky covers the whole header, not a band. **Ruling (the user, 2026-11-12): 18 flakes back, 13 ms accepted.** A 13 ms frame at about 12 fps doesn't stutter. If it's ever worth chasing, try trial builds with the lights off, then with the snow off. Heat log at thermal 0, battery 25.3–25.5 °C; no Culvery crash (one Bluetooth crash in the system at 05:16).
+- **The snow's seed:** the scatter test now checks 24 moments across the fall, not three. The first seed (21) lined up at one of them, so the seed is now 94: its worst correlation across the fall is 0.25, with at least 9 up-and-down turns.
+- **Still to do:** 30 s asleep with no new frames; the user's look by day and at night; Play chime with Follow the theme (the user's PIN); the holly's size.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
