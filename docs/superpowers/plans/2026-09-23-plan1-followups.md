@@ -10,7 +10,6 @@ The open work, one number each; the details are in the sections below. Numbers n
 1. Camera wake-up's cost: the fixes (P1, P2, P9) are built; left is re-running runs B and C against decision 9's bar. See "November 2026 review" below.
 6. A new name for Settings › Modes, at the end-of-v1 review.
 7. Sound pads played on Sonos.
-8. A Christmas seasonal theme.
 9. A real sleigh-bell recording for Christmas.
 10. Whether birthdays override a doorbell set to one sound.
 
@@ -855,7 +854,7 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 
 ## Plan 14 (seasonal themes): left for later (final review, 2026-10-30)
 - **End-of-v1 design review:** Halloween signed off by the user (2026-11-03).
-- **For the Christmas plan:** a range starting 29 February starts on 1 March in common years, but "Next:" and the dates sheet say 28 February, and saving unchanged rewrites the start to 28 Feb. Only reachable by picking 29 Feb.
+- **For the Christmas plan:** a range starting 29 February starts on 1 March in common years, but "Next:" and the dates sheet say 28 February, and saving unchanged rewrites the start to 28 Feb. Only reachable by picking 29 Feb. **Fixed in Plan 21 (2026-11-11).**
 - **Known, small:** on a cold start the default dates apply for a few milliseconds before the settings are read. A household that moved Halloween could see a flash, and a ring in that moment would play the organ. Leave it unless it shows on the tablet.
 - **The plan against the code:** the bats cross in 45 s in 2 lanes (the plan said 90 s and 4 lanes), from the Task 9 ruling that moved the sky into the header band.
 
@@ -1031,7 +1030,32 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
   Halving the flakes didn't move the 90th percentile, so the flakes aren't the cost. Christmas has about twice Halloween's slow draw commands (7 after its fix), and its sky covers the whole header, not a band. **Ruling (the user, 2026-11-12): 18 flakes back, 13 ms accepted.** A 13 ms frame at about 12 fps doesn't stutter. If it's ever worth chasing, try trial builds with the lights off, then with the snow off. Heat log at thermal 0, battery 25.3–25.5 °C; no Culvery crash (one Bluetooth crash in the system at 05:16).
 - **The snow's seed:** the scatter test now checks 24 moments across the fall, not three. The first seed (21) lined up at one of them, so the seed is now 94: its worst correlation across the fall is 0.25, with at least 9 up-and-down turns.
 - **Asleep (3e329513):** Culvery went to sleep on its own after about 4 min untouched; 0 frames in the next 30 s, and the screen stayed dark.
-- **Still to do:** the user's look by day and at night; Play chime with Follow the theme (the user's PIN); the holly's size.
+- **The user's checks (2026-11-12):** Play chime with Follow the theme played the music box; the holly's size suits as built (`hollyUnit` 1.3 dp). The night look is the user's to see in use.
+- **Preview after an install:** an install restarts the app and the preview is held in memory only, so it goes off; turn it on again after each install while checking.
+
+## From Plan 21
+- **For the end-of-v1 design review: warnings against the weather.** The spec asks for the warning and weather colours to be at least 35° of hue apart. Christmas passes; three sets don't, and are left as they are on the user's ruling:
+
+  | Set | Night | Day |
+  |---|---|---|
+  | Normal | 34.2° | 35.9° |
+  | Birthday nights that keep the normal warning colour | 34.2° | – |
+  | The pink birthday | 22.4° | 26.7° |
+  | The orange birthday | 72.6° | 75.5° |
+  | Halloween | 58.4° | 60.6° |
+  | Christmas | 164.2° | 162.2° |
+
+  The test pins the normal and birthday sets at these values.
+- **For the end-of-v1 design review:** the editor's Clash tag and the free-check "busy" line use the weather colour, so they turn ice blue under Christmas. Moving them to the warning colour would change the normal look too.
+- **Accepted, as for Halloween:** a ring right after a cold start, before the clock is read, plays the classic chime even in December; edited Christmas dates may show the defaults for a moment after a restart.
+- **Faults put to the user, not fixed:** the clock face's "0" reads like a small raised "o" (the user: leave it); the lights run across most of the header, as the bunting does (by design).
+- **Frame cost:** 13 ms at the 90th percentile, accepted (see "on the tablet" above).
+
+## Plan 21 not in this build, on purpose
+- Corner art on cards other than Today (a Plan 14 leftover).
+- A real sleigh-bell recording (item 9).
+- Sound pads on Sonos (item 7).
+- Birthdays overriding a doorbell set to one sound (item 10).
 
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
@@ -1086,7 +1110,7 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **A Modes settings tab with custom modes (the user, 2026-10-29, from the Plan 13 walk-through):** **Done in Plan 15b (2026-11-03).** one Settings page for Holiday and Party mode, where the family can also add their own modes (each with its own plug, music and lights choices and a tile in the One-tap tray). Its own spec; no detail yet. Would fold the Party mode settings page and the Plugs tab's per-mode columns into one place.
 - **Plan 18 left for later (2026-11-05):**
   - Pads on Sonos (the user chose the tablet speaker for now).
-  - A Christmas seasonal theme, which would make Christmas music box Follow the theme's sound in December.
+  - A Christmas seasonal theme, which would make Christmas music box Follow the theme's sound in December. **Done in Plan 21 (2026-11-12).**
   - A real sleigh-bell recording for Christmas, if the family finds one with a licence that allows it (generated sleigh bells didn't convince).
   - Birthdays override a doorbell set to one sound? Today only Follow the theme switches to Happy Birthday.
 - **Plan 18 deferred minors (2026-11-05, from the build's reviews):**
