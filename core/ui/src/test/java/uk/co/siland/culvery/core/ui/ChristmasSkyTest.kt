@@ -103,7 +103,7 @@ class ChristmasSkyTest {
             val r = cov / sqrt(xs.sumOf { (it - mx) * (it - mx) } * ys.sumOf { (it - my) * (it - my) })
             assertWithMessage("correlation of height with column at $t ms").that(abs(r)).isLessThan(0.5)
             val turns = flakes.sortedBy { it.centre.x }.map { it.centre.y }.zipWithNext { a, b -> b > a }.zipWithNext { a, b -> a != b }.count { it }
-            assertWithMessage("up/down turns along the width at $t ms").that(turns).isAtLeast(4)
+            assertWithMessage("up/down turns along the width at $t ms").that(turns).isAtLeast(SNOW_FLAKES / 3)
         }
     }
 

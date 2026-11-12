@@ -45,7 +45,7 @@ object ChristmasDimens {
 }
 
 /** How many flakes fall, and how long each takes to cross the header and come back in at the top. */
-internal const val SNOW_FLAKES = 9
+internal const val SNOW_FLAKES = 18
 internal const val SNOW_FALL_MS = 24_000L
 
 /** How long a bulb's twinkle takes, and how few bulbs make a string. */
@@ -60,7 +60,7 @@ class Flake(val centre: Offset, val radius: Float)
  * its own slot down the fall, shuffled apart and jittered within the slot, so no two line up; and its own size, sway and sway phase.
  */
 private object SnowScatter {
-    private val random = Random(232)
+    private val random = Random(94)
     private fun slots() = (0 until SNOW_FLAKES).shuffled(random).map { (it + 0.15f + 0.7f * random.nextFloat()) / SNOW_FLAKES }.toFloatArray()
 
     val column = slots()
