@@ -264,14 +264,13 @@ class ContrastTest {
         }
     }
 
-    /** **pin**: the holly sits under card text and stands off the card (21 §3.7); the inks were added with this test, so it passed before the drawing. */
+    /** The holly sprig hangs half over the Today card's edge, so it stands off both the card and the page (21 §3.7). */
     @Test
-    fun theHollyReadsUnderCardText() {
+    fun theHollyStandsOffTheCardAndThePage() {
         christmas.forEach { (name, t) ->
             listOf("leaf" to ChristmasInks.hollyLeaf(t), "berry" to ChristmasInks.hollyBerry(t)).forEach { (part, ink) ->
-                check("$name ink on the holly $part", t.ink, ink, TEXT)
-                check("$name mute on the holly $part", t.mute, ink, TEXT)
-                check("$name holly $part on surf", ink, t.surf, SKY_MIN)
+                check("$name holly $part on surf", ink, t.surf, NON_TEXT)
+                check("$name holly $part on bg", ink, t.bg, NON_TEXT)
             }
         }
     }

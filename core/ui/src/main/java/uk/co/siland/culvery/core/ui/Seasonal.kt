@@ -53,6 +53,8 @@ class SeasonalLook(
     val mark: (@Composable (width: Dp) -> Unit)? = null,
     /** Drawn behind the Today card's content, over its surface, inside its clip. */
     val cardCorner: (DrawScope.(HhColors) -> Unit)? = null,
+    /** Drawn over the Today card, outside its clip, so it can hang over the card's edge; a picture only. */
+    val cardPin: (DrawScope.(HhColors) -> Unit)? = null,
     /** Drawn behind Home's content; moves only while [drifting]. */
     val sky: (@Composable (drifting: Boolean, modifier: Modifier) -> Unit)? = null,
 )

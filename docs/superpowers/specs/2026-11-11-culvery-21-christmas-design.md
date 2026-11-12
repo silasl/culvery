@@ -40,7 +40,7 @@ On a December evening the wall should read as Christmas from across the room: sn
 4. **Mark (option A, "the house, snowed in"):** Culvery's own house and dove, with snow along the roof, a wreath on the door and the dove in robin red. It replaces `CulveryMark` while Christmas shows, at the same size and place.
 5. **Clock face:** **Mountains of Christmas** (bold) for the big Home clock's digits, in the accent red, by day and by night.
 6. **Home's header:** snow drifts down across the **whole header, behind the clock** as well as the open band. A **string of fairy lights** hangs across the open band, where the birthday bunting hangs, and twinkles slowly. Halloween's bats stay in the band as they are.
-7. **Corner art:** a sprig of holly (two leaves, three berries) in the Today card's top-right corner, where Halloween's cobweb is, **smaller than the first mockup** (about 40 × 25 dp in the mockup's scale). The user isn't sure of the holly yet: its size and look are to be tweaked on the tablet once built.
+7. **Corner art:** a sprig of holly (two spiked leaves with a vein, three berries) pinned on the Today card's top-right corner, half over its edge: one leaf along the top edge, one down the right side, the berries on the corner. Full Christmas green and red. Chosen 2026-11-12 from four mockups after the walk-through, at the smaller of two sizes; it replaced a faint sprig drawn behind the card's text.
 8. **Doorbell:** with *Follow the theme*, a ring plays the Christmas music box (Plan 18's `CHRISTMAS_MUSIC_BOX`) while Christmas shows. A birthday still plays Happy Birthday.
 
 Mockups: `culvery/.superpowers/brainstorm/111-1794391406/content/` (gitignored): `colours.html`, `mark-v2.html`, `clock-face.html`, `card-art.html`, `lights.html`, `day.html`. Note that `day.html`'s day clock is wrongly in DM Sans; Christmas uses Mountains of Christmas by day too.
@@ -100,7 +100,7 @@ Mockups: `culvery/.superpowers/brainstorm/111-1794391406/content/` (gitignored):
 - The date, the night clock and every other text stay in DM Sans.
 
 ### 4.6 Corner art
-- The holly is Christmas's `cardCorner`, drawn behind the Today card's content inside its clip, as the cobweb is: two leaves and three berries in muted Christmas inks, faint enough to sit behind content. Its size is a named dimension (like `HalloweenDimens.webSpan`) so the user's tweak on the tablet is one number. It must not change the "+" or "See the week" buttons' touch areas. The builder decides whether the "+" moves; the mockup moved it left.
+- The holly is Christmas's `cardPin`: drawn over the Today card, outside its clip, so it can hang over the corner (the cobweb stays a clipped `cardCorner`). Its leaf and berry stand 3:1 off both the card and the page. Its size is one named unit (`ChristmasDimens.hollyUnit`) so a tweak on the tablet is one number. It only draws: the "+" and "See the week" buttons keep their places and touch areas.
 
 ### 4.7 The doorbell
 - Plan 18 already ties a sound to a theme (`BuiltInSound.theme`, `SoundLibrary.forTheme`), so the Plan 14 leftover "the doorbell sound as part of a theme's look" is already met. For Christmas: `CHRISTMAS_MUSIC_BOX`'s `theme` becomes `SeasonalTheme.CHRISTMAS`.

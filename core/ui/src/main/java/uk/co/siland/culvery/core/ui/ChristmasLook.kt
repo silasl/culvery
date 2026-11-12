@@ -43,7 +43,7 @@ val ChristmasDay = HhColors(
     border = Color(0xFFDCD2C2),
 )
 
-val ChristmasLook = SeasonalLook(night = ChristmasNight, day = ChristmasDay, clockFace = MountainsOfChristmasClock, mark = { width -> ChristmasMark(width) }, cardCorner = { c -> drawHolly(ChristmasInks.hollyLeaf(c), ChristmasInks.hollyBerry(c), ChristmasDimens.hollySpan) }, sky = { drifting, m -> ChristmasSky(drifting, m) })
+val ChristmasLook = SeasonalLook(night = ChristmasNight, day = ChristmasDay, clockFace = MountainsOfChristmasClock, mark = { width -> ChristmasMark(width) }, cardPin = { c -> drawHollySprig(c) }, sky = { drifting, m -> ChristmasSky(drifting, m) })
 
 object ChristmasInks {
     val NIGHT_SNOW = Color(0xFF2C4034)
@@ -73,12 +73,15 @@ object ChristmasInks {
     fun wreath(c: HhColors): Color = if (c.isLight) WREATH_DAY else WREATH_NIGHT
     fun robin(c: HhColors): Color = c.accent
 
-    /** The holly on the Today card sits under its text: as much colour as keeps `mute` text 4.5:1 over it, by night darker and by day paler. */
-    val HOLLY_LEAF_NIGHT = Color(0xFF1C4529)
-    val HOLLY_BERRY_NIGHT = Color(0xFF6E1F24)
-    val HOLLY_LEAF_DAY = Color(0xFFB4DFBE)
-    val HOLLY_BERRY_DAY = Color(0xFFFFC7C9)
+    /** The holly sprig on the Today card's corner: a leaf, its vein and a berry, each standing off both the card and the page. */
+    val HOLLY_LEAF_NIGHT = Color(0xFF3E8E55)
+    val HOLLY_RIB_NIGHT = Color(0xFF1E5230)
+    val HOLLY_BERRY_NIGHT = Color(0xFFEE6A6E)
+    val HOLLY_LEAF_DAY = Color(0xFF2E7D46)
+    val HOLLY_RIB_DAY = Color(0xFF1B4D2B)
+    val HOLLY_BERRY_DAY = Color(0xFFC62A31)
 
     fun hollyLeaf(c: HhColors): Color = if (c.isLight) HOLLY_LEAF_DAY else HOLLY_LEAF_NIGHT
+    fun hollyRib(c: HhColors): Color = if (c.isLight) HOLLY_RIB_DAY else HOLLY_RIB_NIGHT
     fun hollyBerry(c: HhColors): Color = if (c.isLight) HOLLY_BERRY_DAY else HOLLY_BERRY_NIGHT
 }

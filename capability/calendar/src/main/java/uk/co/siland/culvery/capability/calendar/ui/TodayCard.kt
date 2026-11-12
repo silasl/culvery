@@ -90,6 +90,7 @@ fun TodayCard(
         // The foot is the list's: the scroll runs to the card's edge under the fade.
         padding = PaddingValues(start = CalendarDimens.todayPaddingH, end = CalendarDimens.todayPaddingH, top = CalendarDimens.todayPaddingV),
         decoration = Culvery.look?.cardCorner,
+        pin = Culvery.look?.cardPin,
     ) {
         TodayBody(events, tomorrow?.copy(events = candidates), onOpen, onAdd)
     }

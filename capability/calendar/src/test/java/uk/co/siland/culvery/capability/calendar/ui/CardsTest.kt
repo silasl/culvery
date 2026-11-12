@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.collect.Range
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,7 +57,6 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.BinInks
-import uk.co.siland.culvery.core.ui.ChristmasDimens
 import uk.co.siland.culvery.core.ui.ChristmasInks
 import uk.co.siland.culvery.core.ui.ChristmasNight
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -360,53 +361,31 @@ class CardsTest {
         }
     }
 
-    /** The card's pixels in the [ChristmasDimens.hollySpan] boxes that aren't [surf], outside the buttons and the rounded corner. */
-    private inner class HollyCorners(val surf: Color, val berry: Color) {
-        private val card = compose.onNodeWithTag("calendar_today")
-        private val node = card.fetchSemanticsNode()
-        private val image = windowBitmap(card)
-        private val density = node.layoutInfo.density.density
-        private val bounds = node.boundsInWindow
-        private val buttons = listOf(compose.onNodeWithTag("today_add"), compose.onNodeWithText("See the week")).map { it.fetchSemanticsNode().boundsInWindow }
-        private val width = (ChristmasDimens.hollySpan.value * density).toInt()
-        private val height = (ChristmasDimens.hollySpan.value * 25 / 40 * density).toInt()
-        private val arc = (CalendarDimens.cardRadius.value * density).toInt()
-
-        private fun differs(x: Int, y: Int) = image.getPixel(x, y) != surf.toArgb() && buttons.none { it.contains(Offset(x + 0.5f, y + 0.5f)) }
-
-        /** False for the pixels the card's rounded corners cut away. */
-        private fun insideCard(x: Int, y: Int): Boolean {
-            val cx = x + 0.5f
-            val cy = y + 0.5f
-            val dx = maxOf(bounds.left + arc - cx, cx - (bounds.right - arc), 0f)
-            val dy = maxOf(bounds.top + arc - cy, cy - (bounds.bottom - arc), 0f)
-            return dx * dx + dy * dy <= (arc - 1f) * (arc - 1f)
-        }
-
-        private fun topRightBox() = (bounds.top.toInt() until bounds.top.toInt() + height).flatMap { y ->
-            (bounds.right.toInt() - width until bounds.right.toInt()).map { x -> x to y }
-        }.filter { (x, y) -> insideCard(x, y) }
-
-        fun topRight(): Int = topRightBox().count { (x, y) -> differs(x, y) }
-
-        fun berries(): Int = topRightBox().count { (x, y) -> image.getPixel(x, y) == berry.toArgb() }
-
-        fun bottomLeft(): Int = (bounds.bottom.toInt() - height until bounds.bottom.toInt()).sumOf { y ->
-            (bounds.left.toInt() until bounds.left.toInt() + width).count { x -> insideCard(x, y) && differs(x, y) }
-        }
-    }
-
+    /** **pin**: the sprig hangs on the card's top-right corner: berries at the corner, leaves over the top and right edges, nothing at the foot. */
     @Test
-    fun theHollySitsInTheTopRightCorner() {
+    fun theHollyHangsOnTheTopRightCorner() {
         seasonal = SeasonalTheme.CHRISTMAS
-        showSized { TodayCard(SampleUi.today, onAdd = {}) }
-        val corners = HollyCorners(ChristmasNight.surf, ChristmasInks.hollyBerry(ChristmasNight))
-        assertThat(corners.topRight()).isGreaterThan(0)
-        assertThat(corners.berries()).isGreaterThan(0)
-        assertThat(corners.bottomLeft()).isEqualTo(0)
+        show { Box(Modifier.padding(32.dp).size(todayCardSize)) { TodayCard(SampleUi.today, onAdd = {}) } }
+        val card = compose.onNodeWithTag("calendar_today")
+        val image = windowBitmap(card)
+        val node = card.fetchSemanticsNode()
+        val d = node.layoutInfo.density.density
+        val bounds = node.boundsInWindow
+        fun px(dp: Int) = (dp * d).toInt()
+        fun count(ink: Color, xs: IntRange, ys: IntRange) = ys.sumOf { y -> xs.count { x -> image.getPixel(x, y) == ink.toArgb() } }
+        val berry = ChristmasInks.hollyBerry(ChristmasNight)
+        val leaf = ChristmasInks.hollyLeaf(ChristmasNight)
+        val right = bounds.right.toInt()
+        val top = bounds.top.toInt()
+        assertWithMessage("berries at the corner").that(count(berry, right - px(12) until right + px(12), top - px(12) until top + px(12))).isGreaterThan(0)
+        assertWithMessage("a leaf over the top edge").that(count(leaf, right - px(50) until right, top - px(12) until top)).isGreaterThan(0)
+        assertWithMessage("a leaf over the right edge").that(count(leaf, right until right + px(12), top until top + px(50))).isGreaterThan(0)
+        val width = bounds.left.toInt() until right
+        val foot = bounds.bottom.toInt() - px(40) until bounds.bottom.toInt()
+        assertWithMessage("nothing at the foot").that(count(leaf, width, foot) + count(berry, width, foot)).isEqualTo(0)
     }
 
-    /** **pin**: the holly is drawn behind the content and moves nothing. */
+    /** **pin**: the holly is only drawn, and moves nothing. */
     @Test
     fun theButtonsStayWhereTheyAreUnderTheHolly() {
         var added = 0
