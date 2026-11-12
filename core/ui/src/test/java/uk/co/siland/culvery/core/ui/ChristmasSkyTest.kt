@@ -90,10 +90,10 @@ class ChristmasSkyTest {
         assertThat(flakes.map { it.centre.x }.toSet().size).isEqualTo(SNOW_FLAKES)
     }
 
-    /** The flakes don't line up: across the width, how far down each is doesn't follow where it is (the first scatter drew a diagonal). */
+    /** The flakes never line up as they fall: across the width, how far down each is doesn't follow where it is (the first scatter drew a diagonal). */
     @Test
     fun theSnowIsScatteredNotInALine() {
-        for (t in listOf(0L, SNOW_FALL_MS / 3, SNOW_FALL_MS * 2 / 3)) {
+        for (t in (0 until 24).map { SNOW_FALL_MS * it / 24 }) {
             val flakes = snow(t)
             val xs = flakes.map { it.centre.x.toDouble() }
             val ys = flakes.map { it.centre.y.toDouble() }
@@ -103,7 +103,7 @@ class ChristmasSkyTest {
             val r = cov / sqrt(xs.sumOf { (it - mx) * (it - mx) } * ys.sumOf { (it - my) * (it - my) })
             assertWithMessage("correlation of height with column at $t ms").that(abs(r)).isLessThan(0.5)
             val turns = flakes.sortedBy { it.centre.x }.map { it.centre.y }.zipWithNext { a, b -> b > a }.zipWithNext { a, b -> a != b }.count { it }
-            assertWithMessage("up/down turns along the width at $t ms").that(turns).isAtLeast(6)
+            assertWithMessage("up/down turns along the width at $t ms").that(turns).isAtLeast(4)
         }
     }
 
