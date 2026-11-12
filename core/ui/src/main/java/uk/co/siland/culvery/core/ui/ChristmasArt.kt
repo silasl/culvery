@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
 
 object ChristmasDimens {
     val flakeRadiusMin = 1.5.dp
@@ -52,23 +53,35 @@ internal const val BULBS_MIN = 3
 
 class Flake(val centre: Offset, val radius: Float)
 
-// Each flake's own fixed place in the fall, its column and its size, spread by steps coprime with SNOW_FLAKES.
-private fun flakeFraction(i: Int, step: Int) = (i * step % SNOW_FLAKES + 0.5f) / SNOW_FLAKES
+/**
+ * A fixed scatter, so the snow looks random but draws the same on every run. Each flake has its own slot across the width and
+ * its own slot down the fall, shuffled apart and jittered within the slot, so no two line up; and its own size, sway and sway phase.
+ */
+private object SnowScatter {
+    private val random = Random(21)
+    private fun slots() = (0 until SNOW_FLAKES).shuffled(random).map { (it + 0.15f + 0.7f * random.nextFloat()) / SNOW_FLAKES }.toFloatArray()
+
+    val column = slots()
+    val start = slots()
+    val size = FloatArray(SNOW_FLAKES) { random.nextFloat() }
+    val sway = FloatArray(SNOW_FLAKES) { 0.4f + 0.6f * random.nextFloat() }
+    val swayPhase = FloatArray(SNOW_FLAKES) { random.nextFloat() }
+}
 
 /** Each flake's column and radius in [area], worked out once per size so a step allocates nothing. */
 private class SnowField(private val area: Rect, density: Density) {
     private val sway = with(density) { ChristmasDimens.snowSway.toPx() }
     private val columns = FloatArray(SNOW_FLAKES) { i ->
-        area.left + minOf(sway, area.width / 2) + maxOf(area.width - 2 * sway, 0f) * flakeFraction(i, 11)
+        area.left + minOf(sway, area.width / 2) + maxOf(area.width - 2 * sway, 0f) * SnowScatter.column[i]
     }
     val radii = with(density) {
         val min = ChristmasDimens.flakeRadiusMin.toPx()
         val max = ChristmasDimens.flakeRadiusMax.toPx()
-        FloatArray(SNOW_FLAKES) { i -> min + (max - min) * flakeFraction(i, 5) }
+        FloatArray(SNOW_FLAKES) { i -> min + (max - min) * SnowScatter.size[i] }
     }
 
-    fun fall(t: Float, i: Int) = (flakeFraction(i, 7) + t) % 1f
-    fun x(fall: Float, i: Int) = columns[i] + sway * sin(2f * PI.toFloat() * fall)
+    fun fall(t: Float, i: Int) = (SnowScatter.start[i] + t) % 1f
+    fun x(fall: Float, i: Int) = columns[i] + sway * SnowScatter.sway[i] * sin(2f * PI.toFloat() * (fall + SnowScatter.swayPhase[i]))
     fun y(fall: Float) = area.top + fall * area.height
 }
 

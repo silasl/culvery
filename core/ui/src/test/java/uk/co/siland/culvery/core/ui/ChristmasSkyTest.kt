@@ -27,6 +27,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlin.math.abs
+import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.days
 import org.junit.Rule
 import org.junit.Test
@@ -87,6 +88,23 @@ class ChristmasSkyTest {
         flakes.forEach { assertThat(it.radius).isAtMost(ChristmasDimens.flakeRadiusMax.value) }
         assertThat(flakes.map { it.radius }.toSet().size).isGreaterThan(1)
         assertThat(flakes.map { it.centre.x }.toSet().size).isEqualTo(SNOW_FLAKES)
+    }
+
+    /** The flakes don't line up: across the width, how far down each is doesn't follow where it is (the first scatter drew a diagonal). */
+    @Test
+    fun theSnowIsScatteredNotInALine() {
+        for (t in listOf(0L, SNOW_FALL_MS / 3, SNOW_FALL_MS * 2 / 3)) {
+            val flakes = snow(t)
+            val xs = flakes.map { it.centre.x.toDouble() }
+            val ys = flakes.map { it.centre.y.toDouble() }
+            val mx = xs.average()
+            val my = ys.average()
+            val cov = xs.zip(ys).sumOf { (x, y) -> (x - mx) * (y - my) }
+            val r = cov / sqrt(xs.sumOf { (it - mx) * (it - mx) } * ys.sumOf { (it - my) * (it - my) })
+            assertWithMessage("correlation of height with column at $t ms").that(abs(r)).isLessThan(0.5)
+            val turns = flakes.sortedBy { it.centre.x }.map { it.centre.y }.zipWithNext { a, b -> b > a }.zipWithNext { a, b -> a != b }.count { it }
+            assertWithMessage("up/down turns along the width at $t ms").that(turns).isAtLeast(6)
+        }
     }
 
     /** **pin** against the stub's fixed list; a time fed into a phase is reduced on the Long first, so a long run draws as the first minutes did (21 §4.4). */

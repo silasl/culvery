@@ -73,11 +73,11 @@ object ChristmasInks {
     fun wreath(c: HhColors): Color = if (c.isLight) WREATH_DAY else WREATH_NIGHT
     fun robin(c: HhColors): Color = c.accent
 
-    /** The holly on the Today card sits under its text: a leaf and a berry a step off `surf`, by night darker and by day paler. */
-    val HOLLY_LEAF_NIGHT = Color(0xFF24382B)
-    val HOLLY_BERRY_NIGHT = Color(0xFF4A2426)
-    val HOLLY_LEAF_DAY = Color(0xFFDCE5DC)
-    val HOLLY_BERRY_DAY = Color(0xFFF0D2D2)
+    /** The holly on the Today card sits under its text: as much colour as keeps `mute` text 4.5:1 over it, by night darker and by day paler. */
+    val HOLLY_LEAF_NIGHT = Color(0xFF1C4529)
+    val HOLLY_BERRY_NIGHT = Color(0xFF6E1F24)
+    val HOLLY_LEAF_DAY = Color(0xFFB4DFBE)
+    val HOLLY_BERRY_DAY = Color(0xFFFFC7C9)
 
     fun hollyLeaf(c: HhColors): Color = if (c.isLight) HOLLY_LEAF_DAY else HOLLY_LEAF_NIGHT
     fun hollyBerry(c: HhColors): Color = if (c.isLight) HOLLY_BERRY_DAY else HOLLY_BERRY_NIGHT
