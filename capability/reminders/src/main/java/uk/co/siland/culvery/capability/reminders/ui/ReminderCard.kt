@@ -127,7 +127,7 @@ private fun CountChip(of: Int) {
 }
 
 @Composable
-private fun StripeUi.toStripe(): Stripe {
+internal fun StripeUi.toStripe(): Stripe {
     val c = Culvery.colors
     if (colour != null) return Stripe(Color(colour))
     val ink = BinInks.byId(inkId)

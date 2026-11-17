@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -43,6 +44,7 @@ class RemindersViewTest {
     private lateinit var store: RemindersStore
     private lateinit var household: HouseholdRepository
     private lateinit var view: RemindersView
+    private lateinit var engine: RemindersEngine
     private lateinit var alex: Person
     private lateinit var sam: Person
     private lateinit var mia: Person
@@ -67,7 +69,7 @@ class RemindersViewTest {
         val wall = WallClock { nowMillis }
         val clock = HouseholdClock(HouseholdZone(household).zone, wall, scope, ticks)
         ticks.value = nowMillis
-        val engine = RemindersEngine(
+        engine = RemindersEngine(
             store, FakeAlertHost(), clock.minutes, wall, { zone }, MutableStateFlow(true), MutableStateFlow(false), NightHours { false },
             MutableStateFlow(true), null, { PadStart.STARTED }, scope,
         ) {}
@@ -159,5 +161,72 @@ class RemindersViewTest {
         )
         assertThat(binsCard(key, kept, due, at("2026-11-19T07:00:00"), zone, 2)).isEqualTo(tonight!!.copy(words = "Bins out today", dueAt = "Wed 18:00", of = 2))
         assertThat(binsCard(key, null, due, due, zone, 1)).isNull()
+    }
+
+    private suspend fun addWeekly(time: String, words: String, who: List<PersonId>, vararg days: DayOfWeek) =
+        store.add(ReminderDraft(words, who, java.time.LocalTime.parse(time), Schedule.Weekly(days.toSet())), alex.id, nowMillis)!!
+
+    @Test
+    fun waitingRowsShowTheDueTimeOrBackAt() = runTest {
+        val id = add("2026-11-18T07:30:00", "PE kit", listOf(mia.id))
+        tick("2026-11-18T07:30:00")
+        val row = view.tab.first { it.waiting.isNotEmpty() }.waiting.single()
+        assertThat(row).isEqualTo(RowUi(DueKey.Mine(id), id, listOf(StripeUi(colour = mia.color)), "07:30", "PE kit", "Mia", null))
+        engine.later(DueKey.Mine(id))
+        assertThat(view.tab.first { it.waiting.singleOrNull()?.note != null }.waiting.single().note).isEqualTo("Back at 08:00")
+    }
+
+    @Test
+    fun todayHoldsNextTimesToday() = runTest {
+        add("2026-11-18T16:30:00", "Swimming bag", listOf(mia.id))
+        addWeekly("12:00", "Lunch money", listOf(sam.id), *DayOfWeek.entries.toTypedArray())
+        add("2026-11-19T09:00:00", "Dentist", listOf(sam.id))
+        val tab = view.tab.first { it.today.size == 2 }
+        assertThat(tab.today.map { it.words }).containsExactly("Lunch money", "Swimming bag").inOrder()
+        assertThat(tab.today.map { it.time }).containsExactly("12:00", "16:30").inOrder()
+        assertThat(tab.today.map { it.key }).containsExactly(null, null)
+        assertThat(tab.comingUp.map { it.words }).containsExactly("Dentist")
+    }
+
+    @Test
+    fun comingUpIsByNextTimeWithItsRepeatWords() = runTest {
+        val friday = addWeekly("08:00", "Library books", listOf(mia.id), DayOfWeek.FRIDAY)
+        val thursday = add("2026-11-19T09:00:00", "Dentist", listOf(sam.id))
+        val rows = view.tab.first { it.comingUp.size == 2 }.comingUp
+        assertThat(rows.map { it.id }).containsExactly(thursday, friday).inOrder()
+        assertThat(rows.map { it.time }).containsExactly("Thu 09:00", "Fri 08:00").inOrder()
+        assertThat(rows.map { it.note }).containsExactly("Once", "Every Friday").inOrder()
+    }
+
+    @Test
+    fun aWaitingRepeatIsListedOnce() = runTest {
+        addWeekly("07:30", "Vitamins", listOf(mia.id), *DayOfWeek.entries.toTypedArray())
+        tick("2026-11-18T07:30:00")
+        val tab = view.tab.first { it.waiting.isNotEmpty() }
+        assertThat(tab.waiting).hasSize(1)
+        assertThat(tab.today).isEmpty()
+        assertThat(tab.comingUp).isEmpty()
+    }
+
+    @Test
+    fun theCardAndTodayFollowMidnight() = runTest {
+        val id = add("2026-11-19T09:00:00", "Dentist", listOf(sam.id))
+        assertThat(view.tab.first().comingUp.map { it.id }).containsExactly(id)
+        tick("2026-11-19T00:01:00")
+        val tab = view.tab.first { it.today.isNotEmpty() }
+        assertThat(tab.today.map { it.id }).containsExactly(id)
+        assertThat(tab.today.single().time).isEqualTo("09:00")
+        assertThat(tab.comingUp).isEmpty()
+    }
+
+    @Test
+    fun aRowHidesItsWords() {
+        val row = RowUi(DueKey.Mine(4), 4, listOf(StripeUi(colour = mia.color)), "07:30", "PE kit", "Mia", "Once")
+        assertThat(row.toString()).isEqualTo("RowUi(${DueKey.Mine(4)}, 4)")
+    }
+
+    @Test
+    fun theBinsRowTitleSaysWhenItWillRemind() {
+        assertThat(binsRowTitle(java.time.LocalTime.of(18, 0))).isEqualTo("Bins · The evening before a collection, 18:00")
     }
 }

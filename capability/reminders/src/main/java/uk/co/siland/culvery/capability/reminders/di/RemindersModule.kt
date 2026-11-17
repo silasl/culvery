@@ -10,8 +10,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import javax.inject.Singleton
+import uk.co.siland.culvery.capability.reminders.RemindersCapability
 import uk.co.siland.culvery.capability.reminders.RemindersEngine
 import uk.co.siland.culvery.capability.reminders.db.RemindersDatabase
+import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 
 @Module
@@ -20,6 +22,10 @@ abstract class RemindersModule {
     @Binds
     @IntoSet
     abstract fun engine(impl: RemindersEngine): Startable
+
+    @Binds
+    @IntoSet
+    abstract fun capability(impl: RemindersCapability): Capability
 
     companion object {
         @Provides

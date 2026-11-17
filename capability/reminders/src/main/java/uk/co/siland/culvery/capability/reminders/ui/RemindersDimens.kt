@@ -20,4 +20,9 @@ internal object RemindersDimens {
     val chipHeight = 35.dp
     val chipTextSize = 15.sp
     val chipPaddingH = 12.dp
+
+    val rowGap = 8.dp
+    val sectionTop = 14.dp
+    val rowBarHeight = 40.dp
+    val timeSize = 17.sp
 }
