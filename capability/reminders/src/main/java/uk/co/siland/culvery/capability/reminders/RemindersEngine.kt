@@ -20,6 +20,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.capability.reminders.ui.ReminderCardHost
+import uk.co.siland.culvery.core.house.BinCollection
+import uk.co.siland.culvery.core.house.BinCollections
+import uk.co.siland.culvery.core.house.BinDays
 import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.household.HouseholdZone
@@ -50,6 +53,7 @@ class RemindersEngine internal constructor(
     private val setupComplete: Flow<Boolean>,
     private val holiday: StateFlow<Boolean?>,
     private val night: NightHours,
+    private val bins: Flow<BinDays?>,
     private val lit: StateFlow<Boolean>,
     private val door: DoorQuiet?,
     private val chime: suspend (volume: Float) -> PadStart,
@@ -68,11 +72,12 @@ class RemindersEngine internal constructor(
         night: NightHours,
         lit: ScreenLit,
         door: Optional<DoorQuiet>,
+        bins: Optional<BinCollections>,
         player: SoundPlayer,
         view: Lazy<RemindersView>,
         @ApplicationScope scope: CoroutineScope,
     ) : this(
-        store, host, clock.minutes, wall, { zone.current() }, setup.setupComplete, house.holiday, night, lit.lit, door.orElse(null),
+        store, host, clock.minutes, wall, { zone.current() }, setup.setupComplete, house.holiday, night, bins.binDays(), lit.lit, door.orElse(null),
         { volume -> player.playReminder(volume) }, scope,
         { engine -> ReminderCardHost(view.get(), engine) },
     )
@@ -90,6 +95,7 @@ class RemindersEngine internal constructor(
     private val triggers = Channel<Unit>(Channel.CONFLATED)
 
     @Volatile private var setupDone = false
+    @Volatile private var binDays: BinDays? = null
     private val setupKnown = CompletableDeferred<Unit>()
 
     // What the last pass saw, to log and wake on a change only; touched under the mutex.
@@ -98,6 +104,7 @@ class RemindersEngine internal constructor(
     private var lastCard: Pair<DueKey, Int>? = null
     private var lastHeld: Held? = null
     private var lastOwed = emptySet<DueKey>()
+    private var lastBins: DueKey.Bins? = null
 
     /** When each key's chime was paid, kept here as well as stored: a mark that can't be saved must not repeat the chime every minute. */
     private val chimedAt = mutableMapOf<DueKey, Long>()
@@ -111,6 +118,7 @@ class RemindersEngine internal constructor(
             launch { host.inFront.collect { poke() } }
             launch { host.showing.collect { poke() } }
             launch { holiday.collect { poke() } }
+            launch { bins.collect { binDays = it; poke() } }
             launch { lit.collect { poke() } }
             // No pass before setup's value: it would log "held away" for a wall that is only waiting to be told.
             setupKnown.await()
@@ -118,23 +126,29 @@ class RemindersEngine internal constructor(
         }
     }
 
-    fun done(key: DueKey) = answer(key) { id ->
-        store.done(id, clock.nowMillis())
+    fun done(key: DueKey) = answer(key) {
+        when (key) {
+            is DueKey.Mine -> store.done(key.id, clock.nowMillis())
+            is DueKey.Bins -> store.binsDone(key.date)
+        }
         Log.i(TAG, "done")
     }
 
-    fun later(key: DueKey) = answer(key) { id ->
-        store.later(id, clock.nowMillis())
+    fun later(key: DueKey) = answer(key) {
+        when (key) {
+            is DueKey.Mine -> store.later(key.id, clock.nowMillis())
+            is DueKey.Bins -> store.binsLater(clock.nowMillis())
+        }
         Log.i(TAG, "later")
     }
 
-    /** A bins key is never waiting yet, so it is ignored here. */
-    private fun answer(key: DueKey, write: suspend (id: Long) -> Unit) {
+    /** A key no longer waiting (answered already, or gone) is ignored. */
+    private fun answer(key: DueKey, write: suspend () -> Unit) {
         scope.launch {
             mutex.withLock {
                 guarded {
-                    if (key !is DueKey.Mine || _waiting.value.none { it.key == key }) return@guarded
-                    write(key.id)
+                    if (_waiting.value.none { it.key == key }) return@guarded
+                    write()
                     pass()
                 }
             }
@@ -167,10 +181,13 @@ class RemindersEngine internal constructor(
         if (wall.night != null && wall.holiday != null) store.markHeld(wall.night || wall.holiday, now)
         val state = store.state.first()
         val zone = zone()
-        val dues = inOrder(store.reminders.first().mapNotNull { it.due(now, zone) })
+        val binsNow = binsDue(binDays, state, now, zone)
+        keepBinsCollection(binsNow?.second, state, now, zone)
+        val dues = inOrder(store.reminders.first().mapNotNull { it.due(now, zone) } + listOfNotNull(binsNow?.first))
         _waiting.value = dues
         if (dues.size > lastDueCount) Log.i(TAG, "due ${dues.size}")
         lastDueCount = dues.size
+        logBins(binsNow?.first?.key as? DueKey.Bins, now, zone)
 
         val open = dues.filterNot { it.snoozed(now) }
         var live = handle?.takeIf { it.showing.value }
@@ -195,6 +212,22 @@ class RemindersEngine internal constructor(
         if (live != null && wall.night == false && owed.any { it !in lastOwed }) host.wake()
         lastOwed = if (live != null) owed.toSet() else emptySet()
         if (live != null && owed.isNotEmpty() && soundAllowed(wall)) pay(live, owed, now)
+    }
+
+    /** A started bins reminder keeps its collection until Done or noon on its day, whatever the calendar lists (ruling 16). */
+    private suspend fun keepBinsCollection(waiting: BinCollection?, state: ReminderState, now: Long, zone: ZoneId) {
+        val kept = state.binsKept
+        when {
+            waiting != null -> if (waiting != kept) store.binsKept(waiting)
+            kept != null && (now >= binsClearsAt(kept.date, zone) || state.binsDoneFor == kept.date) -> store.binsKept(null)
+        }
+    }
+
+    private fun logBins(key: DueKey.Bins?, now: Long, zone: ZoneId) {
+        val before = lastBins
+        if (key != null && key != before) Log.i(TAG, "bins due")
+        if (before != null && key != before && now >= binsClearsAt(before.date, zone)) Log.i(TAG, "bins cleared")
+        lastBins = key
     }
 
     /** Follows a new handle: when a ring takes the layer from it, that is a reason to run a pass. */

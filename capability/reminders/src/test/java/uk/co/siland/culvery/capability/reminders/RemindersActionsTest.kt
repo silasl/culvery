@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.test.awaiting
 
@@ -66,10 +67,17 @@ class RemindersActionsTest {
 
     private fun at(text: String) = LocalDateTime.parse(text).atZone(london).toInstant().toEpochMilli()
 
+    private var nightStarts: LocalTime? = LocalTime.of(22, 0)
+    private val nightHours = object : NightHours {
+        override fun isNight() = false
+
+        override fun startsAt() = nightStarts
+    }
+
     private suspend fun TestScope.access(): TestAccess = testAccess(household, RemindersPermissionSource())
 
     private fun TestScope.actions(access: TestAccess, clock: WallClock = WallClock { nowMillis }) =
-        RemindersActions(access.control, store, clock, HouseholdZone(household), access.toasts, backgroundScope)
+        RemindersActions(access.control, store, clock, HouseholdZone(household), access.toasts, nightHours, backgroundScope)
 
     private fun once(who: List<PersonId>, words: String = "PE kit", time: LocalTime = LocalTime.of(16, 30), on: LocalDate = today) =
         ReminderDraft(words, who, time, Schedule.Once(on))
@@ -443,5 +451,38 @@ class RemindersActionsTest {
         actions.couldNotOpen()
         assertThat(access.toasts.urgent).containsExactly("Couldn’t open the reminder — try again.")
         assertThat(COULD_NOT_SAVE).isEqualTo("Couldn’t save — try again.")
+    }
+
+    @Test
+    fun onlyAnAdultChangesTheBinsReminder() = runTest {
+        val access = access()
+        val actions = actions(access)
+        access.answer(TestAccess.MIA, null)
+        assertThat(actions.saveBins(false, LocalTime.of(19, 0))).isEqualTo(BinsSave.Cancelled)
+        assertThat(store.state.first()).isEqualTo(ReminderState())
+
+        access.answer(TestAccess.MIA, TestAccess.SAM)
+        assertThat(actions.saveBins(false, LocalTime.of(19, 0))).isEqualTo(BinsSave.Saved)
+        assertThat(store.state.first().binsOn).isFalse()
+        assertThat(store.state.first().binsTime).isEqualTo(LocalTime.of(19, 0))
+        assertThat(access.requests.map { it.label }.distinct()).containsExactly("Change the bins reminder")
+
+        // The PIN just entered is still in force.
+        assertThat(actions.saveBins(true, LocalTime.of(18, 30))).isEqualTo(BinsSave.Saved)
+        assertThat(store.state.first().binsOn).isTrue()
+    }
+
+    @Test
+    fun aBinsTimeInNightHoursIsRefused() = runTest {
+        val access = access()
+        val actions = actions(access)
+        assertThat(actions.saveBins(true, LocalTime.of(22, 0))).isEqualTo(BinsSave.BadTime)
+        assertThat(actions.saveBins(true, LocalTime.of(11, 30))).isEqualTo(BinsSave.BadTime)
+        assertThat(access.requests).isEmpty()
+        assertThat(store.state.first()).isEqualTo(ReminderState())
+        nightStarts = null
+        access.answer(TestAccess.SAM)
+        assertThat(actions.saveBins(true, LocalTime.of(23, 30))).isEqualTo(BinsSave.Saved)
+        assertThat(store.state.first().binsTime).isEqualTo(LocalTime.of(23, 30))
     }
 }

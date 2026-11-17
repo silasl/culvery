@@ -279,7 +279,7 @@ class ReminderSheetTest {
         val householdDb = Room.inMemoryDatabaseBuilder(context, HouseholdDatabase::class.java).allowMainThreadQueries().build()
         val toaster = RecordingToaster()
         val actions = RemindersActions(
-            FakeAccess(null), RemindersStore(db), WallClock { throw IllegalStateException("secret words") }, HouseholdZone(HouseholdRepository(householdDb)), toaster, backgroundScope,
+            FakeAccess(null), RemindersStore(db), WallClock { throw IllegalStateException("secret words") }, HouseholdZone(HouseholdRepository(householdDb)), toaster, { null }, backgroundScope,
         )
         overlay.openReminder(null, actions, flowOf(emptyList()))
         assertThat(overlay.content).isNull()

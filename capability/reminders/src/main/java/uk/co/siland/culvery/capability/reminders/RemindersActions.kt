@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.reminders
 
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZonedDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,6 +16,7 @@ import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.today
@@ -27,9 +29,13 @@ const val COULD_NOT_DELETE = "Couldn’t delete — try again."
 const val COULD_NOT_OPEN = "Couldn’t open the reminder — try again."
 internal const val ADD_A_REMINDER = "Add a reminder"
 internal const val CHANGE_THIS_REMINDER = "Change this reminder"
+internal const val CHANGE_THE_BINS_REMINDER = "Change the bins reminder"
 
 /** Past, Full and Invalid are the sheet's to say or ignore; a refusal has already been toasted. */
 enum class SaveResult { Saved, Cancelled, Past, Full, Gone, Invalid }
+
+/** BadTime is the sheet's to say; a cancelled PIN pad is not. */
+enum class BinsSave { Saved, Cancelled, BadTime }
 
 private val ADD_PERMISSIONS = arrayOf(RemindersPermissions.ADD, RemindersPermissions.ADD_SELF)
 private val CHANGE_PERMISSIONS = arrayOf(RemindersPermissions.CHANGE, RemindersPermissions.CHANGE_OWN)
@@ -45,6 +51,7 @@ class RemindersActions @Inject constructor(
     private val clock: WallClock,
     private val zone: HouseholdZone,
     private val toaster: Toaster,
+    private val night: NightHours,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     /** The child whose PIN is still in force, who makes a form theirs from the start. */
@@ -92,6 +99,14 @@ class RemindersActions @Inject constructor(
             if (store.delete(id)) toaster.show(REMINDER_DELETED)
             true
         }.await()
+    }
+
+    /** Saves the bins reminder's switch and time once an adult has said so; a time outside midday to night hours' start is [BinsSave.BadTime] before any PIN pad. */
+    suspend fun saveBins(on: Boolean, time: LocalTime): BinsSave {
+        if (!binsTimeAllowed(time, night.startsAt())) return BinsSave.BadTime
+        access.authorise(RemindersPermissions.BINS, label = CHANGE_THE_BINS_REMINDER) ?: return BinsSave.Cancelled
+        scope.async { store.setBins(on, time) }.await()
+        return BinsSave.Saved
     }
 
     private suspend fun find(id: Long): Reminder? = store.reminders.first().firstOrNull { it.id == id }

@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.reminders.ui.RemindersTab
+import uk.co.siland.culvery.capability.reminders.ui.openBins
 import uk.co.siland.culvery.capability.reminders.ui.openReminder
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.plugin.Capability
@@ -36,11 +37,13 @@ class RemindersCapability internal constructor(
     waiting: Flow<List<Due>>,
     private val tab: Flow<TabUi>,
     private val openForm: suspend (OverlayHost, Long?) -> Unit = { _, _ -> },
+    private val openBins: (OverlayHost, BinsRowUi) -> Unit = { _, _ -> },
     private val done: (DueKey) -> Unit,
 ) : Capability {
     @Inject
     constructor(setup: SetupState, engine: RemindersEngine, view: RemindersView, actions: RemindersActions, household: HouseholdRepository) : this(
-        setup.setupComplete, engine.waiting, view.tab, { overlay, id -> overlay.openReminder(id, actions, household.members) }, engine::done,
+        setup.setupComplete, engine.waiting, view.tab, { overlay, id -> overlay.openReminder(id, actions, household.members) },
+        { overlay, row -> overlay.openBins(row, actions) }, engine::done,
     )
 
     override val id = REMINDERS_ID
@@ -70,7 +73,6 @@ class RemindersCapability internal constructor(
                 }
             }
         }
-        // The bins sheet comes with the next task.
-        ui?.let { RemindersTab(it, onAdd = { open(null) }, onOpen = { open(it) }, onDone = done, onBins = {}) }
+        ui?.let { tabUi -> RemindersTab(tabUi, onAdd = { open(null) }, onOpen = { open(it) }, onDone = done, onBins = { tabUi.bins?.let { openBins(overlay, it) } }) }
     }
 }

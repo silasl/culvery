@@ -1,5 +1,8 @@
 package uk.co.siland.culvery.capability.reminders.ui
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -103,5 +106,17 @@ class RemindersTabTest {
     fun theCantReadLineShowsUnderTheBinsRow() {
         show(TabUi(emptyList(), emptyList(), emptyList(), bins.copy(cantRead = true)))
         compose.onNodeWithText(CANT_READ_BINS).assertIsDisplayed()
+    }
+
+    @Test
+    fun theBinsRowSpeaksItsSwitch() {
+        show(TabUi(emptyList(), emptyList(), emptyList(), bins))
+        compose.onNodeWithTag("reminders_bins").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "On"))
+    }
+
+    @Test
+    fun aSwitchedOffBinsRowSaysOff() {
+        show(TabUi(emptyList(), emptyList(), emptyList(), bins.copy(on = false)))
+        compose.onNodeWithTag("reminders_bins").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Off"))
     }
 }

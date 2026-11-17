@@ -6,12 +6,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import uk.co.siland.culvery.core.house.BinCollection
+import uk.co.siland.culvery.core.house.BinCollections
+import uk.co.siland.culvery.core.house.BinDays
 import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
@@ -78,9 +81,9 @@ internal fun binsCard(key: DueKey.Bins, kept: BinCollection?, dueAtMillis: Long,
     val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
     return CardUi(
         key = key,
-        words = if (today >= key.date) "Bins out today" else "Bins out tonight",
+        words = binsWords(key.date, today),
         stripes = collection.bins.map { StripeUi(inkId = it.inkId) },
-        who = "Bins",
+        who = BINS_WHO,
         dueAt = dueText(dueAtMillis, nowMillis, zone),
         detail = collection.bins.joinToString { it.name },
         of = waiting.takeIf { it > 1 },
@@ -93,7 +96,15 @@ private fun backAt(due: Due, nowMillis: Long, zone: ZoneId): String? {
 }
 
 /** A waiting repeat is under Waiting only; the others sit under Today or Coming up by their next time. */
-internal fun tabOf(dues: List<Due>, reminders: List<Reminder>, state: ReminderState, people: List<Person>, nowMillis: Long, zone: ZoneId): TabUi {
+internal fun tabOf(
+    dues: List<Due>,
+    reminders: List<Reminder>,
+    state: ReminderState,
+    people: List<Person>,
+    nowMillis: Long,
+    zone: ZoneId,
+    bins: BinDays?,
+): TabUi {
     val byId = reminders.associateBy { it.id }
 
     fun row(r: Reminder, time: String, key: DueKey?, note: String?): RowUi {
@@ -117,7 +128,8 @@ internal fun tabOf(dues: List<Due>, reminders: List<Reminder>, state: ReminderSt
         .sortedWith(compareBy({ it.second }, { it.first.id }))
     val (todays, later) = next.partition { Instant.ofEpochMilli(it.second).atZone(zone).toLocalDate() == today }
     fun rows(list: List<Pair<Reminder, Long>>) = list.map { (r, at) -> row(r, dueText(at, nowMillis, zone), null, repeatWords(r.schedule)) }
-    return TabUi(waiting, rows(todays), rows(later), bins = null)
+    val binsRow = bins?.takeIf { it.connected }?.let { BinsRowUi(state.binsOn, state.binsTime, it.readFailed) }
+    return TabUi(waiting, rows(todays), rows(later), binsRow)
 }
 
 /** The card the engine is showing, as the wall draws it; null while there is none to draw. */
@@ -128,7 +140,10 @@ class RemindersView @Inject constructor(
     household: HouseholdRepository,
     clock: HouseholdClock,
     zone: HouseholdZone,
+    bins: Optional<BinCollections>,
 ) {
+    private val binDays: Flow<BinDays?> = bins.binDays()
+
     // The minute is an input only so a card's due time gains its day at midnight.
     val card: Flow<CardUi?> = combine(engine.showing, store.reminders, store.state, household.people, clock.minutes) { showing, reminders, state, people, _ ->
         showing?.let {
@@ -152,7 +167,9 @@ class RemindersView @Inject constructor(
     }.distinctUntilChanged()
 
     // The minute is an input so the groups regroup at midnight with no write to the store.
-    val tab: Flow<TabUi> = combine(engine.waiting, store.reminders, store.state, household.people, clock.minutes) { dues, reminders, state, people, _ ->
-        tabOf(dues, reminders, state, people, clock.nowMillis(), zone.current())
+    private val binDaysEachMinute = combine(binDays, clock.minutes) { days, _ -> days }
+
+    val tab: Flow<TabUi> = combine(engine.waiting, store.reminders, store.state, household.people, binDaysEachMinute) { dues, reminders, state, people, days ->
+        tabOf(dues, reminders, state, people, clock.nowMillis(), zone.current(), days)
     }.distinctUntilChanged()
 }

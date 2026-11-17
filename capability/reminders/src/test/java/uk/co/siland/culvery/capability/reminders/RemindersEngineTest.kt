@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
@@ -26,7 +27,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.reminders.db.RemindersDatabase
+import uk.co.siland.culvery.core.house.BinCollection
+import uk.co.siland.culvery.core.house.BinDays
 import uk.co.siland.culvery.core.house.DoorQuiet
+import uk.co.siland.culvery.core.house.HouseBin
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.AlertHandle
 import uk.co.siland.culvery.core.plugin.AlertHost
@@ -92,6 +96,7 @@ class RemindersEngineTest {
         val setupArrives = CompletableDeferred<Unit>()
         val holiday = MutableStateFlow<Boolean?>(false)
         val lit = MutableStateFlow(true)
+        val bins = MutableStateFlow<BinDays?>(null)
         var night: Boolean? = false
         val minutes = MutableStateFlow(LocalDateTime.ofInstant(Instant.ofEpochMilli(nowMillis), zone))
         val chimes = mutableListOf<Float>()
@@ -101,7 +106,7 @@ class RemindersEngineTest {
         var onDuck: (() -> Unit)? = null
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val engine = RemindersEngine(
-            store, DuckingHost(fake) { onDuck?.invoke() }, minutes, { nowMillis }, { zone }, if (lateSetup) flow { setupArrives.await(); emitAll(setup) } else setup, holiday, NightHours { night }, lit, door,
+            store, DuckingHost(fake) { onDuck?.invoke() }, minutes, { nowMillis }, { zone }, if (lateSetup) flow { setupArrives.await(); emitAll(setup) } else setup, holiday, NightHours { night }, bins, lit, door,
             { volume ->
                 chimes += volume
                 chimeError?.let { chimeError = null; throw it }
@@ -567,5 +572,107 @@ class RemindersEngineTest {
         rig.tick("2026-11-18T07:30:00")
         rig.engine.done(mine(a))
         assertThat(logs()).containsExactly("due 2", "card up 1 of 2", "chime", "done", "card up 1 of 1").inOrder()
+    }
+
+    private val thursday = LocalDate.of(2026, 11, 19)
+    private val thursdays = BinCollection(thursday, listOf(HouseBin("Food", "green"), HouseBin("Recycling", null)))
+    private val binsKey = DueKey.Bins(thursday)
+
+    private fun binDays(vararg collections: BinCollection, readFailed: Boolean = false) = BinDays(true, readFailed, collections.toList())
+
+    @Test
+    fun binsShowAndChimeLikeAnyReminder() = runTest {
+        val rig = Rig().also { it.bins.value = binDays(thursdays); it.start() }
+        rig.tick("2026-11-18T17:59:00")
+        assertThat(rig.engine.showing.value).isNull()
+        assertThat(rig.engine.waiting.value).isEmpty()
+        rig.tick("2026-11-18T18:00:00")
+        assertThat(rig.key).isEqualTo(binsKey)
+        assertThat(rig.chimes).containsExactly(0.6f)
+        assertThat(store.state.first().binsChimedAtMillis).isEqualTo(at("2026-11-18T18:00:00"))
+        assertThat(store.state.first().binsKept).isEqualTo(thursdays)
+        rig.tick("2026-11-18T18:01:00")
+        assertThat(rig.chimes).hasSize(1)
+        assertThat(logs()).containsExactly("due 1", "bins due", "card up 1 of 1", "chime").inOrder()
+    }
+
+    @Test
+    fun laterAndDoneWorkOnTheBinsCard() = runTest {
+        val rig = Rig().also { it.bins.value = binDays(thursdays); it.start() }
+        rig.tick("2026-11-18T18:00:00")
+        rig.engine.later(binsKey)
+        assertThat(rig.engine.showing.value).isNull()
+        assertThat(rig.engine.waiting.value.map { it.key }).containsExactly(binsKey)
+        rig.tick("2026-11-18T18:29:00")
+        assertThat(rig.engine.showing.value).isNull()
+        rig.tick("2026-11-18T18:30:00")
+        assertThat(rig.key).isEqualTo(binsKey)
+        assertThat(rig.chimes).hasSize(2)
+        rig.engine.done(binsKey)
+        assertThat(rig.engine.showing.value).isNull()
+        assertThat(rig.engine.waiting.value).isEmpty()
+        assertThat(store.state.first().binsDoneFor).isEqualTo(thursday)
+        assertThat(store.state.first().binsKept).isNull()
+        assertThat(logs()).containsAtLeast("later", "done")
+        assertThat(logs()).doesNotContain("bins cleared")
+    }
+
+    @Test
+    fun binsClearAtNoonEvenOnHoliday() = runTest {
+        val rig = Rig().also { it.bins.value = binDays(thursdays); it.holiday.value = true; it.start() }
+        rig.tick("2026-11-18T18:00:00")
+        assertThat(rig.engine.showing.value).isNull()
+        assertThat(rig.engine.waiting.value.map { it.key }).containsExactly(binsKey)
+        rig.tick("2026-11-19T11:59:00")
+        assertThat(rig.engine.waiting.value).hasSize(1)
+        rig.tick("2026-11-19T12:00:00")
+        assertThat(rig.engine.waiting.value).isEmpty()
+        assertThat(logs().filter { it == "bins cleared" }).hasSize(1)
+        assertThat(store.state.first().binsKept).isNull()
+    }
+
+    @Test
+    fun aFailedReadStillFiresFromStoredDates() = runTest {
+        val rig = Rig().also { it.bins.value = binDays(thursdays, readFailed = true); it.start() }
+        rig.tick("2026-11-18T18:00:00")
+        assertThat(rig.key).isEqualTo(binsKey)
+    }
+
+    @Test
+    fun binsAndAReminderShareTheCardOldestFirst() = runTest {
+        val rig = Rig().also { it.bins.value = binDays(thursdays); it.start() }
+        val id = add("2026-11-18T17:30:00")
+        rig.tick("2026-11-18T17:30:00")
+        assertThat(rig.key).isEqualTo(mine(id))
+        rig.tick("2026-11-18T18:00:00")
+        assertThat(rig.key).isEqualTo(mine(id))
+        assertThat(rig.engine.showing.value!!.of).isEqualTo(2)
+        rig.engine.done(mine(id))
+        assertThat(rig.key).isEqualTo(binsKey)
+        assertThat(rig.engine.showing.value!!.of).isEqualTo(1)
+    }
+
+    @Test
+    fun aBinsReminderOutlivesTheMorningsRead() = runTest {
+        val first = Rig().also { it.bins.value = binDays(thursdays); it.start() }
+        first.tick("2026-11-18T18:00:00")
+        assertThat(first.chimes).hasSize(1)
+        first.bins.value = binDays(BinCollection(LocalDate.of(2026, 11, 20), listOf(HouseBin("Garden", null))))
+        first.tick("2026-11-19T00:30:00")
+        assertThat(first.key).isEqualTo(binsKey)
+        first.stop()
+
+        nowMillis = at("2026-11-19T07:00:00")
+        val second = Rig().also { it.bins.value = binDays(BinCollection(LocalDate.of(2026, 11, 20), listOf(HouseBin("Garden", null)))); it.start() }
+        val due = second.engine.showing.value!!.due
+        assertThat(due.key).isEqualTo(binsKey)
+        val card = binsCard(binsKey, store.state.first().binsKept, due.dueAtMillis, nowMillis, zone, 1)!!
+        assertThat(card.words).isEqualTo("Bins out today")
+        assertThat(card.detail).isEqualTo("Food, Recycling")
+        assertThat(second.chimes).isEmpty()
+        second.tick("2026-11-19T12:00:00")
+        assertThat(second.engine.showing.value).isNull()
+        assertThat(store.state.first().binsKept).isNull()
+        assertThat(logs()).contains("bins cleared")
     }
 }

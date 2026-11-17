@@ -10,9 +10,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import uk.co.siland.culvery.capability.reminders.BinsRowUi
+import uk.co.siland.culvery.capability.reminders.CHANGE_THE_BINS_REMINDER
 import uk.co.siland.culvery.capability.reminders.CANT_READ_BINS
 import uk.co.siland.culvery.capability.reminders.DueKey
 import uk.co.siland.culvery.capability.reminders.RowUi
@@ -35,7 +38,8 @@ internal const val ADD_REMINDER = "Add reminder"
 internal const val WAITING = "Waiting"
 internal const val TODAY = "Today"
 internal const val COMING_UP = "Coming up"
-private const val CHANGE_BINS = "Change the bins reminder"
+private const val SWITCH_ON = "On"
+private const val SWITCH_OFF = "Off"
 const val NO_REMINDERS = "No reminders yet. Tap Add reminder to make one."
 
 /**
@@ -105,10 +109,10 @@ private fun ReminderRow(row: RowUi, tag: String, onOpen: (Long) -> Unit, onDone:
 private fun BinsRow(bins: BinsRowUi, onBins: () -> Unit, modifier: Modifier) {
     HhListRow(
         title = binsRowTitle(bins.time),
-        modifier = modifier.testTag("reminders_bins"),
+        modifier = modifier.testTag("reminders_bins").semantics { stateDescription = if (bins.on) SWITCH_ON else SWITCH_OFF },
         trailing = { HhSwitch(bins.on, tag = "reminders_bins_switch") },
         onClick = onBins,
-        clickLabel = CHANGE_BINS,
+        clickLabel = CHANGE_THE_BINS_REMINDER,
         below = if (bins.cantRead) {
             { Text(CANT_READ_BINS, style = HhType.secondary, color = Culvery.colors.danger, modifier = Modifier.testTag("reminders_bins_cant_read")) }
         } else {
