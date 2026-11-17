@@ -26,13 +26,13 @@ class DebugClock internal constructor(private val system: () -> Long) : WallCloc
 
     override fun nowMillis(): Long = system() + minutes * MS_PER_MINUTE
 
-    /** Sets the offset so the wall reads [time] in [zone] at its next occurrence after the real now, to the minute. */
+    /** Sets the offset so the wall reads [time] in [zone] at its next occurrence after what it reads now, to the minute. */
     fun moveTo(time: LocalTime, zone: ZoneId) {
-        val real = system()
+        val real = nowMillis()
         val now = Instant.ofEpochMilli(real).atZone(zone)
         val today = now.toLocalDate().atTime(time).atZone(zone)
         val next = if (today.isAfter(now)) today else now.toLocalDate().plusDays(1).atTime(time).atZone(zone)
-        minutes = (next.toInstant().toEpochMilli() - real + MS_PER_MINUTE - 1) / MS_PER_MINUTE
+        minutes += (next.toInstant().toEpochMilli() - real + MS_PER_MINUTE - 1) / MS_PER_MINUTE
     }
 
     fun add(more: Long) {
