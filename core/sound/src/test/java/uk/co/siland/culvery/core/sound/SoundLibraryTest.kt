@@ -32,7 +32,7 @@ class SoundLibraryTest {
         file.writeBytes(byteArrayOf(0))
     }
 
-    private val inTheLibrary = BuiltInSound.entries - BuiltInSound.REMINDER
+    private val inTheLibrary = BuiltInSound.choices
 
     private fun library() = SoundLibrary({ folder.root }, CoroutineScope(UnconfinedTestDispatcher()), UnconfinedTestDispatcher())
 

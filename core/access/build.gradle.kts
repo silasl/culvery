@@ -19,7 +19,7 @@ dependencies {
     testFixturesImplementation(platform(libs.androidx.compose.bom))
     testFixturesImplementation(libs.androidx.compose.ui)
     // TestAccess: real access rules over an in-memory household, with PIN pads answered from a queue.
-    testFixturesImplementation(testFixtures(project(":core:plugin")))
+    testFixturesApi(testFixtures(project(":core:plugin")))
     testFixturesImplementation(libs.androidx.test.core)
     testFixturesImplementation(libs.kotlinx.coroutines.test)
 }

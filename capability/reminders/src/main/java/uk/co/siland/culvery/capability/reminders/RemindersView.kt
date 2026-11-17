@@ -3,7 +3,6 @@ package uk.co.siland.culvery.capability.reminders
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import java.util.Optional
@@ -65,12 +64,10 @@ fun binsRowTitle(time: LocalTime) = "Bins · The evening before a collection, ${
 
 data class TabUi(val waiting: List<RowUi>, val today: List<RowUi>, val comingUp: List<RowUi>, val bins: BinsRowUi?)
 
-private val CLOCK = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
-
 /** `16:30` for today, else `Mon 16:30`. */
 internal fun dueText(dueAtMillis: Long, nowMillis: Long, zone: ZoneId): String {
     val due = Instant.ofEpochMilli(dueAtMillis).atZone(zone)
-    val time = due.format(CLOCK)
+    val time = clockText(due.toLocalTime())
     val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
     return if (due.toLocalDate() == today) time else "${due.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)} $time"
 }

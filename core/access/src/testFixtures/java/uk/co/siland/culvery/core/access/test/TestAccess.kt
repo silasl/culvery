@@ -24,6 +24,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 
 /**
  * The real access rules over an in-memory household, with PIN pads answered from a queue.

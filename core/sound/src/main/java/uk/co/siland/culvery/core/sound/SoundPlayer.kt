@@ -104,22 +104,19 @@ class SoundPlayer internal constructor(
      * opening or playing, [PadStart.STOPPED] when a ring or stop came while it opened, [PadStart.FAILED] when it won't open or start.
      */
     suspend fun playPad(pad: Int, sound: Sound, volume: Float, capMs: Long = PAD_CAP_MS): PadStart {
-        val epochBefore = synchronized(lock) {
-            if (doorbellOpening > 0 || doorbellPlaying > 0) return PadStart.DOORBELL
-            stopPads()
-            padEpoch
-        }
+        val epochBefore = beginPad() ?: return PadStart.DOORBELL
         return start(sound, volume, capMs, pad, epochBefore, null)
     }
 
     /** Plays the reminder chime in the pad slot, so a ring or a pad cuts it, without touching [padPlaying] or [previewing]. [PadStart.DOORBELL] while the doorbell's sound opens or plays. */
     suspend fun playReminder(volume: Float): PadStart {
-        val epochBefore = synchronized(lock) {
-            if (doorbellOpening > 0 || doorbellPlaying > 0) return PadStart.DOORBELL
-            stopPads()
-            padEpoch
-        }
+        val epochBefore = beginPad() ?: return PadStart.DOORBELL
         return start(REMINDER, volume, REMINDER_CHIME_MS, 0, epochBefore, null, showsAsPad = false)
+    }
+
+    /** Stops the pads and returns the epoch to start against, or null while the doorbell's sound opens or plays. */
+    private fun beginPad(): Long? = synchronized(lock) {
+        if (doorbellOpening > 0 || doorbellPlaying > 0) null else { stopPads(); padEpoch }
     }
 
     /** A ring started: the pads stop. */

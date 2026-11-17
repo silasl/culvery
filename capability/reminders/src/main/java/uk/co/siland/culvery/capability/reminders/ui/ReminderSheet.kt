@@ -146,9 +146,15 @@ internal fun ReminderSheetHost(
     onClose: () -> Unit,
 ) {
     var line by remember(form) { mutableStateOf<String?>(null) }
+    var deleting by remember(form) { mutableStateOf(false) }
     val action = rememberSingleAction(form) { e ->
-        Log.w(TAG, "Couldn't save (${e::class.simpleName})")
-        line = COULD_NOT_SAVE
+        if (deleting) {
+            Log.w(TAG, "Couldn't delete (${e::class.simpleName})")
+            line = COULD_NOT_DELETE
+        } else {
+            Log.w(TAG, "Couldn't save (${e::class.simpleName})")
+            line = COULD_NOT_SAVE
+        }
     }
     // A save running counts as edited, so the idle close never cuts it off half done.
     val edited by rememberUpdatedState(onEdited)
@@ -163,17 +169,9 @@ internal fun ReminderSheetHost(
         onSave = {
             if (!action.busy && form.canSave) {
                 line = null
+                deleting = false
                 action.run {
-                    val result = try {
-                        save(editing, form.toDraft())
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Couldn't save (${e::class.simpleName})")
-                        line = COULD_NOT_SAVE
-                        return@run
-                    }
-                    when (result) {
+                    when (save(editing, form.toDraft())) {
                         SaveResult.Saved, SaveResult.Gone -> onClose()
                         SaveResult.Past -> line = PICK_A_LATER_TIME
                         SaveResult.Full -> line = LIST_FULL
@@ -185,18 +183,8 @@ internal fun ReminderSheetHost(
         onDelete = {
             editing?.let { id ->
                 line = null
-                action.run {
-                    val gone = try {
-                        delete(id)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Couldn't delete (${e::class.simpleName})")
-                        line = COULD_NOT_DELETE
-                        return@run
-                    }
-                    if (gone) onClose()
-                }
+                deleting = true
+                action.run { if (delete(id)) onClose() }
             }
         },
         onClose = onClose,

@@ -16,12 +16,24 @@ import uk.co.siland.culvery.core.plugin.Toaster
 /** [block] on a real dispatcher, as DataStore's writes need, failing after 5 s. */
 suspend fun <T> soon(block: suspend CoroutineScope.() -> T): T = withContext(Dispatchers.Default) { withTimeout(5_000, block) }
 
-/** A [Toaster] that keeps each message [shown], from whatever thread showed it. */
+/** A [Toaster] that keeps what it was asked to show, from whatever thread showed it. */
 class RecordingToaster : Toaster {
-    val shown = CopyOnWriteArrayList<String>()
+    // Written from Room's and the app scope's threads, read on the test's.
+    val messages: MutableList<String> = CopyOnWriteArrayList()
+
+    /** The messages, as [messages]. */
+    val shown: MutableList<String> get() = messages
+
+    /** The messages shown as urgent (errors and refusals). */
+    val urgent: MutableList<String> = CopyOnWriteArrayList()
+
+    /** The action of each toast shown with one, in order; a plain toast adds nothing. */
+    val actions: MutableList<ToastAction> = CopyOnWriteArrayList()
 
     override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) {
-        shown += message
+        messages += message
+        if (urgent) this.urgent += message
+        if (action != null) actions += action
     }
 }
 

@@ -122,7 +122,7 @@ class RemindersEngine internal constructor(
             launch { lit.collect { poke() } }
             // No pass before setup's value: it would log "held away" for a wall that is only waiting to be told.
             setupKnown.await()
-            for (ignored in triggers) guarded { mutex.withLock { pass() } }
+            for (ignored in triggers) guarded(PASS) { mutex.withLock { pass() } }
         }
     }
 
@@ -146,7 +146,7 @@ class RemindersEngine internal constructor(
     private fun answer(key: DueKey, write: suspend () -> Unit) {
         scope.launch {
             mutex.withLock {
-                guarded {
+                guarded(PASS) {
                     if (_waiting.value.none { it.key == key }) return@guarded
                     write()
                     pass()
@@ -159,13 +159,14 @@ class RemindersEngine internal constructor(
         triggers.trySend(Unit)
     }
 
-    private suspend fun guarded(block: suspend () -> Unit) {
+    /** Logs the exception's class as "[subject] failed" and carries on. */
+    private suspend fun guarded(subject: String, block: suspend () -> Unit) {
         try {
             block()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            Log.w(TAG, "A pass failed (${e::class.simpleName})")
+            Log.w(TAG, "$subject failed (${e::class.simpleName})")
         }
     }
 
@@ -182,13 +183,7 @@ class RemindersEngine internal constructor(
         val state = store.state.first()
         val zone = zone()
         val binsNow = binsDue(binDays, state, now, zone)
-        try {
-            keepBinsCollection(binsNow?.second, state, now, zone)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            Log.w(TAG, "A bins write failed (${e::class.simpleName})")
-        }
+        guarded(BINS_WRITE) { keepBinsCollection(binsNow?.second, state, now, zone) }
         val dues = inOrder(store.reminders.first().mapNotNull { it.due(now, zone) } + listOfNotNull(binsNow?.first))
         _waiting.value = dues
         if (dues.size > lastDueCount) Log.i(TAG, "due ${dues.size}")
@@ -218,6 +213,7 @@ class RemindersEngine internal constructor(
         if (live != null && wall.night == false && owed.any { it !in lastOwed }) host.wake()
         lastOwed = if (live != null) owed.toSet() else emptySet()
         if (live != null && owed.isNotEmpty() && soundAllowed(wall)) pay(live, owed, now)
+        chimedAt.keys.retainAll(dues.mapTo(mutableSetOf()) { it.key })
     }
 
     /** A started bins reminder keeps its collection until Done or noon on its day, whatever the calendar lists (ruling 16). */
@@ -259,5 +255,7 @@ class RemindersEngine internal constructor(
 
     private companion object {
         const val TAG = "Reminders"
+        const val PASS = "A pass"
+        const val BINS_WRITE = "A bins write"
     }
 }

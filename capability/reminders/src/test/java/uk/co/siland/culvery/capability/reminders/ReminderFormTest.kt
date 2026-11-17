@@ -32,14 +32,12 @@ class ReminderFormTest {
         child.toggleWho(PersonId.FAMILY)
         child.toggleWho(mia)
         assertThat(child.who).containsExactly(mia)
-        assertThat(child.canChangeWho).isFalse()
     }
 
     @Test
     fun anAdultsStartsAsFamilyAndPicksAsTheCalendarsDo() {
         val adult = form()
         assertThat(adult.who).containsExactly(PersonId.FAMILY)
-        assertThat(adult.canChangeWho).isTrue()
         adult.toggleWho(alex)
         assertThat(adult.who).containsExactly(alex)
         adult.toggleWho(sam)

@@ -46,8 +46,6 @@ class ReminderForm(original: Reminder?, val today: LocalDate, now: LocalTime, va
 
     var time: LocalTime by mutableStateOf(openingTime)
 
-    val canChangeWho: Boolean get() = childOnly == null
-
     /** The last person stays: Family replaces the set and a person replaces Family. A child's taps change nothing. */
     fun toggleWho(person: PersonId) {
         if (childOnly != null) return
