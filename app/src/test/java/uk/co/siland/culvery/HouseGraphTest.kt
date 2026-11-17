@@ -11,7 +11,9 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import uk.co.siland.culvery.capability.calendar.CalendarBinCollections
 import uk.co.siland.culvery.capability.calendar.CalendarBirthdays
+import uk.co.siland.culvery.capability.reminders.RemindersEngine
 import uk.co.siland.culvery.core.house.HouseModeScheduler
 import uk.co.siland.culvery.core.plugin.TrayWidth
 import uk.co.siland.culvery.di.HouseGraphProbe
@@ -92,5 +94,22 @@ class HouseGraphTest {
     @Test
     fun theCalendarFindsTheBirthdays() {
         assertThat(probe.todaysBirthdays()).isInstanceOf(CalendarBirthdays::class.java)
+    }
+
+    @Test
+    fun theRemindersEngineStartsWithTheApp() {
+        assertThat(probe.startables().filterIsInstance<RemindersEngine>()).hasSize(1)
+    }
+
+    @Test
+    fun theBinsSeamIsTheCalendars() {
+        assertThat(probe.binCollections().get()).isInstanceOf(CalendarBinCollections::class.java)
+    }
+
+    @Test
+    fun remindersSitsBetweenShoppingAndMusicOnTheRail() {
+        val rail = probe.capabilities().sortedBy { it.order }.map { it.id }
+        assertThat(rail.indexOf("reminders")).isEqualTo(rail.indexOf("shopping") + 1)
+        assertThat(rail.indexOf("music")).isEqualTo(rail.indexOf("reminders") + 1)
     }
 }

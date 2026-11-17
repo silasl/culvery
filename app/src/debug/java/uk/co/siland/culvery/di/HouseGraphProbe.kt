@@ -9,6 +9,7 @@ import uk.co.siland.culvery.capability.lights.Bridges
 import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.party.ModesShelf
 import uk.co.siland.culvery.capability.party.StoredModesHouse
+import uk.co.siland.culvery.core.house.BinCollections
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
@@ -41,6 +42,7 @@ interface HouseGraphProbe {
     fun speakers(): Speakers
     fun bridges(): Bridges
     fun multiDayEvents(): Optional<MultiDayEvents>
+    fun binCollections(): Optional<BinCollections>
     fun todaysBirthdays(): TodaysBirthdays
     fun startables(): Set<@JvmSuppressWildcards Startable>
     fun showingTheme(): ShowingTheme

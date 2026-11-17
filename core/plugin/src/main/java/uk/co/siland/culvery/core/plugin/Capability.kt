@@ -16,7 +16,7 @@ interface Capability : HomeCardContributor {
     val railIcon: Flow<String> get() = flowOf(icon)
 
     /**
-     * Rail position: Calendar 10, Music 30, Lights 40 (its tab also holds the plugs; Plugs has no tab of its own),
+     * Rail position: Calendar 10, Shopping 20, Reminders 25, Music 30, Lights 40 (its tab also holds the plugs; Plugs has no tab of its own),
      * Door 50, Weather 60, Hoover 70 (no tab).
      */
     val order: Int
