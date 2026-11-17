@@ -101,9 +101,9 @@ class RemindersActions @Inject constructor(
         }.await()
     }
 
-    /** Saves the bins reminder's switch and time once an adult has said so; a time outside midday to night hours' start is [BinsSave.BadTime] before any PIN pad. */
+    /** Saves the bins reminder's switch and time once an adult has said so; switching on at a time outside midday to night hours' start is [BinsSave.BadTime] before any PIN pad. */
     suspend fun saveBins(on: Boolean, time: LocalTime): BinsSave {
-        if (!binsTimeAllowed(time, night.startsAt())) return BinsSave.BadTime
+        if (on && !binsTimeAllowed(time, night.startsAt())) return BinsSave.BadTime
         access.authorise(RemindersPermissions.BINS, label = CHANGE_THE_BINS_REMINDER) ?: return BinsSave.Cancelled
         scope.async { store.setBins(on, time) }.await()
         return BinsSave.Saved

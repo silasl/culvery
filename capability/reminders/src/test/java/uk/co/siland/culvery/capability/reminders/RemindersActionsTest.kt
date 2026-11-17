@@ -485,4 +485,13 @@ class RemindersActionsTest {
         assertThat(actions.saveBins(true, LocalTime.of(23, 30))).isEqualTo(BinsSave.Saved)
         assertThat(store.state.first().binsTime).isEqualTo(LocalTime.of(23, 30))
     }
+
+    @Test
+    fun switchingTheBinsReminderOffWorksWithAStaleTime() = runTest {
+        val access = access()
+        val actions = actions(access)
+        access.answer(TestAccess.SAM)
+        assertThat(actions.saveBins(false, LocalTime.of(22, 30))).isEqualTo(BinsSave.Saved)
+        assertThat(store.state.first().binsOn).isFalse()
+    }
 }

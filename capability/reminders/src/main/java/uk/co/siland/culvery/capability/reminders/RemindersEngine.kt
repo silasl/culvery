@@ -182,7 +182,13 @@ class RemindersEngine internal constructor(
         val state = store.state.first()
         val zone = zone()
         val binsNow = binsDue(binDays, state, now, zone)
-        keepBinsCollection(binsNow?.second, state, now, zone)
+        try {
+            keepBinsCollection(binsNow?.second, state, now, zone)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            Log.w(TAG, "A bins write failed (${e::class.simpleName})")
+        }
         val dues = inOrder(store.reminders.first().mapNotNull { it.due(now, zone) } + listOfNotNull(binsNow?.first))
         _waiting.value = dues
         if (dues.size > lastDueCount) Log.i(TAG, "due ${dues.size}")

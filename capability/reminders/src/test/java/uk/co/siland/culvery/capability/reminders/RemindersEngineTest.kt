@@ -632,6 +632,18 @@ class RemindersEngineTest {
     }
 
     @Test
+    fun aFailingBinsWriteStillLetsAFamilyReminderShow() = runTest {
+        db.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER no_kept BEFORE INSERT ON reminder_state WHEN NEW.binsKeptDate IS NOT NULL BEGIN SELECT RAISE(ABORT, 'no'); END",
+        )
+        val rig = Rig().also { it.bins.value = binDays(thursdays); it.start() }
+        val id = add("2026-11-18T18:00:00")
+        rig.tick("2026-11-18T18:00:00")
+        assertThat(rig.engine.waiting.value.map { it.key }).contains(mine(id))
+        assertThat(logs()).contains("A bins write failed (SQLiteConstraintException)")
+    }
+
+    @Test
     fun aFailedReadStillFiresFromStoredDates() = runTest {
         val rig = Rig().also { it.bins.value = binDays(thursdays, readFailed = true); it.start() }
         rig.tick("2026-11-18T18:00:00")
