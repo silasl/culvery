@@ -183,7 +183,7 @@ internal object LogHygiene {
      *
      * `dues.size`, `open.size` and `held.word` are the reminders engine's counts and its fixed reason (away, holiday, night, ring), never the words, a name, a person id or a chosen time (`RemindersEngine`, 22 §6).
      *
-     * `subject` is `RemindersEngine.guarded`'s fixed opening words, "A pass" or "A bins write".
+     * `failedStep` is `RemindersEngine.guarded`'s fixed opening words, "A pass" or "A bins write".
      *
      * `size.first`, `size.second`, `rates.first` and `rates.last` are the camera's size and frame-rate range, and `quietNames(off)` the modes turned off (19 §4.1).
      */
@@ -195,7 +195,7 @@ internal object LogHygiene {
         "step.name", "own.logName", "source.sound.key", "after.screen.name", "names.size",
         "collections.size", "failed.kind.name", "failuresPhrase(failedInARow)", "e.reasonWord()", "mark.elapsedNow().inWholeMilliseconds",
         "size.first", "size.second", "rates.first", "rates.last", "quietNames(off)",
-        "dues.size", "open.size", "held.word", "subject",
+        "dues.size", "open.size", "held.word", "failedStep",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|i|wtf|println)\(""")

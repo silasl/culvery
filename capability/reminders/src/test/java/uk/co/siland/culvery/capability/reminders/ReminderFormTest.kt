@@ -25,6 +25,14 @@ class ReminderFormTest {
     ) = Reminder(7, words, who, alex, time, schedule, 0, null, null)
 
     @Test
+    fun aNewOneOffLateAtNightStartsTomorrowRatherThanAtMidnightToday() {
+        val late = form(now = LocalTime.of(23, 56))
+        assertThat(late.time).isEqualTo(LocalTime.MIDNIGHT)
+        assertThat(late.date).isEqualTo(today.plusDays(1))
+        assertThat(form(now = LocalTime.of(23, 55)).date).isEqualTo(today)
+    }
+
+    @Test
     fun aChildsWhoIsFixedToThem() {
         val child = form(childOnly = mia)
         assertThat(child.who).containsExactly(mia)

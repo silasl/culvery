@@ -8,7 +8,11 @@ import java.util.Locale
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import uk.co.siland.culvery.core.house.BinCollection
@@ -18,6 +22,7 @@ import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.ui.clockText
 
@@ -138,11 +143,12 @@ class RemindersView @Inject constructor(
     clock: HouseholdClock,
     zone: HouseholdZone,
     bins: Optional<BinCollections>,
+    @ApplicationScope scope: CoroutineScope,
 ) {
     private val binDays: Flow<BinDays?> = bins.binDays()
 
     // The minute is an input only so a card's due time gains its day at midnight.
-    val card: Flow<CardUi?> = combine(engine.showing, store.reminders, store.state, household.people, clock.minutes) { showing, reminders, state, people, _ ->
+    val card: StateFlow<CardUi?> = combine(engine.showing, store.reminders, store.state, household.people, clock.minutes) { showing, reminders, state, people, _ ->
         showing?.let {
             val now = clock.nowMillis()
             val tz = zone.current()
@@ -161,7 +167,7 @@ class RemindersView @Inject constructor(
                 }
             }
         }
-    }.distinctUntilChanged()
+    }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, null)
 
     // The minute is an input so the groups regroup at midnight with no write to the store.
     private val binDaysEachMinute = combine(binDays, clock.minutes) { days, _ -> days }

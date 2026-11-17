@@ -55,7 +55,9 @@ data class ReminderState(
     val heldSeen: Boolean = false,
     val heldEndedAtMillis: Long? = null,
     val binsKept: BinCollection? = null,
-)
+) {
+    override fun toString() = "ReminderState"
+}
 
 /** Line breaks and tabs as spaces, runs of spaces as one, trimmed. */
 fun tidyWords(raw: String): String = raw.replace(Regex("\\s+"), " ").trim()

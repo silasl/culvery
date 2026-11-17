@@ -177,7 +177,7 @@ class SoundPlayer internal constructor(
                 }
             }
             val endsAfter = when {
-                sound.source is SoundSource.OnTablet -> capMs
+                sound.source is SoundSource.OnTablet || !showsAsPad -> capMs
                 play.doorbell -> DOORBELL_CEILING_MS
                 else -> null
             }

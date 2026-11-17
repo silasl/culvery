@@ -75,13 +75,7 @@ class RemindersActions @Inject constructor(
         return null
     }
 
-    /**
-     * Adds [draft], or changes reminder [editing] to it, and says how it went. A draft the form would not let through is
-     * [SaveResult.Invalid] before any PIN pad. A new one needs `reminders.add`, or `add.self` for themselves alone; a change
-     * needs `change`, or `change.own` on one they made, and the add rule again when who it is for changed. A one-off whose
-     * time has passed, or whose day is before today, is [SaveResult.Past] when new or when its time or day changed, so a waiting one's words can be corrected.
-     * [SaveResult.Cancelled]: the PIN pad was cancelled, or the person was refused and told so by a toast.
-     */
+    /** [SaveResult.Invalid] before any PIN pad; [SaveResult.Past] only when new or moved; [SaveResult.Cancelled] when the PIN pad or a refusal ends it. */
     suspend fun save(editing: Long?, draft: ReminderDraft): SaveResult {
         val existing = editing?.let { find(it) ?: return SaveResult.Gone }
         val tidy = tidyWords(draft.words)

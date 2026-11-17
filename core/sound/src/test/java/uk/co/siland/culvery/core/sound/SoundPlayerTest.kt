@@ -488,6 +488,16 @@ class SoundPlayerTest {
     }
 
     @Test
+    fun theReminderChimeEndsAtItsLengthIfThePlayerNeverSaysDone() = test {
+        val player = player(reminder to Player.STARTS)
+        assertThat(player.playReminder(1f)).isEqualTo(PadStart.STARTED)
+        passTime(REMINDER_CHIME_MS - 1)
+        assertThat(released(reminder)).isFalse()
+        passTime(2)
+        assertThat(released(reminder)).isTrue()
+    }
+
+    @Test
     fun theReminderChimeLeavesThePadStateAlone() = test {
         val player = player(reminder to Player.STARTS, honk to Player.STARTS)
         assertThat(player.playReminder(1f)).isEqualTo(PadStart.STARTED)

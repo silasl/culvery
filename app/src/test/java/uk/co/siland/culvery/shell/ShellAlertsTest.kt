@@ -10,6 +10,7 @@ import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -28,9 +29,11 @@ private class RecordingQuieter(private val name: String, private val log: Mutabl
     var gate: CompletableDeferred<Unit>? = null
     var fails = false
     var lowers = false
+    var takes = 0L
 
     override suspend fun quiet(): Boolean {
         log += "$name quiet"
+        delay(takes)
         gate?.await()
         if (fails) throw IOException("the speaker went away")
         log += "$name quieted"
@@ -394,6 +397,21 @@ class ShellAlertsTest {
         runCurrent()
         assertThat(log.count { it == "music restore" }).isEqualTo(1)
         assertThat(alerts.lowered.value).isFalse()
+    }
+
+    /** Fails if the restore is timed from the call rather than from when the quieters finish. */
+    @Test
+    fun aDuckRestoresItsLengthAfterASlowQuieterFinishes() = runTest {
+        val log = mutableListOf<String>()
+        val alerts = alerts(RecordingQuieter("music", log).apply { takes = 400 }, scope = backgroundScope)
+        alerts.duck(1_100)
+        assertThat(testScheduler.currentTime).isEqualTo(400)
+        advanceTimeBy(1_099)
+        runCurrent()
+        assertThat(log).doesNotContain("music restore")
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(log.count { it == "music restore" }).isEqualTo(1)
     }
 
     /** Fails if a duck waits on a hung quieter past the cap, or restores before its length. */

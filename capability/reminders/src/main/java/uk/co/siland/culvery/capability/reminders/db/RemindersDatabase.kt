@@ -77,7 +77,6 @@ interface RemindersDao {
     suspend fun putState(row: ReminderStateEntity)
 }
 
-/** v1. A later version ships a hand-written Migration, as the calendar does. */
 @Database(entities = [ReminderEntity::class, ReminderStateEntity::class], version = 1, exportSchema = true)
 abstract class RemindersDatabase : RoomDatabase() {
     abstract fun remindersDao(): RemindersDao

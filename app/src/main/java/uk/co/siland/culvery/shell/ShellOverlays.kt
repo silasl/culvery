@@ -166,7 +166,7 @@ class ShellAlerts @Inject constructor(
     }
 
     override suspend fun duck(forMillis: Long) {
-        val quiet = synchronized(lock) {
+        val (quiet, due) = synchronized(lock) {
             if (loud) return
             val before = lastPass
             val pass = scope.launch {
@@ -174,14 +174,13 @@ class ShellAlerts @Inject constructor(
                 runAll { it.quiet() }
             }
             lastPass = pass
-            val due = ++duckDue
-            scope.launch {
-                delay(forMillis)
-                synchronized(lock) { if (due == duckDue) startRestorePass() }
-            }
-            pass
+            pass to ++duckDue
         }
         withTimeoutOrNull(QUIET_CAP_MS) { quiet.join() }
+        scope.launch {
+            delay(forMillis)
+            synchronized(lock) { if (due == duckDue) startRestorePass() }
+        }
     }
 
     private fun install(loud: Boolean, holdsAwake: Boolean, content: @Composable () -> Unit): AlertHandle {

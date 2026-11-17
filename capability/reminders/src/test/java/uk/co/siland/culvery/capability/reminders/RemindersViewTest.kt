@@ -79,7 +79,7 @@ class RemindersViewTest {
             store, FakeAlertHost(), clock.minutes, wall, { zone }, MutableStateFlow(true), MutableStateFlow(false), NightHours { false },
             binDays, MutableStateFlow(true), null, { PadStart.STARTED }, scope,
         ) {}
-        view = RemindersView(store, engine, household, clock, HouseholdZone(household), Optional.of(object : BinCollections { override val days: Flow<BinDays> = binDays }))
+        view = RemindersView(store, engine, household, clock, HouseholdZone(household), Optional.of(object : BinCollections { override val days: Flow<BinDays> = binDays }), scope)
         engine.start()
     }
 
@@ -286,7 +286,7 @@ class RemindersViewTest {
         binDays.value = BinDays(false, false, emptyList())
         assertThat(view.tab.first { it.bins == null }.bins).isNull()
         val clock = HouseholdClock(HouseholdZone(household).zone, WallClock { nowMillis }, scope, ticks)
-        val bare = RemindersView(store, engine, household, clock, HouseholdZone(household), Optional.empty())
+        val bare = RemindersView(store, engine, household, clock, HouseholdZone(household), Optional.empty(), scope)
         assertThat(bare.tab.first().bins).isNull()
     }
 }

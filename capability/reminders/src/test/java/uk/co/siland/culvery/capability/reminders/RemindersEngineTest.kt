@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -90,7 +91,7 @@ class RemindersEngineTest {
     }
 
     /** One engine, the way the wall would have it, with every input a test moves. */
-    private inner class Rig(door: FakeDoor? = FakeDoor(), lateSetup: Boolean = false) {
+    private inner class Rig(door: FakeDoor? = FakeDoor(), lateSetup: Boolean = false, binsFlow: Flow<BinDays?>? = null) {
         val fake = FakeAlertHost()
         val setup = MutableStateFlow(true)
         val setupArrives = CompletableDeferred<Unit>()
@@ -106,7 +107,7 @@ class RemindersEngineTest {
         var onDuck: (() -> Unit)? = null
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val engine = RemindersEngine(
-            store, DuckingHost(fake) { onDuck?.invoke() }, minutes, { nowMillis }, { zone }, if (lateSetup) flow { setupArrives.await(); emitAll(setup) } else setup, holiday, NightHours { night }, bins, lit, door,
+            store, DuckingHost(fake) { onDuck?.invoke() }, minutes, { nowMillis }, { zone }, if (lateSetup) flow { setupArrives.await(); emitAll(setup) } else setup, holiday, NightHours { night }, binsFlow ?: bins, lit, door,
             { volume ->
                 chimes += volume
                 chimeError?.let { chimeError = null; throw it }
@@ -200,6 +201,32 @@ class RemindersEngineTest {
         door.quiet = false
         rig.tick("2026-11-18T07:32:00")
         assertThat(rig.chimes).containsExactly(0.6f)
+    }
+
+    @Test
+    fun quietHoursEndingOnADarkWallWakeItAndTheChimePlaysOnceLit() = runTest {
+        val door = FakeDoor(quiet = true)
+        val rig = Rig(door).also { it.lit.value = false; it.start() }
+        add("2026-11-18T07:30:00")
+        rig.tick("2026-11-18T07:30:00")
+        assertThat(rig.engine.showing.value).isNotNull()
+        val wakes = rig.fake.wakes
+        door.quiet = false
+        rig.tick("2026-11-18T07:31:00")
+        assertThat(rig.fake.wakes).isGreaterThan(wakes)
+        assertThat(rig.chimes).isEmpty()
+        rig.lit.value = true
+        assertThat(rig.chimes).hasSize(1)
+    }
+
+    @Test
+    fun aFailingInputDoesNotStopTheOthers() = runTest {
+        val rig = Rig(binsFlow = flow { error("the calendar went away") }).also { it.start() }
+        add("2026-11-18T07:30:00")
+        rig.tick("2026-11-18T07:30:00")
+        assertThat(rig.engine.showing.value).isNotNull()
+        assertThat(logs()).contains("An input failed (IllegalStateException)")
+        assertThat(logs().any { it.contains("went away") }).isFalse()
     }
 
     @Test

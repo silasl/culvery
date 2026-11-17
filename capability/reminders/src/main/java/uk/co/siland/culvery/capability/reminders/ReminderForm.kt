@@ -21,7 +21,7 @@ class ReminderForm(original: Reminder?, val today: LocalDate, now: LocalTime, va
     private val openingWords = original?.words.orEmpty()
     private val openingWho = original?.forPeople ?: listOf(childOnly ?: PersonId.FAMILY)
     private val openingRepeats = original?.schedule is Schedule.Weekly
-    private val openingDate = (original?.schedule as? Schedule.Once)?.date ?: today
+    private val openingDate = (original?.schedule as? Schedule.Once)?.date ?: if (wrapsToTomorrow(now)) today.plusDays(1) else today
     private val openingDays = (original?.schedule as? Schedule.Weekly)?.days.orEmpty()
     private val openingTime = original?.time ?: roundedUp(now)
 
@@ -84,8 +84,11 @@ class ReminderForm(original: Reminder?, val today: LocalDate, now: LocalTime, va
     }
 }
 
-private fun roundedUp(now: LocalTime): LocalTime {
+private fun roundedUpSeconds(now: LocalTime): Int {
     val seconds = now.toSecondOfDay() + if (now.nano > 0) 1 else 0
-    val up = (seconds + STEP * 60 - 1) / (STEP * 60) * STEP * 60
-    return LocalTime.ofSecondOfDay((up % (24 * 3600)).toLong())
+    return (seconds + STEP * 60 - 1) / (STEP * 60) * STEP * 60
 }
+
+private fun roundedUp(now: LocalTime) = LocalTime.ofSecondOfDay((roundedUpSeconds(now) % (24 * 3600)).toLong())
+
+private fun wrapsToTomorrow(now: LocalTime) = roundedUpSeconds(now) >= 24 * 3600

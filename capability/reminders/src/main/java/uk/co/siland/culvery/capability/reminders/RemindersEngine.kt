@@ -13,10 +13,12 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.capability.reminders.ui.ReminderCardHost
@@ -104,6 +106,7 @@ class RemindersEngine internal constructor(
     private var lastCard: Pair<DueKey, Int>? = null
     private var lastHeld: Held? = null
     private var lastOwed = emptySet<DueKey>()
+    private var lastQuiet = false
     private var lastBins: DueKey.Bins? = null
 
     /** When each key's chime was paid, kept here as well as stored: a mark that can't be saved must not repeat the chime every minute. */
@@ -111,19 +114,35 @@ class RemindersEngine internal constructor(
 
     override fun start() {
         scope.launch {
-            launch { minutes.collect { poke() } }
-            launch { store.reminders.collect { poke() } }
-            launch { store.state.collect { poke() } }
-            launch { setupComplete.collect { setupDone = it; setupKnown.complete(Unit); poke() } }
-            launch { host.inFront.collect { poke() } }
-            launch { host.showing.collect { poke() } }
-            launch { holiday.collect { poke() } }
-            launch { bins.collect { binDays = it; poke() } }
-            launch { lit.collect { poke() } }
-            // No pass before setup's value: it would log "held away" for a wall that is only waiting to be told.
-            setupKnown.await()
-            for (ignored in triggers) guarded(PASS) { mutex.withLock { pass() } }
+            supervisorScope {
+                input(minutes) { poke() }
+                input(store.reminders) { poke() }
+                input(store.state) { poke() }
+                input(setupComplete) { setupDone = it; setupKnown.complete(Unit); poke() }
+                input(host.inFront) { poke() }
+                input(host.showing) { poke() }
+                input(holiday) { poke() }
+                input(bins) { binDays = it; poke() }
+                input(lit) { poke() }
+                runPasses()
+            }
         }
+    }
+
+    /** One input failing is logged and leaves the others running; each pass reads the store afresh. */
+    private fun <T> CoroutineScope.input(flow: Flow<T>, onEach: (T) -> Unit) {
+        launch {
+            flow.catch { e ->
+                if (e is CancellationException) throw e
+                Log.w(TAG, "An input failed (${e::class.simpleName})")
+            }.collect { onEach(it) }
+        }
+    }
+
+    private suspend fun runPasses() {
+        // No pass before setup's value: it would log "held away" for a wall that is only waiting to be told.
+        setupKnown.await()
+        for (ignored in triggers) guarded(PASS) { mutex.withLock { pass() } }
     }
 
     fun done(key: DueKey) = answer(key) {
@@ -159,14 +178,14 @@ class RemindersEngine internal constructor(
         triggers.trySend(Unit)
     }
 
-    /** Logs the exception's class as "[subject] failed" and carries on. */
-    private suspend fun guarded(subject: String, block: suspend () -> Unit) {
+    /** Logs the exception's class as "[failedStep] failed" and carries on. */
+    private suspend fun guarded(failedStep: String, block: suspend () -> Unit) {
         try {
             block()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            Log.w(TAG, "$subject failed (${e::class.simpleName})")
+            Log.w(TAG, "$failedStep failed (${e::class.simpleName})")
         }
     }
 
@@ -210,7 +229,9 @@ class RemindersEngine internal constructor(
 
         val owed = open.filter { it.withMark().chimeOwed(now, state.heldEndedAtMillis) }.map { it.key }
         // Only a card that was up has seen what is owed; waking is for the day.
-        if (live != null && wall.night == false && owed.any { it !in lastOwed }) host.wake()
+        val quietEnded = lastQuiet && !wall.quiet && owed.isNotEmpty()
+        if (live != null && wall.night == false && (quietEnded || owed.any { it !in lastOwed })) host.wake()
+        lastQuiet = wall.quiet
         lastOwed = if (live != null) owed.toSet() else emptySet()
         if (live != null && owed.isNotEmpty() && soundAllowed(wall)) pay(live, owed, now)
         chimedAt.keys.retainAll(dues.mapTo(mutableSetOf()) { it.key })

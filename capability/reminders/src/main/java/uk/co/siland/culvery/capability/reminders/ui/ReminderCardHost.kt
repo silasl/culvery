@@ -12,7 +12,7 @@ import uk.co.siland.culvery.capability.reminders.RemindersView
 @Composable
 fun ReminderCardHost(view: RemindersView, engine: RemindersEngine) {
     val showing by engine.showing.collectAsStateWithLifecycle()
-    val card by view.card.collectAsStateWithLifecycle(initialValue = null)
+    val card by view.card.collectAsStateWithLifecycle()
     ReminderCardLayer(showing?.due?.key, card, onDone = engine::done, onLater = engine::later)
 }
 
