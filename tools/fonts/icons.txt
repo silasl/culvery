@@ -2,6 +2,7 @@
 # IconFontTest fails when the two disagree. Run tools/fonts/subset.py after changing this list.
 account_circle
 add
+alarm
 arrow_downward
 arrow_forward
 arrow_upward

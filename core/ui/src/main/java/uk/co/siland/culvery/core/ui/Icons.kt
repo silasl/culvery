@@ -7,6 +7,7 @@ package uk.co.siland.culvery.core.ui
 object Icons {
     const val ACCOUNT_CIRCLE = "account_circle"
     const val ADD = "add"
+    const val ALARM = "alarm"
     const val ARROW_DOWNWARD = "arrow_downward"
     const val ARROW_FORWARD = "arrow_forward"
     const val ARROW_UPWARD = "arrow_upward"

@@ -1,0 +1,148 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "d3f2f4e355f29bd8a55c35c164953dbe",
+    "entities": [
+      {
+        "tableName": "reminder",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `words` TEXT NOT NULL, `forPeople` TEXT NOT NULL, `madeBy` TEXT NOT NULL, `minuteOfDay` INTEGER NOT NULL, `onDate` TEXT, `weekdays` INTEGER NOT NULL, `answeredAtMillis` INTEGER NOT NULL, `snoozedUntilMillis` INTEGER, `chimedAtMillis` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "words",
+            "columnName": "words",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "forPeople",
+            "columnName": "forPeople",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "madeBy",
+            "columnName": "madeBy",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "minuteOfDay",
+            "columnName": "minuteOfDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "onDate",
+            "columnName": "onDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "weekdays",
+            "columnName": "weekdays",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "answeredAtMillis",
+            "columnName": "answeredAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snoozedUntilMillis",
+            "columnName": "snoozedUntilMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "chimedAtMillis",
+            "columnName": "chimedAtMillis",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "reminder_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`slot` INTEGER NOT NULL, `binsOn` INTEGER NOT NULL, `binsMinuteOfDay` INTEGER NOT NULL, `binsDoneFor` TEXT, `binsSnoozedUntilMillis` INTEGER, `binsChimedAtMillis` INTEGER, `heldSeen` INTEGER NOT NULL, `heldEndedAtMillis` INTEGER, `binsKeptDate` TEXT, `binsKeptBins` TEXT, PRIMARY KEY(`slot`))",
+        "fields": [
+          {
+            "fieldPath": "slot",
+            "columnName": "slot",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "binsOn",
+            "columnName": "binsOn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "binsMinuteOfDay",
+            "columnName": "binsMinuteOfDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "binsDoneFor",
+            "columnName": "binsDoneFor",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "binsSnoozedUntilMillis",
+            "columnName": "binsSnoozedUntilMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "binsChimedAtMillis",
+            "columnName": "binsChimedAtMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "heldSeen",
+            "columnName": "heldSeen",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "heldEndedAtMillis",
+            "columnName": "heldEndedAtMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "binsKeptDate",
+            "columnName": "binsKeptDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "binsKeptBins",
+            "columnName": "binsKeptBins",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "slot"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd3f2f4e355f29bd8a55c35c164953dbe')"
+    ]
+  }
+}
