@@ -15,6 +15,7 @@ android {
 dependencies {
     testImplementation(testFixtures(project(":core:ui")))
     testImplementation(testFixtures(project(":core:plugin")))
+    testImplementation(testFixtures(project(":core:access")))
     api(project(":core:plugin"))
     // PersonId and Person appear in this module's public API (SourceMapping, EventUi).
     api(project(":core:household"))

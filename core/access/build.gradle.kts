@@ -18,4 +18,8 @@ dependencies {
     // The Compose compiler runs on the fixtures too, so they need the runtime on their classpath.
     testFixturesImplementation(platform(libs.androidx.compose.bom))
     testFixturesImplementation(libs.androidx.compose.ui)
+    // TestAccess: real access rules over an in-memory household, with PIN pads answered from a queue.
+    testFixturesImplementation(testFixtures(project(":core:plugin")))
+    testFixturesImplementation(libs.androidx.test.core)
+    testFixturesImplementation(libs.kotlinx.coroutines.test)
 }

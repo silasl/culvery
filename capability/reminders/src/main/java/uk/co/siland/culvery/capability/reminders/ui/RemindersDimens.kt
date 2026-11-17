@@ -25,4 +25,10 @@ internal object RemindersDimens {
     val sectionTop = 14.dp
     val rowBarHeight = 40.dp
     val timeSize = 17.sp
+
+    val sheetPaddingH = 30.dp
+    val sheetPaddingV = 28.dp
+    val sheetGap = 16.dp
+    val pickerPadding = 16.dp
+    val pickerRadius = 20.dp
 }
