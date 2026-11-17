@@ -95,6 +95,16 @@ class RemindersStoreTest {
     }
 
     @Test
+    fun aChangeOfWeekdaysOnARepeatResetsAnsweredAtAndClearsTheSnooze() = runTest {
+        val id = store.add(weekly(DayOfWeek.MONDAY), alex, 1_000)!!
+        store.later(id, 100)
+        assertThat(store.change(id, weekly(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY), 9_000)).isTrue()
+        val r = store.reminders.first().single()
+        assertThat(r.answeredAtMillis).isEqualTo(9_000)
+        assertThat(r.snoozedUntilMillis).isNull()
+    }
+
+    @Test
     fun aChangeOfWordsOrWhoKeepsThem() = runTest {
         val id = store.add(once(), alex, 1_000)!!
         store.later(id, 200)
@@ -160,6 +170,12 @@ class RemindersStoreTest {
         assertThat(s.binsTime).isEqualTo(LocalTime.of(17, 15))
         assertThat(s.binsDoneFor).isEqualTo(day)
         assertThat(s.binsSnoozedUntilMillis).isEqualTo(1_000 + LATER_MS)
+    }
+
+    @Test
+    fun notHeldOnFreshStateStoresNoEnd() = runTest {
+        store.markHeld(false, 1_000)
+        assertThat(store.state.first().heldEndedAtMillis).isNull()
     }
 
     @Test

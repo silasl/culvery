@@ -5,6 +5,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 import org.junit.Test
+import uk.co.siland.culvery.capability.reminders.db.ReminderEntity
 import uk.co.siland.culvery.core.household.PersonId
 
 class ReminderTest {
@@ -16,7 +17,8 @@ class ReminderTest {
         val weekly = Schedule.Weekly(setOf(DayOfWeek.TUESDAY))
         val draft = ReminderDraft("Dentist at four", listOf(who), LocalTime.of(16, 35), once)
         val reminder = Reminder(9, "Dentist at four", listOf(who), who, LocalTime.of(16, 35), weekly, 0, null, null)
-        listOf(draft.toString(), reminder.toString(), once.toString(), weekly.toString()).forEach {
+        val entity = ReminderEntity(9, "Dentist at four", "person-7731", "person-7731", 995, "2026-11-20", 0, 0, null, null)
+        listOf(draft.toString(), reminder.toString(), once.toString(), weekly.toString(), entity.toString()).forEach {
             assertThat(it).doesNotContain("Dentist")
             assertThat(it).doesNotContain("7731")
             assertThat(it).doesNotContain("16:35")
