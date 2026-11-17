@@ -455,4 +455,47 @@ class SoundPlayerTest {
         assertThat(released(organ)).isTrue()
         assertThat(player.playPad(1, honk, 1f)).isEqualTo(PadStart.STARTED)
     }
+
+    private val reminder = BuiltInSound.REMINDER.asSound()
+
+    @Test
+    fun theReminderChimeRefusesWhileTheDoorbellOpensOrPlays() = test {
+        val player = player(classic to Player.STARTS, reminder to Player.STARTS)
+        player.playDoorbell(classic, 1f)
+        assertThat(player.playReminder(1f)).isEqualTo(PadStart.DOORBELL)
+        assertThat(asked).containsExactly(classic.id)
+
+        lateinit var opening: SoundPlayer
+        var duringOpen: PadStart? = null
+        asked.clear()
+        opening = SoundPlayer({ sound ->
+            asked += sound.id
+            if (sound.id == classic.id) duringOpen = runBlocking { opening.playReminder(1f) }
+            prepared(sound.id).also { made[sound.id] = it }
+        }, scope, io)
+        opening.playDoorbell(classic, 1f)
+        assertThat(duringOpen).isEqualTo(PadStart.DOORBELL)
+        assertThat(asked).containsExactly(classic.id)
+    }
+
+    @Test
+    fun aRingCutsTheReminderChime() = test {
+        val player = player(reminder to Player.STARTS, classic to Player.STARTS)
+        assertThat(player.playReminder(1f)).isEqualTo(PadStart.STARTED)
+        assertThat(playing(reminder)).isTrue()
+        player.playDoorbell(classic, 1f)
+        assertThat(released(reminder)).isTrue()
+    }
+
+    @Test
+    fun theReminderChimeLeavesThePadStateAlone() = test {
+        val player = player(reminder to Player.STARTS, honk to Player.STARTS)
+        assertThat(player.playReminder(1f)).isEqualTo(PadStart.STARTED)
+        assertThat(player.padPlaying.value).isNull()
+        assertThat(player.previewing.value).isNull()
+        assertThat(player.playPad(PREVIEW_PAD, honk, 1f)).isEqualTo(PadStart.STARTED)
+        assertThat(released(reminder)).isTrue()
+        assertThat(player.padPlaying.value).isEqualTo(PREVIEW_PAD)
+        assertThat(player.previewing.value).isEqualTo(honk.id)
+    }
 }

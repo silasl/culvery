@@ -31,6 +31,9 @@ val CHIME_ATTRIBUTES: AudioAttributes = AudioAttributes.Builder()
 /** The pad Settings' Play buttons use. */
 const val PREVIEW_PAD = 0
 
+/** How long the reminder chime plays. */
+const val REMINDER_CHIME_MS = 1_100L
+
 /** How a pad's play ended: it started, the doorbell's sound had the speaker, a stop or newer play came first, or it couldn't play. */
 enum class PadStart { STARTED, DOORBELL, STOPPED, FAILED }
 
@@ -109,6 +112,16 @@ class SoundPlayer internal constructor(
         return start(sound, volume, capMs, pad, epochBefore, null)
     }
 
+    /** Plays the reminder chime in the pad slot, so a ring or a pad cuts it, without touching [padPlaying] or [previewing]. [PadStart.DOORBELL] while the doorbell's sound opens or plays. */
+    suspend fun playReminder(volume: Float): PadStart {
+        val epochBefore = synchronized(lock) {
+            if (doorbellOpening > 0 || doorbellPlaying > 0) return PadStart.DOORBELL
+            stopPads()
+            padEpoch
+        }
+        return start(REMINDER, volume, REMINDER_CHIME_MS, 0, epochBefore, null, showsAsPad = false)
+    }
+
     /** A ring started: the pads stop. */
     fun ringStarted() {
         synchronized(lock) {
@@ -127,11 +140,11 @@ class SoundPlayer internal constructor(
 
     /** Opens and starts on [io] as one step a cancelled caller can't interrupt, so an opened player is always tracked. */
     private suspend fun start(
-        sound: Sound, volume: Float, capMs: Long, padNumber: Int?, epochBefore: Long?, ringsExpected: Long?,
-    ): PadStart = withContext(io + NonCancellable) { startNow(sound, volume, capMs, padNumber, epochBefore, ringsExpected) }
+        sound: Sound, volume: Float, capMs: Long, padNumber: Int?, epochBefore: Long?, ringsExpected: Long?, showsAsPad: Boolean = true,
+    ): PadStart = withContext(io + NonCancellable) { startNow(sound, volume, capMs, padNumber, epochBefore, ringsExpected, showsAsPad) }
 
     /** Refuses with [PadStart.STOPPED] when [epochBefore] or [ringsExpected] no longer matches. */
-    private fun startNow(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, epochBefore: Long?, ringsExpected: Long?): PadStart {
+    private fun startNow(sound: Sound, volume: Float, capMs: Long, padNumber: Int?, epochBefore: Long?, ringsExpected: Long?, showsAsPad: Boolean): PadStart {
         val player = open(sound)
         if (player == null) {
             logFailed(sound)
@@ -161,8 +174,10 @@ class SoundPlayer internal constructor(
             }
             if (padNumber != null) {
                 pad = play
-                padState.value = padNumber
-                previewState.value = sound.id.takeIf { padNumber == PREVIEW_PAD }
+                if (showsAsPad) {
+                    padState.value = padNumber
+                    previewState.value = sound.id.takeIf { padNumber == PREVIEW_PAD }
+                }
             }
             val endsAfter = when {
                 sound.source is SoundSource.OnTablet -> capMs
@@ -234,6 +249,7 @@ class SoundPlayer internal constructor(
         const val DOORBELL_CEILING_MS = 30_000L
         private const val TAG = "SoundPlayer"
         private val CLASSIC = BuiltInSound.CLASSIC.asSound()
+        private val REMINDER = BuiltInSound.REMINDER.asSound()
 
         private fun openFile(path: String): MediaPlayer? {
             val player = MediaPlayer()

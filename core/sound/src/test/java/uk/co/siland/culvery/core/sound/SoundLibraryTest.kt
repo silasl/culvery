@@ -32,6 +32,8 @@ class SoundLibraryTest {
         file.writeBytes(byteArrayOf(0))
     }
 
+    private val inTheLibrary = BuiltInSound.entries - BuiltInSound.REMINDER
+
     private fun library() = SoundLibrary({ folder.root }, CoroutineScope(UnconfinedTestDispatcher()), UnconfinedTestDispatcher())
 
     /** Regression guard (18 §2.2): the page's re-read wins over a start-up read that was slower to finish. */
@@ -95,14 +97,14 @@ class SoundLibraryTest {
     fun aFailedFirstReadStillCountsAsLanded() {
         val library = SoundLibrary({ throw IllegalStateException("no folder") }, CoroutineScope(UnconfinedTestDispatcher()), UnconfinedTestDispatcher())
         assertThat(library.firstReadDone.value).isTrue()
-        assertThat(library.sounds.value.map { it.id }).containsExactlyElementsIn(BuiltInSound.entries.map { it.id })
+        assertThat(library.sounds.value.map { it.id }).containsExactlyElementsIn(inTheLibrary.map { it.id })
     }
 
     @Test
     fun builtInsComeFirst() {
         touch("Test Honk.wav")
         val ids = library().sounds.value.map { it.id }
-        assertThat(ids.take(BuiltInSound.entries.size)).containsExactlyElementsIn(BuiltInSound.entries.map { it.id }).inOrder()
+        assertThat(ids.take(inTheLibrary.size)).containsExactlyElementsIn(inTheLibrary.map { it.id }).inOrder()
         assertThat(ids.last()).isEqualTo("file:Test Honk.wav")
     }
 
@@ -160,5 +162,13 @@ class SoundLibraryTest {
     fun byIdOfAGoneFileIsNull() {
         assertThat(library().byId("file:Gone.wav")).isNull()
         assertThat(library().byId(null)).isNull()
+    }
+
+    @Test
+    fun theReminderChimeIsInNoList() = runTest {
+        val library = library()
+        assertThat(library.sounds.value.map { it.id }).doesNotContain(BuiltInSound.REMINDER.id)
+        assertThat(library.choices.first().map { it.id }).doesNotContain(BuiltInSound.REMINDER.id)
+        assertThat(library.byId("builtin:reminder")).isNull()
     }
 }

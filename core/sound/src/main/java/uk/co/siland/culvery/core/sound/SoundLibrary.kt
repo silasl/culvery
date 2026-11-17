@@ -34,7 +34,8 @@ class SoundLibrary @VisibleForTesting constructor(
     constructor(@ApplicationContext context: Context, @ApplicationScope scope: CoroutineScope) :
         this({ context.getExternalFilesDir(null)?.resolve("sounds") }, scope, Dispatchers.IO)
 
-    private val builtIns = BuiltInSound.entries.map { it.asSound() }
+    /** The reminder chime is Reminders' own and is never offered as a choice. */
+    private val builtIns = (BuiltInSound.entries - BuiltInSound.REMINDER).map { it.asSound() }
     private val state = MutableStateFlow(builtIns)
     // Guarded by state.
     private var reads = 0L

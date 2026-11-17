@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.ui.SeasonalTheme
@@ -13,7 +15,7 @@ class BuiltInSoundTest {
     @Test
     fun idsAreBuiltinKeys() {
         assertThat(BuiltInSound.entries.map { it.id }).containsExactly(
-            "builtin:classic", "builtin:organ", "builtin:happy_birthday", "builtin:christmas_music_box",
+            "builtin:classic", "builtin:organ", "builtin:happy_birthday", "builtin:christmas_music_box", "builtin:reminder",
         ).inOrder()
     }
 
@@ -31,5 +33,15 @@ class BuiltInSoundTest {
         for (sound in BuiltInSound.entries) {
             resources.openRawResourceFd(sound.res).use { assertThat(it.length).isGreaterThan(0L) }
         }
+    }
+
+    @Test
+    fun theReminderChimeLastsAboutASecond() {
+        val resources = ApplicationProvider.getApplicationContext<Context>().resources
+        // A canonical 44-byte header: the rate is at byte 24, the data size at byte 40, 16-bit mono.
+        val bytes = resources.openRawResource(BuiltInSound.REMINDER.res).use { it.readBytes() }
+        val header = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        val ms = header.getInt(40) / 2 * 1000.0 / header.getInt(24)
+        assertThat(ms).isWithin(50.0).of(REMINDER_CHIME_MS.toDouble())
     }
 }
