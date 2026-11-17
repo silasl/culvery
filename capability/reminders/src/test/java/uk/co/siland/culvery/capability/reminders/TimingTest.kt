@@ -159,4 +159,13 @@ class TimingTest {
         assertThat(inOrder(listOf(newest, tiedHigh, tiedLow, bins, oldest)))
             .containsExactly(oldest, bins, tiedLow, tiedHigh, newest).inOrder()
     }
+
+    @Test
+    fun aWeeklyTimeExactlyAWeekBackIsTheEighthLookBackDate() {
+        val now = at("2026-11-18T07:00:00")
+        val wednesday = weekly(DayOfWeek.WEDNESDAY)
+        assertThat(reminder(wednesday, half7, at("2026-11-11T08:00:00")).due(now, zone)).isNull()
+        assertThat(reminder(wednesday, half7, at("2026-11-10T12:00:00")).due(now, zone)!!.dueAtMillis)
+            .isEqualTo(at("2026-11-11T07:30:00"))
+    }
 }

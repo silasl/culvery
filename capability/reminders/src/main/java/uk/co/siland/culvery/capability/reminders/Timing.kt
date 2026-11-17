@@ -24,6 +24,7 @@ internal fun Reminder.due(nowMillis: Long, zone: ZoneId): Due? {
         is Schedule.Once -> listOf(timeOn(schedule.date, time, zone))
         is Schedule.Weekly -> {
             val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+            // Eight dates: today and the seven before, so the same weekday a week ago is covered.
             (0L..7L).map { today.minusDays(it) }
                 .filter { it.dayOfWeek in schedule.days }
                 .map { timeOn(it, time, zone) }

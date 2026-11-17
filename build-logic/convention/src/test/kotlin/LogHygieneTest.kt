@@ -59,6 +59,7 @@ class LogHygieneTest {
         assertThat(sources.map { it.name }).contains("MidSussexBinsProvider.kt")
         assertThat(sources.map { it.name }).contains("Camera2Frames.kt")
         assertThat(sources.map { it.name }).contains("Presence.kt")
+        assertThat(sources.map { it.name }).contains("RemindersEngine.kt")
         // 77 calls when written; a floor well below that still fails if the scan stops finding them.
         assertThat(sources.sumOf { LogHygiene.callCount(it.readText()) }).isAtLeast(50)
     }
@@ -98,6 +99,17 @@ class LogHygieneTest {
         assertThat(LogHygiene.problems("""Log.i(TAG, "Bins read: ${'$'}{collections.size} collections")""")).isEmpty()
         assertThat(LogHygiene.problems("""Log.w(TAG, "Bins read failed: ${'$'}{failed.kind.name}")""")).isEmpty()
         assertThat(LogHygiene.problems("""Log.i(TAG, "Bins read for ${'$'}{conn.config}")""")).hasSize(1)
+    }
+
+    @Test
+    fun theRemindersLinesPass() {
+        val d = "$"
+        assertThat(LogHygiene.problems("""Log.i(TAG, "due ${d}{dues.size}")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.i(TAG, "card up 1 of ${d}{open.size}")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.i(TAG, "held ${d}{held.word}")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.w(TAG, "A pass failed (${d}{e::class.simpleName})")""")).isEmpty()
+        assertThat(LogHygiene.problems("""Log.i(TAG, "due ${d}{reminder.words}")""")).hasSize(1)
+        assertThat(LogHygiene.problems("""Log.i(TAG, "due at ${d}{due.dueAtMillis}")""")).hasSize(1)
     }
 
     @Test
@@ -169,6 +181,8 @@ internal object LogHygiene {
      *
      * `mark.elapsedNow().inWholeMilliseconds` is how long the doorbell's layout read took (19 §3.2).
      *
+     * `dues.size`, `open.size` and `held.word` are the reminders engine's counts and its fixed reason (away, holiday, night, ring), never the words, a name, a person id or a chosen time (`RemindersEngine`, 22 §6).
+     *
      * `size.first`, `size.second`, `rates.first` and `rates.last` are the camera's size and frame-rate range, and `quietNames(off)` the modes turned off (19 §4.1).
      */
     val ALLOWED = setOf(
@@ -179,6 +193,7 @@ internal object LogHygiene {
         "step.name", "own.logName", "source.sound.key", "after.screen.name", "names.size",
         "collections.size", "failed.kind.name", "failuresPhrase(failedInARow)", "e.reasonWord()", "mark.elapsedNow().inWholeMilliseconds",
         "size.first", "size.second", "rates.first", "rates.last", "quietNames(off)",
+        "dues.size", "open.size", "held.word",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|i|wtf|println)\(""")
