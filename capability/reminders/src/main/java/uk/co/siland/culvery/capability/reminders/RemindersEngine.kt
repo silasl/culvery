@@ -3,9 +3,13 @@ package uk.co.siland.culvery.capability.reminders
 import android.util.Log
 import androidx.compose.runtime.Composable
 import java.time.LocalDateTime
+import dagger.Lazy
 import java.time.ZoneId
+import java.util.Optional
+import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -15,14 +19,22 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import uk.co.siland.culvery.capability.reminders.ui.ReminderCardHost
 import uk.co.siland.culvery.core.house.DoorQuiet
+import uk.co.siland.culvery.core.house.HouseMode
+import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.AlertHandle
 import uk.co.siland.culvery.core.plugin.AlertHost
+import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.NightHours
+import uk.co.siland.culvery.core.plugin.ScreenLit
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.sound.PadStart
+import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.sound.REMINDER_CHIME_MS
+import uk.co.siland.culvery.core.sound.SoundPlayer
 
 /**
  * Decides each minute, and at once when an input changes, whether the reminder card is up and whether a chime is owed (22 §4.4).
@@ -42,8 +54,29 @@ class RemindersEngine internal constructor(
     private val door: DoorQuiet?,
     private val chime: suspend (volume: Float) -> PadStart,
     private val scope: CoroutineScope,
-    private val card: @Composable () -> Unit,
+    private val card: @Composable (RemindersEngine) -> Unit,
 ) : Startable {
+    @Inject
+    constructor(
+        store: RemindersStore,
+        host: AlertHost,
+        clock: HouseholdClock,
+        wall: WallClock,
+        zone: HouseholdZone,
+        setup: SetupState,
+        house: HouseMode,
+        night: NightHours,
+        lit: ScreenLit,
+        door: Optional<DoorQuiet>,
+        player: SoundPlayer,
+        view: Lazy<RemindersView>,
+        @ApplicationScope scope: CoroutineScope,
+    ) : this(
+        store, host, clock.minutes, wall, { zone.current() }, setup.setupComplete, house.holiday, night, lit.lit, door.orElse(null),
+        { volume -> player.playReminder(volume) }, scope,
+        { engine -> ReminderCardHost(view.get(), engine) },
+    )
+
     private val _waiting = MutableStateFlow<List<Due>>(emptyList())
     private val _showing = MutableStateFlow<Showing?>(null)
 
@@ -57,6 +90,7 @@ class RemindersEngine internal constructor(
     private val triggers = Channel<Unit>(Channel.CONFLATED)
 
     @Volatile private var setupDone = false
+    private val setupKnown = CompletableDeferred<Unit>()
 
     // What the last pass saw, to log and wake on a change only; touched under the mutex.
     private var handle: AlertHandle? = null
@@ -73,11 +107,13 @@ class RemindersEngine internal constructor(
             launch { minutes.collect { poke() } }
             launch { store.reminders.collect { poke() } }
             launch { store.state.collect { poke() } }
-            launch { setupComplete.collect { setupDone = it; poke() } }
+            launch { setupComplete.collect { setupDone = it; setupKnown.complete(Unit); poke() } }
             launch { host.inFront.collect { poke() } }
             launch { host.showing.collect { poke() } }
             launch { holiday.collect { poke() } }
             launch { lit.collect { poke() } }
+            // No pass before setup's value: it would log "held away" for a wall that is only waiting to be told.
+            setupKnown.await()
             for (ignored in triggers) guarded { mutex.withLock { pass() } }
         }
     }
@@ -140,7 +176,7 @@ class RemindersEngine internal constructor(
         var live = handle?.takeIf { it.showing.value }
         val holding = heldBy(wall)
         if (open.isNotEmpty() && holding == null) {
-            live = live ?: host.showIfFree(holdsAwake = false, content = card)?.also(::watch)
+            live = live ?: host.showIfFree(holdsAwake = false, content = { card(this) })?.also(::watch)
         } else if (live != null) {
             live.dismiss()
             live = null

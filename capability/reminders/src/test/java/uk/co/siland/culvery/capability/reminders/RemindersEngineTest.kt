@@ -9,11 +9,14 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -83,9 +86,10 @@ class RemindersEngineTest {
     }
 
     /** One engine, the way the wall would have it, with every input a test moves. */
-    private inner class Rig(door: FakeDoor? = FakeDoor()) {
+    private inner class Rig(door: FakeDoor? = FakeDoor(), lateSetup: Boolean = false) {
         val fake = FakeAlertHost()
         val setup = MutableStateFlow(true)
+        val setupArrives = CompletableDeferred<Unit>()
         val holiday = MutableStateFlow<Boolean?>(false)
         val lit = MutableStateFlow(true)
         var night: Boolean? = false
@@ -97,7 +101,7 @@ class RemindersEngineTest {
         var onDuck: (() -> Unit)? = null
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val engine = RemindersEngine(
-            store, DuckingHost(fake) { onDuck?.invoke() }, minutes, { nowMillis }, { zone }, setup, holiday, NightHours { night }, lit, door,
+            store, DuckingHost(fake) { onDuck?.invoke() }, minutes, { nowMillis }, { zone }, if (lateSetup) flow { setupArrives.await(); emitAll(setup) } else setup, holiday, NightHours { night }, lit, door,
             { volume ->
                 chimes += volume
                 chimeError?.let { chimeError = null; throw it }
@@ -297,6 +301,17 @@ class RemindersEngineTest {
         rig.fake.inFront.value = true
         assertThat(rig.engine.showing.value).isNotNull()
         assertThat(rig.chimes).hasSize(1)
+    }
+
+    @Test
+    fun aSetupValueThatArrivesLateLogsNoHeldAway() = runTest {
+        val rig = Rig(lateSetup = true).also { it.start() }
+        add("2026-11-18T07:30:00")
+        rig.tick("2026-11-18T07:30:00")
+        assertThat(logs()).doesNotContain("held away")
+        assertThat(rig.engine.showing.value).isNull()
+        rig.setupArrives.complete(Unit)
+        assertThat(rig.engine.showing.value).isNotNull()
     }
 
     @Test
