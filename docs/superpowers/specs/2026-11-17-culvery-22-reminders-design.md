@@ -143,7 +143,7 @@ The chime is paid the first time the card is up while sound is allowed: not nigh
 - **The chime** plays at the doorbell's volume (the `DoorQuiet` seam's `volume`). It never starts while a ring is opening or playing.
 - **Music** ducks for the chime and comes back when the chime ends. It does not stay down while the card is up: the card has no timeout, unlike the door card's 60 seconds.
 - **Door quiet hours** are Door's own setting (`DoorQuiet.quietNow()`). With quiet hours switched off there, only night silences the chime.
-- **With no door capability or no doorbell connected,** the chime plays at full volume and only night silences it.
+- **With no door capability,** the chime plays at full volume and only night silences it. With the capability but no doorbell connected, it plays at the saved doorbell volume: Door's own values are left as they are.
 - **A ring during the chime** cuts it, as it cuts a pad.
 
 ### 4.5 The tab
@@ -158,9 +158,10 @@ The chime is paid the first time the card is up while sound is allowed: not nigh
 - **The Bins row** sits at the foot (4.7).
 
 ### 4.6 Adding and changing
-- **Add reminder** asks who's there (the PIN pad, as Add event does), then opens the form as a sheet.
+- **Add reminder** opens the form as a sheet, as Add event does. "Add reminder" in the form asks who's there (the PIN pad). While a child's PIN is still in force when the form opens, the form is theirs from the start.
 - **The form:** the words; who it's for; Once or Repeats; a day (today by default, up to a year ahead) or seven day chips; the time. Save is "Add reminder" on a new one and "Save changes" on an existing one.
-- **Tapping a row** asks who's there, then opens the same form with "Delete reminder". Deleting shows a toast with Undo, as the calendar and Shopping do.
+- **Tapping a row** opens the same form with "Delete reminder". "Save changes" and "Delete reminder" ask who's there. Deleting shows "Reminder deleted."; there is no Undo, as with a deleted event.
+- **After a PIN,** the next changes need none for two minutes, whoever makes them. This is the events rule, accepted here as it is there.
 - **Permissions**, registered as the calendar's are:
 
 | Permission | Who |
@@ -182,10 +183,10 @@ The chime is paid the first time the card is up while sound is allowed: not nigh
   - Words: "Bins out tonight" until midnight, then "Bins out today".
   - Below: the bin names ("Food, Recycling") with one stripe per bin in its colour. Who reads "Bins".
   - Done ends it for that collection.
-- **The Bins row** on the tab: "Bins · The evening before a collection, 18:00" with a switch. It shows only while a bins connection exists and starts switched on. Tapping it asks for an adult's PIN, then offers the switch and the time.
+- **The Bins row** on the tab: "Bins · The evening before a collection, 18:00" with a switch. It shows only while a bins connection exists and starts switched on. Tapping it offers the switch and the time; "Save changes" asks for an adult's PIN.
 - **The time** must fall from 12:00 up to the start of night hours: "Pick a time from midday until night hours start." If night hours are later moved over it, the reminder follows the night rule.
 - **Can't read.** While the last council read has failed, the row adds "Can’t read the bin dates". The reminder still fires from stored dates. With no stored collections nothing fires.
-- **Late or changed dates.** A collection first seen after T on D−1 is waiting at once. If a waiting collection's bins change, the card follows. If it disappears from the store, its reminder goes.
+- **Late or changed dates.** A collection first seen after T on D−1 is waiting at once. If a waiting collection's bins change, the card follows. A collection that disappears from the store before its reminder starts has none. Once the reminder has started, Reminders keeps that collection itself until Done or 12:00 on D, whatever the calendar then lists: the council's page may drop a collection on its own morning.
 - **Holiday.** A bins reminder still clears at 12:00 on D during Holiday, so it is never shown late.
 - **Two collections can't overlap:** one clears at 12:00 and the next can't start before 12:00.
 - **A hidden bins calendar** gives no reminders: the seam reads what the calendar shows, as the other calendar seams do.
@@ -216,7 +217,7 @@ The chime is paid the first time the card is up while sound is allowed: not nigh
 
 - **Timing, as unit tests with a fake clock:** once; weekly days; a clock change (the spring and autumn hours); missed while off; no backlog; Done; Later and a second Later; a change resetting "answered at"; the 50 limit.
 - **The engine:** each row of 4.4's table, the chime paid once across a restart, a chime owed again at night's end, several waiting sharing one chime, the ring stepping in mid-card and mid-chime, music back up when the chime ends.
-- **Bins:** evening to noon, "tonight" to "today", late-seen, changed, vanished, switched off, Holiday, a failed read with stored dates.
+- **Bins:** evening to noon, "tonight" to "today", late-seen, changed, vanished before it starts, kept once started, switched off, Holiday, a failed read with stored dates.
 - **Permissions:** adult, child (own and not own), the removed person.
 - **The alert layer:** a non-holding alert doesn't hold; it wakes a day dark screen once; the door card still holds.
 - **Screenshots**, light and dark: the tab filled, empty, and with the Bins row and its can't-read line; the form (once, repeating); the card for one person, two people, bins, and "1 of 2".
