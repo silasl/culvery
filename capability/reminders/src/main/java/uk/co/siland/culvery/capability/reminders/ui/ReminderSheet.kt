@@ -41,6 +41,7 @@ import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import uk.co.siland.culvery.capability.reminders.COULD_NOT_DELETE
 import uk.co.siland.culvery.capability.reminders.COULD_NOT_SAVE
 import uk.co.siland.culvery.capability.reminders.LIST_FULL
 import uk.co.siland.culvery.capability.reminders.PICK_A_LATER_TIME
@@ -145,7 +146,10 @@ internal fun ReminderSheetHost(
     onClose: () -> Unit,
 ) {
     var line by remember(form) { mutableStateOf<String?>(null) }
-    val action = rememberSingleAction(form) { line = COULD_NOT_SAVE }
+    val action = rememberSingleAction(form) { e ->
+        Log.w(TAG, "Couldn't save (${e::class.simpleName})")
+        line = COULD_NOT_SAVE
+    }
     // A save running counts as edited, so the idle close never cuts it off half done.
     val edited by rememberUpdatedState(onEdited)
     LaunchedEffect(form) { snapshotFlow { form.edited || action.busy }.collect { edited(it) } }
@@ -188,7 +192,7 @@ internal fun ReminderSheetHost(
                         throw e
                     } catch (e: Exception) {
                         Log.w(TAG, "Couldn't delete (${e::class.simpleName})")
-                        line = COULD_NOT_SAVE
+                        line = COULD_NOT_DELETE
                         return@run
                     }
                     if (gone) onClose()

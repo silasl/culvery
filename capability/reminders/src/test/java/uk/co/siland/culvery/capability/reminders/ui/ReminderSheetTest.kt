@@ -28,6 +28,7 @@ import kotlinx.coroutines.test.runTest
 import org.robolectric.shadows.ShadowLog
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import uk.co.siland.culvery.capability.reminders.COULD_NOT_DELETE
 import uk.co.siland.culvery.capability.reminders.COULD_NOT_SAVE
 import uk.co.siland.culvery.capability.reminders.RemindersActions
 import uk.co.siland.culvery.capability.reminders.RemindersStore
@@ -265,7 +266,7 @@ class ReminderSheetTest {
         show(form(), existing = 7)
         compose.onNodeWithTag("reminder_delete").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText(COULD_NOT_SAVE).assertIsDisplayed()
+        compose.onNodeWithText(COULD_NOT_DELETE).assertIsDisplayed()
         assertThat(closed).isEqualTo(0)
         assertThat(ShadowLog.getLogsForTag("Reminders").map { it.msg }).containsExactly("Couldn't delete (IllegalStateException)")
     }
