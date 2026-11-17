@@ -293,7 +293,7 @@ class RemindersActionsTest {
         val draft = once(listOf(access.alex.id), words = "New words", time = LocalTime.of(8, 0), on = today.minusDays(1))
         assertThat(actions.save(id, draft)).isEqualTo(SaveResult.Saved)
         assertThat(stored().single().schedule).isEqualTo(Schedule.Once(today.minusDays(1)))
-        assertThat(actions.save(id, draft.copy(schedule = Schedule.Once(today.minusDays(2))))).isEqualTo(SaveResult.Invalid)
+        assertThat(actions.save(id, draft.copy(schedule = Schedule.Once(today.minusDays(2))))).isEqualTo(SaveResult.Past)
     }
 
     @Test
@@ -318,7 +318,6 @@ class RemindersActionsTest {
             once(mia, words = "a".repeat(WORDS_MAX + 1)),
             once(emptyList()),
             once(mia, on = today.plusYears(2)),
-            once(mia, on = today.minusDays(1)),
         )
         refused.forEach { assertThat(actions.save(null, it)).isEqualTo(SaveResult.Invalid) }
         assertThat(access.requests).isEmpty()
@@ -399,5 +398,50 @@ class RemindersActionsTest {
         actions.refuseOtherWho("Mia")
         assertThat(access.toasts.messages).containsExactly("Mia can add reminders for Mia only.")
         assertThat(access.toasts.urgent).containsExactly("Mia can add reminders for Mia only.")
+    }
+
+    @Test
+    fun aDayBeforeTodayIsPastAndMoreThanAYearAheadIsInvalid() = runTest {
+        val access = access()
+        val actions = actions(access)
+        access.answer(TestAccess.ALEX)
+        assertThat(actions.save(null, once(listOf(access.alex.id), on = today.minusDays(1)))).isEqualTo(SaveResult.Past)
+        assertThat(actions.save(null, once(listOf(access.alex.id), on = today.plusYears(1).plusDays(1)))).isEqualTo(SaveResult.Invalid)
+        assertThat(stored()).isEmpty()
+    }
+
+    @Test
+    fun aReminderDeletedWhileTheDeletePinPadWasUpSaysNothingAndCloses() = runTest {
+        val access = access()
+        val actions = actions(access)
+        val id = seed(once(listOf(access.alex.id)), access.alex.id)
+        val result = async { actions.delete(id) }
+        awaiting("the PIN pad") { while (access.requests.isEmpty()) delay(10) }
+        store.delete(id)
+        access.prompt.submit(TestAccess.ALEX)
+        assertThat(result.await()).isTrue()
+        assertThat(access.toasts.messages).isEmpty()
+    }
+
+    @Test
+    fun aChildWithASessionInForceIsRefusedByNameWithNoNewPad() = runTest {
+        val access = access()
+        val actions = actions(access)
+        val id = seed(once(listOf(access.alex.id)), access.alex.id)
+        signInMia(access)
+        assertThat(actions.save(id, once(listOf(access.alex.id), words = "Changed"))).isEqualTo(SaveResult.Cancelled)
+        assertThat(access.toasts.messages).containsExactly("Mia can only change reminders they made.")
+        assertThat(access.requests).hasSize(1)
+        assertThat(access.control.session.value).isNull()
+        assertThat(stored().single().words).isEqualTo("PE kit")
+    }
+
+    @Test
+    fun aFailedOpenToastsItsLine() = runTest {
+        val access = access()
+        val actions = actions(access)
+        actions.couldNotOpen()
+        assertThat(access.toasts.urgent).containsExactly("Couldn’t open the reminder — try again.")
+        assertThat(COULD_NOT_SAVE).isEqualTo("Couldn’t save — try again.")
     }
 }

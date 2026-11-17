@@ -22,6 +22,8 @@ import uk.co.siland.culvery.core.plugin.today
 const val PICK_A_LATER_TIME = "Pick a time that hasn’t passed."
 const val LIST_FULL = "The list is full. Delete a reminder to add another."
 const val REMINDER_DELETED = "Reminder deleted."
+const val COULD_NOT_SAVE = "Couldn’t save — try again."
+const val COULD_NOT_OPEN = "Couldn’t open the reminder — try again."
 internal const val ADD_A_REMINDER = "Add a reminder"
 internal const val CHANGE_THIS_REMINDER = "Change this reminder"
 
@@ -50,6 +52,9 @@ class RemindersActions @Inject constructor(
     /** Now, in the household's zone: the form's today and its first time. */
     internal suspend fun openedAt(): ZonedDateTime = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current())
 
+    /** The form couldn't load (a store failure): nothing opens, and this says so. */
+    internal fun couldNotOpen() = toaster.show(COULD_NOT_OPEN, urgent = true)
+
     /** A signed-in child tapped someone else's tile. */
     internal fun refuseOtherWho(name: String) = toaster.show(cannotAddForOthers(name), urgent = true)
 
@@ -66,7 +71,7 @@ class RemindersActions @Inject constructor(
      * Adds [draft], or changes reminder [editing] to it, and says how it went. A draft the form would not let through is
      * [SaveResult.Invalid] before any PIN pad. A new one needs `reminders.add`, or `add.self` for themselves alone; a change
      * needs `change`, or `change.own` on one they made, and the add rule again when who it is for changed. A one-off whose
-     * time has passed is [SaveResult.Past] when new or when its time or day changed, so a waiting one's words can be corrected.
+     * time has passed, or whose day is before today, is [SaveResult.Past] when new or when its time or day changed, so a waiting one's words can be corrected.
      * [SaveResult.Cancelled]: the PIN pad was cancelled, or the person was refused and told so by a toast.
      */
     suspend fun save(editing: Long?, draft: ReminderDraft): SaveResult {
@@ -90,12 +95,12 @@ class RemindersActions @Inject constructor(
 
     private suspend fun find(id: Long): Reminder? = store.reminders.first().firstOrNull { it.id == id }
 
-    /** The day check is for a day the person picked: a waiting one-off keeps the day it has, even if that is past. */
+    /** A day more than a year ahead is refused; one before today (a form left open past midnight) is [SaveResult.Past], and a waiting one-off keeps the day it has. */
     private fun acceptable(draft: ReminderDraft, tidy: String, today: LocalDate, existing: Reminder?): Boolean {
         if (tidy.length !in 1..WORDS_MAX || draft.forPeople.isEmpty()) return false
         val once = draft.schedule as? Schedule.Once ?: return true
         val kept = (existing?.schedule as? Schedule.Once)?.date == once.date
-        return kept || once.date in today..today.plusYears(1)
+        return kept || once.date <= today.plusYears(1)
     }
 
     private suspend fun authoriseAdd(draft: ReminderDraft): Authorised? = access.authorise(

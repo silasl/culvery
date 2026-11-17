@@ -23,6 +23,21 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 import org.junit.Rule
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
+import org.robolectric.shadows.ShadowLog
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import uk.co.siland.culvery.capability.reminders.COULD_NOT_SAVE
+import uk.co.siland.culvery.capability.reminders.RemindersActions
+import uk.co.siland.culvery.capability.reminders.RemindersStore
+import uk.co.siland.culvery.capability.reminders.db.RemindersDatabase
+import uk.co.siland.culvery.core.access.test.FakeAccess
+import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.HouseholdZone
+import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
@@ -59,6 +74,7 @@ class ReminderSheetTest {
     private var closed = 0
     private var refused = 0
     private var result = SaveResult.Saved
+    private var failure: Exception? = null
 
     private fun form(childOnly: PersonId? = null) = ReminderForm(null, today, LocalTime.of(10, 0), childOnly)
 
@@ -73,8 +89,8 @@ class ReminderSheetTest {
                     editing = editing,
                     people = household,
                     childName = childName,
-                    save = { id, draft -> saved += id to draft; result },
-                    delete = { id -> deleted += id; true },
+                    save = { id, draft -> failure?.let { throw it }; saved += id to draft; result },
+                    delete = { id -> failure?.let { throw it }; deleted += id; true },
                     onRefusedWho = { refused++ },
                     onEdited = overlay::markEdited,
                     onClose = { closed++ },
@@ -226,5 +242,49 @@ class ReminderSheetTest {
         // The date grid is core's; its day cells are checked there.
         compose.onNodeWithTag("reminder_repeat_1").performClick()
         compose.assertAccessible()
+    }
+
+    @Test
+    fun aFailedSaveLogsItsClassShowsItsLineAndKeepsTheSheet() {
+        ShadowLog.clear()
+        failure = IllegalStateException("secret words")
+        show(form())
+        compose.onNodeWithTag("reminder_words").performTextInput("PE kit")
+        compose.onNodeWithTag("reminder_save").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText(COULD_NOT_SAVE).assertIsDisplayed()
+        assertThat(closed).isEqualTo(0)
+        compose.onNodeWithTag("reminder_save").assertIsEnabled()
+        assertThat(ShadowLog.getLogsForTag("Reminders").map { it.msg }).containsExactly("Couldn't save (IllegalStateException)")
+    }
+
+    @Test
+    fun aFailedDeleteLogsItsClassShowsItsLineAndKeepsTheSheet() {
+        ShadowLog.clear()
+        failure = IllegalStateException("secret words")
+        show(form(), existing = 7)
+        compose.onNodeWithTag("reminder_delete").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText(COULD_NOT_SAVE).assertIsDisplayed()
+        assertThat(closed).isEqualTo(0)
+        assertThat(ShadowLog.getLogsForTag("Reminders").map { it.msg }).containsExactly("Couldn't delete (IllegalStateException)")
+    }
+
+    @Test
+    fun aFailureToOpenLogsItsClassAndToasts() = runTest {
+        ShadowLog.clear()
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, RemindersDatabase::class.java).allowMainThreadQueries().build()
+        val householdDb = Room.inMemoryDatabaseBuilder(context, HouseholdDatabase::class.java).allowMainThreadQueries().build()
+        val toaster = RecordingToaster()
+        val actions = RemindersActions(
+            FakeAccess(null), RemindersStore(db), WallClock { throw IllegalStateException("secret words") }, HouseholdZone(HouseholdRepository(householdDb)), toaster, backgroundScope,
+        )
+        overlay.openReminder(null, actions, flowOf(emptyList()))
+        assertThat(overlay.content).isNull()
+        assertThat(toaster.shown).containsExactly("Couldn’t open the reminder — try again.")
+        assertThat(ShadowLog.getLogsForTag("Reminders").map { it.msg }.single()).isEqualTo("Couldn't open (IllegalStateException)")
+        db.close()
+        householdDb.close()
     }
 }

@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.reminders.ui
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import uk.co.siland.culvery.capability.reminders.COULD_NOT_SAVE
 import uk.co.siland.culvery.capability.reminders.LIST_FULL
 import uk.co.siland.culvery.capability.reminders.PICK_A_LATER_TIME
 import uk.co.siland.culvery.capability.reminders.Reminder
@@ -72,6 +74,7 @@ import uk.co.siland.culvery.core.ui.WhoOption
 import uk.co.siland.culvery.core.ui.lockedForWho
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
+private const val TAG = "Reminders"
 private const val TITLE = "Reminder"
 private const val WORDS_PLACEHOLDER = "What’s it for?"
 private const val SHOWS_AS_FAMILYS = "Shows as Family’s"
@@ -94,6 +97,8 @@ internal suspend fun OverlayHost.openReminder(id: Long?, actions: RemindersActio
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
+        Log.w(TAG, "Couldn't open (${e::class.simpleName})")
+        actions.couldNotOpen()
         return
     }
     if (generation != before) return
@@ -140,7 +145,7 @@ internal fun ReminderSheetHost(
     onClose: () -> Unit,
 ) {
     var line by remember(form) { mutableStateOf<String?>(null) }
-    val action = rememberSingleAction(form) { line = null }
+    val action = rememberSingleAction(form) { line = COULD_NOT_SAVE }
     // A save running counts as edited, so the idle close never cuts it off half done.
     val edited by rememberUpdatedState(onEdited)
     LaunchedEffect(form) { snapshotFlow { form.edited || action.busy }.collect { edited(it) } }
@@ -155,7 +160,16 @@ internal fun ReminderSheetHost(
             if (!action.busy && form.canSave) {
                 line = null
                 action.run {
-                    when (save(editing, form.toDraft())) {
+                    val result = try {
+                        save(editing, form.toDraft())
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Couldn't save (${e::class.simpleName})")
+                        line = COULD_NOT_SAVE
+                        return@run
+                    }
+                    when (result) {
                         SaveResult.Saved, SaveResult.Gone -> onClose()
                         SaveResult.Past -> line = PICK_A_LATER_TIME
                         SaveResult.Full -> line = LIST_FULL
@@ -164,7 +178,23 @@ internal fun ReminderSheetHost(
                 }
             }
         },
-        onDelete = { editing?.let { id -> action.run { if (delete(id)) onClose() } } },
+        onDelete = {
+            editing?.let { id ->
+                line = null
+                action.run {
+                    val gone = try {
+                        delete(id)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Couldn't delete (${e::class.simpleName})")
+                        line = COULD_NOT_SAVE
+                        return@run
+                    }
+                    if (gone) onClose()
+                }
+            }
+        },
         onClose = onClose,
         onRefusedWho = onRefusedWho,
     )
