@@ -27,7 +27,7 @@ sealed interface EventSpan {
     data class AllDay(val first: LocalDate, val endExclusive: LocalDate) : EventSpan
 }
 
-enum class ClockField { Hour, Minute }
+typealias ClockField = uk.co.siland.culvery.core.ui.ClockField
 
 /** Starts, Ends and All day (9c §3); [endDays] is the end's date minus the start's (all day: last day minus first), and the end is always after the start. */
 data class EventWhen(

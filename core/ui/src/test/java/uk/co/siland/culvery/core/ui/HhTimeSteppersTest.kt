@@ -1,4 +1,4 @@
-package uk.co.siland.culvery.capability.calendar.ui
+package uk.co.siland.culvery.core.ui
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,13 +23,11 @@ import java.time.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.culvery.capability.calendar.ClockField
-import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.isReadAsOne
 
 @RunWith(AndroidJUnit4::class)
-class TimeSteppersTest {
+class HhTimeSteppersTest {
     @get:Rule val compose = createComposeRule()
 
     private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
@@ -44,7 +42,7 @@ class TimeSteppersTest {
         time = initial
         compose.setContent {
             CulveryTheme(dark = true) {
-                TimeSteppers(
+                HhTimeSteppers(
                     time, prefix,
                     onStep = { field, up ->
                         stepped += field to up

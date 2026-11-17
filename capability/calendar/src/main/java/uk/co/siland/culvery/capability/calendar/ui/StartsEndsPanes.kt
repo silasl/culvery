@@ -35,6 +35,7 @@ import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhTimeSteppers
 import uk.co.siland.culvery.core.ui.Icons
 
 internal const val STARTS_DATE_QUESTION = "Which day does it start?"
@@ -132,7 +133,7 @@ private fun WhenTimePane(
     onFreeStart: (LocalTime) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap), modifier = Modifier.testTag(tag)) {
-        TimeSteppers(clock, stepperPrefix, onStep = onStep, enabled = enabled, modifier = Modifier.fillMaxWidth())
+        HhTimeSteppers(clock, stepperPrefix, onStep = onStep, enabled = enabled, modifier = Modifier.fillMaxWidth())
         WhenClash(eventWhen, context, onFreeStart)
     }
 }

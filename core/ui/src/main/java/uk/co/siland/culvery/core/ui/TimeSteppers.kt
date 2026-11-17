@@ -1,4 +1,4 @@
-package uk.co.siland.culvery.capability.calendar.ui
+package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,24 +25,35 @@ import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.time.LocalTime
-import uk.co.siland.culvery.capability.calendar.ClockField
-import uk.co.siland.culvery.core.ui.ButtonSurface
-import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhAlpha
-import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.NOT_AVAILABLE
-import uk.co.siland.culvery.core.ui.hhClickable
-import uk.co.siland.culvery.core.ui.quietFill
-import uk.co.siland.culvery.core.ui.readAsOne
+
+enum class ClockField { Hour, Minute }
+
+/** The time picker's sizes: 88 × 52 buttons radius 18 with a 32 icon, 8 above and below a 72 sp value, 14 either side of the colon. */
+object TimeStepperTokens {
+    val columnGap = 14.dp
+    val width = 88.dp
+    val height = 52.dp
+    val radius = 18.dp
+    val icon = 32.dp
+    val gap = 8.dp
+    val colonBottom = 10.dp
+
+    /** 72 sp / 600, tabular, −2 tracking, line height 1: the hour and minute. */
+    val value = HhType.headerValue.copy(fontSize = 72.sp, letterSpacing = (-2).sp, lineHeight = 72.sp)
+
+    /** 64 sp / 600: the ":" between them. */
+    val colon = HhType.headerValue.copy(fontSize = 64.sp)
+}
 
 /**
  * Hour and minute steppers around a colon, on a `surf` card. [onStep] says which field moved and which way; the caller does the
  * arithmetic. A button [enabled] says false for is dimmed, cannot be pressed and is spoken as "not available".
  */
 @Composable
-internal fun TimeSteppers(
+fun HhTimeSteppers(
     time: LocalTime,
     tagPrefix: String = "",
     onStep: (ClockField, Boolean) -> Unit,
@@ -51,13 +62,13 @@ internal fun TimeSteppers(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeColumnGap, Alignment.CenterHorizontally),
+        horizontalArrangement = Arrangement.spacedBy(TimeStepperTokens.columnGap, Alignment.CenterHorizontally),
         modifier = modifier,
     ) {
         Stepper(time.hour, "${tagPrefix}hour", "Hour", ClockField.Hour, onStep, enabled)
         Text(
-            ":", style = CalendarType.timeColon, color = Culvery.colors.ink,
-            modifier = Modifier.padding(bottom = CalendarDimens.colonBottom).semantics { hideFromAccessibility() },
+            ":", style = TimeStepperTokens.colon, color = Culvery.colors.ink,
+            modifier = Modifier.padding(bottom = TimeStepperTokens.colonBottom).semantics { hideFromAccessibility() },
         )
         Stepper(time.minute, "${tagPrefix}minute", "Minute", ClockField.Minute, onStep, enabled)
     }
@@ -77,13 +88,13 @@ private fun Stepper(
     // Read up, value, down, then the next column.
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(CalendarDimens.stepperGap),
+        verticalArrangement = Arrangement.spacedBy(TimeStepperTokens.gap),
         modifier = Modifier.readAsOne(),
     ) {
         StepButton(Icons.EXPAND_LESS, "${tag}_up", "$name up", enabled(field, true)) { stepped = true; onStep(field, true) }
         Text(
             value.toString().padStart(2, '0'),
-            style = CalendarType.timeValue,
+            style = TimeStepperTokens.value,
             color = c.ink,
             // "Hour 7", not "zero seven"; spoken as it changes, not as the picker opens.
             modifier = Modifier.testTag("${tag}_value").semantics {
@@ -103,13 +114,13 @@ private fun StepButton(icon: String, tag: String, label: String, enabled: Boolea
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .testTag(tag)
-            .size(CalendarDimens.stepperWidth, CalendarDimens.stepperHeight)
+            .size(TimeStepperTokens.width, TimeStepperTokens.height)
             .alpha(if (enabled) 1f else HhAlpha.PAST_DAY)
-            .clip(RoundedCornerShape(CalendarDimens.stepperRadius))
+            .clip(RoundedCornerShape(TimeStepperTokens.radius))
             .background(quietFill(ButtonSurface.Surf, c))
             .hhClickable(onClick, enabled = enabled)
             .semantics { if (!enabled) stateDescription = NOT_AVAILABLE },
     ) {
-        HhIcon(icon, size = CalendarDimens.stepperIcon, tint = c.ink, contentDescription = label)
+        HhIcon(icon, size = TimeStepperTokens.icon, tint = c.ink, contentDescription = label)
     }
 }

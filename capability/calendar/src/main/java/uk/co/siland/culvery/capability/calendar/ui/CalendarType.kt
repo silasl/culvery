@@ -78,12 +78,6 @@ internal object CalendarType {
     /** 14 sp / 400: explanation card text. */
     val noteBody = HhType.secondary
 
-    /** 72 sp / 600, tabular, −2 tracking, line height 1: the time picker's hour and minute. */
-    val timeValue = HhType.headerValue.copy(fontSize = 72.sp, letterSpacing = (-2).sp, lineHeight = 72.sp)
-
-    /** 64 sp / 600: the ":" between them. */
-    val timeColon = HhType.headerValue.copy(fontSize = 64.sp)
-
     /** 22 sp / 700: "Connecting to Google Calendar…" and Settings' "Calendars" (3a design §4). */
     val blockTitle = HhType.sectionTitle
 
@@ -116,15 +110,6 @@ internal object CalendarType {
     /** 27 sp / 700 and 15 sp / 700: the pane's question and its Skip. */
     val paneQuestion = HhType.screenTitle.copy(fontSize = 27.sp)
     val paneSkip = HhType.buttonLabel
-
-    /** 28 sp / 700, 20 sp / 700 and 13 sp: a Who tile's initial, name and role (handoff 6b). */
-    val whoInitial = HhType.dateNumber.copy(fontSize = 28.sp)
-    val whoName = HhType.sectionTitle.copy(fontSize = 20.sp)
-    val whoRole = HhType.secondary.copy(fontSize = 13.sp)
-
-    /** 19 sp / 700 and 14 sp: "Everyone" and "Shows as a Family event". */
-    val everyoneName = HhType.cardTitle
-    val everyoneLine = HhType.secondary
 
     /** 14 sp: the line under the Who pane. */
     val whoHint = HhType.secondary
@@ -218,28 +203,6 @@ internal object EditorDimens {
     val bannerPadding = 15.dp
     val bannerIcon = 20.dp
     val bannerGap = 10.dp
-
-    // Who tiles: three a row, 13 apart, 160 tall, radius 20; a 64 circle 8 above the name, the role 8 below it. Chosen, a
-    // 3 ring inside and a 32 badge 11 in from the top right; locked, a 20 lock 11 in from the top left.
-    val tileGap = 13.dp
-    val tileHeight = 160.dp
-    val tileRadius = 20.dp
-    val tileCircle = 64.dp
-    val tileInnerGap = 8.dp
-    val tileRing = 3.dp
-    val tileBadge = 32.dp
-    val tileBadgeIcon = 21.dp
-    val tileCorner = 11.dp
-    val tileLock = 20.dp
-
-    // The Everyone row: 69 tall, radius 19, 19 in at the sides, a 40 Family circle with a 24 icon 13 before the words.
-    val everyoneHeight = 69.dp
-    val everyoneRadius = 19.dp
-    val everyonePaddingH = 19.dp
-    val everyoneGap = 13.dp
-    val everyoneCircle = 40.dp
-    val everyoneIcon = 24.dp
-    val everyoneLineGap = 1.dp
 
     // The Day pane: quick picks 8 apart; the month grid's own numbers are core:ui's DateGridTokens.
     val quickGap = 8.dp
@@ -369,8 +332,6 @@ internal object CalendarDimens {
     // A shared event's chip (9 §3.3): `surf2`, a 4 dp striped edge, content 12 from the chip's left, overlapping
     // 8 dp dots 2 dp over each other with a 1 dp ring in the surface behind; the detail sheet's For row uses the same overlap.
     val sharedChipEdge = 4.dp
-    /** The outline of a stripe whose ink is too dark to see on the chip (night black). */
-    val stripeEdge = 1.dp
     val sharedChipPaddingStart = 12.dp
     val sharedDot = 8.dp
     val sharedDotOverlap = 2.dp
@@ -423,17 +384,9 @@ internal object CalendarDimens {
     // The confirm card's delete icon.
     val footerIcon = 24.dp
 
-    // The time steppers (hand-off §7 and Culvery.dc.html), and the picker card's radius 30 and padding 26: the columns
-    // 14 apart; steppers 88×52, radius 18, a 32 dp icon, 8 from the value; ":" 10 above the baseline.
+    // The picker card (hand-off §7): radius 30, padding 26; its steppers are core:ui's TimeStepperTokens.
     val pickerRadius = 30.dp
     val pickerPadding = 26.dp
-    val timeColumnGap = 14.dp
-    val stepperWidth = 88.dp
-    val stepperHeight = 52.dp
-    val stepperRadius = 18.dp
-    val stepperIcon = 32.dp
-    val stepperGap = 8.dp
-    val colonBottom = 10.dp
 
     // The failure card: radius 18, padding 14×16, the icon 12 from the text; `cloud_off` 24 dp, the body 2 below its title.
     val editorCardRadius = 18.dp

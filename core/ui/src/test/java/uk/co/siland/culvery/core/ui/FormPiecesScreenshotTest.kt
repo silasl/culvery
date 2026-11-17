@@ -4,10 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.time.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,4 +77,25 @@ class FormPiecesScreenshotTest {
     @Test fun toastActionDark() = snapToast("toast_action_dark", true)
 
     @Test fun toastActionLight() = snapToast("toast_action_light", false)
+
+    private fun snapPicker(name: String, content: @Composable () -> Unit) {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Column(Modifier.testTag("shot").background(Culvery.colors.bg).padding(16.dp).width(549.dp)) { content() }
+            }
+        }
+        compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
+    }
+
+    @Test fun whoPickerDark() = snapPicker("who_picker_dark") {
+        HhWhoPicker(
+            options = SampleWho.options, chosen = setOf("sam", "mia"), everyone = false,
+            everyoneLine = "Shows as a Family event", everyoneColour = SampleWho.FAMILY,
+            locked = { it == "alex" }, enabled = true, onPick = {}, onRefused = {},
+        )
+    }
+
+    @Test fun timeSteppersDark() = snapPicker("time_steppers_dark") {
+        HhTimeSteppers(LocalTime.of(7, 5), onStep = { _, _ -> }, enabled = { field, up -> !(field == ClockField.Hour && up) }, modifier = Modifier.fillMaxWidth())
+    }
 }

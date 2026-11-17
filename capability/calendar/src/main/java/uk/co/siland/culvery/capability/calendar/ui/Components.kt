@@ -7,11 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,28 +18,16 @@ import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhStripedBar
 import uk.co.siland.culvery.core.ui.Icons
 
-/** One band of a [StripedBar]: [fill], outlined in [edge] when it has one. */
-internal data class Stripe(val fill: Color, val edge: Color? = null)
+internal typealias Stripe = uk.co.siland.culvery.core.ui.Stripe
 
-/** An event's colour bar: [stripes] in equal bands along its length, the first at the top (9 §3.4); fills the row's intrinsic height. */
+/** An event's colour bar: [stripes] in equal bands along its length, the first at the top (9 §3.4). */
 @JvmName("StripedBarOfStripes")
 @Composable
-internal fun StripedBar(stripes: List<Stripe>, width: Dp, modifier: Modifier = Modifier, radius: Dp = width / 2) {
-    Column(
-        modifier
-            .width(width)
-            .fillMaxHeight()
-            .clip(RoundedCornerShape(radius))
-            .testTag("event_bar"),
-    ) {
-        stripes.forEach { stripe ->
-            val band = Modifier.fillMaxWidth().weight(1f).background(stripe.fill)
-            Box(stripe.edge?.let { band.border(CalendarDimens.stripeEdge, it) } ?: band)
-        }
-    }
-}
+internal fun StripedBar(stripes: List<Stripe>, width: Dp, modifier: Modifier = Modifier, radius: Dp = width / 2) =
+    HhStripedBar(stripes, width, modifier, radius)
 
 /** [StripedBar] in plain [colors]. */
 @Composable
