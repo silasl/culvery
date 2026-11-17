@@ -44,6 +44,7 @@ The open work, one number each; the details are in the sections below. Numbers n
 29. The thermostat as an everyday control.
 30. Narrowing the Home Assistant token's reach.
 31. Ring through Home Assistant.
+41. Reminders from a phone or Google, and "remind us" on a calendar event (see "Plan 22 (Reminders) not in this build").
 
 ## From Plan 1 (deferred)
 
@@ -1056,6 +1057,16 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - A real sleigh-bell recording (item 9).
 - Sound pads on Sonos (item 7).
 - Birthdays overriding a doorbell set to one sound (item 10).
+
+## Plan 22 (Reminders) not in this build, on purpose
+Spec `docs/superpowers/specs/2026-11-17-culvery-22-reminders-design.md`. Item 41 covers the first two.
+- Reminders made on a phone or read from Google. The route weighed: a "Reminders" calendar in the house account, each event a reminder at its start time. Google Tasks keeps a due date but no time, and Google's own event reminders belong to each account.
+- "Remind us" on a calendar event.
+- Monthly or yearly repeats (a reminder is once, or weekly on chosen days).
+- A sound chosen per reminder, a chime that repeats, or a spoken reminder.
+- Anything drawn on the night clock or the dark screen (Plan 8's ruling stands).
+- Reminders shown on the calendar or on a Home card.
+- Night-holding in the alert layer for every capability (see "From Plan 8"). Reminders applies its own rules.
 
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
