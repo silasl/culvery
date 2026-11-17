@@ -114,7 +114,7 @@ class RemindersEngine internal constructor(
             block()
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "A pass failed (${e::class.simpleName})")
         }
     }
@@ -155,8 +155,9 @@ class RemindersEngine internal constructor(
         lastHeld = why
 
         val owed = open.filter { it.withMark().chimeOwed(now, state.heldEndedAtMillis) }.map { it.key }
-        if (live != null && owed.any { it !in lastOwed }) host.wake()
-        lastOwed = owed.toSet()
+        // Only a card that was up has seen what is owed; waking is for the day.
+        if (live != null && wall.night == false && owed.any { it !in lastOwed }) host.wake()
+        lastOwed = if (live != null) owed.toSet() else emptySet()
         if (live != null && owed.isNotEmpty() && soundAllowed(wall)) pay(live, owed, now)
     }
 

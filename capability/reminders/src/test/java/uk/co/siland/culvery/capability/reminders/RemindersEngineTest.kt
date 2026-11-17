@@ -93,12 +93,14 @@ class RemindersEngineTest {
         val chimes = mutableListOf<Float>()
         var chimeResult = PadStart.STARTED
         var chimeThrows = 0
+        var chimeError: Error? = null
         var onDuck: (() -> Unit)? = null
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val engine = RemindersEngine(
             store, DuckingHost(fake) { onDuck?.invoke() }, minutes, { nowMillis }, { zone }, setup, holiday, NightHours { night }, lit, door,
             { volume ->
                 chimes += volume
+                chimeError?.let { chimeError = null; throw it }
                 if (chimeThrows > 0) {
                     chimeThrows--
                     error("chime")
@@ -483,6 +485,63 @@ class RemindersEngineTest {
         assertThat(rig.engine.waiting.value.map { it.key }).containsExactly(mine(first), mine(second))
         assertThat(rig.engine.showing.value!!.of).isEqualTo(2)
         assertThat(store.reminders.first().map { it.chimedAtMillis }).containsExactly(at("2026-11-18T07:30:00"), at("2026-11-18T07:31:00"))
+    }
+
+    @Test
+    fun nightEndingOnADarkWallWakesItAndChimesOnceLit() = runTest {
+        nowMillis = at("2026-11-18T06:00:00")
+        val rig = Rig().also { it.night = true; it.lit.value = false; it.start() }
+        add("2026-11-18T06:45:00")
+        rig.tick("2026-11-18T06:45:00")
+        assertThat(rig.engine.showing.value).isNull()
+        val wakes = rig.fake.wakes
+        rig.night = false
+        rig.tick("2026-11-18T07:00:00")
+        assertThat(rig.engine.showing.value).isNotNull()
+        assertThat(rig.fake.wakes).isGreaterThan(wakes)
+        assertThat(rig.chimes).isEmpty()
+        rig.lit.value = true
+        assertThat(rig.chimes).hasSize(1)
+    }
+
+    @Test
+    fun holidayEndingOnADarkWallWakesItAndChimesOnceLit() = runTest {
+        val rig = Rig().also { it.holiday.value = true; it.lit.value = false; it.start() }
+        add("2026-11-18T07:30:00")
+        rig.tick("2026-11-18T07:30:00")
+        assertThat(rig.engine.showing.value).isNull()
+        val wakes = rig.fake.wakes
+        rig.holiday.value = false
+        assertThat(rig.engine.showing.value).isNotNull()
+        assertThat(rig.fake.wakes).isGreaterThan(wakes)
+        assertThat(rig.chimes).isEmpty()
+        rig.lit.value = true
+        assertThat(rig.chimes).hasSize(1)
+    }
+
+    @Test
+    fun aTapAtNightWithANewlyOwedTimeDoesNotWake() = runTest {
+        nowMillis = at("2026-11-18T06:00:00")
+        val rig = Rig().also { it.night = true; it.lit.value = true; it.start() }
+        add("2026-11-18T06:45:00")
+        rig.tick("2026-11-18T06:45:00")
+        assertThat(rig.engine.showing.value).isNotNull()
+        assertThat(rig.fake.wakes).isEqualTo(0)
+        assertThat(rig.chimes).isEmpty()
+    }
+
+    @Test
+    fun anErrorInAPassIsLoggedAndTheEngineKeepsRunning() = runTest {
+        val rig = Rig().also { it.start() }
+        rig.chimeError = AssertionError("chime")
+        add("2026-11-18T07:30:00")
+        rig.tick("2026-11-18T07:30:00")
+        assertThat(logs()).contains("A pass failed (AssertionError)")
+        val second = add("2026-11-18T07:31:00", "Swimming bag")
+        rig.tick("2026-11-18T07:31:00")
+        assertThat(rig.engine.waiting.value.map { it.key }).contains(mine(second))
+        assertThat(rig.chimes).isNotEmpty()
+        assertThat(store.reminders.first().map { it.chimedAtMillis }).doesNotContain(null)
     }
 
     @Test
