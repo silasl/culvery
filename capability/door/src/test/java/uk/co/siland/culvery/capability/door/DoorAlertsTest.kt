@@ -251,6 +251,33 @@ class DoorAlertsTest {
         assertThat(seen).containsExactly(1L)
     }
 
+    /** Fails if the card's close takes the layer from an alert another owner put there. */
+    @Test
+    fun aCloseAfterAnotherAlertTookTheLayerRemovesNothing() = runTest {
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        val other = host.show {}
+        advanceTimeBy(CARD_MS)
+        runCurrent()
+        assertThat(alerts.showing.value).isNull()
+        assertThat(other.showing.value).isTrue()
+        assertThat(host.showing.value).isTrue()
+        assertThat(host.dismissed).isEqualTo(0)
+    }
+
+    /** Fails if a ring leaves a quiet alert on the layer, or the card it raises is quiet or lets the wall sleep. */
+    @Test
+    fun aRingTakesTheLayerFromAnotherOwner() = runTest {
+        val alerts = alerts()
+        val other = host.showIfFree {}!!
+        alerts.onRecorded(rung(1))
+        assertThat(other.showing.value).isFalse()
+        assertThat(alerts.showing.value?.eventId).isEqualTo(1)
+        assertThat(host.loud).isTrue()
+        assertThat(host.holdsAwake).isTrue()
+        assertThat(host.shown).isEqualTo(2)
+    }
+
     /** 5 §2.6: in quiet hours the card still shows; no chime. 22:00 BST. */
     @Test
     fun quietHoursKeepTheCardButNotTheChime() = runTest {

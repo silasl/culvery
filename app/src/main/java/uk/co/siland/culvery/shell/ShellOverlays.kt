@@ -15,13 +15,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import uk.co.siland.culvery.core.plugin.AlertHandle
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.AlertQuieter
 import uk.co.siland.culvery.core.plugin.ApplicationScope
@@ -88,8 +94,9 @@ class OverlayState : OverlayHost {
 /**
  * The app's [AlertHost]: the content the alert layer draws, whether the screen it observes is resumed ([inFront], for
  * alerts) or started ([shown], for the display's states and brightness), and the quieters
- * a loud alert runs (6 §3.3). Each quiet or restore pass starts after the one before, so a restore never overtakes the
- * quiet it undoes.
+ * a loud alert runs (6 §3.3). Each quiet or restore pass, a duck's included, starts after the one before, so a restore
+ * never overtakes the quiet it undoes. The content, the current handle, [holds] and the passes change under one lock, so
+ * a handle's dismiss never takes a newer alert.
  */
 @Singleton
 class ShellAlerts @Inject constructor(
@@ -113,37 +120,97 @@ class ShellAlerts @Inject constructor(
     private val _lowered = MutableStateFlow(false)
     override val lowered: StateFlow<Boolean> = _lowered.asStateFlow()
 
+    private val _holds = MutableStateFlow(false)
+
+    /** True while the alert showing holds the wall awake: any alert but one shown with `holdsAwake = false`. */
+    val holds: StateFlow<Boolean> = _holds.asStateFlow()
+
+    private val _wakes = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** One per [wake]; hot and never replayed. */
+    val wakes: SharedFlow<Unit> = _wakes.asSharedFlow()
+
     private val lock = Any()
+    private var current: Handle? = null
     private var loud = false
+    private var duckDue = 0
     private var passNumber = 0
     private var lastPass: Job = Job().apply { complete() }
     private var quietened: Deferred<Unit> = CompletableDeferred(Unit)
 
-    override fun show(loud: Boolean, content: @Composable () -> Unit) {
-        synchronized(lock) {
-            _content.value = content
-            _showing.value = true
-            if (loud && !this.loud) startQuiet() else if (!loud && this.loud) startRestore()
-            this.loud = loud
+    private inner class Handle : AlertHandle {
+        private val _showing = MutableStateFlow(true)
+        override val showing: StateFlow<Boolean> = _showing.asStateFlow()
+
+        fun end() {
+            _showing.value = false
+        }
+
+        override fun dismiss() {
+            synchronized(lock) { if (current === this) clear() }
         }
     }
+
+    override fun show(loud: Boolean, holdsAwake: Boolean, content: @Composable () -> Unit): AlertHandle =
+        synchronized(lock) { install(loud, holdsAwake, content) }
+
+    override fun showIfFree(holdsAwake: Boolean, content: @Composable () -> Unit): AlertHandle? =
+        synchronized(lock) { if (current != null) null else install(loud = false, holdsAwake, content) }
 
     override suspend fun quieted() {
         synchronized(lock) { quietened }.await()
     }
 
-    override fun dismiss() {
-        synchronized(lock) {
-            _content.value = null
-            _showing.value = false
-            if (loud) startRestore()
-            loud = false
+    override fun wake() {
+        _wakes.tryEmit(Unit)
+    }
+
+    override suspend fun duck(forMillis: Long) {
+        val quiet = synchronized(lock) {
+            if (loud) return
+            val before = lastPass
+            val pass = scope.launch {
+                before.join()
+                runAll { it.quiet() }
+            }
+            lastPass = pass
+            val due = ++duckDue
+            scope.launch {
+                delay(forMillis)
+                synchronized(lock) { if (due == duckDue) startRestorePass() }
+            }
+            pass
         }
+        withTimeoutOrNull(QUIET_CAP_MS) { quiet.join() }
+    }
+
+    private fun install(loud: Boolean, holdsAwake: Boolean, content: @Composable () -> Unit): AlertHandle {
+        current?.end()
+        val handle = Handle()
+        current = handle
+        _content.value = content
+        _showing.value = true
+        _holds.value = holdsAwake
+        if (loud && !this.loud) startQuiet() else if (!loud && this.loud) startRestore()
+        this.loud = loud
+        return handle
+    }
+
+    private fun clear() {
+        current?.end()
+        current = null
+        _content.value = null
+        _showing.value = false
+        _holds.value = false
+        if (loud) startRestore()
+        loud = false
     }
 
     private fun startQuiet() {
         val before = lastPass
         val number = ++passNumber
+        // The loud alert's own restore covers a duck still waiting to restore.
+        duckDue++
         _lowered.value = false
         val pass = scope.launch {
             before.join()
@@ -159,12 +226,16 @@ class ShellAlerts @Inject constructor(
     private fun startRestore() {
         passNumber++
         _lowered.value = false
+        startRestorePass()
+        quietened = CompletableDeferred(Unit)
+    }
+
+    private fun startRestorePass() {
         val before = lastPass
         lastPass = scope.launch {
             before.join()
             runAll { it.restore() }
         }
-        quietened = CompletableDeferred(Unit)
     }
 
     /** Every quieter at once; one that fails is logged and the others go on. */

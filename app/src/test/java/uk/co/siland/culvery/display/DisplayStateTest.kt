@@ -5,6 +5,7 @@ import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -41,7 +42,8 @@ private class Wall(
     val holiday = MutableStateFlow<Boolean?>(null)
     val exit = KioskExit()
     val resumed = MutableStateFlow(inFront)
-    val display = DisplayState(this.prefs, now, touches, this.inFront, this.camera, holiday, exit.exited, test.backgroundScope)
+    val alertWakes = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val display = DisplayState(this.prefs, now, touches, this.inFront, this.camera, holiday, exit.exited, alertWakes, test.backgroundScope)
     val lit = ScreenLitState().also { ScreenLitFeed(resumed, display.screen, it, test.backgroundScope).start() }
     var wakes = 0
         private set
@@ -77,6 +79,11 @@ private class Wall(
 
     fun move() {
         display.moved()
+        test.runCurrent()
+    }
+
+    fun alertWake() {
+        alertWakes.tryEmit(Unit)
         test.runCurrent()
     }
 
@@ -380,6 +387,41 @@ class DisplayStateTest {
         val wall = wall(at = DAY.atTime(23, 0))
         wall.move()
         assertThat(wall.screen).isEqualTo(NIGHT_CLOCK)
+    }
+
+    /** Fails if an alert's wake leaves a dark screen by day dark, counts as more than one wake, or leaves the wall awake for good. */
+    @Test
+    fun anAlertsWakeWakesADarkScreenByDayOnce() = runTest {
+        val wall = wall()
+        wall.asleep()
+        wall.alertWake()
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        assertThat(wall.wakes).isEqualTo(1)
+        wall.changesAt(FIVE_MINUTES, AWAKE, ASLEEP)
+    }
+
+    /** Fails if an alert's wake lights the night clock or a Holiday mode wall. */
+    @Test
+    fun anAlertsWakeNeverWakesTheNightClockOrHoliday() = runTest {
+        val night = wall(at = DAY.atTime(23, 0))
+        night.alertWake()
+        assertThat(night.screen).isEqualTo(NIGHT_CLOCK)
+        assertThat(night.wakes).isEqualTo(0)
+
+        val away = wall()
+        away.away(true)
+        away.alertWake()
+        assertThat(away.screen).isEqualTo(ASLEEP)
+        assertThat(away.wakes).isEqualTo(0)
+    }
+
+    /** Fails if an alert's wake on a lit wall leaves the sleep wait running from before it. */
+    @Test
+    fun anAlertsWakeOnALitWallRestartsTheWait() = runTest {
+        val wall = wall()
+        wall.after(FIVE_MINUTES - 1_000)
+        wall.alertWake()
+        wall.changesAt(FIVE_MINUTES, AWAKE, ASLEEP)
     }
 
     /** Fails if the clock returns under a hold at night, or doesn't follow a minute after it ends. */

@@ -18,6 +18,15 @@ interface AlertQuieter {
 /** A loud alert waits this long at most for the quieters before its own sound (6 §3.3). */
 const val QUIET_CAP_MS = 500L
 
+/** An owner's hold on the alert layer. */
+interface AlertHandle {
+    /** True while this alert is the one on the layer; false for good once it is replaced or dismissed. */
+    val showing: StateFlow<Boolean>
+
+    /** Takes this alert off the layer if it is still the one showing; nothing otherwise. */
+    fun dismiss()
+}
+
 /**
  * The alert layer (5 §3.3, §5.1): above sheets, Settings and the wizard, below the PIN pad. Unlike [OverlayHost.show], an
  * alert never replaces or closes the open sheet, and touching it is not a touch for the screens beneath, whose own
@@ -39,13 +48,24 @@ interface AlertHost {
     /**
      * Shows [content] on the alert layer, replacing any alert already there. A [loud] alert runs every [AlertQuieter]'s
      * quiet() while it shows and their restore() when it goes (6 §3.3); one replacing a loud alert runs nothing again.
+     * [holdsAwake] false: the wall's sleep timer runs as if the alert weren't there.
      */
-    fun show(loud: Boolean = false, content: @Composable () -> Unit)
+    fun show(loud: Boolean = false, holdsAwake: Boolean = true, content: @Composable () -> Unit): AlertHandle
+
+    /** A quiet alert onto an empty layer only: null, and nothing changed, while any alert shows. */
+    fun showIfFree(holdsAwake: Boolean = true, content: @Composable () -> Unit): AlertHandle?
 
     /** Returns once the quieters have finished for the loud alert showing, or [QUIET_CAP_MS] after it showed; at once otherwise. */
     suspend fun quieted()
 
-    fun dismiss()
+    /** Wakes a dark screen as someone moving in front of it would: by day and in front only, never the night clock or on Holiday mode. */
+    fun wake()
+
+    /**
+     * Turns the quieters down, returns once they finish or after [QUIET_CAP_MS], and restores them [forMillis] later. Nothing
+     * while a loud alert shows; a loud alert showing when the restore comes due keeps them down. Never sets [lowered].
+     */
+    suspend fun duck(forMillis: Long)
 }
 
 val LocalAlertHost = staticCompositionLocalOf<AlertHost> {

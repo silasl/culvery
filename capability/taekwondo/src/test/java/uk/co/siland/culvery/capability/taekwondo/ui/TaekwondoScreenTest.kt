@@ -310,13 +310,13 @@ class TaekwondoScreenTest {
             after(10_500)
             assertThat(open("move_korean")).isTrue()
 
-            compose.runOnIdle { alerts.show(loud = loud) {} }
+            val alert = compose.runOnIdle { alerts.show(loud = loud) {} }
             settle()
 
             assertThat(open("pattern_0")).isTrue()
             assertThat(open("move_korean")).isFalse()
             assertThat(speaker.stops).isAtLeast(1)
-            compose.runOnIdle { alerts.dismiss() }
+            compose.runOnIdle { alert.dismiss() }
             settle()
         }
     }

@@ -210,6 +210,7 @@ class MainActivity : ComponentActivity() {
             val now = shell.now.collectAsStateWithLifecycle()
             val toast by toasts.current.collectAsStateWithLifecycle()
             val alert by alerts.content.collectAsStateWithLifecycle()
+            val alertHolds by alerts.holds.collectAsStateWithLifecycle()
             val complete by setupComplete.collectAsStateWithLifecycle()
             val pinRequest by pinPrompt.request.collectAsStateWithLifecycle()
             val sessionEnds by access.expiresAt.collectAsStateWithLifecycle()
@@ -217,7 +218,7 @@ class MainActivity : ComponentActivity() {
             val running by presence.running.collectAsStateWithLifecycle()
             val overlay = remember { OverlayState() }
             val spot = remember { CameraMarkSpot() }
-            val held = holding(pinRequest != null, overlay.isShowing, alert != null, state.settingsOpen, complete)
+            val held = holding(pinRequest != null, overlay.isShowing, alertHolds, state.settingsOpen, complete)
             LaunchedEffect(held) { display.held(held) }
             CompositionLocalProvider(
                 LocalShellNavigator provides navigator,

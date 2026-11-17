@@ -17,6 +17,7 @@ import uk.co.siland.culvery.capability.door.ui.DoorCardHost
 import uk.co.siland.culvery.capability.door.ui.DoorCardUi
 import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.household.HouseholdZone
+import uk.co.siland.culvery.core.plugin.AlertHandle
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.NightHours
@@ -39,7 +40,8 @@ data class ShowingRing(val eventId: Long, val card: DoorCardUi)
  * The alert decision (5 §4.6–4.7). A new ring, or an unrecognised alert, while Culvery is in front raises the card or
  * refreshes it (a loud alert: the shell turns music down while it shows, 6 §3.3), restarts its 60 seconds (9 §2.4), and chimes unless it is quiet hours or the last chime that played was under 10 seconds ago.
  * A re-post of the card's own ring updates the card only. Motion, and anything while Culvery isn't in front, at night (8 §2.7), or while Holiday mode is on (11 §5.5), is
- * only stored. Every change to the card happens under one lock, so a close never takes a newer ring's card.
+ * only stored. Every change to the card happens under one lock, so a close never takes a newer ring's card, and the card
+ * closes by its own handle, so it never takes another owner's alert.
  * quieted() is awaited inside the lock, so a Got it tap in those 500 ms waits for them.
  */
 @Singleton
@@ -76,6 +78,7 @@ class DoorAlerts internal constructor(
     private val _showing = MutableStateFlow<ShowingRing?>(null)
     val showing: StateFlow<ShowingRing?> = _showing.asStateFlow()
     private var closing: Job? = null
+    private var handle: AlertHandle? = null
     private var lastChimeMillis: Long? = null
 
     suspend fun onRecorded(recorded: Recorded) = lock.withLock {
@@ -102,10 +105,10 @@ class DoorAlerts internal constructor(
             if (onHoliday) Log.w(TAG, "No card for a ring: Holiday mode was on")
             return@withLock
         }
-        val alreadyShowing = _showing.value != null
         _showing.value = ShowingRing(event.id, card)
         chime.hushPads()
-        if (!alreadyShowing) host.show(loud = true) { DoorCardHost(this@DoorAlerts) }
+        // The card's own handle going false means another owner took the layer: a ring takes it back.
+        if (handle?.showing?.value != true) handle = host.show(loud = true) { DoorCardHost(this@DoorAlerts) }
         closing?.cancel()
         closing = scope.launch {
             delay(CARD_MS)
@@ -149,6 +152,7 @@ class DoorAlerts internal constructor(
 
     private fun close() {
         _showing.value = null
-        host.dismiss()
+        handle?.dismiss()
+        handle = null
     }
 }

@@ -2,14 +2,12 @@ package uk.co.siland.culvery.capability.door
 
 import android.graphics.Bitmap
 import android.graphics.Color
-import androidx.compose.runtime.Composable
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.CoroutineContext
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +20,6 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
-import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.sound.PadStart
 import uk.co.siland.culvery.core.sound.Sound
 import uk.co.siland.culvery.core.sound.SoundLibrary
@@ -67,38 +64,7 @@ internal fun picture(width: Int, height: Int): Bitmap = Bitmap.createBitmap(widt
 
 internal fun File.names(): List<String> = listFiles()?.map { it.name }?.sorted().orEmpty()
 
-/** An alert host a test drives: whether Culvery is in front, and what was shown and dismissed. */
-internal class FakeAlertHost(inFront: Boolean = true) : AlertHost {
-    override val inFront = MutableStateFlow(inFront)
-    override val lowered = MutableStateFlow(false)
-    override val showing = MutableStateFlow(false)
-    @Volatile var shown = 0
-    @Volatile var dismissed = 0
-    var content: (@Composable () -> Unit)? = null
-
-    /** Whether the last show was loud. */
-    var loud: Boolean? = null
-
-    /** Holds quieted() until completed; null returns at once. */
-    var quietedGate: CompletableDeferred<Unit>? = null
-    var quietedCalls = 0
-
-    override fun show(loud: Boolean, content: @Composable () -> Unit) {
-        shown++
-        this.loud = loud
-        this.content = content
-    }
-
-    override suspend fun quieted() {
-        quietedCalls++
-        quietedGate?.await()
-    }
-
-    override fun dismiss() {
-        dismissed++
-        content = null
-    }
-}
+internal typealias FakeAlertHost = uk.co.siland.culvery.core.plugin.test.FakeAlertHost
 
 /** Records each play as the sound's id and the volume. */
 internal class FakeChime : Chime {

@@ -98,6 +98,7 @@ import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.access.ui.PinPadSheet
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.plugin.AlertHandle
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
 import uk.co.siland.culvery.core.plugin.Connection
@@ -360,11 +361,21 @@ class ShellScreenshotTest {
             override val lowered = MutableStateFlow(false)
             override val showing = MutableStateFlow(false)
 
-            override fun show(loud: Boolean, content: @Composable () -> Unit) = Unit
+            private val handle = object : AlertHandle {
+                override val showing = MutableStateFlow(false)
+
+                override fun dismiss() = Unit
+            }
+
+            override fun show(loud: Boolean, holdsAwake: Boolean, content: @Composable () -> Unit) = handle
+
+            override fun showIfFree(holdsAwake: Boolean, content: @Composable () -> Unit): AlertHandle? = handle
 
             override suspend fun quieted() = Unit
 
-            override fun dismiss() = Unit
+            override fun wake() = Unit
+
+            override suspend fun duck(forMillis: Long) = Unit
         }
         val checks = ShoppingChecks(store, sync, object : ScreenLit {
             override val lit = MutableStateFlow(false)

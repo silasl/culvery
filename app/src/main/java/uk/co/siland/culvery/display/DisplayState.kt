@@ -129,6 +129,7 @@ class DisplayState internal constructor(
     camera: StateFlow<CameraState>,
     holiday: StateFlow<Boolean?>,
     kioskExited: StateFlow<Boolean>,
+    alertWakes: Flow<Unit>,
     scope: CoroutineScope,
 ) : NightHours {
     @Inject
@@ -141,7 +142,7 @@ class DisplayState internal constructor(
         house: HouseMode,
         kioskExit: KioskExit,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(settings.read, clock.now, activity.touches, alerts.shown, camera.state, house.holiday, kioskExit.exited, scope)
+    ) : this(settings.read, clock.now, activity.touches, alerts.shown, camera.state, house.holiday, kioskExit.exited, alerts.wakes, scope)
 
     private val lock = Any()
     private val state = MutableStateFlow(next(START, prefs.value, now.value, shown.value, holiday.value))
@@ -169,6 +170,9 @@ class DisplayState internal constructor(
         }
         scope.launch {
             touches.drop(1).collect { if (state.value.screen == Screen.AWAKE) activity.tryEmit(Unit) }
+        }
+        scope.launch {
+            alertWakes.collect { moved() }
         }
         scope.launch {
             state.map { it.waiting() }.distinctUntilChanged().collectLatest { wait ->

@@ -18,8 +18,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -55,6 +57,8 @@ import uk.co.siland.culvery.shell.ShellAlerts
 import uk.co.siland.culvery.shell.SunToday
 import uk.co.siland.culvery.shell.ui.ShellLayers
 
+private const val FIVE_MINUTES = 300_000L
+private val NOON = LocalDateTime.of(2026, 10, 19, 12, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
 private val ELEVEN_PM = LocalDateTime.of(2026, 10, 19, 23, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
 
 /** A camera the test opens and fails by hand. */
@@ -85,7 +89,7 @@ class DisplayWiringTest {
     @Test
     fun eachShownThingHoldsTheScreen() {
         fun held(pin: Boolean = false, sheet: Boolean = false, alert: Boolean = false, settings: Boolean = false, complete: Boolean? = true) =
-            holding(pinShowing = pin, sheetShowing = sheet, alertShowing = alert, settingsOpen = settings, complete = complete)
+            holding(pinShowing = pin, sheetShowing = sheet, alertHolds = alert, settingsOpen = settings, complete = complete)
         assertThat(held()).isFalse()
         assertThat(held(pin = true)).isTrue()
         assertThat(held(sheet = true)).isTrue()
@@ -106,11 +110,12 @@ class DisplayWiringTest {
             MutableStateFlow(CameraState.ALLOWED),
             MutableStateFlow(null),
             MutableStateFlow(false),
+            emptyFlow(),
             backgroundScope,
         )
         runCurrent()
         assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
-        display.held(holding(pinShowing = false, sheetShowing = false, alertShowing = false, settingsOpen = false, complete = null))
+        display.held(holding(pinShowing = false, sheetShowing = false, alertHolds = false, settingsOpen = false, complete = null))
         runCurrent()
         assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
         advanceTimeBy(NIGHT_AWAKE_MS)
@@ -118,15 +123,15 @@ class DisplayWiringTest {
         assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
     }
 
-    /** The display's pieces as Hilt builds them, over the real alert host and a screen the test moves through its lifecycle, at 23:00. */
-    private inner class Wired(scope: CoroutineScope) {
+    /** The display's pieces as Hilt builds them, over the real alert host and a screen the test moves through its lifecycle, at 23:00 unless told otherwise. */
+    private inner class Wired(scope: CoroutineScope, at: Long = ELEVEN_PM) {
         val alerts = ShellAlerts(emptySet(), scope)
         private val owner = object : LifecycleOwner {
             val registry = LifecycleRegistry.createUnsafe(this)
             override val lifecycle: Lifecycle get() = registry
         }
         private val settings = displaySettings(folder.root, scope)
-        private val clock = HouseholdClock(flowOf(ZoneOffset.UTC), { 0L }, scope, flowOf(ELEVEN_PM))
+        private val clock = HouseholdClock(flowOf(ZoneOffset.UTC), { 0L }, scope, flowOf(at))
         val display = DisplayState(settings, clock, FakeUserActivity(), alerts, CameraAccess({ true }, { true }, settings, scope), object : HouseMode { override val holiday = MutableStateFlow<Boolean?>(null) }, KioskExit(), scope)
         val brightness = ScreenBrightness(display, alerts, clock, SunToday(null, scope), settings, scope)
 
@@ -135,6 +140,11 @@ class DisplayWiringTest {
         }
 
         fun lifecycle(vararg events: Lifecycle.Event) = events.forEach(owner.registry::handleLifecycleEvent)
+
+        /** What MainActivity does with the alert layer: the wall is held while the alert showing holds it. */
+        fun holdWhileAnAlertHolds(scope: CoroutineScope) {
+            scope.launch { alerts.holds.collect { display.held(holding(false, false, alertHolds = it, settingsOpen = false, complete = true)) } }
+        }
     }
 
     /** Resumed at night with the settings read. */
@@ -143,6 +153,52 @@ class DisplayWiringTest {
         lifecycle(Lifecycle.Event.ON_CREATE, Lifecycle.Event.ON_START, Lifecycle.Event.ON_RESUME)
         runCurrent()
         assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+    }
+
+    /** Resumed by day with the settings read and the alert layer holding the wall as the app does. */
+    private suspend fun TestScope.wiredAtNoon() = Wired(backgroundScope, at = NOON).apply {
+        display.night.first { it == false }
+        lifecycle(Lifecycle.Event.ON_CREATE, Lifecycle.Event.ON_START, Lifecycle.Event.ON_RESUME)
+        holdWhileAnAlertHolds(backgroundScope)
+        runCurrent()
+        assertThat(display.screen.value).isEqualTo(Screen.AWAKE)
+    }
+
+    /** Fails if an alert shown not to hold the wall still keeps it awake by day, or leaves the alert off the layer. */
+    @Test
+    fun aNonHoldingAlertLetsTheWallSleepByDay() = runTest {
+        val wired = wiredAtNoon()
+        wired.alerts.showIfFree(holdsAwake = false) {}
+        runCurrent()
+        advanceTimeBy(FIVE_MINUTES)
+        runCurrent()
+        assertThat(wired.display.screen.value).isEqualTo(Screen.ASLEEP)
+        assertThat(wired.alerts.showing.value).isTrue()
+    }
+
+    /** Fails if an alert shown not to hold the wall keeps the night clock away once the minute awake is over. */
+    @Test
+    fun aNonHoldingAlertLetsTheNightClockReturn() = runTest {
+        val wired = wiredAtNight()
+        wired.holdWhileAnAlertHolds(backgroundScope)
+        wired.alerts.showIfFree(holdsAwake = false) {}
+        wired.display.tapped()
+        runCurrent()
+        assertThat(wired.display.screen.value).isEqualTo(Screen.AWAKE)
+        advanceTimeBy(NIGHT_AWAKE_MS)
+        runCurrent()
+        assertThat(wired.display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+    }
+
+    /** Fails if an alert shown as usual stops holding the wall awake by day. */
+    @Test
+    fun aHoldingAlertStillHolds() = runTest {
+        val wired = wiredAtNoon()
+        wired.alerts.show {}
+        runCurrent()
+        advanceTimeBy(FIVE_MINUTES * 6)
+        runCurrent()
+        assertThat(wired.display.screen.value).isEqualTo(Screen.AWAKE)
     }
 
     /** Fails if a pause with Culvery still on screen, as a new intent to the home activity makes, wakes the night clock. */

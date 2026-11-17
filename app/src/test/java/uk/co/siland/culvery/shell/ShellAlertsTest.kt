@@ -13,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -70,9 +71,9 @@ class ShellAlertsTest {
         val first: @Composable () -> Unit = {}
         val second: @Composable () -> Unit = {}
         alerts.show(content = first)
-        alerts.show(content = second)
+        val h2 = alerts.show(content = second)
         assertThat(alerts.content.value).isSameInstanceAs(second)
-        alerts.dismiss()
+        h2.dismiss()
         assertThat(alerts.content.value).isNull()
     }
 
@@ -83,9 +84,9 @@ class ShellAlertsTest {
         assertThat(alerts.showing.value).isFalse()
         alerts.show(loud = false, content = nothing)
         assertThat(alerts.showing.value).isTrue()
-        alerts.show(loud = true, content = nothing)
+        val h2 = alerts.show(loud = true, content = nothing)
         assertThat(alerts.showing.value).isTrue()
-        alerts.dismiss()
+        h2.dismiss()
         assertThat(alerts.showing.value).isFalse()
     }
 
@@ -151,10 +152,10 @@ class ShellAlertsTest {
     fun dismissRunsEveryRestore() = runTest {
         val log = mutableListOf<String>()
         val alerts = alerts(RecordingQuieter("a", log), RecordingQuieter("b", log), scope = backgroundScope)
-        alerts.show(loud = true, content = nothing)
+        val h1 = alerts.show(loud = true, content = nothing)
         runCurrent()
         log.clear()
-        alerts.dismiss()
+        h1.dismiss()
         runCurrent()
         assertThat(log).containsExactly("a restore", "b restore")
     }
@@ -166,11 +167,11 @@ class ShellAlertsTest {
         val alerts = alerts(RecordingQuieter("music", log), scope = backgroundScope)
         alerts.show(loud = true, content = nothing)
         runCurrent()
-        alerts.show(loud = true, content = nothing)
+        val h2 = alerts.show(loud = true, content = nothing)
         runCurrent()
         val quieted = askQuieted(alerts)
         assertThat(quieted.isCompleted).isTrue()
-        alerts.dismiss()
+        h2.dismiss()
         runCurrent()
         assertThat(log).containsExactly("music quiet", "music quieted", "music restore").inOrder()
     }
@@ -180,9 +181,9 @@ class ShellAlertsTest {
     fun aQuietAlertNeverQuietens() = runTest {
         val log = mutableListOf<String>()
         val alerts = alerts(RecordingQuieter("music", log), scope = backgroundScope)
-        alerts.show(content = nothing)
+        val h1 = alerts.show(content = nothing)
         val quieted = askQuieted(alerts)
-        alerts.dismiss()
+        h1.dismiss()
         runCurrent()
         assertThat(quieted.isCompleted).isTrue()
         assertThat(log).isEmpty()
@@ -206,9 +207,9 @@ class ShellAlertsTest {
         val log = mutableListOf<String>()
         val slow = RecordingQuieter("music", log).apply { gate = CompletableDeferred() }
         val alerts = alerts(slow, scope = backgroundScope)
-        alerts.show(loud = true, content = nothing)
+        val h1 = alerts.show(loud = true, content = nothing)
         runCurrent()
-        alerts.dismiss()
+        h1.dismiss()
         runCurrent()
         assertThat(log).containsExactly("music quiet")
         slow.gate!!.complete(Unit)
@@ -221,11 +222,11 @@ class ShellAlertsTest {
     fun aFailingQuieterDoesNotStopTheOthers() = runTest {
         val log = mutableListOf<String>()
         val alerts = alerts(RecordingQuieter("gone", log).apply { fails = true }, RecordingQuieter("music", log), scope = backgroundScope)
-        alerts.show(loud = true, content = nothing)
+        val h1 = alerts.show(loud = true, content = nothing)
         val quieted = askQuieted(alerts)
         assertThat(quieted.isCompleted).isTrue()
         assertThat(log).containsExactly("gone quiet", "music quiet", "music quieted")
-        alerts.dismiss()
+        h1.dismiss()
         runCurrent()
         assertThat(log).containsAtLeast("gone restore", "music restore")
     }
@@ -235,16 +236,16 @@ class ShellAlertsTest {
         val some = RecordingQuieter("some", mutableListOf())
         val alerts = alerts(RecordingQuieter("none", mutableListOf()), some, scope = backgroundScope)
         assertThat(alerts.lowered.value).isFalse()
-        alerts.show(loud = true, content = nothing)
+        val h1 = alerts.show(loud = true, content = nothing)
         askQuieted(alerts)
         assertThat(alerts.lowered.value).isFalse()
-        alerts.dismiss()
+        h1.dismiss()
         runCurrent()
         some.lowers = true
-        alerts.show(loud = true, content = nothing)
+        val h2 = alerts.show(loud = true, content = nothing)
         askQuieted(alerts)
         assertThat(alerts.lowered.value).isTrue()
-        alerts.dismiss()
+        h2.dismiss()
         assertThat(alerts.lowered.value).isFalse()
     }
 
@@ -287,14 +288,171 @@ class ShellAlertsTest {
     fun aLateAnswerFromAnEarlierRingIsIgnored() = runTest {
         val late = CompletableDeferred<Unit>()
         val alerts = alerts(ScriptedQuieter(listOf(late, null), listOf(true, false)), scope = backgroundScope)
-        alerts.show(loud = true, content = nothing)
+        val h1 = alerts.show(loud = true, content = nothing)
         runCurrent()
-        alerts.dismiss()
+        h1.dismiss()
         alerts.show(loud = true, content = nothing)
         runCurrent()
         late.complete(Unit)
         runCurrent()
         assertThat(alerts.lowered.value).isFalse()
+    }
+
+    /** Fails if a handle's dismiss takes an alert that replaced its own, or a replaced handle still says it shows. */
+    @Test
+    fun aHandleDismissesOnlyItsOwnAlert() {
+        val alerts = alerts()
+        val first: @Composable () -> Unit = {}
+        val second: @Composable () -> Unit = {}
+        val a = alerts.show(content = first)
+        val b = alerts.show(content = second)
+        a.dismiss()
+        assertThat(alerts.content.value).isSameInstanceAs(second)
+        assertThat(alerts.showing.value).isTrue()
+        assertThat(a.showing.value).isFalse()
+        assertThat(b.showing.value).isTrue()
+    }
+
+    /** Fails if showIfFree replaces an alert, or refuses an empty layer. */
+    @Test
+    fun showIfFreeNeverReplaces() {
+        val alerts = alerts()
+        val up: @Composable () -> Unit = {}
+        val held = alerts.show(content = up)
+        assertThat(alerts.showIfFree(content = nothing)).isNull()
+        assertThat(alerts.content.value).isSameInstanceAs(up)
+        held.dismiss()
+        val free = alerts.showIfFree(content = nothing)
+        assertThat(free).isNotNull()
+        assertThat(free!!.showing.value).isTrue()
+        assertThat(alerts.content.value).isSameInstanceAs(nothing)
+    }
+
+    /** Fails if a handle outlives its alert's replacement, or its dismiss then takes the newer alert. */
+    @Test
+    fun aReplacedHandleSaysSo() {
+        val alerts = alerts()
+        val h = alerts.showIfFree(content = nothing)!!
+        alerts.show(loud = true, content = nothing)
+        assertThat(h.showing.value).isFalse()
+        h.dismiss()
+        assertThat(alerts.showing.value).isTrue()
+    }
+
+    /** Fails if an alert shown not to hold the wall holds it, or a loud one doesn't. */
+    @Test
+    fun aNonHoldingAlertDoesNotHold() {
+        val alerts = alerts()
+        assertThat(alerts.holds.value).isFalse()
+        val quiet = alerts.showIfFree(holdsAwake = false, content = nothing)!!
+        assertThat(alerts.showing.value).isTrue()
+        assertThat(alerts.holds.value).isFalse()
+        alerts.show(loud = true, content = nothing)
+        assertThat(alerts.holds.value).isTrue()
+        quiet.dismiss()
+        assertThat(alerts.holds.value).isTrue()
+    }
+
+    /** Fails if holds outlives the alert, or a handle's dismiss leaves it set. */
+    @Test
+    fun holdsEndsWithTheAlert() {
+        val alerts = alerts()
+        val h = alerts.show(content = nothing)
+        assertThat(alerts.holds.value).isTrue()
+        h.dismiss()
+        assertThat(alerts.holds.value).isFalse()
+    }
+
+    /** Fails if a wake is lost, or one wake is heard twice. */
+    @Test
+    fun wakeIsOneSignal() = runTest {
+        val alerts = alerts()
+        var heard = 0
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { alerts.wakes.collect { heard++ } }
+        runCurrent()
+        alerts.wake()
+        runCurrent()
+        assertThat(heard).isEqualTo(1)
+        alerts.wake()
+        runCurrent()
+        assertThat(heard).isEqualTo(2)
+    }
+
+    /** Fails if a duck skips the quieters, restores early or late, waits for the restore, or sets lowered. */
+    @Test
+    fun aDuckQuietsThenRestoresAfterItsLength() = runTest {
+        val log = mutableListOf<String>()
+        val alerts = alerts(RecordingQuieter("music", log).apply { lowers = true }, scope = backgroundScope)
+        alerts.duck(1_100)
+        assertThat(testScheduler.currentTime).isEqualTo(0)
+        assertThat(log).containsExactly("music quiet", "music quieted").inOrder()
+        assertThat(alerts.lowered.value).isFalse()
+        advanceTimeBy(1_099)
+        runCurrent()
+        assertThat(log).doesNotContain("music restore")
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(log.count { it == "music restore" }).isEqualTo(1)
+        assertThat(alerts.lowered.value).isFalse()
+    }
+
+    /** Fails if a duck waits on a hung quieter past the cap, or restores before its length. */
+    @Test
+    fun aDuckReturnsAtTheCapWhenAQuieterHangs() = runTest {
+        val hung = RecordingQuieter("hung", mutableListOf()).apply { gate = CompletableDeferred() }
+        val alerts = alerts(hung, scope = backgroundScope)
+        alerts.duck(5_000)
+        assertThat(testScheduler.currentTime).isEqualTo(QUIET_CAP_MS)
+    }
+
+    /** Fails if a duck turns the quieters down under a loud alert, or its restore undoes the loud alert's quiet. */
+    @Test
+    fun aDuckUnderALoudAlertDoesNothing() = runTest {
+        val log = mutableListOf<String>()
+        val alerts = alerts(RecordingQuieter("music", log), scope = backgroundScope)
+        alerts.show(loud = true, content = nothing)
+        runCurrent()
+        log.clear()
+        alerts.duck(1_000)
+        advanceTimeBy(2_000)
+        runCurrent()
+        assertThat(log).isEmpty()
+    }
+
+    /** Fails if a duck's restore comes due under a loud alert and brings the music back, or never comes once it goes. */
+    @Test
+    fun aLoudAlertDuringADuckKeepsMusicDown() = runTest {
+        val log = mutableListOf<String>()
+        val alerts = alerts(RecordingQuieter("music", log), scope = backgroundScope)
+        alerts.duck(1_000)
+        advanceTimeBy(500)
+        val loud = alerts.show(loud = true, content = nothing)
+        runCurrent()
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertThat(log).doesNotContain("music restore")
+        loud.dismiss()
+        runCurrent()
+        assertThat(log.count { it == "music restore" }).isEqualTo(1)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertThat(log.count { it == "music restore" }).isEqualTo(1)
+    }
+
+    /** Fails if a second duck is cut short by the first one's restore. */
+    @Test
+    fun aSecondDuckExtendsTheFirst() = runTest {
+        val log = mutableListOf<String>()
+        val alerts = alerts(RecordingQuieter("music", log), scope = backgroundScope)
+        alerts.duck(1_000)
+        advanceTimeBy(600)
+        alerts.duck(1_000)
+        advanceTimeBy(600)
+        runCurrent()
+        assertThat(log).doesNotContain("music restore")
+        advanceTimeBy(400)
+        runCurrent()
+        assertThat(log.count { it == "music restore" }).isEqualTo(1)
     }
 
     /** Fails if inFront is true before the screen resumes or stays true after it pauses (5 §2.7). */

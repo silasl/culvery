@@ -192,6 +192,16 @@ class SetupWiringTest {
     }
 
     @Test
+    fun aNonHoldingAlertDoesNotHoldTheWall() {
+        assertThat(holding(pinShowing = false, sheetShowing = false, alertHolds = false, settingsOpen = false, complete = true)).isFalse()
+    }
+
+    @Test
+    fun theDoorCardStillHolds() {
+        assertThat(holding(pinShowing = false, sheetShowing = false, alertHolds = true, settingsOpen = false, complete = true)).isTrue()
+    }
+
+    @Test
     fun theSplashHoldsUntilSetupIsKnown() {
         assertThat(holdSplash(complete = null, cardsLoaded = false, shownMillis = 0)).isTrue()
     }
