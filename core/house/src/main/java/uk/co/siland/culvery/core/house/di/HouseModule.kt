@@ -7,6 +7,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
+import uk.co.siland.culvery.core.house.BinCollections
 import uk.co.siland.culvery.core.house.DoorQuiet
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
@@ -36,6 +37,9 @@ abstract class HouseModule {
 
     @BindsOptionalOf
     abstract fun multiDayEvents(): MultiDayEvents
+
+    @BindsOptionalOf
+    abstract fun binCollections(): BinCollections
 
     @BindsOptionalOf
     abstract fun music(): HouseMusic

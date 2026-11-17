@@ -226,6 +226,23 @@ interface TodaysBirthdays {
     val today: StateFlow<List<Person>>
 }
 
+/** A bin on a collection day: its wall [name] ("Food") and the chosen `BinInks` id, null for a kind with none. */
+data class HouseBin(val name: String, val inkId: String?)
+
+/** The bins put out on [date], one entry per date. */
+data class BinCollection(val date: LocalDate, val bins: List<HouseBin>)
+
+/**
+ * [connected] is true once a bins calendar is connected, [readFailed] while one couldn't be read; [collections] are the stored
+ * ones for today and tomorrow in date order, kept through a failed read.
+ */
+data class BinDays(val connected: Boolean, val readFailed: Boolean, val collections: List<BinCollection>)
+
+/** The calendar's stored bin collections; absent with no calendar capability. */
+interface BinCollections {
+    val days: Flow<BinDays>
+}
+
 interface MultiDayEvents {
     suspend fun around(today: LocalDate): List<MultiDayEvent>
 }

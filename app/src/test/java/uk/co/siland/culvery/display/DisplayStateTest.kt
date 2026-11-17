@@ -546,6 +546,15 @@ class DisplayStateTest {
         held.changesAt(NIGHT_AWAKE_MS, AWAKE, NIGHT_CLOCK)
     }
 
+    /** Fails if night's start isn't the saved time, or isn't null before the settings are read. */
+    @Test
+    fun nightStartIsTheSavedTime() = runTest {
+        val unread = wall(prefs = null)
+        assertThat(unread.display.startsAt()).isNull()
+        unread.set(DisplayPrefs(nightFrom = LocalTime.of(21, 15)))
+        assertThat(unread.display.startsAt()).isEqualTo(LocalTime.of(21, 15))
+    }
+
     /** Fails if equal night times mean all night rather than no night. */
     @Test
     fun equalNightTimesMeanNoNight() = runTest {

@@ -2,6 +2,7 @@ package uk.co.siland.culvery.display
 
 import android.util.Log
 import java.time.LocalDateTime
+import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -186,6 +187,8 @@ class DisplayState internal constructor(
     }
 
     override fun isNight(): Boolean? = nightAt(now.value, prefs.value)
+
+    override fun startsAt(): LocalTime? = prefs.value?.nightFrom
 
     /** The sleep layer's own tap or TalkBack click: wakes the dark screen and the night clock. */
     fun tapped() = wake { true }
