@@ -66,14 +66,18 @@ class RemindersForEvents internal constructor(
     }
 
     override suspend fun changed(key: String, now: EventTimes, startsAtMillis: Long?): Boolean = scope.async {
-        val reminder = store.byEvent(key) ?: return@async false
-        when (val move = reminder.afterEvent(now, startsAtMillis, clock.nowMillis(), zone.current())) {
-            EventMove.None -> false
+        val nowMillis = clock.nowMillis()
+        val zone = zone.current()
+        when (store.moveForEvent(key) { it.afterEvent(now, startsAtMillis, nowMillis, zone) }) {
+            null, EventMove.None -> false
             EventMove.Delete -> {
-                if (store.delete(reminder.id)) Log.i(TAG, "event gone")
+                Log.i(TAG, "event gone")
                 false
             }
-            is EventMove.To -> store.put(move.reminder).also { if (it) Log.i(TAG, "event moved") }
+            is EventMove.To -> {
+                Log.i(TAG, "event moved")
+                true
+            }
         }
     }.await()
 }

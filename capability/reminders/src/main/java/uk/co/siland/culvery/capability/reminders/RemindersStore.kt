@@ -83,8 +83,17 @@ class RemindersStore @Inject constructor(private val db: RemindersDatabase) {
         keys.distinct().chunked(KEYS_PER_QUERY).sumOf { dao.deleteForEvents(it) }
     }
 
-    /** Writes the whole reminder as it is; false, writing nothing, when it has gone. */
-    suspend fun put(reminder: Reminder): Boolean = dao.update(reminder.toEntity()) > 0
+    /** Reads the event's reminder, has [decide] say what becomes of it, and writes that, in one transaction; null when it has none. */
+    internal suspend fun moveForEvent(key: String, decide: (Reminder) -> EventMove): EventMove? = db.withTransaction {
+        val row = dao.byEvent(key) ?: return@withTransaction null
+        decide(row.toReminder()).also { move ->
+            when (move) {
+                EventMove.None -> Unit
+                EventMove.Delete -> dao.delete(row.id)
+                is EventMove.To -> dao.update(move.reminder.toEntity())
+            }
+        }
+    }
 
     suspend fun setBins(on: Boolean, time: LocalTime) = updateState { it.copy(binsOn = on, binsTime = time) }
 
