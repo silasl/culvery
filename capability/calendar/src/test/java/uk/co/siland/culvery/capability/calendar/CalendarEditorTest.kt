@@ -321,18 +321,31 @@ class CalendarEditorTest {
     }
 
     @Test
-    fun everySavedWallWriteStampsItsKey() = runTest {
+    fun everySavedWallWriteThatMovesOrRemovesStampsItsKey() = runTest {
         val access = testAccess(household)
         put(event("dinner", createdBy = access.alex.id.value), event("football", createdBy = access.alex.id.value))
         access.answer(TestAccess.ALEX)
         val editor = editor(access)
-        assertThat(editor.update(ref("dinner"), edited("Supper"), setOf(EventField.TITLE))).isEqualTo(EditResult.Done)
+        assertThat(editor.update(ref("dinner"), edited("Dinner"), setOf(EventField.TIMES))).isEqualTo(EditResult.Done)
         writer.failWith = UnreachableException("offline")
         assertThat(editor.delete(ref("football"))).isEqualTo(EditResult.Queued)
         assertThat(editor.create(draft("Swimming", PersonId.FAMILY.value))).isEqualTo(EditResult.Queued)
         assertThat(store.wallWrittenSince(opened))
             .containsExactly(dinnerKey, eventKey("c1", "s-family", "football"), eventKey("c1", "s-family", "key-1"))
         assertThat(store.wallWrittenSince(opened + testScheduler.currentTime + 1)).isEmpty()
+    }
+
+    /** A title or people change must not hide a phone's move of the same event arriving in the next sync. */
+    @Test
+    fun aTitleOnlyWallWriteStampsNothing() = runTest {
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value), event("football", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        assertThat(editor.update(ref("dinner"), edited("Supper"), setOf(EventField.TITLE))).isEqualTo(EditResult.Done)
+        writer.failWith = UnreachableException("offline")
+        assertThat(editor.update(ref("football"), edited("Football club"), setOf(EventField.TITLE))).isEqualTo(EditResult.Queued)
+        assertThat(store.wallWrittenSince(opened)).isEmpty()
     }
 
     /** As the sheet chooses them: "key-1", "key-2"… in the order Save is tapped. */

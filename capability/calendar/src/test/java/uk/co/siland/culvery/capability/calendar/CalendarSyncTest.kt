@@ -1641,31 +1641,137 @@ class CalendarSyncTest {
         assertThat(reminders.changed).containsExactly(laterSwimLink)
     }
 
+    /** The wall's title change, sent with the times the phone has since given the event: only its title is patched. */
+    private fun retitledLaterSwim() = EventDraft("Swim club", laterSwim().start, laterSwim().end, "sam-id", "alex-id")
+
     @Test
-    fun aRefusedQueuedMoveWithAnotherQueuedBehindItTellsNothing() = runTest {
+    fun aChangeWithAnotherStillQueuedTellsNothingYet() = runTest {
         connect("c1", "calendar.a", s1)
         a.events = { listOf(laterSwim()) }
         val sync = remindingEngine()
         sync.syncAll()
         queue(ChangeKind.UPDATE, draft = swimDraft("sam-id"), fields = setOf(EventField.TIMES))
-        queue(ChangeKind.UPDATE, draft = swimDraft("sam-id"), fields = setOf(EventField.TIMES), next = now.plusSeconds(86_400))
+        queue(ChangeKind.UPDATE, draft = retitledLaterSwim(), fields = setOf(EventField.TITLE), next = now.plusSeconds(86_400))
         w.failWith = WriteRejectedException("event is locked")
         sync.syncAll()
         assertThat(store.pendingNow()).hasSize(1)
         assertThat(reminders.changed).isEmpty()
+        assertThat(reminders.gone).isEmpty()
     }
 
+    /** Review fix round 1: the refused move's reminder goes back once the title change queued behind it is sent. */
     @Test
-    fun aRefusedQueuedDeleteTellsNothing() = runTest {
+    fun aRefusedMoveWithATitleChangeBehindItIsToldWhenTheLastSettles() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(laterSwim()) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        queue(ChangeKind.UPDATE, draft = swimDraft("sam-id"), fields = setOf(EventField.TIMES))
+        queue(ChangeKind.UPDATE, draft = retitledLaterSwim(), fields = setOf(EventField.TITLE))
+        w.failNextUpdate = WriteRejectedException("event is locked")
+        sync.syncAll()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(reminders.changed).containsExactly(laterSwimLink)
+    }
+
+    /** Review fix round 1: a phone's move held while the wall's title change waited is told once that change is sent. */
+    @Test
+    fun aPhoneMoveHeldBehindAQueuedTitleChangeIsToldWhenItSettles() = runTest {
         connect("c1", "calendar.a", s1)
         a.events = { listOf(swim()) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        queue(ChangeKind.UPDATE, draft = retitledLaterSwim(), fields = setOf(EventField.TITLE), next = now.plusSeconds(3_600))
+        a.events = { listOf(laterSwim()) }
+        sync.syncAll()
+        assertThat(reminders.changed).isEmpty()
+        now = now.plusSeconds(3_600)
+        a.events = { emptyList() }
+        sync.syncAll()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(reminders.changed).containsExactly(laterSwimLink)
+    }
+
+    /** Review fix round 1: a phone's delete held while a wall change waited is told once that change is refused. */
+    @Test
+    fun aPhoneDeleteHeldBehindAQueuedChangeIsToldWhenItSettles() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        queue(ChangeKind.UPDATE, draft = retitledLaterSwim(), fields = setOf(EventField.TITLE), next = now.plusSeconds(3_600))
+        a.events = { emptyList() }
+        a.removed = { listOf("swim") }
+        sync.syncAll()
+        assertThat(reminders.gone).isEmpty()
+        now = now.plusSeconds(3_600)
+        a.removed = { emptyList() }
+        w.failWith = WriteRejectedException(EVENT_GONE)
+        sync.syncAll()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(reminders.gone).containsExactly(listOf(linkKey("swim")))
+    }
+
+    /** The reminder went when the delete was queued; a refused delete brings the event back without it. */
+    @Test
+    fun aRefusedQueuedDeleteBringsNoReminderBack() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(laterSwim()) }
         val sync = remindingEngine()
         sync.syncAll()
         queue(ChangeKind.DELETE, draft = null)
         w.failWith = WriteRejectedException("event is locked")
         sync.syncAll()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(reminders.changed).isEmpty()
         assertThat(reminders.gone).isEmpty()
+        // Where the event is; Reminders has no reminder for it to move.
+        assertThat(reminders.changed).containsExactly(laterSwimLink)
+    }
+
+    @Test
+    fun anAcceptedQueuedDeleteTellsItsEventGone() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        queue(ChangeKind.DELETE, draft = null)
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        assertThat(reminders.gone).containsExactly(listOf(linkKey("swim")))
+    }
+
+    @Test
+    fun aRefusedQueuedCreateTellsItsEventGone() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = remindingEngine()
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
+        w.failWith = WriteRejectedException("calendar is full")
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        assertThat(reminders.gone).containsExactly(listOf(linkKey(key)))
+    }
+
+    /** Review fix round 1: the wall moves an event after the pass stored a phone's move and before it tells Reminders. */
+    @Test
+    fun aWallMoveBetweenTheCommitAndTheTellingIsNotOverwritten() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val lock = CalendarWriteLock()
+        // Real threads, so runTest can't skip virtual time while the test holds the lock.
+        val sync = engineWith(setOf(w), toaster, io = Dispatchers.Default, timeoutMillis = PROVIDER_TIMEOUT_MS, lock = lock, reminders = reminders)
+        sync.syncAll()
+        a.events = { listOf(laterSwim()) }
+        lateinit var pass: Job
+        withContext(Dispatchers.Default) {
+            lock.withLock {
+                pass = this@runTest.launch(Dispatchers.Default) { sync.syncAll() }
+                // The pass has committed the phone's move and waits for the lock to tell Reminders.
+                awaitWaiting(lock, 1)
+                store.stampWallWrite(linkKey("swim"), now.toEpochMilli())
+            }
+        }
+        pass.join()
+        assertThat(store.eventNow(EventRef("c1", "s1", "swim"))!!.start).isEqualTo(laterSwim().start)
+        assertThat(reminders.changed).isEmpty()
     }
 }

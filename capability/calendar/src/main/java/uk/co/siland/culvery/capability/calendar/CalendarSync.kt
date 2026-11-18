@@ -109,8 +109,8 @@ class CalendarSync internal constructor(
      * and changes older than [OUTBOX_MAX_AGE_MS] are dropped, with one toast per connection, shown even if the pass
      * then fails. Age leaves out time the connection spent waiting for sign-in (3a design D16). An aged create is
      * first looked up by its key (C9): if the provider made it, it is completed and the changes behind it are sent
-     * whatever their age. A dropped create takes the changes queued behind it with it (2b-2 design §5). A dropped move
-     * takes its reminder back with the event (22 §10.5).
+     * whatever their age. A dropped create takes the changes queued behind it with it (2b-2 design §5). Each change sent
+     * or dropped tells Reminders where its event now is, once nothing else is queued for it.
      */
     private suspend fun drainOutbox(connections: List<StoredConnection>, zone: ZoneId) {
         val now = clock.nowMillis()
@@ -125,6 +125,7 @@ class CalendarSync internal constructor(
 
         suspend fun drop(change: PendingChange, label: String, reason: String?) {
             val ref = change.ref
+            val link = linkOf(change)
             val count = if (change.kind == ChangeKind.CREATE && ref != null) {
                 droppedCreates += ref
                 // Under the editor's lock: an edit being queued behind this create goes with it, or finds it gone.
@@ -140,7 +141,7 @@ class CalendarSync internal constructor(
             reasons += reason
             // The changes that went with a create have no reason of their own.
             repeat(count - 1) { reasons += null }
-            if (change.kind == ChangeKind.UPDATE && EventField.TIMES in fieldsFor(change.kind, change.fields)) ref?.let { putBack(it, zone) }
+            settled(change, link, zone)
         }
 
         try {
@@ -181,6 +182,8 @@ class CalendarSync internal constructor(
                     drop(change, label, null)
                     continue
                 }
+                // Read before it is sent: an accepted delete takes the row that says which series it was.
+                val link = linkOf(change)
                 val sent = if (aged) {
                     // C9: its reply may have been lost after the provider made it; ask before dropping it.
                     val found = callWriter(io, timeoutMillis) { writer.find(stored.connection, source.source, checkNotNull(change.clientKey)) }
@@ -196,7 +199,10 @@ class CalendarSync internal constructor(
                 // Undo took the create with the changes queued behind it, which this pass read before it did.
                 if (sent.byUndo && ref != null) droppedCreates += ref
                 when (val outcome = sent.outcome) {
-                    is WriteOutcome.Accepted -> if (aged && ref != null) foundCreates += ref
+                    is WriteOutcome.Accepted -> {
+                        if (aged && ref != null) foundCreates += ref
+                        settled(change, link, zone)
+                    }
                     is WriteOutcome.Rejected -> drop(change, label, outcome.reason)
                     is WriteOutcome.Retry -> {
                         val next = retryLater(change, now)
@@ -443,27 +449,53 @@ class CalendarSync internal constructor(
             val written = store.wallWrittenSince(readBegan)
             val told = changes.filter { it.key !in written }
             val goneKeys = told.filterIsInstance<EventChange.Gone>().map { it.key }
-            if (goneKeys.isNotEmpty()) tellReminders { gone(goneKeys) }
-            told.filterIsInstance<EventChange.Changed>().forEach { tellReminders { changed(it.key, it.now, it.startsAtMillis) } }
+            if (goneKeys.isNotEmpty()) reminding { gone(goneKeys) }
+            told.filterIsInstance<EventChange.Changed>().forEach { reminding { changed(it.key, it.now, it.startsAtMillis) } }
         }
     }
 
     /**
-     * A queued move to [ref] was dropped, so the event stays where it is stored: its reminder goes back with it, unless
-     * a later change for it is still queued.
+     * [change]'s event by its link id, the series' for a date of one, read before it settles: an accepted delete takes
+     * its row. Null with no Reminders, or when the store can't say.
      */
-    private suspend fun putBack(ref: EventRef, zone: ZoneId) {
-        if (reminders == null) return
+    private suspend fun linkOf(change: PendingChange): EventRef? {
+        if (reminders == null) return null
+        var link: EventRef? = null
+        reminding {
+            val id = when (change.kind) {
+                ChangeKind.CREATE -> change.clientKey
+                ChangeKind.ASSIGN_SERIES -> change.remoteId
+                else -> change.remoteId?.let { store.eventNow(EventRef(change.connectionId, change.sourceId, it))?.seriesId ?: it }
+            }
+            link = id?.let { EventRef(change.connectionId, change.sourceId, it) }
+        }
+        return link
+    }
+
+    /**
+     * [change] was sent or dropped. Once nothing else is queued for its event, Reminders hears where the event now is:
+     * what a sync held back while the change waited, or the stored times a refused move leaves (22 §10.5). Reminders
+     * ignores times it already has, and an event with no reminder.
+     */
+    private suspend fun settled(change: PendingChange, link: EventRef?, zone: ZoneId) {
+        if (link == null) return
         writeLock.withLock {
-            if (store.pendingNow().any { it.ref == ref }) return@withLock
-            val event = store.eventNow(ref) ?: return@withLock
-            val (times, startsAt) = linkTimes(listOf(event), emptyList(), zone, todayIn(zone), clock.nowMillis())
-            tellReminders { changed(eventKey(event), times, startsAt) }
+            reminding {
+                if (store.pendingNow().any { it.ref == change.ref }) return@reminding
+                val key = eventKey(link.connectionId, link.sourceId, link.remoteId)
+                val rows = store.linkRows(link)
+                if (rows.isEmpty()) {
+                    gone(listOf(key))
+                } else {
+                    val (times, startsAt) = linkTimes(rows, emptyList(), zone, todayIn(zone), clock.nowMillis())
+                    changed(key, times, startsAt)
+                }
+            }
         }
     }
 
-    /** A failure in Reminders never fails the sync. */
-    private suspend fun tellReminders(call: suspend EventReminders.() -> Unit) {
+    /** A failure here, in Reminders or in the store reads [call] makes, never fails the sync or the drain. */
+    private suspend fun reminding(call: suspend EventReminders.() -> Unit) {
         val reminders = reminders ?: return
         try {
             reminders.call()

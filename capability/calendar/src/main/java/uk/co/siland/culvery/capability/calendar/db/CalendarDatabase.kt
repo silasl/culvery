@@ -450,6 +450,17 @@ interface CalendarDao {
     )
     suspend fun seriesRows(connectionId: String, sourceId: String, seriesId: String): List<EventRow>
 
+    /** The rows whose link key is [linkId]'s: a series' dates, or the one-off with that id. */
+    @Query(
+        """
+        SELECT e.*, s.personId AS sourcePersonId FROM event e
+        JOIN source s ON s.connectionId = e.connectionId AND s.sourceId = e.sourceId
+        WHERE e.connectionId = :connectionId AND e.sourceId = :sourceId
+        AND (e.seriesId = :linkId OR (e.seriesId IS NULL AND e.remoteId = :linkId))
+        """,
+    )
+    suspend fun linkRows(connectionId: String, sourceId: String, linkId: String): List<EventRow>
+
     @Query("SELECT * FROM sync_state WHERE connectionId = :connectionId AND sourceId = :sourceId")
     suspend fun syncState(connectionId: String, sourceId: String): SyncStateEntity?
 

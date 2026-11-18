@@ -516,7 +516,9 @@ class CalendarEditor internal constructor(
             EventField.TIMES in fields.orEmpty() -> { { moved?.let { movedTo(key, it) } == true } }
             else -> null
         }
-        return onAppScope(kind, serviceNameOf(target.to.connection, serviceOf), key, tell) {
+        // A title or people change can't put old times back on a reminder, and must not hide a phone's move.
+        val stampKey = key.takeIf { kind == ChangeKind.DELETE || EventField.TIMES in fields.orEmpty() }
+        return onAppScope(kind, serviceNameOf(target.to.connection, serviceOf), stampKey, tell) {
             val ref = target.event.ref
             val queued = store.pendingNow()
             val pending = queued.filter { it.ref == ref }
@@ -540,7 +542,7 @@ class CalendarEditor internal constructor(
                     if (ahead.isNotEmpty()) {
                         queue(target.to, kind, sendTo, draft, attempted = false, fields = fields)
                     } else {
-                        attempt(target.to, kind, sendTo, draft, fields = fields, key = key)
+                        attempt(target.to, kind, sendTo, draft, fields = fields, key = stampKey)
                     }
                 }
             }

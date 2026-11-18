@@ -493,6 +493,10 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     suspend fun eventNow(ref: EventRef): StoredEvent? =
         dao.eventNow(ref.connectionId, ref.sourceId, ref.remoteId)?.toStored()
 
+    /** The stored rows of the event whose link is [link]: a series' dates, or the one-off. */
+    suspend fun linkRows(link: EventRef): List<StoredEvent> =
+        dao.linkRows(link.connectionId, link.sourceId, link.remoteId).map { it.toStored() }
+
     /** The stored dates of the series [seriesId]. */
     suspend fun seriesRows(connectionId: String, sourceId: String, seriesId: String): List<StoredEvent> =
         dao.seriesRows(connectionId, sourceId, seriesId).map { it.toStored() }

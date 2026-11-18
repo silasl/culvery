@@ -22,6 +22,8 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
     /** The ids delete and deleteSeries removed. */
     val deleted = mutableSetOf<String>()
     var failWith: Throwable? = null
+    /** The next update throws it; then updates work again. */
+    var failNextUpdate: Throwable? = null
     /** The next delete or deleteSeries throws it; then they work again. */
     var failNextDelete: Throwable? = null
     /** When set, each write waits for it: a slow network the test releases. */
@@ -67,6 +69,10 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
         synchronized(this) { fieldSets += fields }
         gate?.await()
         failWith?.let { throw it }
+        failNextUpdate?.let {
+            failNextUpdate = null
+            throw it
+        }
         return RemoteEvent(remoteId, draft.title, draft.start, draft.end, recurring = false, draft.forPerson, draft.createdBy)
     }
 
