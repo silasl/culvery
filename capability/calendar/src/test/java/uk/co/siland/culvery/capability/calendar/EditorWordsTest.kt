@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.calendar
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -119,6 +120,24 @@ class EditorWordsTest {
         val mon28 = LocalDate.of(2026, 9, 28)
         assertThat(firstDates(bins())).isEqualTo(listOf(mon28, mon28.plusWeeks(1), mon28.plusWeeks(2), mon28.plusWeeks(3)) to 0)
         assertThat(firstDates(guitar())).isEqualTo(listOf(sat26) to 0)
+    }
+
+    @Test
+    fun aSeriesOnTwoDaysIsCheckedOnBoth() {
+        val swim = new().apply {
+            updateTitle("Swim")
+            toggleWho(mia.id)
+            pickStartDate(LocalDate.of(2026, 10, 19))
+            chooseRepeat(RepeatChoice.Weekly)
+            toggleDay(DayOfWeek.WEDNESDAY)
+            stopsAfter()
+        }
+        val mon19 = LocalDate.of(2026, 10, 19)
+        assertThat(checkSentence(swim, people)).startsWith("Swim for Mia, every week, on Mon, Wed, ")
+        assertThat(checkSentence(swim, people)).endsWith("from 19 Oct to 18 Nov. 10 times in all.")
+        assertThat(firstDates(swim)).isEqualTo(listOf(mon19, mon19.plusDays(2), mon19.plusDays(7), mon19.plusDays(9)) to 6)
+        swim.keepsGoing()
+        assertThat(firstDates(swim).first).containsExactly(mon19, mon19.plusDays(2), mon19.plusDays(7), mon19.plusDays(9)).inOrder()
     }
 
     /** Sunday 25 October 2026, when 01:00–02:00 happens twice: the row and Save both keep the wall clocks. */

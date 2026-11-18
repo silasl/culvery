@@ -33,6 +33,7 @@ import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.backoffMillis
 import uk.co.siland.culvery.core.plugin.today
 import uk.co.siland.culvery.core.repeat.choiceOf
+import uk.co.siland.culvery.core.repeat.daysOf
 import uk.co.siland.culvery.core.repeat.nthOf
 import uk.co.siland.culvery.core.repeat.wording
 
@@ -161,7 +162,7 @@ class CalendarEditor internal constructor(
     private suspend fun addedLineFor(draft: EventDraft): String {
         val (day, last) = daySpan(draft.start, draft.end, zone.current())
         val today = today()
-        val wording = draft.recurrence?.let { choiceOf(it.rule, day) }?.wording(day, nthOf(draft.recurrence.rule, day))
+        val wording = draft.recurrence?.let { choiceOf(it.rule, day)?.wording(day, nthOf(it.rule, day), daysOf(it.rule, day)) }
         return addedLine(draft.title, wording, day.takeIf { weeksTo(today, day, shown()) == null }, through = last)
     }
 

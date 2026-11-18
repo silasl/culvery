@@ -32,6 +32,7 @@ import uk.co.siland.culvery.core.repeat.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.spokenWho
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -61,7 +62,7 @@ internal class WhenContext(
  */
 @Composable
 internal fun StartDatePane(eventWhen: EventWhen, context: WhenContext, banner: String? = null, quickPicks: List<LocalDate> = emptyList(), onPick: (LocalDate) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
+    Column(verticalArrangement = Arrangement.spacedBy(ControlTokens.formGap)) {
         if (banner != null) CopiedBanner(banner)
         if (quickPicks.isNotEmpty()) QuickPicks(quickPicks, onPick)
         WhenDateGrid(eventWhen, context, "starts_date_pane", opensOn = eventWhen.startDate, onPick = onPick)
@@ -132,7 +133,7 @@ private fun WhenTimePane(
     enabled: (ClockField, Boolean) -> Boolean = { _, _ -> true },
     onFreeStart: (LocalTime) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap), modifier = Modifier.testTag(tag)) {
+    Column(verticalArrangement = Arrangement.spacedBy(ControlTokens.formGap), modifier = Modifier.testTag(tag)) {
         HhTimeSteppers(clock, stepperPrefix, onStep = onStep, enabled = enabled, modifier = Modifier.fillMaxWidth())
         WhenClash(eventWhen, context, onFreeStart)
     }

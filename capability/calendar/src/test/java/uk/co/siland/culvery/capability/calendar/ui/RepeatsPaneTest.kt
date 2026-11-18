@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
@@ -274,6 +275,29 @@ class RepeatsPaneTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    @Test
+    fun tickingASecondDayRewordsTheRow() {
+        show(repeating())
+        node("repeat_day_SATURDAY").assertIsSelected()
+        node("repeat_day_MONDAY").assertIsNotSelected().performClick()
+        node("repeat_day_MONDAY").assertIsSelected()
+        node("repeat_Weekly").assertTextEquals("Every week, on Mon, Sat")
+        part("editor_row_repeats_value").assertTextEquals("Every week, on Mon, Sat")
+        node("repeat_day_SATURDAY").performClick()
+        node("repeat_day_SATURDAY").assertIsSelected()
+        assertThat(form.pick.daysOn(saturday)).containsExactly(DayOfWeek.MONDAY, DayOfWeek.SATURDAY)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theDaysAreLockedOnAnEventLongerThanADay() {
+        show(guitar { chooseAllDay(true); pickEndDate(saturday.plusDays(1)); chooseRepeat(RepeatChoice.Fortnightly) })
+        node("repeat_day_MONDAY").performClick()
+        node("repeat_day_MONDAY").assertIsNotSelected()
+        part("repeat_days_note").assertTextEquals("Too long to repeat that often.")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     /** At 1.3 and 1.5 every option and the stepper's count read on one line, inside the pane. */
     @Test
     fun theRowsFitAtLargerFontScales() {
@@ -289,6 +313,7 @@ class RepeatsPaneTest {
                 assertWithMessage("$tag's words fit at $s").that(layout.getLineRight(0) - layout.getLineLeft(0)).isAtMost(layout.size.width.toFloat())
                 assertWithMessage("$tag inside the pane at $s").that(node(tag).getUnclippedBoundsInRoot().right).isAtMost(pane.right)
             }
+            assertWithMessage("the day chips inside the pane at $s").that(node("repeat_day_SUNDAY").getUnclippedBoundsInRoot().right).isAtMost(pane.right)
         }
         compose.assertClickablesHaveRoleAndLabel()
     }

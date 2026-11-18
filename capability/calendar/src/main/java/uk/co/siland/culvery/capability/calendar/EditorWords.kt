@@ -77,7 +77,7 @@ fun checkSentence(form: EditorForm, people: List<Person>): String {
     val series = form.repeat.takeIf { first != null && it != RepeatChoice.Never }
     val span = form.eventWhen.span(form.zone)
     val whenWords = when {
-        first != null && series != null -> "${lowerFirst(series.wording(first, form.nthOn(first)))}, ${seriesTime(form)}"
+        first != null && series != null -> "${lowerFirst(series.wording(first, form.nthOn(first), form.pick.daysOn(first)))}, ${seriesTime(form)}"
         span != null -> spanWords(span, form.zone)
         else -> null
     }
@@ -86,7 +86,7 @@ fun checkSentence(form: EditorForm, people: List<Person>): String {
     val from = first.format(DAY_MONTH)
     return when (val end = form.repeatEnd) {
         is RepeatEnd.After -> {
-            val last = occurrences(series, first, end.times, form.nthOn(first)).last()
+            val last = occurrences(series, first, end.times, form.nthOn(first), form.pick.daysOn(first)).last()
             "$parts, from $from to ${last.format(DAY_MONTH)}. ${plural(end.times.toLong(), "time")} in all."
         }
         else -> "$parts, from $from."
@@ -108,9 +108,10 @@ private fun seriesTime(form: EditorForm): String {
 /** The Check pane's first few dates, and how many more a counted series has after them; one for a one-off. */
 fun firstDates(form: EditorForm): Pair<List<LocalDate>, Int> {
     val first = form.eventWhen.startDate ?: return emptyList<LocalDate>() to 0
+    val days = form.pick.daysOn(first)
     return when (val end = form.repeatEnd) {
-        is RepeatEnd.After -> occurrences(form.repeat, first, minOf(end.times, FIRST_FEW), form.nthOn(first)) to maxOf(end.times - FIRST_FEW, 0)
-        else -> occurrences(form.repeat, first, FIRST_FEW, form.nthOn(first)) to 0
+        is RepeatEnd.After -> occurrences(form.repeat, first, minOf(end.times, FIRST_FEW), form.nthOn(first), days) to maxOf(end.times - FIRST_FEW, 0)
+        else -> occurrences(form.repeat, first, FIRST_FEW, form.nthOn(first), days) to 0
     }
 }
 

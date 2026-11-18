@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.calendar
 
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
@@ -11,6 +12,7 @@ import uk.co.siland.culvery.core.repeat.DAYS_PER_WEEK
 import uk.co.siland.culvery.core.repeat.RepeatChoice
 import uk.co.siland.culvery.core.repeat.SHORT_DAY
 import uk.co.siland.culvery.core.repeat.choiceOf
+import uk.co.siland.culvery.core.repeat.daysOf
 import uk.co.siland.culvery.core.repeat.fitsLength
 import uk.co.siland.culvery.core.repeat.nthOf
 import uk.co.siland.culvery.core.repeat.nthWeekday
@@ -33,12 +35,15 @@ internal fun Suggestion.anchor(): LocalDate = seriesStart ?: rememberedDate
 /** The repeat the suggestion remembers, when the editor offers it. */
 internal fun Suggestion.choice(): RepeatChoice? = rule?.let { choiceOf(it, anchor()) }?.takeIf { it != RepeatChoice.Never }
 
+/** The weekdays a weekly repeat lands on when it lists several, the anchor's own among them; else empty. */
+internal fun Suggestion.days(): Set<DayOfWeek> = rule?.let { daysOf(it, anchor()) }.orEmpty()
+
 internal fun Suggestion.nth(): Int = rule?.let { nthOf(it, anchor()) } ?: nthWeekday(anchor())
 
 private fun Suggestion.eventLength(): Duration? = if (allDay) days?.let { Duration.ofDays(it.toLong()) } else length
 
 // Dropped when the event is longer than the repeat allows (9c §3.3).
-private fun Suggestion.filledRepeat(): RepeatChoice? = choice()?.takeIf { c -> eventLength()?.let(c::fitsLength) ?: true }
+private fun Suggestion.filledRepeat(): RepeatChoice? = choice()?.takeIf { c -> eventLength()?.let { c.fitsLength(it, days()) } ?: true }
 
 /** The people the suggestion is for, still in the household; Family when none are. */
 internal fun Suggestion.whoNow(people: List<Person>): List<Person> =
@@ -80,13 +85,17 @@ fun patternLine(s: Suggestion, people: List<Person>, today: LocalDate): String {
     }
     val anchor = s.anchor()
     val time = s.timeWords(spoken = false)
-    val pattern = if (choice == RepeatChoice.Weekly) "${weekdayName(anchor)}s $time" else "${choice.wording(anchor, s.nth())}, $time"
+    val pattern = if (choice == RepeatChoice.Weekly && s.days().isEmpty()) {
+        "${weekdayName(anchor)}s $time"
+    } else {
+        "${choice.wording(anchor, s.nth(), s.days())}, $time"
+    }
     return listOf(who, pattern, s.lastOrNext(today)).joinToString(" · ")
 }
 
 private fun fills(s: Suggestion, people: List<Person>, childOnly: Boolean, spoken: Boolean): String {
     val who = s.whoNow(people).let { if (it.singleOrNull()?.isFamily == true) EVERYONE else whoLine(it) }
-    val repeat = s.filledRepeat()?.let { lowerFirst(it.wording(s.anchor(), s.nth())) }
+    val repeat = s.filledRepeat()?.let { lowerFirst(it.wording(s.anchor(), s.nth(), s.days())) }
     val time = s.timeWords(spoken)
     return when {
         childOnly -> "Fills in $time"

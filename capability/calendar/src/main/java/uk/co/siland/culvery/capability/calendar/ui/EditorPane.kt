@@ -37,6 +37,7 @@ import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -121,7 +122,7 @@ internal fun EditorPane(
 ) {
     val c = Culvery.colors
     Column(
-        verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap),
+        verticalArrangement = Arrangement.spacedBy(ControlTokens.formGap),
         modifier = Modifier
             .testTag("editor_pane")
             .fillMaxSize()

@@ -119,9 +119,6 @@ internal object CalendarType {
     val timeCheck = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600)
     val timeFreeAt = HhType.secondary
 
-    /** 17 sp / 600: the Repeats stepper's count in tabular figures (handoff 6f). */
-    val repeatCount = HhType.rowTitle.copy(fontFeatureSettings = "tnum")
-
     /** 19 sp / 600 the title, 14 sp the muted line, 13 sp / 600 the fill line, 15 sp / 700 the pill: a suggestion (handoff 6a). */
     val suggestionTitle = HhType.rowTitle.copy(fontSize = 19.sp)
     val suggestionLine = HhType.secondary
@@ -175,13 +172,12 @@ internal object EditorDimens {
     val footIcon = 16.dp
     val footIconGap = 8.dp
 
-    // The pane: `surf`, radius 24, padding 24 / 29 / 27, 15 between its parts; the header at least 48 tall, the question
-    // 13 from Skip and Next, which are 8 apart; Skip 19 at its sides.
+    // The pane: `surf`, radius 24, padding 24 / 29 / 27, its parts ControlTokens.formGap apart; the header at least 48 tall,
+    // the question 13 from Skip and Next, which are 8 apart; Skip 19 at its sides.
     val paneRadius = 24.dp
     val panePaddingTop = 24.dp
     val panePaddingH = 29.dp
     val panePaddingBottom = 27.dp
-    val paneGap = 15.dp
     val paneHeader = 48.dp
     val paneHeaderGap = 13.dp
     val paneButtonGap = 8.dp
@@ -215,11 +211,6 @@ internal object EditorDimens {
     val checkIcon = 19.dp
     val checkIconGap = 5.dp
     val freeGap = 8.dp
-
-    // The Repeats pane (its options are HhRadioRows): the stepper's 48 buttons 8 either side of its count, a 48 pill 19 in at
-    // its sides.
-    val stepperGap = 8.dp
-    val stepperPaddingH = 19.dp
 
     // The Check pane: date chips 40 tall, 8 apart, 15 in at the sides, an 8 dot 7 before the date; the week chip about as
     // wide as a week column's inside.

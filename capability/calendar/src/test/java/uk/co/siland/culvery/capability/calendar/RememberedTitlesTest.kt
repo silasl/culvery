@@ -1,12 +1,14 @@
 package uk.co.siland.culvery.capability.calendar
 
 import com.google.common.truth.Truth.assertThat
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.db.EventEntity
 import uk.co.siland.culvery.capability.calendar.db.EventRow
 import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
+import uk.co.siland.culvery.core.repeat.RepeatChoice
 
 class RememberedTitlesTest {
     private val zone = ZoneId.of("Europe/London")
@@ -85,6 +87,16 @@ class RememberedTitlesTest {
         val rule = "DTSTART:20260924\nRRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH"
         val kept = remembered(timed("a", "Club", day(9, 24), rule = rule, seriesId = "a")).single()
         assertThat(kept.rule).isEqualTo("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH")
+    }
+
+    @Test
+    fun aRememberedSeriesOnTwoDaysIsSuggestedWithBoth() {
+        val rule = "DTSTART:20260914\nRRULE:FREQ=WEEKLY;BYDAY=MO,WE;COUNT=20"
+        val kept = remembered(timed("a", "Swim", day(9, 14), rule = rule, seriesId = "a")).single()
+        assertThat(kept.rule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE")
+        val suggestion = LoadedTitles(listOf(kept)).matching("Swim").single()
+        assertThat(suggestion.choice()).isEqualTo(RepeatChoice.Weekly)
+        assertThat(suggestion.days()).containsExactly(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY)
     }
 
     @Test

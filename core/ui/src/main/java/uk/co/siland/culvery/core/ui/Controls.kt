@@ -89,6 +89,9 @@ object ControlTokens {
     val chipBusyIcon = 16.dp
     val chipIcon = 20.dp
 
+    // 15 between a form's parts: the editor pane's, the repeat picker's.
+    val formGap = 15.dp
+
     // A segmented control (handoff 6e): its chips 4 inside a `surf2` pill.
     val segmentPadding = 4.dp
 

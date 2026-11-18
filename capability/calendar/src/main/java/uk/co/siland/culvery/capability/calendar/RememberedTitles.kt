@@ -10,6 +10,7 @@ import uk.co.siland.culvery.core.plugin.textKey
 import uk.co.siland.culvery.core.repeat.RepeatChoice
 import uk.co.siland.culvery.core.repeat.RepeatEnd
 import uk.co.siland.culvery.core.repeat.choiceOf
+import uk.co.siland.culvery.core.repeat.daysOf
 import uk.co.siland.culvery.core.repeat.nthOf
 import uk.co.siland.culvery.core.repeat.recurrenceRule
 import uk.co.siland.culvery.core.repeat.seriesStart
@@ -101,7 +102,7 @@ private fun EventRow.remembered(zone: ZoneId, keyOf: (String) -> String): Rememb
 /** The repeat the editor offers, written with no end and no first date; null for any other, or one that can't be read. */
 private fun keptRule(rule: String, start: LocalDate): String? {
     val choice = runCatching { choiceOf(rule, start) }.getOrNull()?.takeIf { it != RepeatChoice.Never } ?: return null
-    return recurrenceRule(choice, RepeatEnd.Never, start, nthOf(rule, start))
+    return recurrenceRule(choice, RepeatEnd.Never, start, nthOf(rule, start), daysOf(rule, start))
 }
 
 /**

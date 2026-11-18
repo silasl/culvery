@@ -35,7 +35,10 @@ val EDITOR_REPEATS: List<RepeatChoice> = listOf(
     RepeatChoice.Daily,
 )
 
-/** Whether an event [length] long ends before the next one of this repeat starts (9c §3.3); on several [days] only a day or less does. */
+/**
+ * Whether an event [length] long ends before the next one of this repeat starts (9c §3.3); on several [days] only a day or less does.
+ * [days] is the whole set, the start's own weekday included, unlike the other functions' extra days.
+ */
 fun RepeatChoice.fitsLength(length: Duration, days: Set<DayOfWeek> = emptySet()): Boolean = when (this) {
     RepeatChoice.Never, RepeatChoice.Yearly -> true
     RepeatChoice.Daily -> length <= Duration.ofDays(1)

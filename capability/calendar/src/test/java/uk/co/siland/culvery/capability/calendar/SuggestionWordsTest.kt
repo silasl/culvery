@@ -107,6 +107,15 @@ class SuggestionWordsTest {
         val daily = "RRULE:FREQ=DAILY;INTERVAL=1"
         val twoDays = Suggestion("Camp", "mia", true, null, null, 2, daily, day(9, 1), day(9, 2))
         assertThat(fillLine(twoDays, household, childOnly = false)).isEqualTo("Fills in Mia, all day for 2 days")
+        val onTwoDays = Suggestion("Camp", "mia", true, null, null, 2, "RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE", day(9, 14), day(9, 14))
+        assertThat(fillLine(onTwoDays, household, childOnly = false)).isEqualTo("Fills in Mia, all day for 2 days")
+    }
+
+    @Test
+    fun aSeriesOnSeveralDaysNamesThemAll() {
+        val swim = series("RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE", day(9, 16), first = day(9, 14))
+        assertThat(patternLine(swim, household, today)).isEqualTo("Family · Every week, on Mon, Wed, 10:00–11:00 · last on Wed 16 Sep")
+        assertThat(fillLine(swim, household, childOnly = false)).isEqualTo("Fills in Everyone, 10:00–11:00 and every week, on Mon, Wed")
     }
 
     @Test

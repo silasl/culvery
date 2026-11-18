@@ -36,6 +36,7 @@ import uk.co.siland.culvery.capability.calendar.needsLine
 import uk.co.siland.culvery.capability.calendar.timeValue
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.clockText
 
@@ -95,7 +96,7 @@ internal fun CheckPane(form: EditorForm, household: EditorPeople) {
         return
     }
     val (dates, more) = firstDates(form)
-    Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
+    Column(verticalArrangement = Arrangement.spacedBy(ControlTokens.formGap)) {
         Text(checkSentence(form, household.people), style = CalendarType.checkSentence, color = c.ink, modifier = Modifier.testTag("check_sentence"))
         if (dates.isNotEmpty()) {
             // A one-off's single date needs no heading over it.

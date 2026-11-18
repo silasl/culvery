@@ -13,6 +13,7 @@ import uk.co.siland.culvery.core.household.FAMILY_COLOR
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.label
+import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhWhoPicker
 import uk.co.siland.culvery.core.ui.WhoOption
@@ -43,7 +44,7 @@ internal fun WhoPane(
     onRefusedWho: () -> Unit,
 ) {
     val options = remember(members) { members.map { WhoOption(it.person.id.value, it.person.name, it.role.label, it.person.color) } }
-    Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
+    Column(verticalArrangement = Arrangement.spacedBy(ControlTokens.formGap)) {
         HhWhoPicker(
             options = options,
             chosen = form.who.mapTo(mutableSetOf()) { it.value },

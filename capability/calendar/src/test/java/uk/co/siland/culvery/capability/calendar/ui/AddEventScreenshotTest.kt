@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
@@ -270,6 +271,13 @@ class AddEventScreenshotTest {
     fun addEventRepeatsDark() {
         show(weeklyGuitar(), dark = true, start = EditorStep.Repeats)
         snap("add_event_repeats_dark")
+    }
+
+    /** Every week on Wed and Sat chosen: the day chips under the rows, Saturday fixed. */
+    @Test
+    fun addEventRepeatsDaysDark() {
+        show(weeklyGuitar().apply { toggleDay(DayOfWeek.WEDNESDAY) }, dark = true, start = EditorStep.Repeats)
+        snap("add_event_repeats_days_dark")
     }
 
     /** Handoff 6g: the sentence, the first four Saturdays with Mia's dot and "+ 8 more", and Mia's week chip. */

@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.calendar
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -480,6 +481,59 @@ class EditorFormTest {
         form.moreTimes()
         form.moreTimes()
         assertThat(form.repeatsValue).isEqualTo("Every Saturday · 12 times")
+    }
+
+    @Test
+    fun theRepeatsRowWordsTheDays() {
+        val form = ready(day = mon19)
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.toggleDay(DayOfWeek.WEDNESDAY)
+        assertThat(form.repeatsValue).isEqualTo("Every week, on Mon, Wed")
+        form.stopsAfter()
+        assertThat(form.repeatsValue).isEqualTo("Every week, on Mon, Wed · 10 times")
+        assertThat(form.stepperLabel).isEqualTo("10 times · last on Wed 18 Nov")
+    }
+
+    @Test
+    fun aNewEventOnTwoDaysWritesBothInItsRule() {
+        val form = ready(day = mon19)
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.toggleDay(DayOfWeek.WEDNESDAY)
+        form.stopsAfter()
+        assertThat(form.draft(createdBy = null).recurrence)
+            .isEqualTo(Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE;COUNT=$DEFAULT_TIMES", london))
+        form.toggleDay(DayOfWeek.MONDAY)
+        assertThat(form.draft(createdBy = null).recurrence?.rule).contains("BYDAY=MO,WE")
+    }
+
+    @Test
+    fun daysAreLockedOnceTheEventIsLongerThanADay() {
+        val form = ready(day = mon19)
+        form.chooseRepeat(RepeatChoice.Weekly)
+        assertThat(form.daysLocked).isFalse()
+        form.chooseAllDay(true)
+        form.pickEndDate(day(20))
+        assertThat(form.daysLocked).isTrue()
+        form.toggleDay(DayOfWeek.WEDNESDAY)
+        assertThat(form.draft(createdBy = null).recurrence?.rule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1")
+
+        val two = ready(day = mon19).apply {
+            chooseRepeat(RepeatChoice.Weekly)
+            toggleDay(DayOfWeek.WEDNESDAY)
+            chooseAllDay(true)
+            pickEndDate(day(20))
+        }
+        assertThat(two.repeat).isEqualTo(RepeatChoice.Never)
+        assertThat(two.repeatTooLong).isTrue()
+    }
+
+    @Test
+    fun tickingADayIsAnEdit() {
+        val form = new(day = mon19).apply { chooseRepeat(RepeatChoice.Weekly) }
+        form.toggleDay(DayOfWeek.WEDNESDAY)
+        assertThat(form.edited).isTrue()
+        form.chooseRepeat(RepeatChoice.Never)
+        assertThat(form.edited).isFalse()
     }
 
     @Test

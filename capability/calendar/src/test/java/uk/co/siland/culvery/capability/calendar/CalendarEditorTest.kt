@@ -171,6 +171,18 @@ class CalendarEditorTest {
     }
 
     @Test
+    fun theAddedToastNamesEveryDayOfAWeeklySeries() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        val start = LocalDate.of(2026, 10, 19).atTime(10, 0).atZone(london).toInstant()
+        val draft = EventDraft("Swim", EventTime.Timed(start), EventTime.Timed(start.plusSeconds(2700)), PersonId.FAMILY.value, null)
+            .copy(recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE", london))
+        assertThat(editor.create(draft)).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages.single()).contains("every week, on Mon, Wed")
+    }
+
+    @Test
     fun aMultiDayAllDayEventIsWrittenWithItsExclusiveEnd() = runTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
