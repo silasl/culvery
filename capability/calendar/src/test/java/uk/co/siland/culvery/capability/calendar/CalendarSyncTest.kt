@@ -51,6 +51,7 @@ import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.backoffMillis
+import uk.co.siland.culvery.core.repeat.Recurrence
 import uk.co.siland.culvery.core.ui.test.awaiting
 
 // Robolectric for Room and for android.util.Log (the engine logs timeouts).
@@ -1749,6 +1750,19 @@ class CalendarSyncTest {
         a.failWith = UnreachableException("reads are down")
         sync.syncAll()
         assertThat(reminders.gone).containsExactly(listOf(linkKey(key)))
+    }
+
+    /** Review fix round 2: an accepted new series has no stored dates until the next sync brings them; its reminder stays. */
+    @Test
+    fun anAcceptedQueuedRepeatingCreateKeepsItsReminder() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = remindingEngine()
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id").copy(recurrence = Recurrence("RRULE:FREQ=WEEKLY", london)), clientKey = key)
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(reminders.gone).isEmpty()
+        assertThat(reminders.changed).isEmpty()
     }
 
     /** Review fix round 1: the wall moves an event after the pass stored a phone's move and before it tells Reminders. */

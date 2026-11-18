@@ -123,9 +123,8 @@ class CalendarSync internal constructor(
         // Aged creates the provider turned out to have: the changes behind them are sent whatever their age.
         val foundCreates = mutableSetOf<EventRef>()
 
-        suspend fun drop(change: PendingChange, label: String, reason: String?) {
+        suspend fun drop(change: PendingChange, label: String, reason: String?, link: EventRef?) {
             val ref = change.ref
-            val link = linkOf(change)
             val count = if (change.kind == ChangeKind.CREATE && ref != null) {
                 droppedCreates += ref
                 // Under the editor's lock: an edit being queued behind this create goes with it, or finds it gone.
@@ -163,7 +162,7 @@ class CalendarSync internal constructor(
                     ageMillis(change, stored?.needsSignInSinceMillis, now) > OUTBOX_MAX_AGE_MS
                 if (aged && change.kind != ChangeKind.CREATE) {
                     Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}: unsent for 48 hours")
-                    drop(change, label, null)
+                    drop(change, label, null, linkOf(change))
                     continue
                 }
                 if (change.nextAttemptMillis > now) {
@@ -179,7 +178,7 @@ class CalendarSync internal constructor(
                 val writer = stored?.let { s -> writers.firstOrNull { it.providerId == s.connection.providerId } }
                 if (stored == null || source == null || writer == null || !change.isComplete()) {
                     Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}: nothing can deliver it")
-                    drop(change, label, null)
+                    drop(change, label, null, linkOf(change))
                     continue
                 }
                 // Read before it is sent: an accepted delete takes the row that says which series it was.
@@ -189,7 +188,7 @@ class CalendarSync internal constructor(
                     val found = callWriter(io, timeoutMillis) { writer.find(stored.connection, source.source, checkNotNull(change.clientKey)) }
                     if (found is WriteOutcome.Accepted && found.event == null) {
                         Log.w(TAG, "Dropping a queued CREATE for ${change.connectionId}: unsent for 48 hours, and never made")
-                        drop(change, label, null)
+                        drop(change, label, null, link)
                         continue
                     }
                     Sent(if (found is WriteOutcome.Accepted) complete(change, stored.connection, source.source, found, zone) else found)
@@ -201,9 +200,10 @@ class CalendarSync internal constructor(
                 when (val outcome = sent.outcome) {
                     is WriteOutcome.Accepted -> {
                         if (aged && ref != null) foundCreates += ref
-                        settled(change, link, zone)
+                        // A new series is stored with no dates; they come with the next sync, so its reminder stays.
+                        if (change.kind != ChangeKind.CREATE || change.draft?.recurrence == null) settled(change, link, zone)
                     }
-                    is WriteOutcome.Rejected -> drop(change, label, outcome.reason)
+                    is WriteOutcome.Rejected -> drop(change, label, outcome.reason, link)
                     is WriteOutcome.Retry -> {
                         val next = retryLater(change, now)
                         ref?.let { blockedRefs[it] = next }
