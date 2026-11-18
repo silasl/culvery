@@ -149,6 +149,16 @@ class RepeatWordsTest {
     }
 
     @Test
+    fun severalDaysAreWordedWithTheirLastDate() {
+        val monday = LocalDate.of(2026, 9, 21)
+        val counted = "DTSTART:20260921\nRRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE;COUNT=6"
+        assertThat(label(counted, monday, monday)).isEqualTo("Every week, on Mon, Wed · 6 times · last on Wed 7 Oct")
+        assertThat(label("RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,FR", monday, monday)).isEqualTo("Every week, on Mon to Wed, Fri")
+        assertThat(label("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE", monday, monday)).isEqualTo("Every 2 weeks, on Mon, Wed")
+        assertThat(label("RRULE:FREQ=WEEKLY;BYDAY=TU,WE", monday, monday)).isEqualTo("Yes")
+    }
+
+    @Test
     fun theReadBackAgreesWithTheEditor() {
         for (choice in EDITOR_REPEATS - RepeatChoice.Never) {
             val rule = recurrenceRule(choice, RepeatEnd.Never, day = saturday)

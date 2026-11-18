@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.repeat
 
 import com.google.common.truth.Truth.assertThat
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalDate
 import org.junit.Assert.assertThrows
@@ -173,5 +174,81 @@ class RecurrenceTest {
         assertThat(fits(RepeatChoice.MonthlyOnWeekday, Duration.ofDays(29))).isFalse()
         assertThat(fits(RepeatChoice.Yearly, Duration.ofDays(60))).isTrue()
         assertThat(fits(RepeatChoice.Never, Duration.ofDays(60))).isTrue()
+    }
+
+    // Monday 21 September 2026.
+    private val monday = LocalDate.of(2026, 9, 21)
+
+    @Test
+    fun severalDaysAreWrittenMondayFirst() {
+        val rule = recurrenceRule(RepeatChoice.Weekly, RepeatEnd.After(6), monday, days = setOf(DayOfWeek.WEDNESDAY))
+        assertThat(rule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE;COUNT=6")
+        assertThat(recurrenceRule(RepeatChoice.Fortnightly, RepeatEnd.Never, saturday, days = setOf(DayOfWeek.MONDAY)))
+            .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,SA")
+    }
+
+    @Test
+    fun oneDayWritesNoByDay() {
+        assertThat(recurrenceRule(RepeatChoice.Weekly, RepeatEnd.Never, monday, days = setOf(DayOfWeek.MONDAY)))
+            .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1")
+        assertThat(recurrenceRule(RepeatChoice.Weekly, RepeatEnd.Never, monday)).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1")
+    }
+
+    @Test
+    fun aListWithTheStartsDayReadsBackAsWeekly() {
+        assertThat(choiceOf("RRULE:FREQ=WEEKLY;BYDAY=MO,WE", monday)).isEqualTo(RepeatChoice.Weekly)
+        assertThat(choiceOf("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE", monday)).isEqualTo(RepeatChoice.Fortnightly)
+        assertThat(daysOf("RRULE:FREQ=WEEKLY;BYDAY=WE,MO", monday)).containsExactly(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY)
+        assertThat(daysOf("RRULE:FREQ=WEEKLY;BYDAY=MO", monday)).isEmpty()
+    }
+
+    @Test
+    fun aListWithoutTheStartsDayIsNoChoice() {
+        assertThat(choiceOf("RRULE:FREQ=WEEKLY;BYDAY=TU,WE", monday)).isNull()
+        assertThat(choiceOf("RRULE:FREQ=WEEKLY;BYDAY=MO,XX", monday)).isNull()
+        assertThat(daysOf("RRULE:FREQ=WEEKLY;BYDAY=TU,WE", monday)).isEmpty()
+    }
+
+    @Test
+    fun severalDaysAreWorded() {
+        fun words(choice: RepeatChoice, vararg days: DayOfWeek) = choice.wording(monday, days = days.toSet())
+        assertThat(words(RepeatChoice.Weekly, DayOfWeek.WEDNESDAY)).isEqualTo("Every week, on Mon, Wed")
+        assertThat(words(RepeatChoice.Weekly, DayOfWeek.TUESDAY, DayOfWeek.FRIDAY, DayOfWeek.THURSDAY, DayOfWeek.WEDNESDAY))
+            .isEqualTo("Every week, on Mon to Fri")
+        assertThat(words(RepeatChoice.Weekly, *DayOfWeek.entries.toTypedArray())).isEqualTo("Every day")
+        assertThat(words(RepeatChoice.Fortnightly, DayOfWeek.WEDNESDAY)).isEqualTo("Every 2 weeks, on Mon, Wed")
+        assertThat(words(RepeatChoice.Weekly, DayOfWeek.TUESDAY)).isEqualTo("Every week, on Mon, Tue")
+        assertThat(words(RepeatChoice.Weekly, DayOfWeek.MONDAY)).isEqualTo("Every Monday")
+        // Sat, Sun, Mon is not a run: the week runs Monday to Sunday.
+        assertThat(RepeatChoice.Weekly.wording(saturday, days = setOf(DayOfWeek.SUNDAY, DayOfWeek.MONDAY)))
+            .isEqualTo("Every week, on Mon, Sat, Sun")
+    }
+
+    @Test
+    fun severalDaysCountThroughTheWeeks() {
+        val days = setOf(DayOfWeek.WEDNESDAY)
+        assertThat(occurrences(RepeatChoice.Weekly, monday, 4, days = days)).containsExactly(
+            LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 28), LocalDate.of(2026, 9, 30),
+        ).inOrder()
+        assertThat(occurrences(RepeatChoice.Fortnightly, monday, 3, days = days)).containsExactly(
+            LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 23), LocalDate.of(2026, 10, 5),
+        ).inOrder()
+    }
+
+    @Test
+    fun aCountedListsLastDate() {
+        val days = setOf(DayOfWeek.WEDNESDAY)
+        val nth = nthWeekday(monday)
+        assertThat(lastOccurrence(RepeatChoice.Weekly, monday, 6, nth, days)).isEqualTo(LocalDate.of(2026, 10, 7))
+        assertThat(lastOccurrence(RepeatChoice.Weekly, monday, COUNTED_LAST_CAP + 1, nth, days)).isNull()
+    }
+
+    @Test
+    fun severalDaysFitOnlyADay() {
+        val two = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY)
+        assertThat(RepeatChoice.Weekly.fitsLength(Duration.ofDays(1), two)).isTrue()
+        assertThat(RepeatChoice.Weekly.fitsLength(Duration.ofDays(2), two)).isFalse()
+        assertThat(RepeatChoice.Fortnightly.fitsLength(Duration.ofDays(2), two)).isFalse()
+        assertThat(RepeatChoice.Fortnightly.fitsLength(Duration.ofDays(10))).isTrue()
     }
 }

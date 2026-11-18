@@ -3,6 +3,7 @@ package uk.co.siland.culvery.provider.calendar_google
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -40,6 +41,10 @@ import uk.co.siland.culvery.core.google.test.FakeTokenSource
 import uk.co.siland.culvery.core.google.test.assertLogsHoldNoPersonalData
 import uk.co.siland.culvery.core.google.test.failureOf
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.repeat.RepeatChoice
+import uk.co.siland.culvery.core.repeat.choiceOf
+import uk.co.siland.culvery.core.repeat.daysOf
+import uk.co.siland.culvery.core.repeat.repeatWords
 
 @RunWith(AndroidJUnit4::class)
 class GoogleReadTest {
@@ -324,6 +329,17 @@ class GoogleReadTest {
         val rules = provider.sync(conn, family, range, null).upserts.associate { it.remoteId to it.recurrenceRule }
         assertThat(rules["bins_20261003"]).isEqualTo("DTSTART:20260926\nRRULE:FREQ=WEEKLY;COUNT=12")
         assertThat(rules["late_20261003T223000Z"]).isEqualTo("DTSTART:20260926\nRRULE:FREQ=WEEKLY")
+    }
+
+    @Test
+    fun aSeveralDayRuleReadsBackWithItsDays() = runTest {
+        google.putEvent(family.id, google.timed("piano", "Piano", at(22, 15), at(22, 16)) { putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY;BYDAY=TU,TH") } })
+        google.putEvent(family.id, google.timed("piano_1", "Piano", at(22, 15), at(22, 16)) { put("recurringEventId", "piano") })
+        val rule = provider.sync(conn, family, range, null).upserts.single { it.remoteId == "piano_1" }.recurrenceRule!!
+        val tuesday = LocalDate.of(2026, 9, 22)
+        assertThat(choiceOf(rule, tuesday)).isEqualTo(RepeatChoice.Weekly)
+        assertThat(daysOf(rule, tuesday)).containsExactly(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY)
+        assertThat(repeatWords(rule, tuesday, london, tuesday)).isEqualTo("Every week, on Tue, Thu")
     }
 
     @Test

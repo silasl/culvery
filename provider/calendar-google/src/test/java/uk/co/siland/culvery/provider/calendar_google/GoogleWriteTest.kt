@@ -2,6 +2,7 @@ package uk.co.siland.culvery.provider.calendar_google
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -394,6 +395,14 @@ class GoogleWriteTest {
         val sent = google.bodies.single().getValue("recurrence").jsonArray.map { it.jsonPrimitive.content }
         assertThat(sent).containsExactly("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4SA;COUNT=12")
         assertThat(sent.none { it.startsWith("DTSTART") }).isTrue()
+    }
+
+    @Test
+    fun aSeveralDayRuleIsSentAsWritten() = runTest {
+        val rule = recurrenceRule(RepeatChoice.Weekly, RepeatEnd.After(6), LocalDate.of(2026, 9, 21), days = setOf(DayOfWeek.WEDNESDAY))!!
+        provider.create(conn, family, draft().copy(recurrence = Recurrence(rule, london)), key)
+        val sent = google.bodies.single().getValue("recurrence").jsonArray.map { it.jsonPrimitive.content }
+        assertThat(sent).containsExactly("RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE;COUNT=6")
     }
 
     /** Google repeats a timed series in the zone it is given, and needs one. */

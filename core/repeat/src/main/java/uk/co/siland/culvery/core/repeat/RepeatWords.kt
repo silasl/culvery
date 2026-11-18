@@ -25,9 +25,10 @@ fun repeatWords(rule: String?, day: LocalDate, zone: ZoneId, today: LocalDate): 
     val firstDay = first ?: day
     val choice = readChoice(parts, firstDay)
     val nth = nthOf(rule, firstDay)
-    val words = if (choice != null) choice.wording(firstDay, nth) else otherInterval(parts, firstDay) ?: return REPEATS_YES
+    val days = daysOf(rule, firstDay)
+    val words = if (choice != null) choice.wording(firstDay, nth, days) else otherInterval(parts, firstDay) ?: return REPEATS_YES
     val count = parts["COUNT"]?.toIntOrNull()?.takeIf { it >= 1 }?.let { n ->
-        val lastDay = if (choice != null && first != null) lastOccurrence(choice, first, n, nth) else null
+        val lastDay = if (choice != null && first != null) lastOccurrence(choice, first, n, nth, days) else null
         val last = lastDay?.let { " · last on ${shortDay(it, today)}" }.orEmpty()
         " · ${"%,d".format(Locale.UK, n)} ${if (n == 1) "time" else "times"}$last"
     }.orEmpty()
