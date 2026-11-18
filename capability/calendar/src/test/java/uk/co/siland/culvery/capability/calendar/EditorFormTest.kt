@@ -528,15 +528,6 @@ class EditorFormTest {
     }
 
     @Test
-    fun tickingADayIsAnEdit() {
-        val form = new(day = mon19).apply { chooseRepeat(RepeatChoice.Weekly) }
-        form.toggleDay(DayOfWeek.WEDNESDAY)
-        assertThat(form.edited).isTrue()
-        form.chooseRepeat(RepeatChoice.Never)
-        assertThat(form.edited).isFalse()
-    }
-
-    @Test
     fun typingThenClearingIsNotEdited() {
         val form = new(day = mon19)
         form.updateTitle("Swim")

@@ -19,6 +19,7 @@ import uk.co.siland.culvery.core.ui.Icons
 
 internal const val CHOOSE_A_DAY_FIRST = "Choose a day first."
 internal const val TOO_LONG_TO_REPEAT = "Too long to repeat that often."
+internal const val THE_EVENTS_OWN_DAY = "The event’s own day"
 
 /** "To skip one date, change it in Google Calendar on your phone." */
 internal fun skipOneDateLine(service: String): String = "To skip one date, change it in $service on your phone."
@@ -43,7 +44,8 @@ internal fun RepeatsPane(form: EditorForm, service: String, onPicked: () -> Unit
             lockedLine = { TOO_LONG_TO_REPEAT.takeUnless { _ -> form.fits(it) } },
             daysLocked = form.daysLocked,
             daysLockedLine = TOO_LONG_TO_REPEAT,
-            busy = form.saving,
+            ownDayLine = THE_EVENTS_OWN_DAY,
+            actions = form.repeatActions,
             onPicked = { if (it == RepeatChoice.Never) onPicked() },
         )
         Text(skipOneDateLine(service), style = CalendarType.whoHint, color = Culvery.colors.mute, modifier = Modifier.testTag("repeats_hint"))

@@ -54,8 +54,8 @@ object RepeatPickerType {
  * The repeats worded from [day] as radio rows, a [RepeatPick.kept] rule first as its own; for weekly and every 2 weeks a
  * chip for each day, [day]'s own ticked and fixed; while it repeats, Keeps going | Stops after, and for Stops after one
  * stepper with the count and the last date. A row [lockedLine] gives a reason for is locked and shows it; [daysLocked]
- * chips can't be ticked, and [daysLockedLine] says why under them. A tap while [busy] changes nothing. [onPicked] follows
- * each row chosen.
+ * chips can't be ticked, and [daysLockedLine] says why under them and to TalkBack; [ownDayLine] is what TalkBack hears on
+ * [day]'s own chip. Taps go to [actions]; one while [busy] changes nothing. [onPicked] follows each row chosen.
  */
 @Composable
 fun HhRepeatPicker(
@@ -68,6 +68,8 @@ fun HhRepeatPicker(
     lockedLine: (RepeatChoice) -> String? = { null },
     daysLocked: Boolean = false,
     daysLockedLine: String? = null,
+    ownDayLine: String? = null,
+    actions: RepeatPickActions = pick,
     busy: Boolean = false,
     onPicked: (RepeatChoice) -> Unit = {},
 ) {
@@ -75,7 +77,7 @@ fun HhRepeatPicker(
         HhRadioGroup {
             pick.kept?.let { kept ->
                 val words = remember(kept, day, zone, today) { "As the event: ${repeatWords(kept, day, zone, today)}" }
-                HhRadioRow(words, selected = pick.keeping, tag = "repeat_kept") { if (!busy) pick.keep() }
+                HhRadioRow(words, selected = pick.keeping, tag = "repeat_kept") { if (!busy) actions.keep() }
             }
             EDITOR_REPEATS.forEach { choice ->
                 val line = lockedLine(choice)
@@ -87,57 +89,63 @@ fun HhRepeatPicker(
                     locked = line != null,
                 ) {
                     if (!busy) {
-                        pick.choose(choice)
+                        actions.choose(choice)
                         onPicked(choice)
                     }
                 }
             }
         }
         if (pick.keeping || pick.choice == RepeatChoice.Never) return@Column
-        if (pick.daysOn(day).isNotEmpty()) DayChips(pick, day.dayOfWeek, daysLocked, daysLockedLine, busy)
+        if (pick.daysOn(day).isNotEmpty()) DayChips(pick, actions, day.dayOfWeek, DaysLock(daysLocked, daysLockedLine, ownDayLine), busy)
         val after = pick.end as? RepeatEnd.After
         HhSegmented(
             options = listOf(KEEPS_GOING, STOPS_AFTER),
             selected = if (after != null) 1 else 0,
             onSelect = {
                 if (!busy) {
-                    if (it == 0) pick.keepsGoing() else pick.stopsAfter()
+                    if (it == 0) actions.keepsGoing() else actions.stopsAfter()
                 }
             },
             tag = "ends_mode",
         )
-        if (after != null) Stepper(pick, after.times, day, nth, busy)
+        if (after != null) Stepper(pick, actions, after.times, day, nth, busy)
     }
 }
 
+private class DaysLock(val locked: Boolean, val line: String?, val ownLine: String?)
+
+// A chip a tap can't change says why, if the caller gave a reason, and offers no tap.
 @Composable
-private fun DayChips(pick: RepeatPick, own: DayOfWeek, locked: Boolean, lockedLine: String?, busy: Boolean) {
+private fun DayChips(pick: RepeatPick, actions: RepeatPickActions, own: DayOfWeek, lock: DaysLock, busy: Boolean) {
     val chosen = pick.extraDays + own
     Row(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap), modifier = Modifier.testTag("repeat_days")) {
         DayOfWeek.entries.forEach { d ->
+            val isOwn = d == own
             HhChoiceChip(
                 label = d.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
                 selected = d in chosen,
                 tag = "repeat_day_${d.name}",
-                onClick = { if (!locked && !busy) pick.toggleDay(d, own) },
-                enabled = !locked || d == own,
+                onClick = { if (!busy) actions.toggleDay(d, own) },
+                enabled = !lock.locked || isOwn,
                 unselectedFill = Culvery.colors.surf2,
                 role = Role.Checkbox,
-                locked = d == own,
+                stateDescription = if (isOwn) lock.ownLine else lock.line.takeIf { lock.locked },
+                locked = isOwn,
+                explains = false,
             )
         }
     }
-    if (locked && lockedLine != null) {
-        Text(lockedLine, style = RadioRowTokens.lineStyle, color = Culvery.colors.mute, modifier = Modifier.testTag("repeat_days_note"))
+    if (lock.locked && lock.line != null) {
+        Text(lock.line, style = RadioRowTokens.lineStyle, color = Culvery.colors.mute, modifier = Modifier.testTag("repeat_days_note"))
     }
 }
 
 /** − "12 times · last on Sat 12 Dec" +: held, a button keeps stepping; each end disables its button. */
 @Composable
-private fun Stepper(pick: RepeatPick, times: Int, day: LocalDate, nth: Int, busy: Boolean) {
+private fun Stepper(pick: RepeatPick, actions: RepeatPickActions, times: Int, day: LocalDate, nth: Int, busy: Boolean) {
     val c = Culvery.colors
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(RepeatPickerTokens.stepperGap)) {
-        StepButton(Icons.REMOVE, FEWER_TIMES, "ends_fewer", enabled = times > MIN_TIMES) { if (!busy) pick.fewerTimes() }
+        StepButton(Icons.REMOVE, FEWER_TIMES, "ends_fewer", enabled = times > MIN_TIMES) { if (!busy) actions.fewerTimes() }
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -150,7 +158,7 @@ private fun Stepper(pick: RepeatPick, times: Int, day: LocalDate, nth: Int, busy
         ) {
             Text(pick.stepperLabel(day, nth).orEmpty(), style = RepeatPickerType.count, color = c.ink, maxLines = 1)
         }
-        StepButton(Icons.ADD, MORE_TIMES, "ends_more", enabled = times < MAX_TIMES) { if (!busy) pick.moreTimes() }
+        StepButton(Icons.ADD, MORE_TIMES, "ends_more", enabled = times < MAX_TIMES) { if (!busy) actions.moreTimes() }
     }
 }
 

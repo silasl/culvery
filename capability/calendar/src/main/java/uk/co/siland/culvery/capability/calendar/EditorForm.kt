@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.repeat.isLastOfWeekday
 import uk.co.siland.culvery.core.repeat.nthWeekday
 import uk.co.siland.culvery.core.repeat.wording
 import uk.co.siland.culvery.core.ui.RepeatPick
+import uk.co.siland.culvery.core.ui.RepeatPickActions
 import uk.co.siland.culvery.core.ui.plural
 
 private const val FORTNIGHT_DAYS = 14L
@@ -131,7 +132,12 @@ class EditorForm(
 
     fun pickStartDate(date: LocalDate) = editWhen {
         eventWhen = eventWhen.pickStartDate(date, defaults = !timesTouched, today, now)
-        if (!fitsCopiedRepeat(date)) changed(CopiedRow.Repeats)
+        copiedRepeat?.let { s ->
+            // A copied series on several days keeps the others beside the date picked, or, off them, only that date's.
+            val fits = fitsCopiedRepeat(date)
+            pick = RepeatPick(pick.choice, pick.end, if (fits) s.days() - date.dayOfWeek else emptySet())
+            if (!fits) changed(CopiedRow.Repeats)
+        }
     }
 
     /** A day outside the start's day and the 59 after it changes nothing. */
@@ -189,22 +195,20 @@ class EditorForm(
 
     private fun setRepeat(choice: RepeatChoice, days: Set<DayOfWeek> = emptySet()) {
         pick = RepeatPick(choice, extraDays = days)
-        copiedFrom = null
+        copiedRepeat = null
     }
 
     private var copiedRows: Set<CopiedRow> by mutableStateOf(emptySet())
 
-    private var copiedFrom: Suggestion? by mutableStateOf(null)
-
-    /** The suggestion whose repeat [use] filled in, until Repeats changes: its choice or its days. */
-    val copiedRepeat: Suggestion?
-        get() = copiedFrom?.takeIf { pick.choice == it.choice() && pick.extraDays == it.days() }
+    /** The suggestion whose repeat [use] filled in, until Repeats changes. */
+    var copiedRepeat: Suggestion? by mutableStateOf(null)
+        private set
 
     /** What [use] filled in, until each row changes (9c §4.4). */
     val copied: Set<CopiedRow> get() = if (copiedRepeat != null) copiedRows + CopiedRow.Repeats else copiedRows
 
     private fun changed(row: CopiedRow) {
-        if (row == CopiedRow.Repeats) copiedFrom = null else copiedRows -= row
+        if (row == CopiedRow.Repeats) copiedRepeat = null else copiedRows -= row
     }
 
     /** The place in its month a monthly-on-a-weekday repeat takes for [day]: a copied "last", or [day]'s own. */
@@ -239,40 +243,63 @@ class EditorForm(
         touchWhen(eventWhen.copiedFrom(s))
         val filled = s.choice()?.takeIf { canRepeat && childOnly == null && it.fitsLength(eventWhen.repeatLength, s.days()) }
         if (filled != null) {
-            setRepeat(filled, s.days())
+            setRepeat(filled, s.days() - s.anchor().dayOfWeek)
             repeatTooLong = false
             repeatsAnswered = true
         } else if (!fits(repeat)) {
             dropRepeat()
         }
         copiedRows = if (childOnly == null) setOf(CopiedRow.Who, CopiedRow.Starts) else setOf(CopiedRow.Starts)
-        copiedFrom = s.takeIf { filled != null }
+        copiedRepeat = s.takeIf { filled != null }
         usedSuggestion = s
     }
 
-    /** Back to Never drops the end and the days: they only show while the event repeats. */
-    fun chooseRepeat(choice: RepeatChoice) = edit {
+    // Any change to the repeat clears what was copied into it, for good.
+    private inline fun changeRepeat(change: () -> Unit) = edit {
         if (!canRepeat) return@edit
+        val before = Triple(pick.choice, pick.end, pick.extraDays)
+        change()
+        if (Triple(pick.choice, pick.end, pick.extraDays) != before) copiedRepeat = null
+    }
+
+    /** Back to Never drops the end and the days: they only show while the event repeats. */
+    fun chooseRepeat(choice: RepeatChoice) = changeRepeat {
         openRepeats()
-        if (choice == repeat || !fits(choice)) return@edit
-        pick.choose(choice)
-        copiedFrom = null
+        if (fits(choice)) pick.choose(choice)
     }
 
     /** A day beside the start's own, while it repeats weekly or every 2 weeks and the days aren't [daysLocked]. */
-    fun toggleDay(day: DayOfWeek) = edit {
-        val first = eventWhen.startDate ?: return@edit
-        if (canRepeat && !daysLocked && pick.daysOn(first).isNotEmpty()) pick.toggleDay(day, first.dayOfWeek)
+    fun toggleDay(day: DayOfWeek) = changeRepeat {
+        val first = eventWhen.startDate
+        if (first != null && !daysLocked && pick.daysOn(first).isNotEmpty()) pick.toggleDay(day, first.dayOfWeek)
     }
 
     /** Choosing it while it is chosen keeps the count. */
-    fun stopsAfter() = edit { if (canRepeat) pick.stopsAfter() }
+    fun stopsAfter() = changeRepeat { pick.stopsAfter() }
 
-    fun keepsGoing() = edit { if (canRepeat) pick.keepsGoing() }
+    fun keepsGoing() = changeRepeat { pick.keepsGoing() }
 
-    fun fewerTimes() = edit { pick.fewerTimes() }
+    fun fewerTimes() = changeRepeat { pick.fewerTimes() }
 
-    fun moreTimes() = edit { pick.moreTimes() }
+    fun moreTimes() = changeRepeat { pick.moreTimes() }
+
+    /** The Repeats pane's taps, through the same guards as the form's own calls. */
+    val repeatActions: RepeatPickActions = object : RepeatPickActions {
+        override fun choose(choice: RepeatChoice) = chooseRepeat(choice)
+
+        // The editor never offers a kept rule.
+        override fun keep() = Unit
+
+        override fun toggleDay(day: DayOfWeek, own: DayOfWeek) = this@EditorForm.toggleDay(day)
+
+        override fun stopsAfter() = this@EditorForm.stopsAfter()
+
+        override fun keepsGoing() = this@EditorForm.keepsGoing()
+
+        override fun fewerTimes() = this@EditorForm.fewerTimes()
+
+        override fun moreTimes() = this@EditorForm.moreTimes()
+    }
 
     /** The stepper's centre while it stops after a count: "12 times · last on Sat 12 Dec". */
     val stepperLabel: String? get() = eventWhen.startDate?.let { pick.stepperLabel(it, nthOn(it)) }

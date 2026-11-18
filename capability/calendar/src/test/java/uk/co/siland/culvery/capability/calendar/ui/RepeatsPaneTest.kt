@@ -34,6 +34,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.repeat.DEFAULT_TIMES
 import uk.co.siland.culvery.core.repeat.EDITOR_REPEATS
+import uk.co.siland.culvery.capability.calendar.CopiedRow
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.core.repeat.MAX_TIMES
 import uk.co.siland.culvery.core.repeat.MIN_TIMES
@@ -102,6 +103,35 @@ class RepeatsPaneTest {
         show(guitar(day = null) { use(lastSaturday); pickStartDate(saturday) })
         node("repeat_MonthlyOnWeekday").assertTextEquals("Every month, on the last Saturday")
         node("repeat_MonthlyOnWeekday").assertIsSelected()
+    }
+
+    @Test
+    fun changingTheRepeatAndBackDoesNotBringBackTheCopiedTag() {
+        val lastSaturday = Suggestion(
+            "Guitar lesson", "mia", false, LocalTime.of(10, 0), Duration.ofMinutes(45), null, "RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1SA",
+            LocalDate.of(2026, 7, 25), LocalDate.of(2026, 8, 29),
+        )
+        show(guitar(day = null) { use(lastSaturday); pickStartDate(saturday) })
+        assertThat(form.copied).contains(CopiedRow.Repeats)
+        node("repeat_Weekly").performClick()
+        node("repeat_MonthlyOnWeekday").performClick()
+        node("repeat_MonthlyOnWeekday").assertIsSelected().assertTextEquals("Every month, on the 4th Saturday")
+        assertThat(form.copied).doesNotContain(CopiedRow.Repeats)
+        assertThat(form.draft(createdBy = null).recurrence?.rule).isEqualTo("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4SA")
+    }
+
+    @Test
+    fun tickingAndUntickingADayClearsTheCopiedTag() {
+        val weekly = Suggestion(
+            "Guitar lesson", "mia", false, LocalTime.of(10, 0), Duration.ofMinutes(45), null, "RRULE:FREQ=WEEKLY;INTERVAL=1",
+            LocalDate.of(2026, 9, 5), LocalDate.of(2026, 9, 19),
+        )
+        show(guitar(day = null) { use(weekly); pickStartDate(saturday) })
+        assertThat(form.copied).contains(CopiedRow.Repeats)
+        node("repeat_day_MONDAY").performClick()
+        node("repeat_day_MONDAY").performClick()
+        node("repeat_day_MONDAY").assertIsNotSelected()
+        assertThat(form.copied).doesNotContain(CopiedRow.Repeats)
     }
 
     @Test

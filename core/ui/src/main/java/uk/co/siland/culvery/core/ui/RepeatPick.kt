@@ -20,13 +20,30 @@ import uk.co.siland.culvery.core.repeat.nthWeekday
 import uk.co.siland.culvery.core.repeat.recurrenceRule
 import uk.co.siland.culvery.core.repeat.ruleParts
 
+/** What the repeat picker's taps do: [RepeatPick] does them itself; a form that guards its repeat passes its own. */
+interface RepeatPickActions {
+    fun choose(choice: RepeatChoice)
+
+    fun keep()
+
+    fun toggleDay(day: DayOfWeek, own: DayOfWeek)
+
+    fun stopsAfter()
+
+    fun keepsGoing()
+
+    fun fewerTimes()
+
+    fun moreTimes()
+}
+
 /** The repeat picker's state. [kept] is a rule shown as its own row because no choice writes it; it stays chosen until a choice is tapped. */
 class RepeatPick(
     choice: RepeatChoice = RepeatChoice.Never,
     end: RepeatEnd = RepeatEnd.Never,
     extraDays: Set<DayOfWeek> = emptySet(),
     val kept: String? = null,
-) {
+) : RepeatPickActions {
     var choice: RepeatChoice by mutableStateOf(choice)
         private set
 
@@ -55,7 +72,7 @@ class RepeatPick(
     private val showsEnds: Boolean get() = !keeping && choice != RepeatChoice.Never
 
     /** Leaves [kept]; Never clears the end and the days. */
-    fun choose(choice: RepeatChoice) {
+    override fun choose(choice: RepeatChoice) {
         touched = true
         keeping = false
         this.choice = choice
@@ -65,29 +82,29 @@ class RepeatPick(
         }
     }
 
-    fun keep() {
+    override fun keep() {
         if (kept == null) return
         touched = true
         keeping = true
     }
 
     /** [own] can't be toggled. */
-    fun toggleDay(day: DayOfWeek, own: DayOfWeek) {
+    override fun toggleDay(day: DayOfWeek, own: DayOfWeek) {
         if (day == own) return
         touched = true
         extraDays = if (day in extraDays) extraDays - day else extraDays + day
     }
 
     /** Choosing it while it is chosen keeps the count. */
-    fun stopsAfter() {
+    override fun stopsAfter() {
         if (end !is RepeatEnd.After) chooseEnd(RepeatEnd.After(DEFAULT_TIMES))
     }
 
-    fun keepsGoing() = chooseEnd(RepeatEnd.Never)
+    override fun keepsGoing() = chooseEnd(RepeatEnd.Never)
 
-    fun fewerTimes() = stepTimes(-1)
+    override fun fewerTimes() = stepTimes(-1)
 
-    fun moreTimes() = stepTimes(1)
+    override fun moreTimes() = stepTimes(1)
 
     private fun chooseEnd(end: RepeatEnd) {
         if (!showsEnds) return

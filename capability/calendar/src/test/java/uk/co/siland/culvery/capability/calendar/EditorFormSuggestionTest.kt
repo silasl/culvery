@@ -39,6 +39,24 @@ class EditorFormSuggestionTest {
         Suggestion("Half term", "sam", true, null, null, days, rule, day(7, 11).takeIf { rule != null }, day(7, 11))
 
     @Test
+    fun aCopiedTwoDaySeriesOnAnotherDayKeepsOnlyThatDay() {
+        val swim = Suggestion(
+            "Swim", "mia", false, LocalTime.of(10, 0), Duration.ofMinutes(45), null, "RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE", day(9, 14), day(9, 16),
+        )
+        val form = new().apply { use(swim) }
+        assertThat(form.repeatsValue).isEqualTo("Every week, on Mon, Wed")
+        form.pickStartDate(day(9, 30))
+        assertThat(form.copied).contains(CopiedRow.Repeats)
+        assertThat(form.draft(createdBy = null).recurrence?.rule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE")
+        form.pickStartDate(day(9, 29))
+        assertThat(form.copied).doesNotContain(CopiedRow.Repeats)
+        assertThat(form.repeatsValue).isEqualTo("Every Tuesday")
+        assertThat(form.draft(createdBy = null).recurrence?.rule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1")
+        form.pickStartDate(day(9, 30))
+        assertThat(form.draft(createdBy = null).recurrence?.rule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1")
+    }
+
+    @Test
     fun useFillsEverythingButTheDateAndTheEnd() {
         val form = new(day = day(9, 30))
         val s = guitar()

@@ -3,6 +3,9 @@ package uk.co.siland.culvery.core.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -93,6 +96,34 @@ class RepeatPickerTest {
         assertThat(pick.extraDays).isEmpty()
         node("repeat_day_WEDNESDAY").assertIsNotSelected()
         part("repeat_days_note").assertTextEquals("Too long")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aChipThatCannotChangeSaysWhyAndPromisesNothing() {
+        var locked by mutableStateOf(true)
+        var ownLine by mutableStateOf<String?>("Its own day")
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                HhRepeatPicker(
+                    RepeatPick(RepeatChoice.Weekly), monday, monday, london,
+                    daysLocked = locked, daysLockedLine = "Too long", ownDayLine = ownLine,
+                )
+            }
+        }
+        fun state(tag: String) = node(tag).fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
+        fun clickLabel(tag: String) = node(tag).fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)?.label
+        assertThat(state("repeat_day_MONDAY")).isEqualTo("Its own day")
+        assertThat(clickLabel("repeat_day_MONDAY")).isNull()
+        assertThat(state("repeat_day_TUESDAY")).isEqualTo("Too long")
+        assertThat(clickLabel("repeat_day_TUESDAY")).isNull()
+        locked = false
+        ownLine = null
+        compose.waitForIdle()
+        assertThat(state("repeat_day_MONDAY")).isNull()
+        assertThat(clickLabel("repeat_day_MONDAY")).isNull()
+        assertThat(state("repeat_day_TUESDAY")).isNull()
+        assertThat(clickLabel("repeat_day_TUESDAY")).isNull()
         compose.assertClickablesHaveRoleAndLabel()
     }
 

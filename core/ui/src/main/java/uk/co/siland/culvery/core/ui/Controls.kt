@@ -163,6 +163,7 @@ object ControlType {
  * but isn't faded: the `lock` icon first, no fill, a `surf3` edge and a `mute` label, or selected, filled as chosen.
  * [labelStyle] can ask for tabular figures; a chip stretched wider than its contents centres them. [onLongClick] adds a
  * long press, offered to TalkBack as the action [longClickLabel]. [maxLines] is how many lines a long label takes before …
+ * An unavailable chip whose tap can't explain ([explains] false) offers no tap, and says only its [stateDescription].
  */
 @Composable
 fun HhChoiceChip(
@@ -188,6 +189,7 @@ fun HhChoiceChip(
     longClickLabel: String? = null,
     maxLines: Int = 2,
     modifier: Modifier = Modifier,
+    explains: Boolean = true,
 ) {
     val c = Culvery.colors
     val bare = locked && !selected
@@ -197,7 +199,7 @@ fun HhChoiceChip(
         else -> unselectedInk
     }
     val unavailable = !enabled || locked
-    val state = stateDescription ?: NOT_AVAILABLE.takeIf { unavailable }
+    val state = stateDescription ?: NOT_AVAILABLE.takeIf { unavailable && explains }
     val shape = RoundedCornerShape(ControlTokens.chipRadius)
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -218,7 +220,7 @@ fun HhChoiceChip(
             )
             // Never `enabled = false`: that would stop the explaining tap.
             .hhClickable(
-                onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { unavailable }, role = role, spoken = spokenName,
+                onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { unavailable && explains }, role = role, enabled = explains || !unavailable, spoken = spokenName,
                 onLongClick = onLongClick, longClickLabel = longClickLabel,
             )
             .padding(horizontal = ControlTokens.chipPaddingH),
