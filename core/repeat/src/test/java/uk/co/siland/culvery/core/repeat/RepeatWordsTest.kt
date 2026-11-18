@@ -1,0 +1,158 @@
+package uk.co.siland.culvery.core.repeat
+
+import com.google.common.truth.Truth.assertThat
+import java.time.LocalDate
+import java.time.ZoneId
+import org.junit.Test
+
+/** The detail sheet reads a series back in the editor's words (9 §3.4). */
+class RepeatWordsTest {
+    private val london = ZoneId.of("Europe/London")
+
+    // Saturday 26 September 2026.
+    private val saturday = LocalDate.of(2026, 9, 26)
+
+    private fun label(rule: String?, day: LocalDate = saturday, today: LocalDate = saturday) = repeatWords(rule, day, london, today)
+
+    @Test
+    fun rulesReadInTheEditorsWords() {
+        val expected = mapOf(
+            "RRULE:FREQ=WEEKLY" to "Every Saturday",
+            "RRULE:FREQ=WEEKLY;BYDAY=SA" to "Every Saturday",
+            "RRULE:FREQ=WEEKLY;INTERVAL=2" to "Every 2 weeks, on Saturday",
+            "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=SA" to "Every 2 weeks, on Saturday",
+            "RRULE:FREQ=MONTHLY;BYDAY=4SA" to "Every month, on the 4th Saturday",
+            "RRULE:FREQ=MONTHLY;BYMONTHDAY=26" to "Every month, on the 26th",
+            "RRULE:FREQ=MONTHLY" to "Every month, on the 26th",
+            "RRULE:FREQ=YEARLY" to "Every year, on 26 September",
+            "RRULE:FREQ=DAILY" to "Every day",
+            "RRULE:FREQ=WEEKLY;WKST=MO" to "Every Saturday",
+        )
+        expected.forEach { (rule, words) -> assertThat(label(rule)).isEqualTo(words) }
+    }
+
+    @Test
+    fun theLastWeekdayReadsAsLast() {
+        assertThat(label("RRULE:FREQ=MONTHLY;BYDAY=-1TH", LocalDate.of(2026, 10, 29))).isEqualTo("Every month, on the last Thursday")
+    }
+
+    /** Google offers "last Saturday" for a 4th Saturday that is also the last; the editor writes the 4th there. */
+    @Test
+    fun aLastWeekdayFromAFourthThatIsAlsoTheLastReadsAsLast() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=MONTHLY;BYDAY=-1SA;COUNT=3"))
+            .isEqualTo("Every month, on the last Saturday · 3 times · last on Sat 28 Nov")
+        assertThat(label("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1SA")).isEqualTo("Every month, on the last Saturday")
+        // The 19th is no month's last Saturday.
+        assertThat(label("RRULE:FREQ=MONTHLY;BYDAY=-1SA", LocalDate.of(2026, 9, 19))).isEqualTo(REPEATS_YES)
+    }
+
+    @Test
+    fun aMonthlyRuleByDateReadsItsDay() {
+        assertThat(label("RRULE:FREQ=MONTHLY;BYMONTHDAY=22", LocalDate.of(2026, 9, 22))).isEqualTo("Every month, on the 22nd")
+    }
+
+    @Test
+    fun otherIntervalsReadAsTheirUnits() {
+        assertThat(label("RRULE:FREQ=MONTHLY;INTERVAL=3")).isEqualTo("Every 3 months")
+        assertThat(label("RRULE:FREQ=DAILY;INTERVAL=3")).isEqualTo("Every 3 days")
+        assertThat(label("RRULE:FREQ=WEEKLY;INTERVAL=3;BYDAY=SA")).isEqualTo("Every 3 weeks")
+    }
+
+    @Test
+    fun aCountWithTheSeriesStartSaysTheLastDate() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=WEEKLY;COUNT=12")).isEqualTo("Every Saturday · 12 times · last on Sat 12 Dec")
+    }
+
+    /** The series' own first date, not this occurrence's, is where the count starts. */
+    @Test
+    fun aLaterOccurrenceCountsFromTheSeriesStart() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=WEEKLY;COUNT=12", LocalDate.of(2026, 10, 31)))
+            .isEqualTo("Every Saturday · 12 times · last on Sat 12 Dec")
+        assertThat(label("DTSTART:20261029\nRRULE:FREQ=MONTHLY;BYDAY=-1TH;COUNT=3", LocalDate.of(2026, 11, 26)))
+            .isEqualTo("Every month, on the last Thursday · 3 times · last on Thu 31 Dec")
+    }
+
+    @Test
+    fun aCountWithNoSeriesStartSaysOnlyTheCount() {
+        assertThat(label("RRULE:FREQ=WEEKLY;COUNT=12")).isEqualTo("Every Saturday · 12 times")
+    }
+
+    @Test
+    fun untilReadsAsItsDay() {
+        assertThat(label("RRULE:FREQ=WEEKLY;UNTIL=20261212")).isEqualTo("Every Saturday · until Sat 12 Dec")
+    }
+
+    /** Google writes a timed series' UNTIL as a UTC time; it is read in the household zone. */
+    @Test
+    fun aTimedUntilReadsInTheHouseholdZone() {
+        assertThat(label("RRULE:FREQ=WEEKLY;UNTIL=20261212T095959Z")).isEqualTo("Every Saturday · until Sat 12 Dec")
+        // 23:30 UTC on 1 Aug is 00:30 on 2 Aug in London.
+        assertThat(label("RRULE:FREQ=DAILY;UNTIL=20260801T233000Z")).isEqualTo("Every day · until Sun 2 Aug")
+    }
+
+    @Test
+    fun aLastDateInAnotherYearHasItsYear() {
+        assertThat(label("RRULE:FREQ=WEEKLY;UNTIL=20270302")).isEqualTo("Every Saturday · until Tue 2 Mar 2027")
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=WEEKLY;COUNT=12", today = LocalDate.of(2025, 12, 31)))
+            .isEqualTo("Every Saturday · 12 times · last on Sat 12 Dec 2026")
+        assertThat(label("RRULE:FREQ=WEEKLY;UNTIL=20261212", today = LocalDate.of(2026, 1, 1))).isEqualTo("Every Saturday · until Sat 12 Dec")
+    }
+
+    @Test
+    fun anythingElseIsYes() {
+        listOf(
+            null,
+            "RRULE:FREQ=WEEKLY;BYDAY=MO,WE",
+            "RRULE:FREQ=WEEKLY;BYDAY=WE",
+            "RRULE:FREQ=MONTHLY;BYDAY=2SA",
+            "RRULE:FREQ=MONTHLY;BYMONTHDAY=1",
+            "RRULE:FREQ=HOURLY",
+            "RRULE:FREQ=DAILY;INTERVAL=0",
+            "RRULE:FREQ=WEEKLY;BYSETPOS=1",
+            "not a rule",
+        ).forEach { assertThat(label(it)).isEqualTo(REPEATS_YES) }
+    }
+
+    /** 20 §4.4: past 1,000 times a series that can skip a month or a year isn't counted, so the label is the count alone. */
+    @Test
+    fun aboveTheCapTheLabelIsTheCountAlone() {
+        val the31st = LocalDate.of(2026, 10, 31)
+        assertThat(label("DTSTART:20261031\nRRULE:FREQ=MONTHLY;BYMONTHDAY=31;COUNT=10000", the31st))
+            .isEqualTo("Every month, on the 31st · 10,000 times")
+        val leapDay = LocalDate.of(2028, 2, 29)
+        assertThat(label("DTSTART:20280229\nRRULE:FREQ=YEARLY;COUNT=10000", leapDay)).endsWith(" · 10,000 times")
+    }
+
+    /** Regression guard (20 §4.4): a series worked out directly still names its last date at COUNT 10,000. */
+    @Test
+    fun aLongDailySeriesNamesItsLastDate() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=DAILY;COUNT=10000")).isEqualTo("Every day · 10,000 times · last on Tue 10 Feb 2054")
+    }
+
+    /** Regression guard: a short series still names its last date. */
+    @Test
+    fun aTwelveTimeSeriesStillSaysItsLastDate() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=WEEKLY;BYDAY=SA;COUNT=12")).isEqualTo("Every Saturday · 12 times · last on Sat 12 Dec")
+    }
+
+    /** Review Focus 4: a phone's series with an enormous COUNT, on each rule. */
+    @Test(timeout = 1_000)
+    fun aHugeCountReturnsAtOnce() {
+        listOf(
+            "FREQ=DAILY",
+            "FREQ=WEEKLY;BYDAY=SA",
+            "FREQ=WEEKLY;INTERVAL=2;BYDAY=SA",
+            "FREQ=MONTHLY;BYDAY=4SA",
+            "FREQ=MONTHLY;BYMONTHDAY=26",
+            "FREQ=YEARLY",
+        ).forEach { assertThat(label("DTSTART:20260926\nRRULE:$it;COUNT=2000000000")).contains(" · 2,000,000,000 times") }
+    }
+
+    @Test
+    fun theReadBackAgreesWithTheEditor() {
+        for (choice in EDITOR_REPEATS - RepeatChoice.Never) {
+            val rule = recurrenceRule(choice, RepeatEnd.Never, day = saturday)
+            assertThat(repeatWords(rule, saturday, london, saturday)).isEqualTo(choice.wording(saturday))
+        }
+    }
+}

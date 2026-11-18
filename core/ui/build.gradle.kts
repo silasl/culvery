@@ -12,6 +12,7 @@ android {
 }
 
 dependencies {
+    api(project(":core:repeat"))
     // SingleAction takes a CoroutineScope in its public API.
     api(libs.kotlinx.coroutines.core)
     testImplementation(libs.roborazzi.core)

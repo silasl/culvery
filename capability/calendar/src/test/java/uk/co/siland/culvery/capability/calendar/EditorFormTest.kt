@@ -9,6 +9,12 @@ import java.time.ZoneId
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.repeat.DEFAULT_TIMES
+import uk.co.siland.culvery.core.repeat.MAX_TIMES
+import uk.co.siland.culvery.core.repeat.MIN_TIMES
+import uk.co.siland.culvery.core.repeat.Recurrence
+import uk.co.siland.culvery.core.repeat.RepeatChoice
+import uk.co.siland.culvery.core.repeat.RepeatEnd
 
 /** Wednesday 23 September 2026, 10:00 in London; ranges are on Monday 19 October. Robolectric backs `mutableStateOf`. */
 @RunWith(AndroidJUnit4::class)

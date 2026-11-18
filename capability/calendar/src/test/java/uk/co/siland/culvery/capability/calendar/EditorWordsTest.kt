@@ -10,6 +10,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.repeat.DEFAULT_TIMES
+import uk.co.siland.culvery.core.repeat.RepeatChoice
 
 /** Today is Wednesday 23 September 2026 in London. Robolectric backs the form's `mutableStateOf`. */
 @RunWith(AndroidJUnit4::class)

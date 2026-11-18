@@ -7,11 +7,11 @@ import java.time.ZoneId
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
-import uk.co.siland.culvery.capability.calendar.RepeatChoice
-import uk.co.siland.culvery.capability.calendar.RepeatEnd
-import uk.co.siland.culvery.capability.calendar.occurrences
-import uk.co.siland.culvery.capability.calendar.recurrenceRule
-import uk.co.siland.culvery.capability.calendar.withSeriesStart
+import uk.co.siland.culvery.core.repeat.RepeatChoice
+import uk.co.siland.culvery.core.repeat.RepeatEnd
+import uk.co.siland.culvery.core.repeat.occurrences
+import uk.co.siland.culvery.core.repeat.recurrenceRule
+import uk.co.siland.culvery.core.repeat.withSeriesStart
 
 /** The fake provider's expansion of a series the tablet wrote, COUNT and UNTIL included (9 §4.8). */
 class RecurrenceExpanderTest {

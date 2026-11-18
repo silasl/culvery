@@ -23,6 +23,8 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
+import uk.co.siland.culvery.core.repeat.recurrenceRule
+import uk.co.siland.culvery.core.repeat.ruleParts
 
 private val BIRTHDAY_TITLE = Regex("""\bbirthdays?\b""", RegexOption.IGNORE_CASE)
 

@@ -11,6 +11,10 @@ import java.util.Locale
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.repeat.DAYS_PER_WEEK
+import uk.co.siland.culvery.core.repeat.REPEATS_YES
+import uk.co.siland.culvery.core.repeat.SHORT_DAY
+import uk.co.siland.culvery.core.repeat.wording
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.agoWords
 import uk.co.siland.culvery.core.ui.updatedLabel
@@ -161,12 +165,6 @@ fun problemLine(problem: SyncProblem): String = when (problem) {
 }
 
 internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
-// ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
-internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
-private val SHORT_DAY_AND_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.ENGLISH)
-
-/** "Sat 12 Dec", or "Tue 2 Mar 2027" when [date] isn't in [today]'s year. */
-internal fun shortDay(date: LocalDate, today: LocalDate): String = date.format(if (date.year == today.year) SHORT_DAY else SHORT_DAY_AND_YEAR)
 internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 /** "Sun 27": a day and its date. */
 internal val DAY_AND_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH)
@@ -188,8 +186,6 @@ internal val FULL_WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE
 
 /** "Tuesday 7 October": how TalkBack names a day, and the bins connect screen's next collection. */
 val FULL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
-
-internal const val DAYS_PER_WEEK = 7
 
 /** Home's Today row for a multi-day event: where the time would be (9 §2.1). */
 fun dayOf(span: DaySpan): String = "Day ${span.day} of ${span.of}"

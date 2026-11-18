@@ -4,6 +4,7 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
+import uk.co.siland.culvery.core.repeat.seriesStart
 
 private const val MIN_TYPED = 2
 private const val MAX_SUGGESTIONS = 3

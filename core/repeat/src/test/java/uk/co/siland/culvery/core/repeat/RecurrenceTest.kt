@@ -1,17 +1,13 @@
-package uk.co.siland.culvery.capability.calendar
+package uk.co.siland.culvery.core.repeat
 
 import com.google.common.truth.Truth.assertThat
 import java.time.Duration
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 /** 5 §A.4, 9 §3.1: what Save writes for each choice, the words from the day, and the dates a count lands on. */
 class RecurrenceTest {
-    private val london = ZoneId.of("Europe/London")
-
     // Saturday 26 September 2026: the 4th Saturday, and also the last.
     private val saturday = LocalDate.of(2026, 9, 26)
 
@@ -139,20 +135,6 @@ class RecurrenceTest {
         assertThat(RepeatChoice.MonthlyOnWeekday.wording(lastThursday, nthOf(rule, lastThursday))).isEqualTo("Every month, on the last Thursday")
         assertThat(nthOf("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4TH", lastThursday)).isEqualTo(4)
         assertThat(recurrenceRule(RepeatChoice.MonthlyOnWeekday, RepeatEnd.Never, lastThursday, nth = -1)).isEqualTo(rule)
-    }
-
-    /** Never "Yes": whatever either editor writes, the detail sheet's Repeats row starts with the words for it. */
-    @Test
-    fun whatSaveWritesReadsBackInItsWords() {
-        val starts = listOf(EventTime.AllDay(LocalDate.of(2026, 9, 23)), EventTime.Timed(Instant.parse("2026-09-23T17:00:00Z")))
-        val day = LocalDate.of(2026, 9, 23)
-        for (start in starts) {
-            for (choice in RepeatChoice.entries - RepeatChoice.Never) {
-                for (end in listOf(RepeatEnd.Never, RepeatEnd.After(5))) {
-                    assertThat(repeatsLabel(rule(choice, end, day), start, london, day)).startsWith(choice.wording(day))
-                }
-            }
-        }
     }
 
     @Test

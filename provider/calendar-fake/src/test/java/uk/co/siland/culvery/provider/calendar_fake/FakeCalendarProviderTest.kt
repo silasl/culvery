@@ -13,13 +13,13 @@ import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
-import uk.co.siland.culvery.capability.calendar.Recurrence
+import uk.co.siland.culvery.core.repeat.Recurrence
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
 import uk.co.siland.culvery.capability.calendar.newClientKey
-import uk.co.siland.culvery.capability.calendar.seriesStart
+import uk.co.siland.culvery.core.repeat.seriesStart
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 

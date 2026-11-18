@@ -19,6 +19,8 @@ dependencies {
     api(project(":core:plugin"))
     // PersonId and Person appear in this module's public API (SourceMapping, EventUi).
     api(project(":core:household"))
+    // RepeatChoice, Recurrence and the rule words appear in this module's public API and its providers'.
+    api(project(":core:repeat"))
     implementation(project(":core:ui"))
     implementation(project(":core:access"))
     implementation(project(":core:house"))

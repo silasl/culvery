@@ -35,7 +35,7 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
-import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.core.repeat.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.WeeksShown
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.ui.DarkColors

@@ -13,7 +13,7 @@ import java.time.temporal.TemporalAdjusters
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.instantIn
-import uk.co.siland.culvery.capability.calendar.withoutSeriesStart
+import uk.co.siland.culvery.core.repeat.withoutSeriesStart
 
 private val UNTIL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
 private val UNTIL_UTC: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")

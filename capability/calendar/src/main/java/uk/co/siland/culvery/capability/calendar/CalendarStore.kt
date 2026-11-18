@@ -24,6 +24,9 @@ import uk.co.siland.culvery.capability.calendar.db.SyncStateEntity
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.repeat.Recurrence
+import uk.co.siland.culvery.core.repeat.code
+import uk.co.siland.culvery.core.repeat.recurrenceRule
 
 /** The only writer of calendar.db. UI reads go through CalendarRepository. */
 @Singleton

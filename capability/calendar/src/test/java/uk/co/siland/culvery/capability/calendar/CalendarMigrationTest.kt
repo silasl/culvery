@@ -32,6 +32,8 @@ import uk.co.siland.culvery.capability.calendar.db.MIGRATION_9_10
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.repeat.recurrenceRule
+import uk.co.siland.culvery.core.repeat.seriesStart
 
 /**
  * Drives MigrationTestHelper with the plain framework SQLite driver ([AndroidSQLiteDriver]) rather than

@@ -5,6 +5,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Test
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.repeat.recurrenceRule
 
 class BirthdaysInTest {
     private val zone = ZoneId.of("Europe/London")

@@ -29,6 +29,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.repeat.recurrenceRule
 import uk.co.siland.culvery.core.ui.BinInks
 
 @RunWith(AndroidJUnit4::class)

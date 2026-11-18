@@ -14,6 +14,7 @@ import uk.co.siland.culvery.capability.calendar.db.EventEntity
 import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.repeat.recurrenceRule
 
 @RunWith(AndroidJUnit4::class)
 class CalendarStoreRememberedTest {

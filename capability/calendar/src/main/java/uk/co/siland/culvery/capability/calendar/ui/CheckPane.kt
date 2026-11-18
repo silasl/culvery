@@ -23,7 +23,7 @@ import uk.co.siland.culvery.capability.calendar.DAY_AND_DATE
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
-import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.core.repeat.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.SpanUi
 import uk.co.siland.culvery.capability.calendar.checkSentence
 import uk.co.siland.culvery.capability.calendar.dateChipWords

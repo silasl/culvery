@@ -9,6 +9,9 @@ import java.time.ZoneId
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.repeat.RepeatChoice
+import uk.co.siland.culvery.core.repeat.RepeatEnd
+import uk.co.siland.culvery.core.repeat.seriesStart
 
 /** "Use this" on a new event (9c §4.4): Wednesday 23 September 2026, 10:00 in London. Robolectric backs `mutableStateOf`. */
 @RunWith(AndroidJUnit4::class)

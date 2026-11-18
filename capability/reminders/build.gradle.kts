@@ -14,6 +14,7 @@ dependencies {
     api(project(":core:plugin"))
     implementation(project(":core:house"))
     implementation(project(":core:household"))
+    implementation(project(":core:repeat"))
     implementation(project(":core:access"))
     implementation(project(":core:ui"))
     implementation(project(":core:sound"))

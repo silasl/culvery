@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.repeat.recurrenceRule
 
 /** Who a source's events belong to when they carry no person tag, and whether the source is shown. */
 data class SourceMapping(val person: PersonId, val visible: Boolean) {

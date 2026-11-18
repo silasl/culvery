@@ -28,12 +28,12 @@ import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
-import uk.co.siland.culvery.capability.calendar.Recurrence
-import uk.co.siland.culvery.capability.calendar.RepeatChoice
-import uk.co.siland.culvery.capability.calendar.RepeatEnd
+import uk.co.siland.culvery.core.repeat.Recurrence
+import uk.co.siland.culvery.core.repeat.RepeatChoice
+import uk.co.siland.culvery.core.repeat.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
-import uk.co.siland.culvery.capability.calendar.recurrenceRule
+import uk.co.siland.culvery.core.repeat.recurrenceRule
 import uk.co.siland.culvery.core.google.test.FakeTokenSource
 import uk.co.siland.culvery.core.google.test.assertLogsHoldNoPersonalData
 import uk.co.siland.culvery.core.google.test.failureOf

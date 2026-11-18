@@ -26,7 +26,7 @@ import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
-import uk.co.siland.culvery.capability.calendar.withSeriesStart
+import uk.co.siland.culvery.core.repeat.withSeriesStart
 import uk.co.siland.culvery.core.google.Authorizer
 import uk.co.siland.culvery.core.google.GoogleAnswer
 import uk.co.siland.culvery.core.google.GoogleConnectHost

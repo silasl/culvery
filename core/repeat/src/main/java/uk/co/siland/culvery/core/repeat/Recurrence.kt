@@ -1,4 +1,4 @@
-package uk.co.siland.culvery.capability.calendar
+package uk.co.siland.culvery.core.repeat
 
 import java.time.DayOfWeek
 import java.time.Duration
@@ -43,13 +43,15 @@ fun RepeatChoice.fitsLength(length: Duration): Boolean = when (this) {
     RepeatChoice.Monthly, RepeatChoice.MonthlyOnWeekday -> length <= Duration.ofDays(4L * DAYS_PER_WEEK)
 }
 
+const val DAYS_PER_WEEK = 7
+
 const val DOESNT_REPEAT = "Doesn’t repeat"
 
 private val DATE_IN_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.ENGLISH)
-internal const val LAST = -1
+const val LAST = -1
 private const val FIFTH = 5
 
-internal fun weekdayName(day: LocalDate): String = day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+fun weekdayName(day: LocalDate): String = day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
 
 /** "Every Saturday", "Every 2 weeks, on Saturday", "Every month, on the 4th Saturday", "Every year, on 26 September"… */
 fun RepeatChoice.wording(day: LocalDate, nth: Int = nthWeekday(day)): String = when (this) {
@@ -79,7 +81,7 @@ fun ordinal(n: Int): String {
 }
 
 // RRULE's two-letter weekday, "SA".
-internal fun DayOfWeek.code(): String = name.take(2)
+fun DayOfWeek.code(): String = name.take(2)
 
 /** The [n]th (−1: last) [weekday] of [month]. */
 private fun nthWeekdayIn(month: YearMonth, n: Int, weekday: DayOfWeek): LocalDate {
@@ -121,7 +123,7 @@ internal const val COUNTED_LAST_CAP = 1_000
  * period has a date; counted for a series by date in the month or year, which can skip one, and null past
  * [COUNTED_LAST_CAP] times.
  */
-internal fun lastOccurrence(choice: RepeatChoice, first: LocalDate, count: Int, nth: Int): LocalDate? {
+fun lastOccurrence(choice: RepeatChoice, first: LocalDate, count: Int, nth: Int): LocalDate? {
     if (count < 1) return null
     val steps = (count - 1L) * choice.interval
     return when (choice) {
@@ -151,8 +153,8 @@ sealed interface RepeatEnd {
 /** A new series: its RRULE line and the household zone, which Google needs to repeat a timed series. */
 data class Recurrence(val rule: String, val zone: ZoneId)
 
-internal val UNTIL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
-internal val UNTIL_UTC: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
+val UNTIL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+val UNTIL_UTC: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
 private const val SERIES_START = "DTSTART:"
 
 /**
@@ -181,7 +183,7 @@ fun seriesStart(rule: String?): LocalDate? = rule?.lineSequence()?.firstOrNull {
 fun withoutSeriesStart(rule: String): String = rule.lineSequence().filterNot { it.startsWith(SERIES_START) }.joinToString("\n")
 
 /** [rule]'s parts by name, upper case, with the series' first date skipped; null when a part isn't `NAME=value`. */
-internal fun ruleParts(rule: String): Map<String, String>? =
+fun ruleParts(rule: String): Map<String, String>? =
     withoutSeriesStart(rule).removePrefix("RRULE:").split(';').associate { part ->
         val pair = part.split('=', limit = 2)
         if (pair.size != 2) return null
@@ -189,13 +191,13 @@ internal fun ruleParts(rule: String): Map<String, String>? =
     }
 
 /** Parts that only bound the series or name the week's start; they don't change which days it lands on. */
-internal val BOUNDING_PARTS = setOf("FREQ", "INTERVAL", "UNTIL", "COUNT", "WKST")
+val BOUNDING_PARTS = setOf("FREQ", "INTERVAL", "UNTIL", "COUNT", "WKST")
 
 /**
  * The choice that writes what [parts] say from [start], where a BYDAY or BYMONTHDAY must be [start]'s own. A monthly
  * rule by date is [RepeatChoice.Monthly]. Null for anything no choice writes.
  */
-internal fun readChoice(parts: Map<String, String>, start: LocalDate): RepeatChoice? {
+fun readChoice(parts: Map<String, String>, start: LocalDate): RepeatChoice? {
     val interval = parts["INTERVAL"]?.let { it.toIntOrNull() ?: return null } ?: 1
     val rest = parts - BOUNDING_PARTS
     val byDay = rest["BYDAY"]
@@ -225,7 +227,7 @@ fun choiceOf(rule: String, start: LocalDate): RepeatChoice? =
     ruleParts(rule)?.let { readChoice(it, start) }?.takeIf { it in EDITOR_REPEATS }
 
 // A phone says "last" for a 4th weekday that is also the last of its month; the editor says 4th.
-internal fun isLastOfWeekday(day: LocalDate): Boolean = day.plusWeeks(1).month != day.month
+fun isLastOfWeekday(day: LocalDate): Boolean = day.plusWeeks(1).month != day.month
 
 /**
  * Which of its weekday [rule] repeats on from [start]: −1 for a phone's "last", else [start]'s own place in its month.

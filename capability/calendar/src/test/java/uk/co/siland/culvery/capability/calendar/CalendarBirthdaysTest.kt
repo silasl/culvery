@@ -25,6 +25,7 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.repeat.recurrenceRule
 
 // Robolectric for Room.
 @RunWith(AndroidJUnit4::class)

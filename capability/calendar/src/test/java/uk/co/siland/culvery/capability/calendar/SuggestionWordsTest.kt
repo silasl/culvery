@@ -7,6 +7,7 @@ import java.time.LocalTime
 import org.junit.Test
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.repeat.seriesStart
 
 class SuggestionWordsTest {
     private val today = LocalDate.of(2026, 9, 23)
