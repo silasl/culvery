@@ -249,6 +249,15 @@ class ReminderSheetTest {
         assertThat(refused).isEqualTo(1)
     }
 
+    @Test
+    fun aChildsOwnTickedTileHasNoPadlock() {
+        show(form(childOnly = mia.person.id), childName = "Mia")
+        compose.onNodeWithTag("who_Mia_check", useUnmergedTree = true).performScrollTo().assertExists()
+        compose.onNodeWithTag("who_Mia_lock", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("who_Alex_lock", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("who_everyone_lock", useUnmergedTree = true).assertExists()
+    }
+
     // The date grid is core's: its day cells are left to core's tests.
     private val outsideTheGrid = object : SemanticsNodeInteractionsProvider by compose {
         override fun onAllNodes(matcher: SemanticsMatcher, useUnmergedTree: Boolean) =

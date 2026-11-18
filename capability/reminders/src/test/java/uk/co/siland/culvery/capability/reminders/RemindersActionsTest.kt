@@ -264,6 +264,25 @@ class RemindersActionsTest {
     }
 
     @Test
+    fun aOneOffAlreadyPastIsRefusedBeforeThePinPad() = runTest {
+        val access = access()
+        val actions = actions(access)
+        assertThat(actions.save(null, once(listOf(access.alex.id), time = LocalTime.of(9, 0)))).isEqualTo(SaveResult.Past)
+        assertThat(access.requests).isEmpty()
+        assertThat(stored()).isEmpty()
+    }
+
+    @Test
+    fun aRepeatWithNoTimeLeftIsRefusedBeforeThePinPad() = runTest {
+        val access = access()
+        val actions = actions(access)
+        val ended = ReminderDraft("Vitamins", listOf(access.alex.id), LocalTime.of(10, 0), Schedule.Repeating(today.minusDays(10), "RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20261115"))
+        assertThat(actions.save(null, ended)).isEqualTo(SaveResult.Past)
+        assertThat(access.requests).isEmpty()
+        assertThat(stored()).isEmpty()
+    }
+
+    @Test
     fun aTimeLaterTodayIsFineAndOneEarlierTodayIsNot() = runTest {
         val access = access()
         val actions = actions(access)

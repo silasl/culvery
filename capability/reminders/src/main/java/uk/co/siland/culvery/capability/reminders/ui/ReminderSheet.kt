@@ -269,7 +269,10 @@ private fun WhoPart(form: ReminderForm, people: List<Member>, childName: String?
             everyone = form.who == listOf(PersonId.FAMILY),
             everyoneLine = SHOWS_AS_FAMILYS,
             everyoneColour = FAMILY_COLOR,
-            locked = { key -> lockedForWho(key?.let(::PersonId) ?: PersonId.FAMILY, form.who, form.childOnly) },
+            locked = { key ->
+                val person = key?.let(::PersonId) ?: PersonId.FAMILY
+                person != form.childOnly && lockedForWho(person, form.who, form.childOnly)
+            },
             enabled = !busy,
             onPick = { key -> form.toggleWho(key?.let(::PersonId) ?: PersonId.FAMILY) },
             onRefused = onRefusedWho,

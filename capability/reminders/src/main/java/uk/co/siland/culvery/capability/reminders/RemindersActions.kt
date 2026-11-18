@@ -80,6 +80,7 @@ class RemindersActions @Inject constructor(
         val existing = editing?.let { find(it) ?: return SaveResult.Gone }
         val tidy = tidyWords(draft.words)
         if (!acceptable(draft, tidy, clock.today(zone.current()), existing)) return SaveResult.Invalid
+        if (isPast(existing, draft, clock.nowMillis())) return SaveResult.Past
         val who = (if (existing == null) authoriseAdd(draft) else authoriseChange(existing, draft)) ?: return SaveResult.Cancelled
         val tidied = draft.copy(words = tidy)
         return scope.async { write(editing, existing, tidied, who.person.id) }.await()
@@ -135,14 +136,18 @@ class RemindersActions @Inject constructor(
         )
     }
 
+    private suspend fun isPast(existing: Reminder?, draft: ReminderDraft, now: Long): Boolean {
+        val moved = existing == null || draft.time != existing.time || draft.schedule != existing.schedule
+        return moved && draft.schedule.nextAt(draft.time, now, zone.current()) == null
+    }
+
     /**
      * Reads the clock after the PIN pad has closed, so a time that passed while it was up is caught. A new or moved
      * reminder with no time left (a one-off already past, a repeat whose rule has run out) is [SaveResult.Past].
      */
     private suspend fun write(editing: Long?, existing: Reminder?, draft: ReminderDraft, madeBy: PersonId): SaveResult {
         val now = clock.nowMillis()
-        val moved = existing == null || draft.time != existing.time || draft.schedule != existing.schedule
-        if (moved && draft.schedule.nextAt(draft.time, now, zone.current()) == null) return SaveResult.Past
+        if (isPast(existing, draft, now)) return SaveResult.Past
         if (editing == null) {
             store.add(draft, madeBy, now) ?: return SaveResult.Full
         } else if (!store.change(editing, draft, now)) {
