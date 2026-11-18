@@ -92,6 +92,36 @@ class EventReminderSeedsTest {
     }
 
     @Test
+    fun aPastDateMovedOnAPhoneSeedsTheSeriesUsualTime() {
+        val rule = withSeriesStart("RRULE:FREQ=WEEKLY;INTERVAL=1", today.minusWeeks(3))
+        val moved = occurrence(today.minusWeeks(1), rule, hour = 15)
+        val siblings = listOf(moved, occurrence(today, rule), occurrence(today.plusWeeks(1), rule))
+        val seed = seed(moved, siblings)!!
+        assertThat(seed.day).isEqualTo(today)
+        assertThat(seed.time).isEqualTo(LocalTime.of(17, 0))
+    }
+
+    @Test
+    fun aMovedDateOfASeriesSeedsTheNextRuleDate() {
+        // Mondays; this week's moved to today, Wednesday, and not yet started. Moved dates aren't followed.
+        val monday = LocalDate.of(2026, 10, 26)
+        val rule = withSeriesStart("RRULE:FREQ=WEEKLY;INTERVAL=1", monday)
+        val moved = occurrence(today, rule)
+        val seed = seed(moved, listOf(moved, occurrence(LocalDate.of(2026, 11, 23), rule)))!!
+        assertThat(seed.day).isEqualTo(LocalDate.of(2026, 11, 23))
+        assertThat(seed.time).isEqualTo(LocalTime.of(17, 0))
+    }
+
+    @Test
+    fun anAllDaySeriesTappedOnAPastDateSeedsToday() {
+        val rule = withSeriesStart("RRULE:FREQ=WEEKLY;INTERVAL=1", today.minusWeeks(3))
+        val day = today.minusWeeks(1)
+        val seed = seed(event(EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), id = "series_$day", rule = rule, seriesId = "series"))!!
+        assertThat(seed.day).isEqualTo(today)
+        assertThat(seed.time).isNull()
+    }
+
+    @Test
     fun aSeriesFromALaterDateCarriesWhatIsLeft() {
         val rule = withSeriesStart("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=10", today.minusWeeks(4))
         val seed = seed(occurrence(today.plusWeeks(1), rule))!!
@@ -137,6 +167,9 @@ class EventReminderSeedsTest {
             occurrence(today.plusWeeks(2), rule, hour = 18),
         )
         assertThat(eventTimes(siblings[4], siblings, london, today).time).isEqualTo(LocalTime.of(18, 0))
+        // Equally common: the earliest coming date's.
+        val tied = listOf(occurrence(today.plusWeeks(1), rule, hour = 18), occurrence(today, rule, hour = 17))
+        assertThat(eventTimes(tied[0], tied, london, today).time).isEqualTo(LocalTime.of(17, 0))
         // With none ahead, all of them count.
         assertThat(eventTimes(siblings[0], siblings.take(3), london, today).time).isEqualTo(LocalTime.of(8, 0))
     }

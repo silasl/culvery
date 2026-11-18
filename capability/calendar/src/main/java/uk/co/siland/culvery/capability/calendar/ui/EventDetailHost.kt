@@ -33,7 +33,7 @@ private class Loaded(val detail: EventDetailUi?)
  * Only one action runs at a time; while one runs, further taps are ignored, and one that fails before the editor's
  * write (the tablet's store) is logged rather than crashing the app. The editor toasts each outcome; the host only
  * decides whether the sheet stays open. [initialMode] is ConfirmingDelete when the editor's Delete handed over
- * (2b-2 design D4); [onEdit] loads the editor and swaps to it, and [onChangeWho] does so asking who it is for; [onReminder] opens the event's reminder; each runs as the one action, so taps are ignored while it loads.
+ * (2b-2 design D4); [onEdit] loads the editor and swaps to it, and [onChangeWho] does so asking who it is for; [onReminder] opens the event's reminder, and says so when it can't; each runs as the one action, so taps are ignored while it loads.
  */
 @Composable
 internal fun EventDetailHost(
@@ -45,7 +45,7 @@ internal fun EventDetailHost(
     initialMode: DetailMode = DetailMode.Idle,
     onEdit: suspend () -> Unit,
     onChangeWho: suspend () -> Unit,
-    onReminder: suspend () -> Unit,
+    onReminder: suspend () -> Boolean,
 ) {
     val loaded: Loaded? by remember(ref, today) { repo.event(ref, today).map { Loaded(it) } }.collectAsState(initial = null)
     val people: List<Person> by repo.people.collectAsState(initial = emptyList())
@@ -110,7 +110,7 @@ internal fun EventDetailHost(
         onEdit = { action.run { onEdit() } },
         onChangeWho = { action.run { onChangeWho() } },
         reminder = reminder,
-        onReminder = { action.run { onReminder() } },
+        onReminder = { action.run { if (!onReminder()) editor.cantRemindStarted() } },
     )
 }
 

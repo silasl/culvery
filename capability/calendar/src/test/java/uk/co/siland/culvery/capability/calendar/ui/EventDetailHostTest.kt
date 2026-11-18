@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -57,12 +58,16 @@ import uk.co.siland.culvery.capability.calendar.testAccess
 import uk.co.siland.culvery.capability.calendar.testEditor
 import uk.co.siland.culvery.capability.calendar.testBinColours
 import uk.co.siland.culvery.capability.calendar.testCalendarSettings
+import uk.co.siland.culvery.core.house.EventReminders
+import uk.co.siland.culvery.core.house.EventSeed
+import uk.co.siland.culvery.core.house.EventTimes
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
@@ -165,8 +170,35 @@ class EventDetailHostTest {
 
     private fun show(id: String) = compose.setContent {
         CulveryTheme(dark = true) {
-            if (shown) EventDetailHost(EventRef("c1", "s-family", id), today, repo, editor, onClose = { closed++ }, onEdit = {}, onChangeWho = {}, onReminder = {})
+            if (shown) EventDetailHost(EventRef("c1", "s-family", id), today, repo, editor, onClose = { closed++ }, onEdit = {}, onChangeWho = {}, onReminder = { false })
         }
+    }
+
+    @Test
+    fun tappingAfterTheEventHasStartedSaysSo() {
+        var now = today.atTime(9, 0).atZone(london).toInstant().toEpochMilli()
+        val reminders = object : EventReminders {
+            override fun has(key: String) = flowOf(false)
+            override suspend fun open(host: OverlayHost, seed: EventSeed) = Unit
+            override suspend fun gone(keys: Collection<String>) = false
+            override suspend fun changed(key: String, now: EventTimes, startsAtMillis: Long?) = false
+        }
+        val timed = testEditor(
+            store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { now }, scope, reminders = reminders,
+        )
+        val ref = EventRef("c1", "s-family", "dinner")
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                if (shown) {
+                    EventDetailHost(ref, today, repo, timed, onClose = {}, onEdit = {}, onChangeWho = {}, onReminder = { timed.openReminder(RecordingOverlay(), ref) })
+                }
+            }
+        }
+        waitUntil { compose.onAllNodesWithText("Add reminder").fetchSemanticsNodes().isNotEmpty() }
+        now = today.atTime(19, 31).atZone(london).toInstant().toEpochMilli()
+        compose.onNodeWithTag("detail_reminder").performClick()
+        waitUntil { access.toasts.messages.isNotEmpty() }
+        assertThat(access.toasts.messages).containsExactly("This event has started, so it can’t have a reminder.")
     }
 
     // The editor's scope is the main thread's looper: running it between polls keeps Compose state on that thread alone.

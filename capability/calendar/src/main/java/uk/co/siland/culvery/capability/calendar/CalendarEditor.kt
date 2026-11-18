@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.AccessControl
@@ -82,6 +83,9 @@ const val NEEDS_A_PERSON = "An event needs at least one person."
 
 /** 3a design §3.12: the add/edit sheet couldn't load what it needs, so it closed. */
 const val COULD_NOT_OPEN = "Couldn’t open the event — try again."
+
+/** 22 §10.4: the card's reminder button, tapped after the event started. */
+const val EVENT_STARTED = "This event has started, so it can’t have a reminder."
 
 sealed interface EditResult {
     /** The provider accepted the change. The mirror has it, or the next sync brings it (2b-2 design §3.4). */
@@ -194,21 +198,28 @@ class CalendarEditor internal constructor(
         val reminders = reminders ?: return flowOf(null)
         return combine(store.event(ref), store.pending()) { stored, pending -> seedFor(ref, stored, pending) }
             .flatMapLatest { seed -> seed?.let { s -> reminders.has(s.key).map { if (it) ReminderButton.Change else ReminderButton.Add } } ?: flowOf(null) }
+            .flowOn(io)
             .distinctUntilChanged()
     }
 
-    /** Opens [ref]'s reminder in [host], or the form for a new one; nothing once none can be added. */
-    suspend fun openReminder(host: OverlayHost, ref: EventRef) {
-        val reminders = reminders ?: return
-        seedFor(ref, store.eventNow(ref), store.pendingNow())?.let { reminders.open(host, it) }
+    /** Opens [ref]'s reminder in [host], or the form for a new one; false, opening nothing, once none can be added. */
+    suspend fun openReminder(host: OverlayHost, ref: EventRef): Boolean {
+        val reminders = reminders ?: return false
+        val seed = seedFor(ref, store.eventNow(ref), store.pendingNow()) ?: return false
+        reminders.open(host, seed)
+        return true
     }
+
+    /** The card's reminder button was tapped once the event had started. */
+    internal fun cantRemindStarted() = toaster.show(EVENT_STARTED, urgent = true)
 
     /** [ref] as the detail card shows it, a queued create included, and what the reminder form opens with for it. */
     private suspend fun seedFor(ref: EventRef, stored: StoredEvent?, queued: List<PendingChange>): EventSeed? {
         val pending = queued.filter { it.ref == ref }
         if (pending.any { it.kind == ChangeKind.DELETE }) return null
         val z = zone.current()
-        val event = asShown(stored ?: queuedCreate(pending, PersonId.FAMILY, z) ?: return null, pending, z)
+        val created = stored ?: store.source(ref.connectionId, ref.sourceId)?.let { queuedCreate(pending, it.mapping.person, z) }
+        val event = asShown(created ?: return null, pending, z)
         val siblings = event.seriesId?.let { store.seriesRows(event.connectionId, event.sourceId, it) }.orEmpty()
         return reminderSeed(event, siblings, peopleIn(event.forPerson), clock.nowMillis(), z)
     }

@@ -39,7 +39,8 @@ internal fun eventTimes(event: StoredEvent, siblings: List<StoredEvent>, zone: Z
 
 /**
  * What the reminder form opens with for [event]; null when no reminder can be added: a bin collection, a one-off that
- * has started, a series with no date left. A series opens on the date tapped, or the next one if that has passed. A rule
+ * has started, a series with no date left. A series opens on the date tapped, or the next one if that has passed, at its
+ * usual time. A rule
  * the shared code can't work out, or a count with no first day, gives a one-off for [event]'s own date.
  */
 internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, people: List<PersonId>, nowMillis: Long, zone: ZoneId): EventSeed? {
@@ -47,22 +48,24 @@ internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, peopl
     val now = Instant.ofEpochMilli(nowMillis)
     val today = now.atZone(zone).toLocalDate()
     val time = event.start.timeIn(zone)
+    val times = eventTimes(event, siblings, zone, today)
     // An all-day date has started only once it is over (22 §10.5).
-    fun started(day: LocalDate) = if (time == null) day.isBefore(today) else !day.atTime(time).atZone(zone).toInstant().isAfter(now)
+    fun started(day: LocalDate, at: LocalTime?) = if (at == null) day.isBefore(today) else !day.atTime(at).atZone(zone).toInstant().isAfter(now)
     val tapped = event.start.dayIn(zone)
     val rule = event.recurrenceRule?.takeIf { workable(it, zone) }
     val (day, left) = if (rule == null) {
-        if (started(tapped)) return null
+        if (started(tapped, time)) return null
         tapped to null
     } else {
         val from = when {
-            !started(tapped) -> tapped
-            started(today) -> today.plusDays(1)
+            !started(tapped, time) -> tapped
+            started(today, times.time) -> today.plusDays(1)
             else -> today
         }
         startedFrom(rule, seriesStart(rule) ?: tapped, from, zone) ?: return null
     }
-    return EventSeed(eventKey(event), event.title, people, day, time, left, eventTimes(event, siblings, zone, today))
+    // Another date keeps the series' usual time, not the one this date may have been moved to.
+    return EventSeed(eventKey(event), event.title, people, day, if (day == tapped) time else times.time, left, times)
 }
 
 // A COUNT can be reduced only from the series' true first day.
