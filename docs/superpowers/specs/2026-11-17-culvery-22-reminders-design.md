@@ -261,7 +261,7 @@ Ruled by the user after the first walk-through. Where this section differs from 
    - event moved: the reminder keeps its gap before the event;
    - a repeating event's whole series deleted, or its time or repeat changed on a phone: the reminder follows;
    - one date of a series skipped or moved on a phone: not followed.
-6. From the walk-through: the "time has passed" check comes before the PIN pad (W1); a child's own ticked tile in the who-picker loses its padlock (W3). "Save changes" follows whatever the calendar's editor does when nothing has changed (W4).
+6. From the walk-through: the "time has passed" check comes before the PIN pad (W1); a child's own ticked tile in the who-picker loses its padlock (W3). "Save changes" with nothing changed closes the form with no PIN, as the calendar's editor does (W4).
 
 ### 10.2 The repeat choices
 - **Choices**, in the picker's order: Doesn’t repeat; weekly; every 2 weeks; monthly on the nth weekday; yearly; daily. Each is worded from the chosen day, as today.
@@ -293,7 +293,7 @@ Ruled by the user after the first walk-through. Where this section differs from 
 
 ### 10.5 The link
 - A reminder saved from that form remembers its event: the event's key, its start as it was then, and its repeat as it was then. The key is the calendar's and means nothing to Reminders. A repeating event is one key for the whole series, and an event made repeating on a phone keeps its key.
-- A reminder saved on the event's own day with the event's repeat untouched **follows the repeat**. One the person moved to another day, or gave another repeat, keeps its own repeat.
+- A reminder saved on the event's own day with the event's repeat untouched **follows the repeat**. One the person moved to another day, or gave another repeat, then or later on the Reminders tab, keeps its own repeat.
 - **Event deleted on the wall,** sent or still queued: the reminder is deleted at once with no second PIN, and the toast reads "Event and its reminder deleted." Undo of a just-added event takes its reminder too. If a queued delete is later refused, the event comes back without its reminder.
 - **Event moved on the wall:** the reminder's day and time shift by the same amount. The toast reads "Changes saved. Its reminder moved too."
 - **From a phone,** found at sync:
@@ -303,7 +303,10 @@ Ruled by the user after the first walk-through. Where this section differs from 
   - a series whose repeat changes: a reminder that follows the repeat takes the new one, from its next date; one with its own repeat only shifts.
   - An event with a change still queued on the wall is left alone until that change is sent.
 - **A shifted reminder** starts again from now. If its event's new start has already passed, a one-off is deleted. If only the reminder's time has passed, it shows now.
-- **Not followed:** a change of title or people; one date of a series skipped or moved.
+- **Not followed:** a change of title or people; one date of a series skipped or moved; the new series Google makes for "this and following events" (the old one ends, and a reminder following it ends with it).
+- **Taken as deleted:** an event a phone moves beyond the stored weeks. The wall can't tell that from a deletion.
+- **An all-day event** has started, for these rules and for the button, only once its day is over.
+- **A series that has ended** deletes a reminder that follows its repeat.
 - **The reminder's own life is unchanged.** It can be changed or deleted on the Reminders tab; deleting it leaves the event alone. If the calendar is disconnected the reminder stays and simply stops following.
 - A sync lost to a restart between reading and telling Reminders can leave a reminder for a deleted event. It is an ordinary reminder then, deleted by hand.
 
