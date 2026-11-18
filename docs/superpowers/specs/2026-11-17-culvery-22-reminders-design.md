@@ -9,7 +9,8 @@ The wall reminds the family of things at a set time: a card opens over the scree
 Success: at 18:00 the evening before a collection the wall chimes and shows "Bins out tonight" with the right bins, and whoever taps Done ends it. A child's "PE kit" reminder shows every Friday morning in their colour. Nothing lights or sounds in night hours.
 
 ### Goals
-- A reminder made on the wall: words, who it's for, a time, and one day or a set of weekdays (2.1, 2.7).
+- A reminder made on the wall: words, who it's for, a time, and one day or a repeat from the same choices as an event (2.1, 2.7, 10).
+- A reminder added from a calendar event's card, which then follows that event (10).
 - A card that stays until Done or Later, with one chime (2.2, 2.4, 2.5).
 - Night hours, door quiet hours, Holiday mode and the doorbell are respected (2.3, 4.4).
 - Bins the evening before, from the calendar's stored collections (2.9).
@@ -18,8 +19,8 @@ Success: at 18:00 the evening before a collection the wall chimes and shows "Bin
 ### Non-goals
 Each is on the follow-ups list under Plan 22.
 - Reminders made on a phone or read from Google (a "Reminders" calendar was the route weighed).
-- "Remind us" on a calendar event.
-- Monthly or yearly repeats.
+- A repeat that ends on a date, or one the calendar's picker doesn't offer (section 10 lists what it offers).
+- Following one date of a repeating event that was skipped or moved on a phone.
 - A sound chosen per reminder, a chime that repeats, or a spoken reminder.
 - Anything drawn on the night clock or the dark screen.
 - Reminders shown on the calendar or on a Home card.
@@ -54,8 +55,8 @@ Done ends the reminder (for a repeating one, until its next time). Later closes 
 ### 2.6 Whose it is, and who may change it
 As the calendar: a reminder is for one or more people, or Family, and the card carries their colour and name. Adding, changing and deleting follow the events rule and PIN: adults for anyone; children add for themselves and change what they made.
 
-### 2.7 Once or weekly
-A reminder is for one day, or repeats weekly on chosen weekdays (any of the seven). A repeating reminder runs until deleted.
+### 2.7 Once or repeating
+A reminder is for one day, or repeats. As first built it repeated weekly on chosen weekdays only; section 10 (2026-11-18) replaces that with the calendar's own repeat choices, shared by both.
 
 ### 2.8 Its own tab
 "Reminders" on the rail, between Shopping and Music, with the list, the Add button, and a count on the rail icon.
@@ -245,3 +246,88 @@ Driven by the debug clock and the sample council, waiting on the log lines in se
 - The shape of the three `AlertHost` additions (not holding, waking, a duck for the chime only).
 - The exact layout of the tab, form and card, following the redesign handoff's tokens and the door card's shape.
 - The chime's notes.
+
+## 10. Amendment, 2026-11-18: shared repeats, and reminders on calendar events
+
+Ruled by the user after the first walk-through. Where this section differs from 2.7, 4.1, 4.2, 4.5, 4.6, 5 or 7, this section wins.
+
+### 10.1 The user's rulings
+1. The calendar's repeat choices move out of the calendar into shared code, and events and reminders use the very same choices and the same picker. Reminders get no cut-down version.
+2. The shared picker gains **weekly on several chosen days**, so events get it too.
+3. A reminder added from an event whose repeat the picker can't show (made on a phone: every 3 months, monthly by date, until a date) follows that repeat anyway. The form shows it in words; the person may switch to one of the picker's choices.
+4. **Add reminder** is on every event's card and opens the reminder form filled in. Once the event has a reminder the button reads **Change reminder** and opens it. One reminder per event.
+5. A linked reminder follows its event:
+   - event deleted, on the wall or a phone: the reminder goes; on the wall the toast is "Event and its reminder deleted.";
+   - event moved: the reminder keeps its gap before the event;
+   - a repeating event's whole series deleted, or its time or repeat changed on a phone: the reminder follows;
+   - one date of a series skipped or moved on a phone: not followed.
+6. From the walk-through: the "time has passed" check comes before the PIN pad (W1); a child's own ticked tile in the who-picker loses its padlock (W3). "Save changes" follows whatever the calendar's editor does when nothing has changed (W4).
+
+### 10.2 The repeat choices
+- **Choices**, in the picker's order: Doesn’t repeat; weekly; every 2 weeks; monthly on the nth weekday; yearly; daily. Each is worded from the chosen day, as today.
+- **Chosen days.** With weekly or every 2 weeks picked, a row of seven day chips shows. The chosen day's own weekday is ticked and can't be unticked; the others add days. On an event the chips are locked once the event is longer than a day.
+- **Ends:** Keeps going, or Stops after 2 to 52 times. With several days, each day counts as one time.
+- **Words.** One day: "Every Saturday", "Every 2 weeks, on Saturday". Several: "Every week, on Mon, Wed", "Every week, on Mon to Fri" (three or more in a row), "Every 2 weeks, on Mon, Wed". Weekly on all seven reads "Every day".
+- **Written** as the RRULE Google expects: `BYDAY=MO,WE` on a weekly rule with more than one day.
+- **Read back.** A phone's weekly rule with a list of days that includes the first day reads as this choice; the detail card's Repeats row words it.
+- **Worked out in one place.** Shared code answers, for any rule it understands and a first day: the dates in order, the latest on or before a day, the first after a day, and the same rule started from a later date (its count reduced). It understands FREQ, INTERVAL, a weekly BYDAY list, a monthly BYDAY of one nth weekday, a monthly BYMONTHDAY of one day, COUNT and UNTIL. Anything else it refuses; it never guesses. The sample calendar uses it in place of its own copy.
+
+### 10.3 The reminder
+- **When** (replaces 4.1): a first day, a time, and either nothing (once) or a repeat rule. The seven weekday chips of the first build go; "PE kit, Mon and Wed" is weekly on chosen days from the shared picker.
+- **Waiting** (4.2) is unchanged in meaning, worked out from the rule's dates for any period, not from the last eight days.
+- **Done** on a repeat whose last time has been answered deletes it, as it deletes a one-off.
+- **The form** (replaces 4.6's list): the words; who it's for; the day (today by default, up to a year ahead); the time; Repeats, with the shared picker. The Once / Repeats switch goes.
+- **Past.** A one-off must be in the future, checked before the PIN pad and again after it. A repeating reminder has no such check: its first time is the next one after it is saved.
+- **The list** words a repeat as the event's detail card does: "Once", "Every Friday", "Every week, on Mon to Fri", "Every month, on the 4th Saturday · 6 times".
+- **The database** is redefined at version 1: it has only ever existed on the emulator. The emulator's copy is deleted by hand.
+
+### 10.4 Add reminder on an event
+- **Where.** A button on the detail card of every event, changeable or not: "Add reminder", or "Change reminder" when the event has one. It isn't shown on a bin collection (bins have their own), on a one-off event that has started, on a repeating event with no time left, or when the wall has no Reminders.
+- **What opens.** The reminder form, as a new reminder:
+  - words: the event's title, cut to 60;
+  - who: the event's people, or Family when it has none (a signed-in child's form is still only theirs);
+  - day and time: the event's start; 08:00 on the day for an all-day event; for a repeating event, the date tapped, or the next one if that has passed;
+  - repeats: the event's repeat from that date, with its count reduced by the times already gone. A repeat the picker can't show sits as its own row, "As the event: Every 3 months", ticked. A repeat the shared code can't work out gives a one-off for that date.
+- **Saving** is the reminder's own rule and PIN (4.6). Nothing is saved until "Add reminder" in the form.
+- **Change reminder** opens the reminder as tapping its row would.
+
+### 10.5 The link
+- A reminder saved from that form remembers its event: the event's key, its start as it was then, and its repeat as it was then. The key is the calendar's and means nothing to Reminders. A repeating event is one key for the whole series, and an event made repeating on a phone keeps its key.
+- A reminder saved on the event's own day with the event's repeat untouched **follows the repeat**. One the person moved to another day, or gave another repeat, keeps its own repeat.
+- **Event deleted on the wall,** sent or still queued: the reminder is deleted at once with no second PIN, and the toast reads "Event and its reminder deleted." Undo of a just-added event takes its reminder too. If a queued delete is later refused, the event comes back without its reminder.
+- **Event moved on the wall:** the reminder's day and time shift by the same amount. The toast reads "Changes saved. Its reminder moved too."
+- **From a phone,** found at sync:
+  - an event the sync removes: its reminder is deleted. Ageing out of the stored weeks, a hidden or removed calendar, and an event that was never stored are not removals;
+  - a changed start: the reminder shifts by the same amount;
+  - a series whose usual time changes (the commonest time of its coming dates): the reminder shifts;
+  - a series whose repeat changes: a reminder that follows the repeat takes the new one, from its next date; one with its own repeat only shifts.
+  - An event with a change still queued on the wall is left alone until that change is sent.
+- **A shifted reminder** starts again from now. If its event's new start has already passed, a one-off is deleted. If only the reminder's time has passed, it shows now.
+- **Not followed:** a change of title or people; one date of a series skipped or moved.
+- **The reminder's own life is unchanged.** It can be changed or deleted on the Reminders tab; deleting it leaves the event alone. If the calendar is disconnected the reminder stays and simply stops following.
+- A sync lost to a restart between reading and telling Reminders can leave a reminder for a deleted event. It is an ordinary reminder then, deleted by hand.
+
+### 10.6 The pieces
+- **`:core:repeat`** (new): the choices, the rule writing and reading, the dates, the words. Pure `java.time`. The calendar and both providers import it from there.
+- **`:core:ui`:** the picker and its state, used by the event editor's Repeats pane and the reminder form. The calendar keeps only what is its own: "Choose a day first", "Too long to repeat that often.", and the skip-one-date hint.
+- **`:core:house`:** one seam, implemented by Reminders and optional in the calendar: open the form for an event, whether an event has a reminder, an event has gone, an event's times are now these.
+- **`:capability:calendar`:** the button; the calls from delete, Undo and a move; what a sync removed or changed, worked out inside the sync's own transaction.
+- **`:capability:reminders`:** the schedule as a first day and a rule; the link columns; the seam.
+- **Logs** gain `event gone` and `event moved` on the `Reminders` tag, with nothing else on the line.
+
+### 10.7 Tests
+- **Shared dates:** each choice; several days; a count across several days; every 3 months; monthly by date skipping short months; UNTIL; the latest on or before and the first after, years from the first day; a rule started later with its count reduced; a rule it refuses.
+- **The calendar still passes** its repeat tests from the new package, plus chosen days written, read back and worded; the sample calendar expanding them.
+- **Reminders timing** over a fortnightly, a monthly and a counted rule: missed while off, no backlog, Done on the last time.
+- **The link:** deleted on the wall (sent and queued); Undo of an add; moved on the wall; removed, moved and re-ruled at sync; ageing out and a hidden calendar leaving the reminder; a queued change holding a sync off; one moved date of a series changing nothing.
+- **The form from an event:** one-off, all-day, a series from a later date, a rule the picker can't show, a child.
+- **Screenshots:** the picker with chosen days (event editor and reminder form); the detail card with each button; the form opened from an event.
+
+### 10.8 More walk-through checks
+12. A repeating reminder, weekly on two days: it fires on both.
+13. A monthly reminder: move a month on; it fires once.
+14. An event repeating weekly on two days, made on the wall: it shows on both days.
+15. Add reminder from a one-off event; move the event an hour: the reminder moves. Delete the event: the reminder goes with the toast.
+16. Add reminder from a repeating sample event: the form shows its repeat; the card then reads Change reminder.
+17. Remove an event from the sample calendar's side (debug): the next sync removes its reminder.
+18. A one-off for a time just passed is refused before the PIN pad. A child's own tile has no padlock.
