@@ -306,7 +306,8 @@ Ruled by the user after the first walk-through. Where this section differs from 
 - **Not followed:** a change of title or people; one date of a series skipped or moved; the new series Google makes for "this and following events" (the old one ends, and a reminder following it ends with it).
 - **Taken as deleted:** an event a phone moves beyond the stored weeks. The wall can't tell that from a deletion.
 - **An all-day event** has started, for these rules and for the button, only once its day is over.
-- **A series that has ended** deletes a reminder that follows its repeat.
+- **A series that has ended** deletes its reminder.
+- **All day.** When an event becomes all-day, or stops being all-day, its reminder keeps its time of day; only a change of day moves it.
 - **The reminder's own life is unchanged.** It can be changed or deleted on the Reminders tab; deleting it leaves the event alone. If the calendar is disconnected the reminder stays and simply stops following.
 - A sync lost to a restart between reading and telling Reminders can leave a reminder for a deleted event. It is an ordinary reminder then, deleted by hand.
 
