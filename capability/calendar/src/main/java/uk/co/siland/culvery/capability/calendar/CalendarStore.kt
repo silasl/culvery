@@ -291,23 +291,34 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     /**
      * Touches only the event mirror and the cursor; queued changes in the outbox are never affected. Writes nothing
-     * once the source is gone.
+     * once the source is gone. Returns what it did to the events a reminder may hang on (22 §10.5), as of [nowMillis]:
+     * an event a full read no longer has inside its range is Gone, as is one whose last row an incremental result
+     * removes; one whose link times differ is Changed. An event with a change queued is left out.
      */
-    suspend fun applySync(connectionId: String, sourceId: String, range: DateRange, result: SyncResult, today: LocalDate) =
+    suspend fun applySync(connectionId: String, sourceId: String, range: DateRange, result: SyncResult, today: LocalDate, nowMillis: Long): List<EventChange> =
         db.withTransaction {
             // A source removed while this sync was in flight: no orphan events or stale cursor.
-            val source = dao.source(connectionId, sourceId) ?: return@withTransaction
+            val source = dao.source(connectionId, sourceId) ?: return@withTransaction emptyList()
             dao.clearReadProblem(connectionId, sourceId)
             val keyOf = titleKeys()
             val entities = result.upserts.map { it.toEntity(connectionId, sourceId, range.zone) }
             val kept = entities.associate { it.remoteId to it.title }
-            // What this result removes or retitles: the only events whose titles it may take from the remembered ones.
-            // A full read drops what lies outside its range too, but that is ageing out, not removed.
-            val leaving = if (result.fullReplace) {
-                dao.eventTitlesOfSourceWithin(connectionId, sourceId, range.startInstant.toEpochMilli(), range.endExclusive.atStartOfDay(range.zone).toInstant().toEpochMilli())
+            // What this result removes or replaces. A full read drops what lies outside its range too, but that is ageing out, not removed.
+            val replaced = if (result.fullReplace) {
+                dao.eventsOfSourceWithin(connectionId, sourceId, range.startInstant.toEpochMilli(), range.endExclusive.atStartOfDay(range.zone).toInstant().toEpochMilli())
             } else {
-                (result.removedIds + entities.map { it.remoteId }).distinct().chunked(REMOVE_CHUNK).flatMap { dao.eventsByIds(connectionId, sourceId, it) }.titled()
-            }.filter { e -> kept[e.remoteId].let { it == null || (it != e.title && keyOf(it) != keyOf(e.title)) } }
+                (result.removedIds + entities.map { it.remoteId }).distinct().chunked(REMOVE_CHUNK).flatMap { dao.eventsByIds(connectionId, sourceId, it) }
+            }
+            // The only events whose titles this result may take from the remembered ones.
+            val leaving = replaced.titled().filter { e -> kept[e.remoteId].let { it == null || (it != e.title && keyOf(it) != keyOf(e.title)) } }
+            // An incremental result leaves the other rows of the events it touches, and they count too.
+            val before = if (result.fullReplace) {
+                replaced
+            } else {
+                (replaced + entities).mapTo(HashSet()) { it.linkId }.toList().chunked(KEY_CHUNK).flatMap { dao.eventsOfKeys(connectionId, sourceId, it) }
+            }
+            val staying = if (result.fullReplace) emptyMap() else before.associateBy { it.remoteId } - result.removedIds.toSet()
+            val after = (staying + entities.associateBy { it.remoteId }).values.toList()
             if (result.fullReplace) {
                 dao.deleteEventsForSource(connectionId, sourceId)
             } else {
@@ -320,7 +331,43 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
             // An incremental result keeps what the full sync read: only a full sync reads a new range (4c ruling 1).
             val key = if (result.fullReplace) range.cursorKey() else dao.syncState(connectionId, sourceId)?.rangeStart ?: range.cursorKey()
             dao.upsertSyncState(SyncStateEntity(connectionId, sourceId, result.cursor?.value, key))
+            val changes = linkChanges(source, before, after, entities, range.zone, today, nowMillis)
+            if (changes.isEmpty()) changes else withoutQueued(connectionId, sourceId, changes, before + after)
         }
+
+    /**
+     * Each key [before] had that [after] has no row of is Gone; one whose link times differ is Changed. A series' rule
+     * after comes from [fresh], this result's rows, when one of them has it.
+     */
+    private fun linkChanges(
+        source: SourceEntity,
+        before: List<EventEntity>,
+        after: List<EventEntity>,
+        fresh: List<EventEntity>,
+        zone: ZoneId,
+        today: LocalDate,
+        nowMillis: Long,
+    ): List<EventChange> {
+        fun List<EventEntity>?.stored() = orEmpty().map { EventRow(it, source.personId).toStored() }
+        val left = after.groupBy { it.linkId }
+        val brought = fresh.groupBy { it.linkId }
+        return before.groupBy { it.linkId }.mapNotNull { (id, was) ->
+            val key = eventKey(source.connectionId, source.sourceId, id)
+            val rows = left[id] ?: return@mapNotNull EventChange.Gone(key)
+            val (times, startsAt) = linkTimes(rows.stored(), brought[id].stored(), zone, today, nowMillis)
+            EventChange.Changed(key, times, startsAt).takeIf { times != linkTimes(was.stored(), emptyList(), zone, today, nowMillis).first }
+        }
+    }
+
+    /** [changes] without the events a queued change targets: they are left alone until it is sent (22 §10.5). */
+    private suspend fun withoutQueued(connectionId: String, sourceId: String, changes: List<EventChange>, rows: List<EventEntity>): List<EventChange> {
+        val queued = dao.outboxNow().filter { it.connectionId == connectionId && it.sourceId == sourceId }
+            .flatMapTo(HashSet()) { listOfNotNull(it.remoteId, it.clientKey) }
+        if (queued.isEmpty()) return changes
+        val held = rows.filter { it.remoteId in queued }.mapTo(HashSet()) { eventKey(connectionId, sourceId, it.linkId) } +
+            queued.map { eventKey(connectionId, sourceId, it) }
+        return changes.filter { it.key !in held }
+    }
 
     /**
      * Drops [sourceId]'s events that end before [window] starts, or start at or after the end of what its full sync
@@ -522,6 +569,9 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
         // SQLite allows 999 bound variables per statement on older Android versions.
         const val REMOVE_CHUNK = 500
+
+        // eventsOfKeys binds each key twice.
+        const val KEY_CHUNK = 450
     }
 }
 
@@ -704,3 +754,6 @@ private fun OutboxEntity.toPending() = PendingChange(
 )
 
 private fun List<EventEntity>.titled(): List<EventTitle> = map { EventTitle(it.remoteId, it.seriesId, it.title) }
+
+/** The id in the row's link key: its series', else its own. */
+private val EventEntity.linkId: String get() = seriesId ?: remoteId

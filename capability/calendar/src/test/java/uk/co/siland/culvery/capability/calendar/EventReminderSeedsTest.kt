@@ -213,4 +213,35 @@ class EventReminderSeedsTest {
         // With none ahead, all of them count.
         assertThat(eventTimes(siblings[0], siblings.take(3), london, today).time).isEqualTo(LocalTime.of(8, 0))
     }
+
+    @Test
+    fun aOneOffsLinkIsWhatTheWallSends() {
+        val e = event(timed(today.plusDays(2), 19, 30))
+        assertThat(linkTimes(listOf(e), emptyList(), london, today, now)).isEqualTo(eventTimes(e, emptyList(), london, today) to startsAtMillis(e, london))
+    }
+
+    @Test
+    fun aSeriesLinkStartsAtItsNextComingDate() {
+        val rule = withSeriesStart("RRULE:FREQ=DAILY", today)
+        val rows = listOf(occurrence(today, rule, hour = 9), occurrence(today.plusDays(1), rule), occurrence(today.plusDays(2), rule))
+        val (times, startsAt) = linkTimes(rows.reversed(), emptyList(), london, today, now)
+        assertThat(times).isEqualTo(eventTimes(rows[1], rows, london, today))
+        assertThat(startsAt).isEqualTo(startsAtMillis(rows[1], london))
+    }
+
+    @Test
+    fun aSeriesWhoseRuleRanOutHasNoStart() {
+        val rule = withSeriesStart("RRULE:FREQ=WEEKLY;UNTIL=${today.minusDays(1).toString().replace("-", "")}", today.minusWeeks(2))
+        // A coming date still stored, though the rule has none left.
+        assertThat(linkTimes(listOf(occurrence(today.plusDays(1), rule)), emptyList(), london, today, now).second).isNull()
+    }
+
+    @Test
+    fun aSeriesTakesItsRuleFromTheFreshRowsFirst() {
+        val old = withSeriesStart("RRULE:FREQ=WEEKLY", today)
+        val new = withSeriesStart("RRULE:FREQ=WEEKLY;INTERVAL=2", today)
+        val rows = listOf(occurrence(today.plusWeeks(1), old), occurrence(today.plusWeeks(2), new))
+        assertThat(linkTimes(rows, emptyList(), london, today, now).first.rule).isEqualTo("RRULE:FREQ=WEEKLY")
+        assertThat(linkTimes(rows, rows.drop(1), london, today, now).first.rule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=2")
+    }
 }

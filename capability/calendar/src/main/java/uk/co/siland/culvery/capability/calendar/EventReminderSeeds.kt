@@ -75,11 +75,50 @@ internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, peopl
     return EventSeed(eventKey(event), event.title, people, day, if (day == tapped && !tappedStarted) time else times.time, left, times)
 }
 
-// A date whose own rule wasn't read takes its series' from another stored date: the earliest coming one's, else the latest.
-private fun seriesRule(event: StoredEvent, siblings: List<StoredEvent>, zone: ZoneId, today: LocalDate): String? {
-    event.recurrenceRule?.let { return it }
-    val ruled = siblings.filter { it.recurrenceRule != null }.sortedBy { it.startSort }
-    return (ruled.firstOrNull { !it.start.dayIn(zone).isBefore(today) } ?: ruled.lastOrNull())?.recurrenceRule
+/** What one sync did to events a reminder may hang on. [toString] prints neither the key nor the times. */
+sealed interface EventChange {
+    val key: String
+
+    data class Gone(override val key: String) : EventChange {
+        override fun toString() = "EventChange.Gone"
+    }
+
+    data class Changed(override val key: String, val now: EventTimes, val startsAtMillis: Long?) : EventChange {
+        override fun toString() = "EventChange.Changed"
+    }
+}
+
+/**
+ * The link's times for one key's stored [rows] and when it next starts: a one-off's own start; a series' next coming
+ * stored date, null once its rule or its rows have no date left. A series' rule comes from [fresh], this sync's own
+ * rows, when one of them has it.
+ */
+internal fun linkTimes(rows: List<StoredEvent>, fresh: List<StoredEvent>, zone: ZoneId, today: LocalDate, nowMillis: Long): Pair<EventTimes, Long?> {
+    val siblings = rows.filter { it.seriesId != null }
+    if (siblings.isEmpty()) {
+        val event = rows.minBy { it.startSort }
+        return eventTimes(event, emptyList(), zone, today) to startsAtMillis(event, zone)
+    }
+    val event = ruleBearer(fresh.filter { it.seriesId != null }, zone, today) ?: firstComing(siblings, zone, today)
+    val times = eventTimes(event, siblings, zone, today)
+    val rule = times.rule?.let { RepeatRule.parse(it, zone) }
+    val first = times.day
+    val ranOut = rule != null && first != null && rule.firstAfter(first, today.minusDays(1)) == null
+    val next = if (ranOut) null else siblings.map { startsAtMillis(it, zone) }.filter { it > nowMillis }.minOrNull()
+    return times to next
+}
+
+// A date whose own rule wasn't read takes its series' from another stored date.
+private fun seriesRule(event: StoredEvent, siblings: List<StoredEvent>, zone: ZoneId, today: LocalDate): String? =
+    event.recurrenceRule ?: ruleBearer(siblings, zone, today)?.recurrenceRule
+
+private fun ruleBearer(rows: List<StoredEvent>, zone: ZoneId, today: LocalDate): StoredEvent? =
+    rows.filter { it.recurrenceRule != null }.takeIf { it.isNotEmpty() }?.let { firstComing(it, zone, today) }
+
+// The earliest of [rows] from [today] on, else the latest.
+private fun firstComing(rows: List<StoredEvent>, zone: ZoneId, today: LocalDate): StoredEvent {
+    val sorted = rows.sortedBy { it.startSort }
+    return sorted.firstOrNull { !it.start.dayIn(zone).isBefore(today) } ?: sorted.last()
 }
 
 // A COUNT can be reduced only from the series' true first day.

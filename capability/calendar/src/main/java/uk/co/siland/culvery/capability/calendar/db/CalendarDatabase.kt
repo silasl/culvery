@@ -199,11 +199,18 @@ interface CalendarDao {
     /** Events inside [start, end): what pruneEvents keeps. */
     @Query(
         """
-        SELECT remoteId, seriesId, title FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId
+        SELECT * FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId
         AND NOT (startSort >= :end OR (endSort <= :start AND startSort < :start))
         """,
     )
-    suspend fun eventTitlesOfSourceWithin(connectionId: String, sourceId: String, start: Long, end: Long): List<EventTitle>
+    suspend fun eventsOfSourceWithin(connectionId: String, sourceId: String, start: Long, end: Long): List<EventEntity>
+
+    /** The rows whose link key is one of [keys]: a series' dates, or the one-off with that id. */
+    @Query(
+        "SELECT * FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId " +
+            "AND (seriesId IN (:keys) OR (seriesId IS NULL AND remoteId IN (:keys)))",
+    )
+    suspend fun eventsOfKeys(connectionId: String, sourceId: String, keys: List<String>): List<EventEntity>
 
     @Query("SELECT * FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND remoteId IN (:ids)")
     suspend fun eventsByIds(connectionId: String, sourceId: String, ids: List<String>): List<EventEntity>

@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -17,6 +18,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.ConnectionEntity
 import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
+import uk.co.siland.culvery.core.house.EventTimes
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -24,6 +26,7 @@ import uk.co.siland.culvery.core.repeat.Recurrence
 import uk.co.siland.culvery.core.repeat.code
 import uk.co.siland.culvery.core.repeat.occurrences
 import uk.co.siland.culvery.core.repeat.recurrenceRule
+import uk.co.siland.culvery.core.repeat.withSeriesStart
 
 @RunWith(AndroidJUnit4::class)
 class CalendarStoreTest {
@@ -943,5 +946,169 @@ class CalendarStoreTest {
         )
         store.enqueue(PendingChange(0, "c9", "s1", null, ChangeKind.CREATE, draft, 0, 0L, 0L, clientKey = "k1"))
         assertThat(store.pendingNow().single().draft).isEqualTo(draft)
+    }
+
+    private val noon = at(23, 12).toEpochMilli()
+    private val seriesDates = listOf(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 30), LocalDate.of(2026, 10, 7))
+    private val weekly = withSeriesStart("RRULE:FREQ=WEEKLY", seriesDates.first())
+
+    private fun key(id: String) = eventKey("c1", "s1", id)
+
+    private fun changes(vararg upserts: RemoteEvent, removed: List<String> = emptyList()) =
+        SyncResult(upserts.toList(), removed, SyncCursor("k2"), fullReplace = false)
+
+    private fun startOf(date: LocalDate, hour: Int) = date.atTime(hour, 0).atZone(zone).toInstant()
+
+    private fun swim(date: LocalDate, hour: Int, rule: String? = weekly) = RemoteEvent(
+        "swim_$date", "Swim", EventTime.Timed(startOf(date, hour)), EventTime.Timed(startOf(date, hour).plusSeconds(3_600)),
+        recurring = true, recurrenceRule = rule, seriesId = "swim",
+    )
+
+    private fun swims(hour: Int = 17, rule: String? = weekly) = seriesDates.map { swim(it, hour, rule) }.toTypedArray()
+
+    private suspend fun sync(result: SyncResult, range: DateRange = window) = store.applySync("c1", "s1", range, result, TEST_TODAY, noon)
+
+    @Test
+    fun aFullReadWithoutAnEventReportsItGone() = runTest {
+        connect("s1")
+        sync(full(timed("a", "Dentist", 23, 9), timed("b", "Walk", 23, 10)))
+        assertThat(sync(full(timed("b", "Walk", 23, 10)))).containsExactly(EventChange.Gone(key("a")))
+    }
+
+    @Test
+    fun anIncrementalRemovalReportsItGone() = runTest {
+        connect("s1")
+        sync(full(timed("a", "Dentist", 23, 9), timed("b", "Walk", 23, 10)))
+        assertThat(sync(changes(removed = listOf("a", "never-stored")))).containsExactly(EventChange.Gone(key("a")))
+    }
+
+    @Test
+    fun aChangedStartIsReported() = runTest {
+        connect("s1")
+        sync(full(timed("a", "Dentist", 23, 9)))
+        assertThat(sync(full(timed("a", "Dentist", 24, 10))))
+            .containsExactly(EventChange.Changed(key("a"), EventTimes(LocalDate.of(2026, 9, 24), LocalTime.of(10, 0), null), at(24, 10).toEpochMilli()))
+        assertThat(sync(changes(timed("a", "Dentist", 25, 11))))
+            .containsExactly(EventChange.Changed(key("a"), EventTimes(LocalDate.of(2026, 9, 25), LocalTime.of(11, 0), null), at(25, 11).toEpochMilli()))
+    }
+
+    @Test
+    fun anUnchangedEventReportsNothing() = runTest {
+        connect("s1")
+        sync(full(timed("a", "Dentist", 23, 9), timed("b", "Walk", 23, 10), *swims()))
+        assertThat(sync(full(timed("a", "Dentist at two", 23, 9), timed("b", "Walk", 23, 10), *swims()))).isEmpty()
+        assertThat(sync(changes(timed("a", "Dentist", 23, 9), swim(seriesDates[1], 17)))).isEmpty()
+    }
+
+    @Test
+    fun aPastEventTheReadNoLongerCoversIsNotARemoval() = runTest {
+        connect("s1")
+        val earlier = DateRange(LocalDate.of(2026, 9, 19), window.endExclusive, zone)
+        sync(full(timed("past", "Dentist", 20, 9), timed("a", "Walk", 23, 9)), earlier)
+        assertThat(sync(full(timed("a", "Walk", 23, 9)))).isEmpty()
+    }
+
+    @Test
+    fun anEventOutsideTheReadRangeIsNotARemoval() = runTest {
+        connect("s1")
+        val far = LocalDate.of(2026, 10, 20)
+        sync(full(timed("a", "Walk", 23, 9)))
+        sync(changes(RemoteEvent("far", "Dentist", EventTime.Timed(startOf(far, 9)), EventTime.Timed(startOf(far, 10)), recurring = false)))
+        assertThat(sync(full(timed("a", "Walk", 23, 9)))).isEmpty()
+    }
+
+    /** 22 §10.5: a full read can't tell an event moved past what it reads from one deleted. */
+    @Test
+    fun anEventMovedBeyondTheReadRangeIsTakenAsGone() = runTest {
+        connect("s1")
+        sync(full(timed("a", "Dentist", 23, 9)))
+        assertThat(sync(full())).containsExactly(EventChange.Gone(key("a")))
+    }
+
+    @Test
+    fun aSeriesWithEveryDateRemovedIsGone() = runTest {
+        connect("s1")
+        sync(full(*swims()))
+        assertThat(sync(changes(removed = seriesDates.map { "swim_$it" }))).containsExactly(EventChange.Gone(key("swim")))
+    }
+
+    @Test
+    fun aSeriesWithOneDateRemovedIsNotGone() = runTest {
+        connect("s1")
+        sync(full(*swims()))
+        assertThat(sync(changes(removed = listOf("swim_${seriesDates[1]}")))).isEmpty()
+        assertThat(sync(full(swim(seriesDates[2], 17)))).isEmpty()
+    }
+
+    @Test
+    fun oneMovedDateOfASeriesChangesNothing() = runTest {
+        connect("s1")
+        sync(full(*swims()))
+        assertThat(sync(changes(swim(seriesDates[1], 19)))).isEmpty()
+    }
+
+    @Test
+    fun aSeriesWhoseUsualTimeMovedIsChanged() = runTest {
+        connect("s1")
+        sync(full(*swims(17)))
+        assertThat(sync(full(*swims(18)))).containsExactly(
+            EventChange.Changed(key("swim"), EventTimes(seriesDates.first(), LocalTime.of(18, 0), "RRULE:FREQ=WEEKLY"), startOf(seriesDates.first(), 18).toEpochMilli()),
+        )
+    }
+
+    @Test
+    fun aSeriesWithANewRuleIsChanged() = runTest {
+        connect("s1")
+        sync(full(*swims()))
+        val fortnightly = withSeriesStart("RRULE:FREQ=WEEKLY;INTERVAL=2", seriesDates.first())
+        assertThat(sync(full(swim(seriesDates[0], 17, fortnightly), swim(seriesDates[2], 17, fortnightly)))).containsExactly(
+            EventChange.Changed(key("swim"), EventTimes(seriesDates.first(), LocalTime.of(17, 0), "RRULE:FREQ=WEEKLY;INTERVAL=2"), startOf(seriesDates.first(), 17).toEpochMilli()),
+        )
+    }
+
+    /** The plan review: after an incremental read, the rule its own rows bring wins over the stored dates' old one. */
+    @Test
+    fun anIncrementalReadTakesTheRuleItBrings() = runTest {
+        connect("s1")
+        sync(full(*swims()))
+        val fortnightly = withSeriesStart("RRULE:FREQ=WEEKLY;INTERVAL=2", seriesDates.first())
+        val changed = sync(changes(swim(seriesDates[2], 17, fortnightly), removed = listOf("swim_${seriesDates[1]}"))).single() as EventChange.Changed
+        assertThat(changed.now.rule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=2")
+    }
+
+    @Test
+    fun anEventMadeRepeatingKeepsItsKey() = runTest {
+        connect("s1")
+        val start = startOf(seriesDates.first(), 17)
+        sync(full(RemoteEvent("swim", "Swim", EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)), recurring = false)))
+        assertThat(sync(full(*swims()))).containsExactly(
+            EventChange.Changed(key("swim"), EventTimes(seriesDates.first(), LocalTime.of(17, 0), "RRULE:FREQ=WEEKLY"), start.toEpochMilli()),
+        )
+    }
+
+    /** "This and following" on a phone ends the series: Changed, with no date left to start. */
+    @Test
+    fun aSeriesEndedOnAPhoneHasNoStartLeft() = runTest {
+        connect("s1")
+        sync(full(*swims(10)))
+        val ended = withSeriesStart("RRULE:FREQ=WEEKLY;UNTIL=20260929", seriesDates.first())
+        val changed = sync(changes(swim(seriesDates[0], 10, ended), removed = seriesDates.drop(1).map { "swim_$it" })).single() as EventChange.Changed
+        assertThat(changed.now.rule).isEqualTo("RRULE:FREQ=WEEKLY;UNTIL=20260929")
+        assertThat(changed.startsAtMillis).isNull()
+    }
+
+    @Test
+    fun aQueuedChangeHoldsTheSyncOff() = runTest {
+        connect("s1")
+        sync(full(timed("a", "Dentist", 23, 9), timed("b", "Walk", 23, 10), *swims()))
+        store.enqueue(change(ChangeKind.UPDATE, remoteId = "a"))
+        store.enqueue(change(ChangeKind.ASSIGN_SERIES, remoteId = "swim"))
+        assertThat(sync(full(timed("a", "Dentist", 24, 9), *swims(18)))).containsExactly(EventChange.Gone(key("b")))
+    }
+
+    @Test
+    fun changesPrintNoKeyOrTimes() {
+        assertThat(EventChange.Gone(key("a")).toString()).isEqualTo("EventChange.Gone")
+        assertThat(EventChange.Changed(key("a"), EventTimes(null, null, null), 0L).toString()).isEqualTo("EventChange.Changed")
     }
 }

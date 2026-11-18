@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar
 import android.util.Log
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
@@ -10,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import uk.co.siland.culvery.core.house.EventReminders
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -43,6 +45,7 @@ class CalendarSync internal constructor(
     private val writeLock: CalendarWriteLock,
     private val refresher: SourceRefresher,
     private val undone: UndoneKeys,
+    private val reminders: EventReminders? = null,
 ) {
     @Inject
     constructor(
@@ -55,7 +58,8 @@ class CalendarSync internal constructor(
         writeLock: CalendarWriteLock,
         refresher: SourceRefresher,
         undone: UndoneKeys,
-    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, toaster, writeLock, refresher, undone)
+        reminders: Optional<EventReminders> = Optional.empty(),
+    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, toaster, writeLock, refresher, undone, reminders.orElse(null))
 
     // The loop's timer, a connection change and requestSync may all ask at once: one pass writes at a time.
     private val passLock = Mutex()
@@ -105,7 +109,8 @@ class CalendarSync internal constructor(
      * and changes older than [OUTBOX_MAX_AGE_MS] are dropped, with one toast per connection, shown even if the pass
      * then fails. Age leaves out time the connection spent waiting for sign-in (3a design D16). An aged create is
      * first looked up by its key (C9): if the provider made it, it is completed and the changes behind it are sent
-     * whatever their age. A dropped create takes the changes queued behind it with it (2b-2 design §5).
+     * whatever their age. A dropped create takes the changes queued behind it with it (2b-2 design §5). A dropped move
+     * takes its reminder back with the event (22 §10.5).
      */
     private suspend fun drainOutbox(connections: List<StoredConnection>, zone: ZoneId) {
         val now = clock.nowMillis()
@@ -135,6 +140,7 @@ class CalendarSync internal constructor(
             reasons += reason
             // The changes that went with a create have no reason of their own.
             repeat(count - 1) { reasons += null }
+            if (change.kind == ChangeKind.UPDATE && EventField.TIMES in fieldsFor(change.kind, change.fields)) ref?.let { putBack(it, zone) }
         }
 
         try {
@@ -418,11 +424,54 @@ class CalendarSync internal constructor(
     ): ConnectionHealth? {
         val cursor = store.cursor(conn.id, source.id, window)
         val read = DateRange(window.start, window.endExclusive.plusDays(SYNC_AHEAD_DAYS), window.zone)
+        val readBegan = clock.nowMillis()
         val result = callReader(io, timeoutMillis) { provider.sync(conn, source, read, cursor) }
             .getOrElse { return healthAfter(it, conn, source.id) }
-        store.applySync(conn.id, source.id, read, withoutStrays(result), todayIn(window.zone))
+        val changes = store.applySync(conn.id, source.id, read, withoutStrays(result), todayIn(window.zone), clock.nowMillis())
+        tell(changes, readBegan)
         store.prune(conn.id, source.id, window)
         return ConnectionHealth.Ok
+    }
+
+    /**
+     * Tells Reminders what a sync removed or moved, under the editor's lock so no wall write lands between the check
+     * and the telling. An event the wall wrote since [readBegan] is left out: the read may predate that write.
+     */
+    private suspend fun tell(changes: List<EventChange>, readBegan: Long) {
+        if (reminders == null || changes.isEmpty()) return
+        writeLock.withLock {
+            val written = store.wallWrittenSince(readBegan)
+            val told = changes.filter { it.key !in written }
+            val goneKeys = told.filterIsInstance<EventChange.Gone>().map { it.key }
+            if (goneKeys.isNotEmpty()) tellReminders { gone(goneKeys) }
+            told.filterIsInstance<EventChange.Changed>().forEach { tellReminders { changed(it.key, it.now, it.startsAtMillis) } }
+        }
+    }
+
+    /**
+     * A queued move to [ref] was dropped, so the event stays where it is stored: its reminder goes back with it, unless
+     * a later change for it is still queued.
+     */
+    private suspend fun putBack(ref: EventRef, zone: ZoneId) {
+        if (reminders == null) return
+        writeLock.withLock {
+            if (store.pendingNow().any { it.ref == ref }) return@withLock
+            val event = store.eventNow(ref) ?: return@withLock
+            val (times, startsAt) = linkTimes(listOf(event), emptyList(), zone, todayIn(zone), clock.nowMillis())
+            tellReminders { changed(eventKey(event), times, startsAt) }
+        }
+    }
+
+    /** A failure in Reminders never fails the sync. */
+    private suspend fun tellReminders(call: suspend EventReminders.() -> Unit) {
+        val reminders = reminders ?: return
+        try {
+            reminders.call()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't tell Reminders (${e::class.simpleName})")
+        }
     }
 
     /**

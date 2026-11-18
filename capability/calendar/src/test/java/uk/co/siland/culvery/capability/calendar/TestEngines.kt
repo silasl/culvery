@@ -103,4 +103,5 @@ internal fun testSync(
     writeLock: CalendarWriteLock = CalendarWriteLock(),
     refresher: SourceRefresher = SourceRefresher(store, { emptyList() }, clock, toaster, io, timeoutMillis),
     undone: UndoneKeys = UndoneKeys(InMemoryUndoneCreates()),
-): CalendarSync = CalendarSync(store, providers, zone, clock, io, timeoutMillis, writers, toaster, writeLock, refresher, undone)
+    reminders: EventReminders? = null,
+): CalendarSync = CalendarSync(store, providers, zone, clock, io, timeoutMillis, writers, toaster, writeLock, refresher, undone, reminders)

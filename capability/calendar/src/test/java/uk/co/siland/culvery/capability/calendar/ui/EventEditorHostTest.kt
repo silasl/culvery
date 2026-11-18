@@ -72,6 +72,7 @@ import uk.co.siland.culvery.capability.calendar.UNDO
 import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
+import uk.co.siland.culvery.capability.calendar.applySync
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.cannotAddForOthers
 import uk.co.siland.culvery.capability.calendar.couldNotDelete

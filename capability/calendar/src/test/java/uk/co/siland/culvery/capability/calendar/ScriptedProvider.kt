@@ -42,6 +42,8 @@ internal class ScriptedProvider(
     /** Completes when the first sync call starts. */
     val entered = CompletableDeferred<Unit>()
     var events: (CalendarSource) -> List<RemoteEvent> = { emptyList() }
+    /** The ids an incremental read says were removed. */
+    var removed: (CalendarSource) -> List<String> = { emptyList() }
 
     /** When set, the connect screen reports this at once; otherwise it waits, like a person still choosing. */
     var connectsAs: Connection? = null
@@ -83,7 +85,7 @@ internal class ScriptedProvider(
             if (hang) awaitCancellation()
             gate?.await()
             (failFor[source.id] ?: failWith)?.let { throw it }
-            return SyncResult(events(source), emptyList(), SyncCursor("k${calls.size}"), fullReplace = cursor == null)
+            return SyncResult(events(source), if (cursor == null) emptyList() else removed(source), SyncCursor("k${calls.size}"), fullReplace = cursor == null)
         } finally {
             synchronized(this) { inFlight-- }
         }

@@ -8,6 +8,7 @@ import java.net.ConnectException
 import java.net.UnknownHostException
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicReference
@@ -37,6 +38,8 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.EventEntity
 import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
 import uk.co.siland.culvery.capability.calendar.db.UndoneCreateEntity
+import uk.co.siland.culvery.core.house.EventReminders
+import uk.co.siland.culvery.core.house.EventTimes
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
@@ -91,9 +94,10 @@ class CalendarSyncTest {
         store: CalendarStore = this.store,
         undone: UndoneKeys = UndoneKeys(InMemoryUndoneCreates()),
         clock: WallClock = this.clock,
+        reminders: EventReminders? = null,
     ): CalendarSync {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
-        return testSync(store, setOf(a, b), HouseholdZone(household), clock, writers, toaster, io, timeoutMillis, lock, undone = undone)
+        return testSync(store, setOf(a, b), HouseholdZone(household), clock, writers, toaster, io, timeoutMillis, lock, undone = undone, reminders = reminders)
     }
 
     private suspend fun engine(): CalendarSync = engineWith(emptySet(), SilentToaster)
@@ -401,8 +405,9 @@ class CalendarSyncTest {
         next: Instant = now,
         created: Instant = now,
         clientKey: String? = null,
+        fields: Set<EventField>? = null,
     ): Long = store.enqueue(
-        PendingChange(0, "c1", sourceId, remoteId, kind, draft, attempts, next.toEpochMilli(), created.toEpochMilli(), clientKey),
+        PendingChange(0, "c1", sourceId, remoteId, kind, draft, attempts, next.toEpochMilli(), created.toEpochMilli(), clientKey, fields = fields),
     )
 
     /** C3: a write refused for sign-in keeps the reconnect chip while reads still work, until a reconnect. */
@@ -1552,5 +1557,115 @@ class CalendarSyncTest {
         a.failWith = OfflineException("Play services found no network")
         engine().syncAll()
         assertThat(health("c1")).isEqualTo(ConnectionHealth.Offline)
+    }
+
+    private val reminders = RecordingReminders()
+
+    private suspend fun remindingEngine(): CalendarSync = engineWith(setOf(w), toaster, reminders = reminders)
+
+    private fun linkKey(id: String) = eventKey("c1", "s1", id)
+
+    /** Swim moved an hour later: 17:00 in London. */
+    private fun laterSwim() = swim().copy(start = EventTime.Timed(Instant.parse("2026-09-23T16:00:00Z")), end = EventTime.Timed(Instant.parse("2026-09-23T17:00:00Z")))
+
+    private val laterSwimLink = RecordingReminders.Changed(
+        eventKey("c1", "s1", "swim"),
+        EventTimes(LocalDate.of(2026, 9, 23), LocalTime.of(17, 0), null),
+        Instant.parse("2026-09-23T16:00:00Z").toEpochMilli(),
+    )
+
+    @Test
+    fun removalsAndChangesReachReminders() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim(), at("2026-09-23T17:00:00Z", "Walk"), at("2026-09-24T09:00:00Z", "Dentist")) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        assertThat(reminders.gone).isEmpty()
+        assertThat(reminders.changed).isEmpty()
+        a.events = { listOf(laterSwim()) }
+        a.removed = { listOf("walk", "dentist") }
+        sync.syncAll()
+        assertThat(reminders.gone.single()).containsExactly(linkKey("walk"), linkKey("dentist"))
+        assertThat(reminders.changed).containsExactly(laterSwimLink)
+    }
+
+    @Test
+    fun aSeamThatThrowsDoesNotFailTheSync() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim(), at("2026-09-23T17:00:00Z", "Walk")) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        reminders.fails = IllegalStateException("the reminders store is closed")
+        a.events = { listOf(laterSwim()) }
+        a.removed = { listOf("walk") }
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+        assertThat(cachedTitles()).containsExactly("Swim")
+        // The move is still told after the removal failed.
+        assertThat(reminders.gone).hasSize(1)
+        assertThat(reminders.changed).containsExactly(laterSwimLink)
+        assertThat(ShadowLog.getLogsForTag("CalendarSync").map { it.msg }).contains("Couldn't tell Reminders (IllegalStateException)")
+    }
+
+    /** The plan review: a read that began before a wall move would put the old times back on its reminder. */
+    @Test
+    fun aSyncReadBeforeAWallMoveDoesNotReportTheOldTimes() = runTest {
+        connect("c1", "calendar.a", s1)
+        val walk = at("2026-09-23T17:00:00Z", "Walk")
+        a.events = { listOf(swim(), walk) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        // The wall moves Swim while the next read is on its way; that read still has it where it was, and Walk moved on a phone.
+        store.applyAccepted("c1", "s1", laterSwim(), LocalDate.of(2026, 9, 23), london)
+        val laterWalk = at("2026-09-23T18:00:00Z", "Walk")
+        a.events = {
+            now = now.plusSeconds(1)
+            store.stampWallWrite(linkKey("swim"), now.toEpochMilli())
+            listOf(swim(), laterWalk)
+        }
+        sync.syncAll()
+        assertThat(reminders.changed.map { it.key }).containsExactly(linkKey("walk"))
+    }
+
+    /** 22 §10.5: if a queued move is later refused, the reminder goes back with the event. */
+    @Test
+    fun aRefusedQueuedMoveTakesTheReminderBack() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(laterSwim()) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        queue(ChangeKind.UPDATE, draft = swimDraft("sam-id"), fields = setOf(EventField.TIMES))
+        w.failWith = WriteRejectedException("event is locked")
+        sync.syncAll()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(reminders.changed).containsExactly(laterSwimLink)
+    }
+
+    @Test
+    fun aRefusedQueuedMoveWithAnotherQueuedBehindItTellsNothing() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(laterSwim()) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        queue(ChangeKind.UPDATE, draft = swimDraft("sam-id"), fields = setOf(EventField.TIMES))
+        queue(ChangeKind.UPDATE, draft = swimDraft("sam-id"), fields = setOf(EventField.TIMES), next = now.plusSeconds(86_400))
+        w.failWith = WriteRejectedException("event is locked")
+        sync.syncAll()
+        assertThat(store.pendingNow()).hasSize(1)
+        assertThat(reminders.changed).isEmpty()
+    }
+
+    @Test
+    fun aRefusedQueuedDeleteTellsNothing() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = remindingEngine()
+        sync.syncAll()
+        queue(ChangeKind.DELETE, draft = null)
+        w.failWith = WriteRejectedException("event is locked")
+        sync.syncAll()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(reminders.changed).isEmpty()
+        assertThat(reminders.gone).isEmpty()
     }
 }
