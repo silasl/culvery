@@ -30,7 +30,7 @@ internal fun eventKey(event: StoredEvent): String = eventKey(event.connectionId,
  * commonest among [siblings] from [today] on (all of them when none is ahead).
  */
 internal fun eventTimes(event: StoredEvent, siblings: List<StoredEvent>, zone: ZoneId, today: LocalDate): EventTimes {
-    val rule = event.recurrenceRule ?: return EventTimes(event.start.dayIn(zone), event.start.timeIn(zone), null)
+    val rule = seriesRule(event, siblings, zone, today) ?: return EventTimes(event.start.dayIn(zone), event.start.timeIn(zone), null)
     val dated = siblings.ifEmpty { listOf(event) }.sortedBy { it.startSort }
     val counted = dated.filter { !it.start.dayIn(zone).isBefore(today) }.ifEmpty { dated }
     val time = counted.groupingBy { it.start.timeIn(zone) }.eachCount().maxBy { it.value }.key
@@ -52,7 +52,7 @@ internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, peopl
     // An all-day date has started only once it is over (22 §10.5).
     fun started(day: LocalDate, at: LocalTime?) = if (at == null) day.isBefore(today) else !day.atTime(at).atZone(zone).toInstant().isAfter(now)
     val tapped = event.start.dayIn(zone)
-    val rule = event.recurrenceRule?.takeIf { workable(it, zone) }
+    val rule = seriesRule(event, siblings, zone, today)?.takeIf { workable(it, zone) }
     val (day, left) = if (rule == null) {
         if (started(tapped, time)) return null
         tapped to null
@@ -66,6 +66,13 @@ internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, peopl
     }
     // Another date keeps the series' usual time, not the one this date may have been moved to.
     return EventSeed(eventKey(event), event.title, people, day, if (day == tapped) time else times.time, left, times)
+}
+
+// A date whose own rule wasn't read takes its series' from another stored date: the earliest coming one's, else the latest.
+private fun seriesRule(event: StoredEvent, siblings: List<StoredEvent>, zone: ZoneId, today: LocalDate): String? {
+    event.recurrenceRule?.let { return it }
+    val ruled = siblings.filter { it.recurrenceRule != null }.sortedBy { it.startSort }
+    return (ruled.firstOrNull { !it.start.dayIn(zone).isBefore(today) } ?: ruled.lastOrNull())?.recurrenceRule
 }
 
 // A COUNT can be reduced only from the series' true first day.
