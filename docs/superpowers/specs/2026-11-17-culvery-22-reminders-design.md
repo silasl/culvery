@@ -294,7 +294,7 @@ Ruled by the user after the first walk-through. Where this section differs from 
 ### 10.5 The link
 - A reminder saved from that form remembers its event: the event's key, its start as it was then, and its repeat as it was then. The key is the calendar's and means nothing to Reminders. A repeating event is one key for the whole series, and an event made repeating on a phone keeps its key.
 - A reminder saved on the event's own day with the event's repeat untouched **follows the repeat**. One the person moved to another day, or gave another repeat, then or later on the Reminders tab, keeps its own repeat.
-- **Event deleted on the wall,** sent or still queued: the reminder is deleted at once with no second PIN, and the toast reads "Event and its reminder deleted." Undo of a just-added event takes its reminder too. If a queued delete is later refused, the event comes back without its reminder.
+- **Event deleted on the wall,** sent or still queued: the reminder is deleted at once with no second PIN, and the toast reads "Event and its reminder deleted." Undo of a just-added event takes its reminder too. If a queued delete is later refused, the event comes back without its reminder. If a queued move is later refused, the reminder goes back with the event.
 - **Event moved on the wall:** the reminder's day and time shift by the same amount. The toast reads "Changes saved. Its reminder moved too."
 - **From a phone,** found at sync:
   - an event the sync removes: its reminder is deleted. Ageing out of the stored weeks, a hidden or removed calendar, and an event that was never stored are not removals;
