@@ -137,6 +137,12 @@ class RecurrenceExpanderTest {
     }
 
     @Test
+    fun aHugeIntervalGivesOnlyTheFirstDate() {
+        val made = expand(timedSeries("RRULE:FREQ=YEARLY;INTERVAL=1000000000"), friday.plusYears(500))
+        assertThat(made.map { it.localDay() }).containsExactly(friday)
+    }
+
+    @Test
     fun aYearlySeriesFrom29FebruaryOnlyLandsInLeapYears() {
         val leap = LocalDate.of(2028, 2, 29)
         val made = expand(allDaySeries("RRULE:FREQ=YEARLY;INTERVAL=1;COUNT=2", leap, 1), LocalDate.of(2033, 1, 1))

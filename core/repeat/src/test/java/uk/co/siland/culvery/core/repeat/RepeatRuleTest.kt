@@ -155,6 +155,7 @@ class RepeatRuleTest {
         assertThat(startedFrom(text, wednesday, d(2027, 1, 20), london)).isEqualTo(d(2027, 1, 20) to null)
         assertThat(startedFrom(text, wednesday, d(2027, 1, 21), london)).isNull()
         assertThat(startedFrom(text, wednesday, d(2026, 11, 1), london)).isEqualTo(wednesday to text)
+        assertThat(startedFrom("RRULE:COUNT=10;FREQ=WEEKLY", wednesday, d(2026, 12, 16), london)).isEqualTo(d(2026, 12, 16) to "RRULE:COUNT=6;FREQ=WEEKLY")
     }
 
     @Test
@@ -188,6 +189,27 @@ class RepeatRuleTest {
         val lenient = checkNotNull(RepeatRule.parse("RRULE:FREQ=DAILY;INTERVAL=0;BYSETPOS=1;WKST=SU;COUNT=0", london, strict = false))
         assertThat(lenient.dates(wednesday).take(2).toList()).containsExactly(d(2026, 11, 18), d(2026, 11, 19)).inOrder()
         assertThat(RepeatRule.parse("RRULE:FREQ=DAILY;COUNT=0", london)).isNotNull()
+    }
+
+    @Test
+    fun aHugeIntervalIsRefused() {
+        assertThat(RepeatRule.parse("RRULE:FREQ=YEARLY;INTERVAL=1000000000", london)).isNull()
+        assertThat(RepeatRule.parse("RRULE:FREQ=YEARLY;INTERVAL=1001", london)).isNull()
+        assertThat(RepeatRule.parse("RRULE:FREQ=YEARLY;INTERVAL=1000", london)).isNotNull()
+    }
+
+    @Test
+    fun aHugeIntervalNeverThrowsWhenNotStrict() {
+        for (freq in listOf("DAILY", "WEEKLY", "MONTHLY", "YEARLY")) {
+            val huge = checkNotNull(RepeatRule.parse("RRULE:FREQ=$freq;INTERVAL=1000000000", london, strict = false))
+            assertThat(huge.dates(wednesday).take(2).toList()).isNotEmpty()
+            huge.firstAfter(wednesday, wednesday)
+            huge.firstAfter(wednesday, LocalDate.MAX)
+            huge.latestOnOrBefore(wednesday, LocalDate.MAX)
+        }
+        val yearly = checkNotNull(RepeatRule.parse("RRULE:FREQ=YEARLY;INTERVAL=1000000000", london, strict = false))
+        assertThat(yearly.firstAfter(wednesday, wednesday)).isEqualTo(d(3026, 11, 18))
+        assertThat(yearly.latestOnOrBefore(wednesday, LocalDate.MAX)).isNotNull()
     }
 
     @Test

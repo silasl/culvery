@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.repeat
 
+import java.time.DateTimeException
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -13,7 +14,7 @@ private const val MAX_EMPTY_PERIODS = 1_000
 private const val LAST_MONTH_DAY = 31
 private const val UNTIL_DATE_LENGTH = 8
 private val NTH_RANGE = 1..4
-private val ALWAYS_PARTS = setOf("FREQ", "INTERVAL", "UNTIL", "COUNT", "WKST")
+private const val MAX_INTERVAL = 1_000
 
 /** A rule the shared code can work out. [toString] prints nothing of it. */
 class RepeatRule private constructor(
@@ -42,7 +43,7 @@ class RepeatRule private constructor(
         var period = periodOf(first, limit)
         repeat(MAX_EMPTY_PERIODS) {
             if (period < 0) return null
-            periodDates(first, period--).lastOrNull { !it.isAfter(limit) }?.let { return it }
+            periodDatesOrNull(first, period--)?.lastOrNull { !it.isAfter(limit) }?.let { return it }
         }
         return null
     }
@@ -59,7 +60,7 @@ class RepeatRule private constructor(
         var period = start
         var empty = 0
         while (empty <= MAX_EMPTY_PERIODS) {
-            val found = periodDates(first, period++)
+            val found = periodDatesOrNull(first, period++) ?: return@sequence
             if (found.isEmpty()) empty++ else {
                 empty = 0
                 yieldAll(found)
@@ -74,6 +75,14 @@ class RepeatRule private constructor(
         Freq.MONTHLY -> ChronoUnit.MONTHS.between(YearMonth.from(first), YearMonth.from(day))
         Freq.YEARLY -> (day.year - first.year).toLong()
     } / interval
+
+    // Null when the period's dates can't be represented: the sequence ends there.
+    private fun periodDatesOrNull(first: LocalDate, period: Long): List<LocalDate>? =
+        try {
+            periodDates(first, period)
+        } catch (_: DateTimeException) {
+            null
+        }
 
     // The dates of the [period]th period from [first], in order; none before [first].
     private fun periodDates(first: LocalDate, period: Long): List<LocalDate> {
@@ -98,20 +107,24 @@ class RepeatRule private constructor(
 
     companion object {
         /**
-         * Null for anything but FREQ (DAILY, WEEKLY, MONTHLY, YEARLY), INTERVAL of 1 or more, a weekly BYDAY list, a
+         * Null for anything but FREQ (DAILY, WEEKLY, MONTHLY, YEARLY), INTERVAL of 1 to 1,000, a weekly BYDAY list, a
          * monthly BYDAY of one nth weekday (1 to 4, −1), a monthly BYMONTHDAY of one day, COUNT of 1 or more, UNTIL (a date,
          * or a UTC time read in [zone]) and WKST=MO. A DTSTART line is skipped. When not [strict], an unknown part is
-         * ignored, an INTERVAL below 1 counts as 1 and any WKST is ignored. A COUNT that isn't 1 or more is ignored either way.
+         * ignored, an INTERVAL below 1 counts as 1, above 1,000 as 1,000 and any WKST is ignored. A COUNT that isn't 1 or more is ignored either way.
          */
         fun parse(rule: String, zone: ZoneId, strict: Boolean = true): RepeatRule? {
             val parts = ruleParts(rule) ?: return null
             val freq = Freq.entries.firstOrNull { it.name == parts["FREQ"] } ?: return null
             val byDayAllowed = freq == Freq.WEEKLY || freq == Freq.MONTHLY
             val byMonthDayAllowed = freq == Freq.MONTHLY
-            val allowed = ALWAYS_PARTS + listOfNotNull("BYDAY".takeIf { byDayAllowed }, "BYMONTHDAY".takeIf { byMonthDayAllowed })
+            val allowed = BOUNDING_PARTS + listOfNotNull("BYDAY".takeIf { byDayAllowed }, "BYMONTHDAY".takeIf { byMonthDayAllowed })
             if (strict && (parts.keys - allowed).isNotEmpty()) return null
             if (strict && parts["WKST"].let { it != null && it != DayOfWeek.MONDAY.code() }) return null
-            val interval = parts["INTERVAL"]?.let { text -> text.toIntOrNull()?.takeIf { it >= 1 } ?: if (strict) return null else 1 } ?: 1
+            val interval = parts["INTERVAL"]?.let { text ->
+                val n = text.toLongOrNull()?.takeIf { it >= 1 }
+                if (strict && (n == null || n > MAX_INTERVAL)) return null
+                n?.coerceAtMost(MAX_INTERVAL.toLong())?.toInt() ?: 1
+            } ?: 1
             val until = parts["UNTIL"]?.let { text -> untilDay(text, zone) ?: if (strict) return null else null }
             val byDay = parts["BYDAY"].takeIf { byDayAllowed }
             val byMonthDay = parts["BYMONTHDAY"].takeIf { byMonthDayAllowed }
@@ -155,6 +168,6 @@ fun startedFrom(rule: String, first: LocalDate, day: LocalDate, zone: ZoneId): P
     val start = parsed.firstAfter(first, day.minusDays(1)) ?: return null
     val total = parsed.count ?: return start to withoutSeriesStart(rule)
     val remaining = total - parsed.dates(first).takeWhile { it.isBefore(start) }.count()
-    val reduced = withoutSeriesStart(rule).split(';').joinToString(";") { if (it.uppercase().startsWith("COUNT=")) "COUNT=$remaining" else it }
+    val reduced = withoutSeriesStart(rule).split(';').joinToString(";") { if (it.uppercase().removePrefix("RRULE:").startsWith("COUNT=")) it.replaceAfter('=', remaining.toString()) else it }
     return start to reduced.takeIf { remaining > 1 }
 }
