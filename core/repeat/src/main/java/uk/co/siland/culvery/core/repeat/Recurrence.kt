@@ -84,7 +84,7 @@ fun ordinal(n: Int): String {
 fun DayOfWeek.code(): String = name.take(2)
 
 /** The [n]th (−1: last) [weekday] of [month]. */
-private fun nthWeekdayIn(month: YearMonth, n: Int, weekday: DayOfWeek): LocalDate {
+internal fun nthWeekdayIn(month: YearMonth, n: Int, weekday: DayOfWeek): LocalDate {
     if (n == LAST) {
         val last = month.atEndOfMonth()
         return last.minusDays(((last.dayOfWeek.value - weekday.value + DAYS_PER_WEEK) % DAYS_PER_WEEK).toLong())

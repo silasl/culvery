@@ -129,6 +129,14 @@ class RecurrenceExpanderTest {
     }
 
     @Test
+    fun aWeeklySeriesOnSeveralDaysExpandsToEachDay() {
+        val made = expand(timedSeries("RRULE:FREQ=WEEKLY;BYDAY=MO,FR;COUNT=4"), friday.plusYears(1))
+        assertThat(made.map { it.localDay() }).containsExactly(
+            friday, friday.plusDays(3), friday.plusDays(7), friday.plusDays(10),
+        ).inOrder()
+    }
+
+    @Test
     fun aYearlySeriesFrom29FebruaryOnlyLandsInLeapYears() {
         val leap = LocalDate.of(2028, 2, 29)
         val made = expand(allDaySeries("RRULE:FREQ=YEARLY;INTERVAL=1;COUNT=2", leap, 1), LocalDate.of(2033, 1, 1))
