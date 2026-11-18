@@ -200,6 +200,24 @@ The wall tablet should be set up with Culvery as device owner, on a freshly rese
 
 **Forgotten PIN:** an Admin can reset anyone's PIN in Settings › People. If every Admin has forgotten theirs, clear the app's data (Android Settings › Apps › Culvery › Storage › Clear data). That wipes all configuration and starts setup again.
 
+## Reminders
+
+A reminder is a few words, who it is for, a day and a time. It can repeat with the same choices as a calendar event: doesn’t repeat, every week, every 2 weeks, every month on the nth weekday, every year, or every day. With every week or every 2 weeks, seven day chips let you pick several days ("Every week, on Mon, Wed"). Calendar events repeat on chosen days too.
+
+**From an event:** every event’s card has **Add reminder**, which opens the reminder form filled in from the event. Once the event has one, the button reads **Change reminder**. An event has one reminder. Bin collections have their own and don’t show the button.
+
+**What follows the event:**
+- Delete the event on the wall or on a phone, and the reminder goes with it.
+- Move the event, and the reminder moves too, keeping its gap before the event.
+- Change a repeating event’s time or repeat on a phone, and the reminder follows (one with its own repeat only shifts).
+
+**What doesn’t:**
+- One date of a series skipped or moved.
+- A change of title or people.
+- Google’s "this and following events", which makes a new series; the old one ends and its reminder ends with it.
+
+Deleting a reminder leaves its event alone.
+
 ## Home Assistant
 
 Settings › Home Assistant links Culvery to a Home Assistant on the home network: its address and a token made for Culvery. Check saves the link after an Admin PIN.

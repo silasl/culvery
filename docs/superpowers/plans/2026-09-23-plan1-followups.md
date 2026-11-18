@@ -45,7 +45,7 @@ The open work, one number each; the details are in the sections below. Numbers n
 29. The thermostat as an everyday control.
 30. Narrowing the Home Assistant token's reach.
 31. Ring through Home Assistant.
-41. Reminders from a phone or Google, and "remind us" on a calendar event (see "Plan 22 (Reminders) not in this build").
+41. Reminders from a phone or Google (see "Plan 22 (Reminders) not in this build").
 
 ## From Plan 1 (deferred)
 
@@ -481,6 +481,7 @@ Test flakes seen across the build (timing, not Plan 9a's code; each passed on a 
 - `LightsActionsTest` and `LightsCapabilityTest`: "Timed out waiting for 5000 ms" on DataStore and StateFlow reads.
 - `DoorCapabilityTest.theTabAppearsOnceRingIsConnected`.
 - `SampleHouseTest.sampleTrueKeepsTheSavedConnectionsAndSampleFalseBringsThemBack` (Plan 22's gate, 2026-11-17: failed once in the full-repo run, passed alone and in a fresh run of the app's tests).
+- Plan 22's gate, 2026-11-18, fail only when the machine is busy and pass alone: `MusicSettingsPageTest.connectingByAddressClearsTheFindLine`, `ShoppingSettingsTest.twoAccountsAskWhich`, `MusicCardTest.theCardWatchesOnlyWhileItShows` and `DoorSettingsPageTest.aShorterKeepConfirmsThenAsksAFreshPin`.
 - `SonosSystemTest` after a clock jump.
 - "Database connection closed" (a Room database closed in teardown while a flow still reads it, wrong thread) in `DoorTabTest`, `PeopleUiTest`, `DoorRecorderTest` and `EventDetailHostTest`.
 - `CalendarMigrationTest`.
@@ -1061,10 +1062,13 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - Birthdays overriding a doorbell set to one sound (item 10).
 
 ## Plan 22 (Reminders) not in this build, on purpose
-Spec `docs/superpowers/specs/2026-11-17-culvery-22-reminders-design.md`. Item 41 covers the first two.
+Spec `docs/superpowers/specs/2026-11-17-culvery-22-reminders-design.md`. Item 41 covers the first.
 - Reminders made on a phone or read from Google. The route weighed: a "Reminders" calendar in the house account, each event a reminder at its start time. Google Tasks keeps a due date but no time, and Google's own event reminders belong to each account.
-- "Remind us" on a calendar event.
-- Monthly or yearly repeats (a reminder is once, or weekly on chosen days).
+- A repeat that ends on a date (the picker has Keeps going, or Stops after 2 to 52 times). A phone event's own "until" is followed but can't be made on the wall.
+- One date of a series skipped or moved on a phone isn't followed by its reminder.
+- A reminder isn't told when its event's title or people change.
+- Google's "this and following events" makes a new series, so a reminder doesn't follow onto it; the old series ends and the reminder ends with it.
+- An event moved on a phone beyond the stored weeks loses its reminder: the wall can't tell that from a deletion.
 - A sound chosen per reminder, a chime that repeats, or a spoken reminder.
 - Anything drawn on the night clock or the dark screen (Plan 8's ruling stands).
 - Reminders shown on the calendar or on a Home card.
@@ -1100,6 +1104,14 @@ Left by the final review (2026-11-17), none blocking:
 - A signed-in session can outlive its two minutes across a sleep; it fails closed.
 - The form's screenshot baselines are 1330 dp tall, not the tablet's 800 dp.
 - The debug clock: `at` wins silently over `add` when both are given.
+
+Left by the second pass (2026-11-18), none blocking:
+- The date grid's day cells are read twice by TalkBack.
+- The reminder form is a long scroll.
+- Quick picks for a several-day series offer only one weekday.
+- A reminder whose event's connection is removed stays, and no longer follows anything.
+- A sync cut off by a restart can leave a reminder that no longer matches its event.
+- A reminder with its own monthly-by-date repeat keeps its day of the month when its event moves.
 
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
