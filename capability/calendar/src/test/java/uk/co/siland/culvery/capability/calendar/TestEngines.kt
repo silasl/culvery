@@ -9,12 +9,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.house.EventReminders
+import uk.co.siland.culvery.core.house.EventSeed
+import uk.co.siland.culvery.core.house.EventTimes
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -41,6 +45,39 @@ internal fun testEditor(
     reminders: EventReminders? = null,
 ): CalendarEditor =
     CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf, order, undone, shown, updates, reminders)
+
+/** Reminders as the calendar reaches them: each call recorded, [answer] given to gone and changed, or [fails] thrown. */
+internal class RecordingReminders : EventReminders {
+    val keys = MutableStateFlow(emptySet<String>())
+    val opened = mutableListOf<EventSeed>()
+    val gone = mutableListOf<List<String>>()
+    val changed = mutableListOf<Changed>()
+    var answer = false
+    var fails: Exception? = null
+
+    /** [toString] prints nothing, as the times and the key are the household's. */
+    data class Changed(val key: String, val now: EventTimes, val startsAtMillis: Long?) {
+        override fun toString() = "Changed"
+    }
+
+    override fun has(key: String): Flow<Boolean> = keys.map { key in it }
+
+    override suspend fun open(host: OverlayHost, seed: EventSeed) {
+        opened += seed
+    }
+
+    override suspend fun gone(keys: Collection<String>): Boolean {
+        gone += keys.toList()
+        fails?.let { throw it }
+        return answer
+    }
+
+    override suspend fun changed(key: String, now: EventTimes, startsAtMillis: Long?): Boolean {
+        changed += Changed(key, now, startsAtMillis)
+        fails?.let { throw it }
+        return answer
+    }
+}
 
 /** The Calendar's setting, held in memory and read at once; [shown] is what it starts at. */
 internal fun testCalendarSettings(shown: WeeksShown = WeeksShown.EIGHT): CalendarSettings {

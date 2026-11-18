@@ -37,6 +37,12 @@ internal fun eventTimes(event: StoredEvent, siblings: List<StoredEvent>, zone: Z
     return EventTimes(seriesStart(rule), time, withoutSeriesStart(rule))
 }
 
+/** When a one-off [event] starts for the link: an all-day event once its day is over (22 §10.5). */
+internal fun startsAtMillis(event: StoredEvent, zone: ZoneId): Long = when (val start = event.start) {
+    is EventTime.AllDay -> start.date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    is EventTime.Timed -> start.instant.toEpochMilli()
+}
+
 /**
  * What the reminder form opens with for [event]; null when no reminder can be added: a bin collection, a one-off that
  * has started, a series with no date left. A series opens on the date tapped, or the next one if that has passed, at its

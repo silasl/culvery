@@ -14,10 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -31,7 +28,6 @@ import uk.co.siland.culvery.capability.calendar.ui.RecordingOverlay
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.house.EventReminders
-import uk.co.siland.culvery.core.house.EventSeed
 import uk.co.siland.culvery.core.house.EventTimes
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -44,7 +40,6 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.OUTBOX_BACKOFF_MS
-import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.repeat.Recurrence
 import uk.co.siland.culvery.core.ui.test.awaiting
@@ -115,24 +110,9 @@ class CalendarEditorTest {
         order = { household.people.first().map { it.id } }, undone = undone, shown = { shown }, updates = updates, reminders = reminders,
     )
 
-    private class HeldReminders : EventReminders {
-        val keys = MutableStateFlow(emptySet<String>())
-        val opened = mutableListOf<EventSeed>()
-
-        override fun has(key: String): Flow<Boolean> = keys.map { key in it }
-
-        override suspend fun open(host: OverlayHost, seed: EventSeed) {
-            opened += seed
-        }
-
-        override suspend fun gone(keys: Collection<String>) = false
-
-        override suspend fun changed(key: String, now: EventTimes, startsAtMillis: Long?) = false
-    }
-
     @Test
     fun theCardOffersChangeOnceTheEventHasAReminder() = runTest {
-        val reminders = HeldReminders()
+        val reminders = RecordingReminders()
         put(event("e1", createdBy = null))
         val access = testAccess(household)
         val editor = editor(access, reminders = reminders)
@@ -144,7 +124,7 @@ class CalendarEditorTest {
 
     @Test
     fun aReminderOpensFromTheEventAsTheCardShowsIt() = runTest {
-        val reminders = HeldReminders()
+        val reminders = RecordingReminders()
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
         val editor = editor(access, reminders = reminders)
@@ -157,6 +137,181 @@ class CalendarEditorTest {
         assertThat(seed.people).containsExactly(access.sam.id)
         assertThat(seed.day).isEqualTo(LocalDate.of(2026, 9, 27))
         assertThat(seed.time).isEqualTo(LocalTime.of(18, 0))
+    }
+
+    private val dinnerKey = eventKey("c1", "s-family", "dinner")
+
+    /** Dinner moved to [day], all day. */
+    private fun allDayOn(day: LocalDate) =
+        EventDraft("Dinner", EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), forPerson = null, createdBy = "ignored")
+
+    @Test
+    fun deletingAnEventTakesItsReminder() = runTest {
+        val reminders = RecordingReminders().apply { answer = true }
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access, reminders = reminders).delete(ref("dinner"))).isEqualTo(EditResult.Done)
+        assertThat(reminders.gone).containsExactly(listOf(dinnerKey))
+        assertThat(reminders.changed).isEmpty()
+        assertThat(access.toasts.messages).containsExactly(EVENT_AND_REMINDER_DELETED)
+    }
+
+    @Test
+    fun aQueuedDeleteTakesItToo() = runTest {
+        val reminders = RecordingReminders().apply { answer = true }
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        writer.failWith = UnreachableException("offline")
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access, reminders = reminders).delete(ref("dinner"))).isEqualTo(EditResult.Queued)
+        assertThat(reminders.gone).containsExactly(listOf(dinnerKey))
+        assertThat(access.toasts.messages).containsExactly(EVENT_AND_REMINDER_DELETED)
+    }
+
+    @Test
+    fun aDeleteThatFailsLeavesTheReminder() = runTest {
+        val reminders = RecordingReminders().apply { answer = true }
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value), event("football", createdBy = access.mia.id.value))
+        access.answer(null, TestAccess.ALEX)
+        val editor = editor(access, reminders = reminders)
+        assertThat(editor.delete(ref("football"))).isEqualTo(EditResult.Cancelled)
+        writer.failWith = WriteRejectedException("event is locked")
+        assertThat(editor.delete(ref("dinner"))).isEqualTo(EditResult.Rejected(WriteProblem.Refused("event is locked")))
+        assertThat(reminders.gone).isEmpty()
+        assertThat(store.wallWrittenSince(opened)).isEmpty()
+        assertThat(access.toasts.messages).containsExactly(couldNotDelete(sample, WriteProblem.Refused("event is locked")))
+    }
+
+    @Test
+    fun theToastSaysSoOnlyWhenAReminderWent() = runTest {
+        val reminders = RecordingReminders()
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value), event("football", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access, reminders = reminders)
+        assertThat(editor.delete(ref("football"))).isEqualTo(EditResult.Done)
+        reminders.answer = true
+        assertThat(editor.delete(ref("dinner"))).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages).containsExactly(EVENT_DELETED, EVENT_AND_REMINDER_DELETED).inOrder()
+    }
+
+    @Test
+    fun undoingAnAddTakesItsReminder() = runTest {
+        val reminders = RecordingReminders().apply { answer = true }
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access, reminders = reminders)
+        assertThat(editor.create(draft("Dinner", PersonId.FAMILY.value))).isEqualTo(EditResult.Done)
+        assertThat(editor.create(seriesDraft(), "key-s")).isEqualTo(EditResult.Done)
+        assertThat(editor.undoAdd(added("key-1", "Dinner", access.alex))).isEqualTo(EditResult.Done)
+        assertThat(editor.undoAdd(added("key-s", "Swimming", access.alex, series = true))).isEqualTo(EditResult.Done)
+        assertThat(reminders.gone).containsExactly(listOf(eventKey("c1", "s-family", "key-1")), listOf(eventKey("c1", "s-family", "key-s"))).inOrder()
+        assertThat(access.toasts.messages.takeLast(2)).containsExactly("Removed Dinner.", "Removed Swimming.").inOrder()
+    }
+
+    @Test
+    fun movingAnEventTellsRemindersItsNewTimes() = runTest {
+        val reminders = RecordingReminders()
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access, reminders = reminders)
+        assertThat(editor.update(ref("dinner"), edited("Dinner"), setOf(EventField.TIMES))).isEqualTo(EditResult.Done)
+        val eight = LocalDate.of(2026, 9, 23).atTime(20, 0).atZone(london)
+        // Queued, and all day: it counts as started once its day is over.
+        writer.failWith = UnreachableException("offline")
+        val friday = LocalDate.of(2026, 9, 25)
+        assertThat(editor.update(ref("dinner"), allDayOn(friday), setOf(EventField.TIMES))).isEqualTo(EditResult.Queued)
+        assertThat(reminders.changed).containsExactly(
+            RecordingReminders.Changed(dinnerKey, EventTimes(eight.toLocalDate(), LocalTime.of(20, 0), null), eight.toInstant().toEpochMilli()),
+            RecordingReminders.Changed(dinnerKey, EventTimes(friday, null, null), friday.plusDays(1).atStartOfDay(london).toInstant().toEpochMilli()),
+        ).inOrder()
+        assertThat(reminders.gone).isEmpty()
+    }
+
+    @Test
+    fun aChangeOfTitleAloneTellsNothing() = runTest {
+        val reminders = RecordingReminders().apply { answer = true }
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access, reminders = reminders)
+        assertThat(editor.update(ref("dinner"), edited("Supper"), setOf(EventField.TITLE))).isEqualTo(EditResult.Done)
+        assertThat(editor.update(ref("dinner"), edited("Supper", access.sam.id.value), setOf(EventField.FOR_PERSON))).isEqualTo(EditResult.Done)
+        assertThat(reminders.changed).isEmpty()
+        assertThat(reminders.gone).isEmpty()
+        assertThat(access.toasts.messages).containsExactly(CHANGES_SAVED, CHANGES_SAVED)
+    }
+
+    @Test
+    fun theMovedToastSaysSoOnlyWhenAReminderMoved() = runTest {
+        val reminders = RecordingReminders()
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access, reminders = reminders)
+        assertThat(editor.update(ref("dinner"), edited("Dinner"), setOf(EventField.TIMES))).isEqualTo(EditResult.Done)
+        reminders.answer = true
+        assertThat(editor.update(ref("dinner"), allDayOn(LocalDate.of(2026, 9, 25)), setOf(EventField.TIMES))).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages).containsExactly(CHANGES_SAVED, CHANGES_SAVED_REMINDER_MOVED).inOrder()
+    }
+
+    @Test
+    fun aMoveThatFailsTellsNothing() = runTest {
+        val reminders = RecordingReminders().apply { answer = true }
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        writer.failWith = WriteRejectedException("event is locked")
+        access.answer(TestAccess.ALEX)
+        val result = editor(access, reminders = reminders).update(ref("dinner"), edited("Dinner"), setOf(EventField.TIMES))
+        assertThat(result).isEqualTo(EditResult.Rejected(WriteProblem.Refused("event is locked")))
+        assertThat(reminders.changed).isEmpty()
+    }
+
+    @Test
+    fun aSeamThatThrowsDoesNotFailTheWrite() = runTest {
+        val reminders = RecordingReminders().apply {
+            answer = true
+            fails = IllegalStateException("reminders broke")
+        }
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value), event("football", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access, reminders = reminders)
+        assertThat(editor.update(ref("dinner"), edited("Dinner"), setOf(EventField.TIMES))).isEqualTo(EditResult.Done)
+        assertThat(editor.delete(ref("football"))).isEqualTo(EditResult.Done)
+        assertThat(reminders.changed).hasSize(1)
+        assertThat(reminders.gone).hasSize(1)
+        assertThat(store.eventNow(ref("football"))).isNull()
+        assertThat(access.toasts.messages).containsExactly(CHANGES_SAVED, EVENT_DELETED).inOrder()
+    }
+
+    @Test
+    fun withNoRemindersNothingIsCalled() = runTest {
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value), event("football", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        assertThat(editor.update(ref("dinner"), edited("Dinner"), setOf(EventField.TIMES))).isEqualTo(EditResult.Done)
+        assertThat(editor.delete(ref("football"))).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages).containsExactly(CHANGES_SAVED, EVENT_DELETED).inOrder()
+    }
+
+    @Test
+    fun everySavedWallWriteStampsItsKey() = runTest {
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value), event("football", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        assertThat(editor.update(ref("dinner"), edited("Supper"), setOf(EventField.TITLE))).isEqualTo(EditResult.Done)
+        writer.failWith = UnreachableException("offline")
+        assertThat(editor.delete(ref("football"))).isEqualTo(EditResult.Queued)
+        assertThat(editor.create(draft("Swimming", PersonId.FAMILY.value))).isEqualTo(EditResult.Queued)
+        assertThat(store.wallWrittenSince(opened))
+            .containsExactly(dinnerKey, eventKey("c1", "s-family", "football"), eventKey("c1", "s-family", "key-1"))
+        assertThat(store.wallWrittenSince(opened + testScheduler.currentTime + 1)).isEmpty()
     }
 
     /** As the sheet chooses them: "key-1", "key-2"… in the order Save is tapped. */

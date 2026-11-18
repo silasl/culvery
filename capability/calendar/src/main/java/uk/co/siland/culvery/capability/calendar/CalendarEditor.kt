@@ -58,6 +58,10 @@ const val EVENT_DELETED = "Event deleted."
 /** 2b-2 design D1: the toast after a change. */
 const val CHANGES_SAVED = "Changes saved."
 
+/** 22 §10.5: the toasts once an event's reminder went or moved with it. */
+internal const val EVENT_AND_REMINDER_DELETED = "Event and its reminder deleted."
+internal const val CHANGES_SAVED_REMINDER_MOVED = "Changes saved. Its reminder moved too."
+
 /** The added toast's button (9 §3.1), and what Undo says afterwards. */
 const val UNDO = "Undo"
 
@@ -280,7 +284,8 @@ class CalendarEditor internal constructor(
         val label = serviceNameOf(to.connection, serviceOf)
         val added = AddedEvent(clientKey, to.connection.id, to.source.id, draft.title, draft.recurrence != null, who.person.id.value, label)
         val line = addedLineFor(draft)
-        return onAppScope(ChangeKind.CREATE, label, say = { reportAdded(added, line, it) }) {
+        val key = eventKey(to.connection.id, to.source.id, clientKey)
+        return onAppScope(ChangeKind.CREATE, label, key, say = { result, _ -> reportAdded(added, line, result) }) {
             writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey) }
         }
     }
@@ -299,7 +304,14 @@ class CalendarEditor internal constructor(
             allow = { who, _ -> who.person.id.value == added.createdBy },
             refusal = Refusal.Toast(::cannotChangeOthers),
         ) ?: return EditResult.Cancelled
-        return onAppScope(ChangeKind.DELETE, added.service, say = { reportUndo(added.title, added.service, it) }) {
+        val key = eventKey(added.connectionId, added.sourceId, added.key)
+        return onAppScope(
+            ChangeKind.DELETE,
+            added.service,
+            key,
+            tell = { gone(listOf(key)) },
+            say = { result, _ -> reportUndo(added.title, added.service, result) },
+        ) {
             val source = store.source(added.connectionId, added.sourceId) ?: return@onAppScope EditResult.NotEditable
             val to = destination(added.connectionId, source.source) ?: return@onAppScope EditResult.NotEditable
             writeLock.withLock { undo(added, to) }
@@ -437,12 +449,16 @@ class CalendarEditor internal constructor(
      * Runs [block] on the application scope, so closing the sheet mid-write can't lose the change or its toast, then
      * tells the outcome through [say] and nudges the sync loop. A store failure (disk full, corruption) becomes
      * Rejected(Tablet) instead of reaching the sheet's scope and killing the app. A save's refusal is the sheet's
-     * to show; if the sheet stops waiting (it was closed), the editor toasts it instead.
+     * to show; if the sheet stops waiting (it was closed), the editor toasts it instead. Once the change is saved or
+     * queued, [key] is stamped as the wall's and Reminders is told through [tell]; [say] hears whether a reminder went
+     * or moved.
      */
     private suspend fun onAppScope(
         kind: ChangeKind,
         label: String,
-        say: (EditResult) -> Unit = { report(kind, label, it) },
+        key: String?,
+        tell: (suspend EventReminders.() -> Boolean)? = null,
+        say: (EditResult, reminderToo: Boolean) -> Unit = { result, reminderToo -> report(kind, label, result, reminderToo) },
         block: suspend () -> EditResult,
     ): EditResult {
         val job = scope.async {
@@ -454,7 +470,9 @@ class CalendarEditor internal constructor(
                 Log.w(TAG, "Couldn't save a ${kind.name} (${e::class.simpleName})")
                 EditResult.Rejected(WriteProblem.Tablet)
             }
-            say(result)
+            val saved = result == EditResult.Done || result == EditResult.Queued
+            if (saved && key != null) store.stampWallWrite(key, clock.nowMillis())
+            say(result, saved && tell != null && tellReminders(tell))
             // A sync pass already in flight may briefly put back the old mirror; the pass this asks for corrects it.
             requestSync()
             result
@@ -482,55 +500,70 @@ class CalendarEditor internal constructor(
         forPerson: String? = null,
         edit: EventDraft? = null,
         fields: Set<EventField>? = null,
-    ): EditResult = onAppScope(kind, serviceNameOf(target.to.connection, serviceOf)) {
-        writeLock.withLock {
-            val ref = target.event.ref
-            val queued = store.pendingNow()
-            val pending = queued.filter { it.ref == ref }
-            val event = store.eventNow(ref) ?: queuedCreate(pending, target.event.sourcePerson, zone.current())
-            when {
-                pending.any { it.kind == ChangeKind.DELETE } ->
-                    if (kind == ChangeKind.DELETE) EditResult.Queued else EditResult.NotEditable
-                event == null -> if (kind == ChangeKind.DELETE) EditResult.Done else EditResult.NotEditable
-                who != null && !mayChange(who.granted, Identified(who.person, who.role), createdByOf(event, pending)) -> {
-                    toaster.show(cannotChangeOthers(who.person.name), urgent = true)
-                    // As a refusal on the session shortcut does (2b-1 U2): the next tap asks for a PIN.
-                    access.lock()
-                    EditResult.Cancelled
-                }
-                else -> {
-                    val draft = draftFor(kind, event, pending, forPerson, edit, fields)
-                    val sendTo = if (kind == ChangeKind.ASSIGN_SERIES) checkNotNull(event.seriesId) else ref.remoteId
-                    val ahead = queued.filter { it.ref == ref.copy(remoteId = sendTo) }
-                    if (ahead.isNotEmpty()) {
-                        queue(target.to, kind, sendTo, draft, attempted = false, fields = fields)
-                    } else {
-                        attempt(target.to, kind, sendTo, draft, fields = fields)
+    ): EditResult {
+        val key = eventKey(target.event).takeUnless { kind.isAssign }
+        var moved: StoredEvent? = null
+        val tell: (suspend EventReminders.() -> Boolean)? = when {
+            key == null -> null
+            kind == ChangeKind.DELETE -> { { gone(listOf(key)) } }
+            EventField.TIMES in fields.orEmpty() -> { { moved?.let { movedTo(key, it) } == true } }
+            else -> null
+        }
+        return onAppScope(kind, serviceNameOf(target.to.connection, serviceOf), key, tell) {
+            writeLock.withLock {
+                val ref = target.event.ref
+                val queued = store.pendingNow()
+                val pending = queued.filter { it.ref == ref }
+                val event = store.eventNow(ref) ?: queuedCreate(pending, target.event.sourcePerson, zone.current())
+                when {
+                    pending.any { it.kind == ChangeKind.DELETE } ->
+                        if (kind == ChangeKind.DELETE) EditResult.Queued else EditResult.NotEditable
+                    event == null -> if (kind == ChangeKind.DELETE) EditResult.Done else EditResult.NotEditable
+                    who != null && !mayChange(who.granted, Identified(who.person, who.role), createdByOf(event, pending)) -> {
+                        toaster.show(cannotChangeOthers(who.person.name), urgent = true)
+                        // As a refusal on the session shortcut does (2b-1 U2): the next tap asks for a PIN.
+                        access.lock()
+                        EditResult.Cancelled
+                    }
+                    else -> {
+                        val z = zone.current()
+                        moved = edit?.let { asShown(event, pending, z).withFields(it, checkNotNull(fields) { "An update needs its fields" }, z) }
+                        val draft = draftFor(kind, event, pending, forPerson, moved)
+                        val sendTo = if (kind == ChangeKind.ASSIGN_SERIES) checkNotNull(event.seriesId) else ref.remoteId
+                        val ahead = queued.filter { it.ref == ref.copy(remoteId = sendTo) }
+                        if (ahead.isNotEmpty()) {
+                            queue(target.to, kind, sendTo, draft, attempted = false, fields = fields)
+                        } else {
+                            attempt(target.to, kind, sendTo, draft, fields = fields)
+                        }
                     }
                 }
             }
         }
     }
 
+    /** Tells Reminders the one-off with [key] is now [event]; true when its reminder moved. */
+    private suspend fun EventReminders.movedTo(key: String, event: StoredEvent): Boolean {
+        val z = zone.current()
+        return changed(key, eventTimes(event, emptyList(), z, today()), startsAtMillis(event, z))
+    }
+
     /**
      * No draft for a delete. An assign, of one event or its series, sends the event as it is now, with the new person
-     * and their colour. An update
-     * lays the sheet's [fields] over the event as shown now (its queued changes included) and keeps its creator.
+     * and their colour. An update sends [edited], the sheet's fields laid over the event as shown now (its queued
+     * changes included), and keeps its creator.
      */
     private suspend fun draftFor(
         kind: ChangeKind,
         event: StoredEvent,
         pending: List<PendingChange>,
         forPerson: String?,
-        edit: EventDraft?,
-        fields: Set<EventField>?,
+        edited: StoredEvent?,
     ): EventDraft? = when (kind) {
         ChangeKind.DELETE -> null
         ChangeKind.ASSIGN, ChangeKind.ASSIGN_SERIES -> assignDraft(event, forPerson, colorOf(forPerson))
         ChangeKind.UPDATE -> {
-            val sheet = checkNotNull(edit) { "An update needs its draft" }
-            val touched = checkNotNull(fields) { "An update needs its fields" }
-            val shown = asShown(event, pending, zone.current()).withFields(sheet, touched, zone.current())
+            val shown = checkNotNull(edited) { "An update needs its draft" }
             EventDraft(shown.title, shown.start, shown.end, shown.forPerson, createdByOf(event, pending), colorOf(shown.forPerson))
         }
         ChangeKind.CREATE -> error("A create has no event to change")
@@ -623,14 +656,30 @@ class CalendarEditor internal constructor(
         return EditResult.Queued
     }
 
-    /** A queued change already shows (a delete hides the event), so it reads as done too. A failed delete says delete. */
-    private fun report(kind: ChangeKind, label: String, result: EditResult) {
+    /**
+     * A queued change already shows (a delete hides the event), so it reads as done too, and says so when [reminderToo]
+     * went or moved with it. A failed delete says delete.
+     */
+    private fun report(kind: ChangeKind, label: String, result: EditResult, reminderToo: Boolean) {
         val saved = result == EditResult.Done || result == EditResult.Queued
         when {
             result is EditResult.Rejected && kind == ChangeKind.DELETE -> toaster.show(couldNotDelete(label, result.problem), urgent = true)
             result is EditResult.Rejected && kind.isAssign -> toaster.show(couldNotSave(label, result.problem), urgent = true)
-            saved && kind == ChangeKind.DELETE -> toaster.show(EVENT_DELETED)
-            saved && kind == ChangeKind.UPDATE -> toaster.show(CHANGES_SAVED)
+            saved && kind == ChangeKind.DELETE -> toaster.show(if (reminderToo) EVENT_AND_REMINDER_DELETED else EVENT_DELETED)
+            saved && kind == ChangeKind.UPDATE -> toaster.show(if (reminderToo) CHANGES_SAVED_REMINDER_MOVED else CHANGES_SAVED)
+        }
+    }
+
+    /** True when Reminders answered true; a failure there never fails the event's own write. */
+    private suspend fun tellReminders(call: suspend EventReminders.() -> Boolean): Boolean {
+        val reminders = reminders ?: return false
+        return try {
+            reminders.call()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't tell Reminders (${e::class.simpleName})")
+            false
         }
     }
 

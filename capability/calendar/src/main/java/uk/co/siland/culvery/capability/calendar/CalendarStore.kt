@@ -5,6 +5,7 @@ import androidx.room.withTransaction
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -32,6 +33,18 @@ import uk.co.siland.culvery.core.repeat.recurrenceRule
 @Singleton
 class CalendarStore internal constructor(private val db: CalendarDatabase, private val dao: CalendarDao) : StoredSeries {
     @Inject constructor(db: CalendarDatabase) : this(db, db.calendarDao())
+
+    // Held in memory only: a restart drops them, as it drops the sync pass they guard.
+    private val wallWrites = ConcurrentHashMap<String, Long>()
+
+    /** [key]'s event was written on the wall at [atMillis]; stamps over an hour older are dropped. */
+    fun stampWallWrite(key: String, atMillis: Long) {
+        wallWrites.values.removeIf { it < atMillis - WALL_WRITE_KEPT_MS }
+        wallWrites[key] = atMillis
+    }
+
+    /** The keys written on the wall at or after [sinceMillis]. */
+    fun wallWrittenSince(sinceMillis: Long): Set<String> = wallWrites.filterValues { it >= sinceMillis }.keys
 
     fun connections(): Flow<List<StoredConnection>> = dao.connections().map { rows -> rows.map { it.toStored() } }
 
@@ -530,6 +543,8 @@ private fun DateRange.cursorKey(): String = CursorKey(start, endExclusive, zone.
 
 /** A calendar the service still lists but whose events it refuses (403/404): its row says so (4c design §6.4). */
 internal const val READ_REFUSED = "REFUSED"
+
+private const val WALL_WRITE_KEPT_MS = 3_600_000L
 
 /** What refreshing a connection's calendars did (3a design D7, 4c C7). */
 data class SourcesRefreshed(val masterCleared: Boolean, val droppedChanges: Int)
