@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.house
 
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -8,6 +9,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.plugin.OverlayHost
 
 /** What a device step did: [Failed.line] is the line to show. */
 sealed interface HouseStep {
@@ -250,6 +253,39 @@ interface MultiDayEvents {
 /** An all-day event over two or more days, [last] being its last day. [toString] leaves out the title and the days. */
 data class MultiDayEvent(val title: String, val first: LocalDate, val last: LocalDate) {
     override fun toString() = "MultiDayEvent"
+}
+
+/** An event's times as the calendar has them now. [day] is null for a series whose first day isn't known; [time] is null for all day; [rule] has no first-date line. [toString] prints nothing. */
+data class EventTimes(val day: LocalDate?, val time: LocalTime?, val rule: String?) {
+    override fun toString() = "EventTimes"
+}
+
+/** What the reminder form opens with for an event (22 §10.4). [day], [time] and [rule] are the form's: the date tapped or the next one, and the rule from that date. [now] is what the link remembers. [toString] prints nothing. */
+data class EventSeed(
+    val key: String,
+    val title: String,
+    val people: List<PersonId>,
+    val day: LocalDate,
+    val time: LocalTime?,
+    val rule: String?,
+    val now: EventTimes,
+) {
+    override fun toString() = "EventSeed"
+}
+
+/** Reminders added from calendar events (22 §10.5); absent with no Reminders capability. */
+interface EventReminders {
+    /** Whether the event with [key] has a reminder. */
+    fun has(key: String): Flow<Boolean>
+
+    /** Opens the event's reminder, or the form filled in from [seed] when it has none. */
+    suspend fun open(host: OverlayHost, seed: EventSeed)
+
+    /** The events have gone. True when a reminder went with them. */
+    suspend fun gone(keys: Collection<String>): Boolean
+
+    /** The event's times are now [now], and its start is [startsAtMillis] (the next date's, for a series; null when it has none). True when a reminder moved. */
+    suspend fun changed(key: String, now: EventTimes, startsAtMillis: Long?): Boolean
 }
 
 object HousePermissions {

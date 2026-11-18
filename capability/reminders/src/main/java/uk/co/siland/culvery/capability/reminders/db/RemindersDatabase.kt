@@ -10,6 +10,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -73,6 +74,18 @@ interface RemindersDao {
 
     @Query("DELETE FROM reminder WHERE id = :id")
     suspend fun delete(id: Long): Int
+
+    @Update
+    suspend fun update(row: ReminderEntity): Int
+
+    @Query("SELECT EXISTS(SELECT 1 FROM reminder WHERE eventKey = :key)")
+    fun hasEvent(key: String): Flow<Boolean>
+
+    @Query("SELECT * FROM reminder WHERE eventKey = :key ORDER BY id LIMIT 1")
+    suspend fun byEvent(key: String): ReminderEntity?
+
+    @Query("DELETE FROM reminder WHERE eventKey IN (:keys)")
+    suspend fun deleteForEvents(keys: Collection<String>): Int
 
     @Query("UPDATE reminder SET chimedAtMillis = :nowMillis WHERE id IN (:ids)")
     suspend fun chimed(ids: Collection<Long>, nowMillis: Long)

@@ -12,9 +12,11 @@ import dagger.multibindings.IntoSet
 import javax.inject.Singleton
 import uk.co.siland.culvery.capability.reminders.RemindersCapability
 import uk.co.siland.culvery.capability.reminders.RemindersEngine
+import uk.co.siland.culvery.capability.reminders.RemindersForEvents
 import uk.co.siland.culvery.capability.reminders.RemindersPermissionSource
 import uk.co.siland.culvery.capability.reminders.db.RemindersDatabase
 import uk.co.siland.culvery.core.access.PermissionSource
+import uk.co.siland.culvery.core.house.EventReminders
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -32,6 +34,9 @@ abstract class RemindersModule {
     @Binds
     @IntoSet
     abstract fun permissions(impl: RemindersPermissionSource): PermissionSource
+
+    @Binds
+    abstract fun eventReminders(impl: RemindersForEvents): EventReminders
 
     companion object {
         @Provides

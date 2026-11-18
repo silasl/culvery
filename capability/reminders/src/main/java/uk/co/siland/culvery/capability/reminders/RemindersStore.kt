@@ -9,6 +9,7 @@ import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.capability.reminders.db.ReminderEntity
 import uk.co.siland.culvery.capability.reminders.db.ReminderStateEntity
@@ -72,6 +73,19 @@ class RemindersStore @Inject constructor(private val db: RemindersDatabase) {
     /** False when it had already gone. */
     suspend fun delete(id: Long): Boolean = dao.delete(id) > 0
 
+    /** Whether a reminder remembers the event with [key]. */
+    fun hasEvent(key: String): Flow<Boolean> = dao.hasEvent(key).distinctUntilChanged()
+
+    suspend fun byEvent(key: String): Reminder? = dao.byEvent(key)?.toReminder()
+
+    /** How many reminders went with the events. */
+    suspend fun deleteForEvents(keys: Collection<String>): Int = db.withTransaction {
+        keys.distinct().chunked(KEYS_PER_QUERY).sumOf { dao.deleteForEvents(it) }
+    }
+
+    /** Writes the whole reminder as it is; false, writing nothing, when it has gone. */
+    suspend fun put(reminder: Reminder): Boolean = dao.update(reminder.toEntity()) > 0
+
     suspend fun setBins(on: Boolean, time: LocalTime) = updateState { it.copy(binsOn = on, binsTime = time) }
 
     suspend fun binsDone(date: LocalDate) = updateState { it.copy(binsDoneFor = date) }
@@ -95,6 +109,12 @@ class RemindersStore @Inject constructor(private val db: RemindersDatabase) {
         if (next != current) dao.putState(next.toEntity())
     }
 }
+
+// Under SQLite's limit on a query's arguments.
+private const val KEYS_PER_QUERY = 500
+
+private fun Reminder.toEntity() =
+    ReminderDraft(words, forPeople, time, schedule, event).toEntity(madeBy, answeredAtMillis, snoozedUntilMillis, chimedAtMillis).copy(id = id)
 
 private fun ReminderDraft.toEntity(madeBy: PersonId, answeredAtMillis: Long, snoozedUntilMillis: Long?, chimedAtMillis: Long?) =
     ReminderEntity(

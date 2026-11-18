@@ -48,6 +48,7 @@ import uk.co.siland.culvery.capability.reminders.ReminderForm
 import uk.co.siland.culvery.capability.reminders.RemindersActions
 import uk.co.siland.culvery.capability.reminders.SaveResult
 import uk.co.siland.culvery.capability.reminders.cannotAddForOthers
+import uk.co.siland.culvery.core.house.EventSeed
 import uk.co.siland.culvery.core.household.FAMILY_COLOR
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.PersonId
@@ -84,13 +85,15 @@ private const val OWN_DAY = "The reminder’s own day"
 
 /**
  * Loads what the form needs, then shows it as a sheet with no PIN pad: Save and Delete ask who's there (22 §4.6). [id] null
- * is a new reminder. Shows nothing when [id] has gone, or when a child's PIN is still in force and it isn't theirs.
- * An overlay shown meanwhile is left alone.
+ * is a new reminder, filled in from [seed] when the event has no reminder yet, else that reminder (22 §10.4). Shows
+ * nothing when the reminder has gone, or when a child's PIN is still in force and it isn't theirs. An overlay shown
+ * meanwhile is left alone.
  */
-internal suspend fun OverlayHost.openReminder(id: Long?, actions: RemindersActions, members: Flow<List<Member>>) {
+internal suspend fun OverlayHost.openReminder(id: Long?, actions: RemindersActions, members: Flow<List<Member>>, seed: EventSeed? = null) {
     val before = generation
     val opened = try {
-        val original = id?.let { actions.openExisting(it) ?: return }
+        val editing = id ?: seed?.let { actions.forEvent(it.key) }
+        val original = editing?.let { actions.openExisting(it) ?: return }
         val at = actions.openedAt()
         Opened(original, at.toLocalDate(), at.toLocalTime(), at.zone, actions.childHere(), members.first())
     } catch (e: CancellationException) {
@@ -101,13 +104,13 @@ internal suspend fun OverlayHost.openReminder(id: Long?, actions: RemindersActio
         return
     }
     if (generation != before) return
-    val form = ReminderForm(opened.original, opened.today, opened.now, opened.child)
+    val form = ReminderForm(opened.original, opened.today, opened.now, opened.child, seed.takeIf { opened.original == null })
     show {
         val people by members.collectAsState(initial = opened.people)
         val childName = opened.child?.let { child -> people.firstOrNull { it.person.id == child }?.person?.name }
         ReminderSheetHost(
             form = form,
-            editing = id,
+            editing = opened.original?.id,
             people = people,
             childName = childName,
             zone = opened.zone,

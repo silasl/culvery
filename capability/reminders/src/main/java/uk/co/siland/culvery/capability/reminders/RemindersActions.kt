@@ -75,15 +75,22 @@ class RemindersActions @Inject constructor(
         return null
     }
 
-    /** [SaveResult.Invalid] before any PIN pad; [SaveResult.Past] only when new or moved; [SaveResult.Cancelled] when the PIN pad or a refusal ends it. */
+    /** The reminder that remembers the event with [key]. */
+    internal suspend fun forEvent(key: String): Long? = store.byEvent(key)?.id
+
+    /**
+     * [SaveResult.Invalid] before any PIN pad; [SaveResult.Past] only when new or moved; [SaveResult.Cancelled] when the PIN
+     * pad or a refusal ends it. A new reminder for an event that has one meanwhile changes that one.
+     */
     suspend fun save(editing: Long?, draft: ReminderDraft): SaveResult {
-        val existing = editing?.let { find(it) ?: return SaveResult.Gone }
+        val target = editing ?: draft.event?.let { forEvent(it.key) }
+        val existing = target?.let { find(it) ?: return SaveResult.Gone }
         val tidy = tidyWords(draft.words)
         if (!acceptable(draft, tidy, clock.today(zone.current()), existing)) return SaveResult.Invalid
         if (isPast(existing, draft, clock.nowMillis())) return SaveResult.Past
         val who = (if (existing == null) authoriseAdd(draft) else authoriseChange(existing, draft)) ?: return SaveResult.Cancelled
         val tidied = draft.copy(words = tidy)
-        return scope.async { write(editing, existing, tidied, who.person.id) }.await()
+        return scope.async { write(target, existing, tidied, who.person.id) }.await()
     }
 
     /** Deletes [id] and says so, once a PIN has made the change. True once it is gone, one already gone included. */

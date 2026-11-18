@@ -9,6 +9,7 @@ import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
 import uk.co.siland.culvery.core.house.BinCollections
 import uk.co.siland.culvery.core.house.DoorQuiet
+import uk.co.siland.culvery.core.house.EventReminders
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
@@ -46,6 +47,9 @@ abstract class HouseModule {
 
     @BindsOptionalOf
     abstract fun doorQuiet(): DoorQuiet
+
+    @BindsOptionalOf
+    abstract fun eventReminders(): EventReminders
 
     // With none bound, Holiday mode's tile shows first in the tray as before 15b.
     @BindsOptionalOf

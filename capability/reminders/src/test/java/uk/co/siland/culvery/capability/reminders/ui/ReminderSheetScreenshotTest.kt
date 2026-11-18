@@ -15,6 +15,8 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.reminders.ReminderForm
+import uk.co.siland.culvery.core.house.EventSeed
+import uk.co.siland.culvery.core.house.EventTimes
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -48,6 +50,14 @@ class ReminderSheetScreenshotTest {
         repeat.toggleDay(DayOfWeek.FRIDAY, own = date.dayOfWeek)
     }
 
+    // Every 3 months, which the picker can't show, so it sits as the event's own row.
+    private fun fromEvent(): ReminderForm {
+        val day = LocalDate.of(2026, 11, 20)
+        val rule = "RRULE:FREQ=MONTHLY;INTERVAL=3"
+        val seed = EventSeed("event-1", "Swimming", listOf(alex, PersonId("mia")), day, LocalTime.of(17, 30), rule, EventTimes(day, LocalTime.of(17, 30), rule))
+        return ReminderForm(null, LocalDate.of(2026, 11, 18), LocalTime.of(16, 28), null, seed)
+    }
+
     private fun snap(name: String, dark: Boolean, form: ReminderForm) =
         compose.snap(name, dark, Modifier.size(613.dp, 2000.dp)) {
             ReminderSheet(
@@ -60,4 +70,5 @@ class ReminderSheetScreenshotTest {
     @Test fun onceDark() = snap("reminder_form_once_dark", true, once())
     @Test fun repeatsLight() = snap("reminder_form_repeats_light", false, repeats())
     @Test fun repeatsDark() = snap("reminder_form_repeats_dark", true, repeats())
+    @Test fun fromEventDark() = snap("reminder_form_from_event_dark", true, fromEvent())
 }
