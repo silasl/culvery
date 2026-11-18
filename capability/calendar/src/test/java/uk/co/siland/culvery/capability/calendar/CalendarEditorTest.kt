@@ -23,6 +23,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.db.CalendarDao
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.ui.RecordingOverlay
 import uk.co.siland.culvery.core.access.PermissionSource
@@ -297,6 +298,26 @@ class CalendarEditorTest {
         assertThat(editor.update(ref("dinner"), edited("Dinner"), setOf(EventField.TIMES))).isEqualTo(EditResult.Done)
         assertThat(editor.delete(ref("football"))).isEqualTo(EditResult.Done)
         assertThat(access.toasts.messages).containsExactly(CHANGES_SAVED, EVENT_DELETED).inOrder()
+    }
+
+    @Test
+    fun theKeyIsStampedBeforeTheMirrorIsWritten() = runTest {
+        val real = calendar.calendarDao()
+        var stampedFirst: Boolean? = null
+        lateinit var watched: CalendarStore
+        val dao = object : CalendarDao by real {
+            override suspend fun deleteEvents(connectionId: String, sourceId: String, ids: List<String>) {
+                stampedFirst = dinnerKey in watched.wallWrittenSince(opened)
+                real.deleteEvents(connectionId, sourceId, ids)
+            }
+        }
+        watched = CalendarStore(calendar, dao)
+        store = watched
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).delete(ref("dinner"))).isEqualTo(EditResult.Done)
+        assertThat(stampedFirst).isTrue()
     }
 
     @Test

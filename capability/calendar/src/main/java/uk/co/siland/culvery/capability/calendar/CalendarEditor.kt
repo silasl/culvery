@@ -286,7 +286,7 @@ class CalendarEditor internal constructor(
         val line = addedLineFor(draft)
         val key = eventKey(to.connection.id, to.source.id, clientKey)
         return onAppScope(ChangeKind.CREATE, label, key, say = { result, _ -> reportAdded(added, line, result) }) {
-            writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey) }
+            attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey, key = key)
         }
     }
 
@@ -314,7 +314,7 @@ class CalendarEditor internal constructor(
         ) {
             val source = store.source(added.connectionId, added.sourceId) ?: return@onAppScope EditResult.NotEditable
             val to = destination(added.connectionId, source.source) ?: return@onAppScope EditResult.NotEditable
-            writeLock.withLock { undo(added, to) }
+            undo(added, to, key)
         }
     }
 
@@ -323,7 +323,7 @@ class CalendarEditor internal constructor(
      * has on its way leaves its key in [undone], and the drain deletes it if it lands (20 §4.3). The mirror changes
      * only once the service has deleted it. NotEditable: it couldn't be undone.
      */
-    private suspend fun undo(added: AddedEvent, to: Destination): EditResult {
+    private suspend fun undo(added: AddedEvent, to: Destination, key: String): EditResult {
         val ref = EventRef(added.connectionId, added.sourceId, added.key)
         val onItsWay = undone.isSending(added.key)
         if (onItsWay) undone.add(added.key, added.connectionId, added.sourceId, added.series)
@@ -337,6 +337,7 @@ class CalendarEditor internal constructor(
         val unsent = onItsWay || (create != null && create.attempts == 0)
         return when {
             outcome is WriteOutcome.Accepted -> {
+                stamp(key)
                 try {
                     if (added.series) {
                         store.applySeriesDeleted(added.connectionId, added.sourceId, added.key, today(), zone.current())
@@ -446,12 +447,12 @@ class CalendarEditor internal constructor(
     }
 
     /**
-     * Runs [block] on the application scope, so closing the sheet mid-write can't lose the change or its toast, then
+     * Runs [block] on the application scope under [writeLock], so closing the sheet mid-write can't lose the change or its toast, then
      * tells the outcome through [say] and nudges the sync loop. A store failure (disk full, corruption) becomes
      * Rejected(Tablet) instead of reaching the sheet's scope and killing the app. A save's refusal is the sheet's
      * to show; if the sheet stops waiting (it was closed), the editor toasts it instead. Once the change is saved or
-     * queued, [key] is stamped as the wall's and Reminders is told through [tell]; [say] hears whether a reminder went
-     * or moved.
+     * queued, and before the lock is let go, [key] is stamped as the wall's and Reminders is told through [tell], so
+     * two quick writes reach Reminders in order; [say] hears whether a reminder went or moved.
      */
     private suspend fun onAppScope(
         kind: ChangeKind,
@@ -462,17 +463,23 @@ class CalendarEditor internal constructor(
         block: suspend () -> EditResult,
     ): EditResult {
         val job = scope.async {
+            var reminderToo = false
             val result = try {
-                block()
+                writeLock.withLock {
+                    block().also { result ->
+                        if (result == EditResult.Done || result == EditResult.Queued) {
+                            key?.let(::stamp)
+                            if (tell != null) reminderToo = tellReminders(tell)
+                        }
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Couldn't save a ${kind.name} (${e::class.simpleName})")
                 EditResult.Rejected(WriteProblem.Tablet)
             }
-            val saved = result == EditResult.Done || result == EditResult.Queued
-            if (saved && key != null) store.stampWallWrite(key, clock.nowMillis())
-            say(result, saved && tell != null && tellReminders(tell))
+            say(result, reminderToo)
             // A sync pass already in flight may briefly put back the old mirror; the pass this asks for corrects it.
             requestSync()
             result
@@ -510,32 +517,30 @@ class CalendarEditor internal constructor(
             else -> null
         }
         return onAppScope(kind, serviceNameOf(target.to.connection, serviceOf), key, tell) {
-            writeLock.withLock {
-                val ref = target.event.ref
-                val queued = store.pendingNow()
-                val pending = queued.filter { it.ref == ref }
-                val event = store.eventNow(ref) ?: queuedCreate(pending, target.event.sourcePerson, zone.current())
-                when {
-                    pending.any { it.kind == ChangeKind.DELETE } ->
-                        if (kind == ChangeKind.DELETE) EditResult.Queued else EditResult.NotEditable
-                    event == null -> if (kind == ChangeKind.DELETE) EditResult.Done else EditResult.NotEditable
-                    who != null && !mayChange(who.granted, Identified(who.person, who.role), createdByOf(event, pending)) -> {
-                        toaster.show(cannotChangeOthers(who.person.name), urgent = true)
-                        // As a refusal on the session shortcut does (2b-1 U2): the next tap asks for a PIN.
-                        access.lock()
-                        EditResult.Cancelled
-                    }
-                    else -> {
-                        val z = zone.current()
-                        moved = edit?.let { asShown(event, pending, z).withFields(it, checkNotNull(fields) { "An update needs its fields" }, z) }
-                        val draft = draftFor(kind, event, pending, forPerson, moved)
-                        val sendTo = if (kind == ChangeKind.ASSIGN_SERIES) checkNotNull(event.seriesId) else ref.remoteId
-                        val ahead = queued.filter { it.ref == ref.copy(remoteId = sendTo) }
-                        if (ahead.isNotEmpty()) {
-                            queue(target.to, kind, sendTo, draft, attempted = false, fields = fields)
-                        } else {
-                            attempt(target.to, kind, sendTo, draft, fields = fields)
-                        }
+            val ref = target.event.ref
+            val queued = store.pendingNow()
+            val pending = queued.filter { it.ref == ref }
+            val event = store.eventNow(ref) ?: queuedCreate(pending, target.event.sourcePerson, zone.current())
+            when {
+                pending.any { it.kind == ChangeKind.DELETE } ->
+                    if (kind == ChangeKind.DELETE) EditResult.Queued else EditResult.NotEditable
+                event == null -> if (kind == ChangeKind.DELETE) EditResult.Done else EditResult.NotEditable
+                who != null && !mayChange(who.granted, Identified(who.person, who.role), createdByOf(event, pending)) -> {
+                    toaster.show(cannotChangeOthers(who.person.name), urgent = true)
+                    // As a refusal on the session shortcut does (2b-1 U2): the next tap asks for a PIN.
+                    access.lock()
+                    EditResult.Cancelled
+                }
+                else -> {
+                    val z = zone.current()
+                    moved = edit?.let { asShown(event, pending, z).withFields(it, checkNotNull(fields) { "An update needs its fields" }, z) }
+                    val draft = draftFor(kind, event, pending, forPerson, moved)
+                    val sendTo = if (kind == ChangeKind.ASSIGN_SERIES) checkNotNull(event.seriesId) else ref.remoteId
+                    val ahead = queued.filter { it.ref == ref.copy(remoteId = sendTo) }
+                    if (ahead.isNotEmpty()) {
+                        queue(target.to, kind, sendTo, draft, attempted = false, fields = fields)
+                    } else {
+                        attempt(target.to, kind, sendTo, draft, fields = fields, key = key)
                     }
                 }
             }
@@ -585,6 +590,7 @@ class CalendarEditor internal constructor(
         draft: EventDraft?,
         clientKey: String? = null,
         fields: Set<EventField>? = null,
+        key: String? = null,
     ): EditResult {
         val outcome = callWriter(io, attemptMillis) {
             when (kind) {
@@ -603,6 +609,7 @@ class CalendarEditor internal constructor(
         }
         return when (outcome) {
             is WriteOutcome.Accepted -> {
+                key?.let(::stamp)
                 try {
                     store.applyAcceptedWrite(kind, to.connection.id, to.source.id, remoteId, draft?.forPerson, outcome, today(), zone.current(), series = draft?.recurrence != null)
                     store.writeAccepted(to.connection.id, clock.nowMillis())
@@ -669,6 +676,9 @@ class CalendarEditor internal constructor(
             saved && kind == ChangeKind.UPDATE -> toaster.show(if (reminderToo) CHANGES_SAVED_REMINDER_MOVED else CHANGES_SAVED)
         }
     }
+
+    /** Marks [key] as written on the wall now, for a sync that read the provider before this write. */
+    private fun stamp(key: String) = store.stampWallWrite(key, clock.nowMillis())
 
     /** True when Reminders answered true; a failure there never fails the event's own write. */
     private suspend fun tellReminders(call: suspend EventReminders.() -> Boolean): Boolean {
