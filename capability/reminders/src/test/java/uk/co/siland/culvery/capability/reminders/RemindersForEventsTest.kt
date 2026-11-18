@@ -348,6 +348,54 @@ class RemindersForEventsTest {
     }
 
     @Test
+    fun aSeriesMadeOneOffTakesItsFollowerToThatDay() = runTest {
+        val access = access()
+        linked(Schedule.Repeating(LocalDate.of(2026, 11, 23), weekly), LocalTime.of(17, 0), link(LocalDate.of(2026, 11, 2), LocalTime.of(18, 0), weekly, follows = true))
+        val now = EventTimes(LocalDate.of(2026, 11, 30), LocalTime.of(18, 0), null)
+        assertThat(forEvents(access).changed("event-1", now, at("2026-11-30T18:00:00"))).isTrue()
+        val moved = stored().single()
+        assertThat(moved.schedule).isEqualTo(Schedule.Once(LocalDate.of(2026, 11, 30)))
+        assertThat(moved.time).isEqualTo(LocalTime.of(17, 0))
+    }
+
+    @Test
+    fun aTimedEventMadeAllDayKeepsTheRemindersTime() = runTest {
+        val access = access()
+        linked(Schedule.Once(friday), LocalTime.of(17, 0), link(friday, LocalTime.of(18, 0)))
+        val now = EventTimes(friday, null, null)
+        assertThat(forEvents(access).changed("event-1", now, at("2026-11-21T00:00:00"))).isTrue()
+        val moved = stored().single()
+        assertThat(moved.schedule).isEqualTo(Schedule.Once(friday))
+        assertThat(moved.time).isEqualTo(LocalTime.of(17, 0))
+    }
+
+    @Test
+    fun aOneOffMadeRepeatingTakesItsFollowerOntoTheSeries() = runTest {
+        val access = access()
+        val actions = actions(access)
+        access.answer(TestAccess.SAM)
+        actions.save(null, form(seed()).apply { time = LocalTime.of(17, 0) }.toDraft())
+        val now = EventTimes(friday, LocalTime.of(18, 30), weekly)
+        assertThat(forEvents(access).changed("event-1", now, at("2026-11-20T18:30:00"))).isTrue()
+        val moved = stored().single()
+        assertThat(moved.schedule).isEqualTo(Schedule.Repeating(friday, weekly))
+        assertThat(moved.time).isEqualTo(LocalTime.of(17, 0))
+        assertThat(moved.event?.followsRepeat).isTrue()
+    }
+
+    @Test
+    fun aCountedSeriesWithNoKnownFirstDayOnlyShiftsTheTime() = runTest {
+        val access = access()
+        val own = Schedule.Repeating(LocalDate.of(2026, 11, 25), "$weekly;COUNT=5")
+        linked(own, LocalTime.of(17, 30), link(null, LocalTime.of(18, 0), "$weekly;COUNT=10", follows = true))
+        val now = EventTimes(null, LocalTime.of(19, 0), "$weekly;COUNT=8")
+        assertThat(forEvents(access).changed("event-1", now, at("2026-11-25T19:00:00"))).isTrue()
+        val moved = stored().single()
+        assertThat(moved.schedule).isEqualTo(own)
+        assertThat(moved.time).isEqualTo(LocalTime.of(18, 30))
+    }
+
+    @Test
     fun theSameTimesChangeNothing() = runTest {
         val access = access()
         linked(Schedule.Repeating(friday, weekly), LocalTime.of(17, 0), link(LocalDate.of(2026, 11, 6), LocalTime.of(18, 30), weekly, follows = true), madeAt = at("2026-11-18T08:00:00"))

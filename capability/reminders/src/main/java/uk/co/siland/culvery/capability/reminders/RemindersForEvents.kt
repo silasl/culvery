@@ -60,9 +60,9 @@ class RemindersForEvents internal constructor(
 
     override suspend fun gone(keys: Collection<String>): Boolean {
         if (keys.isEmpty()) return false
-        val went = scope.async { store.deleteForEvents(keys) > 0 }.await()
-        if (went) Log.i(TAG, "event gone")
-        return went
+        return scope.async {
+            (store.deleteForEvents(keys) > 0).also { if (it) Log.i(TAG, "event gone") }
+        }.await()
     }
 
     override suspend fun changed(key: String, now: EventTimes, startsAtMillis: Long?): Boolean = scope.async {
@@ -105,7 +105,7 @@ internal fun Reminder.afterEvent(now: EventTimes, startsAtMillis: Long?, nowMill
         val newRule = now.rule
         when {
             newRule == null -> {
-                first = shifted.toLocalDate()
+                first = now.day ?: shifted.toLocalDate()
                 rule = null
             }
             RepeatRule.parse(newRule, zone) == null || (now.day == null && "COUNT" in ruleParts(newRule).orEmpty()) -> Unit
@@ -133,22 +133,21 @@ internal fun Reminder.afterEvent(now: EventTimes, startsAtMillis: Long?, nowMill
     )
 }
 
-/** New day at new time less old day at old time, all day as 00:00; with a day unknown on either side, the times alone. */
+/** The days moved, when both are known, plus the time moved, when neither side is all day. */
 private fun shiftBetween(link: EventLink, now: EventTimes): Duration {
-    val from = link.time ?: LocalTime.MIDNIGHT
-    val to = now.time ?: LocalTime.MIDNIGHT
     val oldDay = link.day
     val newDay = now.day
-    return if (oldDay != null && newDay != null) {
-        Duration.between(oldDay.atTime(from), newDay.atTime(to))
-    } else {
-        Duration.between(from, to)
-    }.truncatedTo(ChronoUnit.MINUTES)
+    val days = if (oldDay != null && newDay != null) Duration.ofDays(ChronoUnit.DAYS.between(oldDay, newDay)) else Duration.ZERO
+    return days.plusMinutes(timeShift(link.time, now.time).toLong())
 }
+
+/** Minutes between two times of day; none when either is all day. */
+private fun timeShift(from: LocalTime?, to: LocalTime?): Int =
+    if (from == null || to == null) 0 else to.toMinuteOfDay() - from.toMinuteOfDay()
 
 /** A reminder that follows the repeat keeps its day: its time moves as the event's did, stopping at 00:00 or 23:55. */
 private fun followerTime(time: LocalTime, from: LocalTime?, to: LocalTime?): LocalTime {
-    val minutes = time.toMinuteOfDay() + (to ?: LocalTime.MIDNIGHT).toMinuteOfDay() - (from ?: LocalTime.MIDNIGHT).toMinuteOfDay()
+    val minutes = time.toMinuteOfDay() + timeShift(from, to)
     return minutes.coerceIn(0, LAST_MINUTE).let { LocalTime.of(it / 60, it % 60) }
 }
 
