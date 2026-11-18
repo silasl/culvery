@@ -65,8 +65,8 @@ internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, peopl
         }
         startedFrom(rule, seriesStart(rule) ?: tapped, from, zone) ?: return null
     }
-    // Past the date tapped, the series' usual time, not the one that date may have been moved to.
-    return EventSeed(eventKey(event), event.title, people, day, if (tappedStarted) times.time else time, left, times)
+    // Any other date, or one already started, opens at the series' usual time, not the one this date may have been moved to.
+    return EventSeed(eventKey(event), event.title, people, day, if (day == tapped && !tappedStarted) time else times.time, left, times)
 }
 
 // A date whose own rule wasn't read takes its series' from another stored date: the earliest coming one's, else the latest.
