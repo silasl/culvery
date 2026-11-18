@@ -147,7 +147,7 @@ class RemindersEngine internal constructor(
 
     fun done(key: DueKey) = answer(key) {
         when (key) {
-            is DueKey.Mine -> store.done(key.id, clock.nowMillis())
+            is DueKey.Mine -> store.done(key.id, clock.nowMillis(), zone())
             is DueKey.Bins -> store.binsDone(key.date)
         }
         Log.i(TAG, "done")

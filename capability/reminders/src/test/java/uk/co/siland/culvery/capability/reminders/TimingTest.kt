@@ -20,12 +20,10 @@ class TimingTest {
     private fun reminder(schedule: Schedule, time: LocalTime, answeredAt: Long) =
         Reminder(1, "", listOf(PersonId.FAMILY), PersonId.FAMILY, time, schedule, answeredAt, null, null)
 
-    private fun weekly(vararg days: DayOfWeek) = Schedule.Weekly(days.toSet())
-
     private fun due(dueAt: Long, snoozedUntil: Long? = null, chimedAt: Long? = null) =
         Due(DueKey.Mine(1), dueAt, snoozedUntil, chimedAt)
 
-    private val mwf = weekly(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY)
+    private val mwf = weeklyOn(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY)
     private val half7 = LocalTime.of(7, 30)
 
     @Test
@@ -52,7 +50,7 @@ class TimingTest {
 
     @Test
     fun aTimeMissedWhileOffIsStillWaiting() {
-        val r = reminder(weekly(DayOfWeek.FRIDAY), half7, at("2026-11-06T12:00:00"))
+        val r = reminder(weeklyOn(DayOfWeek.FRIDAY), half7, at("2026-11-06T12:00:00"))
         assertThat(r.due(at("2026-11-19T12:00:00"), zone)!!.dueAtMillis).isEqualTo(at("2026-11-13T07:30:00"))
     }
 
@@ -68,7 +66,7 @@ class TimingTest {
 
     @Test
     fun aSpringGapTimeFiresOnceAnHourOn() {
-        val r = reminder(weekly(DayOfWeek.SUNDAY), LocalTime.of(1, 30), utc("2027-03-27T12:00:00Z"))
+        val r = reminder(weeklyOn(DayOfWeek.SUNDAY), LocalTime.of(1, 30), utc("2027-03-27T12:00:00Z"))
         assertThat(timeOn(LocalDate.of(2027, 3, 28), LocalTime.of(1, 30), zone)).isEqualTo(utc("2027-03-28T01:30:00Z"))
         assertThat(r.due(utc("2027-03-28T01:29:59Z"), zone)).isNull()
         assertThat(r.due(utc("2027-03-28T01:30:00Z"), zone)!!.dueAtMillis).isEqualTo(utc("2027-03-28T01:30:00Z"))
@@ -76,7 +74,7 @@ class TimingTest {
 
     @Test
     fun anAutumnOverlapTimeFiresOnce() {
-        val sunday = weekly(DayOfWeek.SUNDAY)
+        val sunday = weeklyOn(DayOfWeek.SUNDAY)
         val r = reminder(sunday, LocalTime.of(1, 30), utc("2027-10-30T12:00:00Z"))
         assertThat(r.due(utc("2027-10-31T01:30:00Z"), zone)!!.dueAtMillis).isEqualTo(utc("2027-10-31T00:30:00Z"))
         val answered = reminder(sunday, LocalTime.of(1, 30), utc("2027-10-31T00:31:00Z"))
@@ -136,7 +134,7 @@ class TimingTest {
 
     @Test
     fun aRepeatMadeAfterTodaysTimeWaitsForItsNextDay() {
-        val r = reminder(weekly(DayOfWeek.TUESDAY), half7, at("2026-11-17T09:00:00"))
+        val r = reminder(weeklyOn(DayOfWeek.TUESDAY), half7, at("2026-11-17T09:00:00"))
         assertThat(r.due(at("2026-11-17T09:00:00"), zone)).isNull()
         assertThat(r.due(at("2026-11-17T23:59:00"), zone)).isNull()
         assertThat(r.due(at("2026-11-24T07:30:00"), zone)!!.dueAtMillis).isEqualTo(at("2026-11-24T07:30:00"))
@@ -161,11 +159,48 @@ class TimingTest {
     }
 
     @Test
-    fun aWeeklyTimeExactlyAWeekBackIsTheEighthLookBackDate() {
+    fun aWeeklyTimeExactlyAWeekBackIsStillWaiting() {
         val now = at("2026-11-18T07:00:00")
-        val wednesday = weekly(DayOfWeek.WEDNESDAY)
+        val wednesday = weeklyOn(DayOfWeek.WEDNESDAY)
         assertThat(reminder(wednesday, half7, at("2026-11-11T08:00:00")).due(now, zone)).isNull()
         assertThat(reminder(wednesday, half7, at("2026-11-10T12:00:00")).due(now, zone)!!.dueAtMillis)
             .isEqualTo(at("2026-11-11T07:30:00"))
+    }
+
+    @Test
+    fun aFortnightlyReminderIsDueEveryOtherWeek() {
+        val fortnightly = Schedule.Repeating(LocalDate.of(2026, 11, 6), "RRULE:FREQ=WEEKLY;INTERVAL=2")
+        val r = reminder(fortnightly, half7, at("2026-11-05T12:00:00"))
+        assertThat(r.due(at("2026-11-06T07:30:00"), zone)!!.dueAtMillis).isEqualTo(at("2026-11-06T07:30:00"))
+        assertThat(r.nextDue(at("2026-11-06T07:30:00"), zone)).isEqualTo(at("2026-11-20T07:30:00"))
+        val answered = reminder(fortnightly, half7, at("2026-11-06T08:00:00"))
+        assertThat(answered.due(at("2026-11-13T12:00:00"), zone)).isNull()
+        assertThat(answered.due(at("2026-11-20T07:30:00"), zone)!!.dueAtMillis).isEqualTo(at("2026-11-20T07:30:00"))
+    }
+
+    @Test
+    fun aMonthlyReminderMissedWhileOffIsWaitingOnce() {
+        val thirdWednesday = Schedule.Repeating(LocalDate.of(2026, 11, 18), "RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=3WE")
+        val r = reminder(thirdWednesday, half7, at("2026-11-17T12:00:00"))
+        assertThat(r.due(at("2027-02-01T12:00:00"), zone)!!.dueAtMillis).isEqualTo(at("2027-01-20T07:30:00"))
+        assertThat(r.nextDue(at("2027-02-01T12:00:00"), zone)).isEqualTo(at("2027-02-17T07:30:00"))
+    }
+
+    @Test
+    fun aCountedReminderHasNoNextAfterItsLast() {
+        val threeFridays = Schedule.Repeating(LocalDate.of(2026, 11, 6), "RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=3")
+        val r = reminder(threeFridays, half7, at("2026-11-20T08:00:00"))
+        assertThat(r.nextDue(at("2026-11-13T08:00:00"), zone)).isEqualTo(at("2026-11-20T07:30:00"))
+        assertThat(r.nextDue(at("2026-11-20T08:00:00"), zone)).isNull()
+        assertThat(r.due(at("2026-11-27T08:00:00"), zone)).isNull()
+    }
+
+    @Test
+    fun aReminderWithARuleItCannotReadNeverFires() {
+        listOf("RRULE:FREQ=HOURLY", "RRULE:FREQ=WEEKLY;BYSETPOS=2", "not a rule").forEach { rule ->
+            val r = reminder(Schedule.Repeating(LocalDate.of(2026, 11, 6), rule), half7, 0)
+            assertThat(r.due(at("2026-11-20T08:00:00"), zone)).isNull()
+            assertThat(r.nextDue(at("2026-11-20T08:00:00"), zone)).isNull()
+        }
     }
 }

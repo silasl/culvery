@@ -5,6 +5,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import uk.co.siland.culvery.core.repeat.RepeatRule
 
 sealed interface DueKey {
     data class Mine(val id: Long) : DueKey
@@ -19,28 +20,29 @@ data class Due(val key: DueKey, val dueAtMillis: Long, val snoozedUntilMillis: L
 internal fun timeOn(date: LocalDate, time: LocalTime, zone: ZoneId): Long =
     ZonedDateTime.of(date, time, zone).toInstant().toEpochMilli()
 
+private fun dayOf(millis: Long, zone: ZoneId): LocalDate = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+
+/** A rule [RepeatRule.parse] refuses is never due. */
 internal fun Reminder.due(nowMillis: Long, zone: ZoneId): Due? {
     val latest = when (schedule) {
-        is Schedule.Once -> listOf(timeOn(schedule.date, time, zone))
-        is Schedule.Weekly -> {
-            val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
-            // Eight dates: today and the seven before, so the same weekday a week ago is covered.
-            (0L..7L).map { today.minusDays(it) }
-                .filter { it.dayOfWeek in schedule.days }
-                .map { timeOn(it, time, zone) }
+        is Schedule.Once -> timeOn(schedule.first, time, zone).takeIf { it <= nowMillis }
+        is Schedule.Repeating -> {
+            val rule = RepeatRule.parse(schedule.rule, zone) ?: return null
+            val onOrBeforeToday = rule.latestOnOrBefore(schedule.first, dayOf(nowMillis, zone)) ?: return null
+            timeOn(onOrBeforeToday, time, zone).takeIf { it <= nowMillis }
+                ?: rule.latestOnOrBefore(schedule.first, onOrBeforeToday.minusDays(1))?.let { timeOn(it, time, zone) }
         }
-    }.filter { it > answeredAtMillis && it <= nowMillis }.maxOrNull() ?: return null
+    }?.takeIf { it > answeredAtMillis } ?: return null
     return Due(DueKey.Mine(id), latest, snoozedUntilMillis, chimedAtMillis)
 }
 
+/** A rule [RepeatRule.parse] refuses has no next time. */
 internal fun Reminder.nextDue(afterMillis: Long, zone: ZoneId): Long? = when (schedule) {
-    is Schedule.Once -> timeOn(schedule.date, time, zone).takeIf { it > afterMillis }
-    is Schedule.Weekly -> {
-        val from = Instant.ofEpochMilli(afterMillis).atZone(zone).toLocalDate()
-        (0L..7L).map { from.plusDays(it) }
-            .filter { it.dayOfWeek in schedule.days }
-            .map { timeOn(it, time, zone) }
-            .firstOrNull { it > afterMillis }
+    is Schedule.Once -> timeOn(schedule.first, time, zone).takeIf { it > afterMillis }
+    is Schedule.Repeating -> RepeatRule.parse(schedule.rule, zone)?.let { rule ->
+        val onOrAfter = rule.firstAfter(schedule.first, dayOf(afterMillis, zone).minusDays(1))
+        onOrAfter?.let { timeOn(it, time, zone) }?.takeIf { it > afterMillis }
+            ?: onOrAfter?.let { rule.firstAfter(schedule.first, it) }?.let { timeOn(it, time, zone) }
     }
 }
 

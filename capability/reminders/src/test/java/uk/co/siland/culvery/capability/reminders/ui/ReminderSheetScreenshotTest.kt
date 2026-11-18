@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -18,13 +19,14 @@ import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.repeat.RepeatChoice
 import uk.co.siland.culvery.core.ui.test.snap
 
 /** The add form in its sheet with the sample household's people. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 // A window as tall as the form, which scrolls on the wall's 800 dp.
-@Config(qualifiers = "w613dp-h1330dp-hdpi")
+@Config(qualifiers = "w613dp-h2000dp-hdpi")
 class ReminderSheetScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -40,17 +42,16 @@ class ReminderSheetScreenshotTest {
         toggleWho(alex)
     }
 
+    // Weekly on Wednesday, the day's own, and Friday.
     private fun repeats() = once().apply {
-        repeats = true
-        toggleDay(DayOfWeek.MONDAY)
-        toggleDay(DayOfWeek.WEDNESDAY)
-        toggleDay(DayOfWeek.FRIDAY)
+        repeat.choose(RepeatChoice.Weekly)
+        repeat.toggleDay(DayOfWeek.FRIDAY, own = date.dayOfWeek)
     }
 
     private fun snap(name: String, dark: Boolean, form: ReminderForm) =
-        compose.snap(name, dark, Modifier.size(613.dp, 1330.dp)) {
+        compose.snap(name, dark, Modifier.size(613.dp, 2000.dp)) {
             ReminderSheet(
-                form = form, people = household, editing = false, childName = null, line = null, busy = false,
+                form = form, people = household, editing = false, childName = null, zone = ZoneId.of("Europe/London"), line = null, busy = false,
                 onSave = {}, onDelete = {}, onClose = {}, onRefusedWho = {},
             )
         }

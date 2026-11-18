@@ -37,7 +37,7 @@ class RemindersTabScreenshotTest {
         today = listOf(RowUi(null, 3, listOf(mia), "16:30", "Swimming bag", "Mia", "Every Friday")),
         comingUp = listOf(
             RowUi(null, 4, listOf(sam), "Thu 09:00", "Ring the dentist", "Sam", "Once"),
-            RowUi(null, 5, listOf(alex), "Sat 10:00", "Water the plants", "Alex", "Sat, Sun"),
+            RowUi(null, 5, listOf(alex), "Sat 10:00", "Water the plants", "Alex", "Every week, on Sat, Sun"),
         ),
         bins = bins,
     )

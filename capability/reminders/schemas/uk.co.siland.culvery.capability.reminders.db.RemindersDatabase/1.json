@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "d3f2f4e355f29bd8a55c35c164953dbe",
+    "identityHash": "cd585f66e863b40d0764c6afc6e0af20",
     "entities": [
       {
         "tableName": "reminder",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `words` TEXT NOT NULL, `forPeople` TEXT NOT NULL, `madeBy` TEXT NOT NULL, `minuteOfDay` INTEGER NOT NULL, `onDate` TEXT, `weekdays` INTEGER NOT NULL, `answeredAtMillis` INTEGER NOT NULL, `snoozedUntilMillis` INTEGER, `chimedAtMillis` INTEGER)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `words` TEXT NOT NULL, `forPeople` TEXT NOT NULL, `madeBy` TEXT NOT NULL, `minuteOfDay` INTEGER NOT NULL, `firstDate` TEXT NOT NULL, `rule` TEXT, `answeredAtMillis` INTEGER NOT NULL, `snoozedUntilMillis` INTEGER, `chimedAtMillis` INTEGER, `eventKey` TEXT, `eventDay` TEXT, `eventMinute` INTEGER, `eventRule` TEXT, `followsRepeat` INTEGER NOT NULL DEFAULT 0)",
         "fields": [
           {
             "fieldPath": "id",
@@ -39,15 +39,15 @@
             "notNull": true
           },
           {
-            "fieldPath": "onDate",
-            "columnName": "onDate",
-            "affinity": "TEXT"
+            "fieldPath": "firstDate",
+            "columnName": "firstDate",
+            "affinity": "TEXT",
+            "notNull": true
           },
           {
-            "fieldPath": "weekdays",
-            "columnName": "weekdays",
-            "affinity": "INTEGER",
-            "notNull": true
+            "fieldPath": "rule",
+            "columnName": "rule",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "answeredAtMillis",
@@ -64,6 +64,33 @@
             "fieldPath": "chimedAtMillis",
             "columnName": "chimedAtMillis",
             "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "eventKey",
+            "columnName": "eventKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "eventDay",
+            "columnName": "eventDay",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "eventMinute",
+            "columnName": "eventMinute",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "eventRule",
+            "columnName": "eventRule",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "followsRepeat",
+            "columnName": "followsRepeat",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -71,7 +98,18 @@
           "columnNames": [
             "id"
           ]
-        }
+        },
+        "indices": [
+          {
+            "name": "index_reminder_eventKey",
+            "unique": false,
+            "columnNames": [
+              "eventKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reminder_eventKey` ON `${TABLE_NAME}` (`eventKey`)"
+          }
+        ]
       },
       {
         "tableName": "reminder_state",
@@ -142,7 +180,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd3f2f4e355f29bd8a55c35c164953dbe')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cd585f66e863b40d0764c6afc6e0af20')"
     ]
   }
 }

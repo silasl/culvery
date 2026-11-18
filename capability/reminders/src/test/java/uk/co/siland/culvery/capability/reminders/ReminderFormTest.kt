@@ -6,6 +6,8 @@ import java.time.LocalDate
 import java.time.LocalTime
 import org.junit.Test
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.repeat.RepeatChoice
+import uk.co.siland.culvery.core.repeat.RepeatEnd
 import uk.co.siland.culvery.core.ui.ClockField
 
 class ReminderFormTest {
@@ -22,7 +24,8 @@ class ReminderFormTest {
         who: List<PersonId> = listOf(alex),
         time: LocalTime = LocalTime.of(7, 30),
         schedule: Schedule = Schedule.Once(today.plusDays(2)),
-    ) = Reminder(7, words, who, alex, time, schedule, 0, null, null)
+        event: EventLink? = null,
+    ) = Reminder(7, words, who, alex, time, schedule, 0, null, null, event)
 
     @Test
     fun aNewOneOffLateAtNightStartsTomorrowRatherThanAtMidnightToday() {
@@ -58,32 +61,53 @@ class ReminderFormTest {
     }
 
     @Test
-    fun saveNeedsWordsSomeoneAndADay() {
+    fun saveNeedsWordsAndSomeone() {
         val f = form()
         assertThat(f.canSave).isFalse()
         f.words = "   \n "
         assertThat(f.canSave).isFalse()
         f.words = "PE kit"
         assertThat(f.canSave).isTrue()
-        f.repeats = true
-        assertThat(f.canSave).isFalse()
-        f.toggleDay(DayOfWeek.MONDAY)
+        f.repeat.choose(RepeatChoice.Weekly)
         assertThat(f.canSave).isTrue()
-        f.toggleDay(DayOfWeek.MONDAY)
-        assertThat(f.canSave).isFalse()
         assertThat(form(original = reminder(who = emptyList())).canSave).isFalse()
     }
 
     @Test
-    fun theDraftTidiesTheWordsAndFollowsOnceOrRepeats() {
+    fun theDraftTidiesTheWordsAndIsOnceUntilARepeatIsPicked() {
         val f = form(now = LocalTime.of(10, 3))
         f.words = "  PE \n kit "
         f.toggleWho(mia)
         assertThat(f.toDraft()).isEqualTo(ReminderDraft("PE kit", listOf(mia), LocalTime.of(10, 5), Schedule.Once(today)))
-        f.repeats = true
-        f.toggleDay(DayOfWeek.FRIDAY)
-        f.toggleDay(DayOfWeek.MONDAY)
-        assertThat(f.toDraft().schedule).isEqualTo(Schedule.Weekly(setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)))
+    }
+
+    @Test
+    fun aRepeatFromThePickerBecomesARepeatingSchedule() {
+        val f = form()
+        f.words = "PE kit"
+        f.date = today.plusDays(5)
+        f.repeat.choose(RepeatChoice.Weekly)
+        f.repeat.toggleDay(DayOfWeek.WEDNESDAY, own = DayOfWeek.MONDAY)
+        assertThat(f.toDraft().schedule).isEqualTo(Schedule.Repeating(today.plusDays(5), "RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE"))
+        f.repeat.stopsAfter()
+        assertThat(f.toDraft().schedule).isEqualTo(Schedule.Repeating(today.plusDays(5), "RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE;COUNT=10"))
+        f.repeat.choose(RepeatChoice.Never)
+        assertThat(f.toDraft().schedule).isEqualTo(Schedule.Once(today.plusDays(5)))
+    }
+
+    @Test
+    fun anExistingRepeatOpensOnItsChoice() {
+        val monday = today.plusDays(5)
+        val f = form(original = reminder(schedule = Schedule.Repeating(monday, "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;COUNT=6")))
+        assertThat(f.date).isEqualTo(monday)
+        assertThat(f.repeat.choice).isEqualTo(RepeatChoice.Fortnightly)
+        assertThat(f.repeat.extraDays).containsExactly(DayOfWeek.THURSDAY)
+        assertThat(f.repeat.end).isEqualTo(RepeatEnd.After(6))
+        assertThat(f.edited).isFalse()
+
+        val phone = form(original = reminder(schedule = Schedule.Repeating(monday, "RRULE:FREQ=MONTHLY;INTERVAL=3")))
+        assertThat(phone.repeat.keeping).isTrue()
+        assertThat(phone.toDraft().schedule).isEqualTo(Schedule.Repeating(monday, "RRULE:FREQ=MONTHLY;INTERVAL=3"))
     }
 
     @Test
@@ -152,16 +176,17 @@ class ReminderFormTest {
 
     @Test
     fun anExistingReminderOpensAsItIs() {
-        val weekly = reminder(who = listOf(mia, sam), time = LocalTime.of(8, 15), schedule = Schedule.Weekly(setOf(DayOfWeek.SATURDAY)))
+        val event = EventLink("event-1", today.plusDays(3), LocalTime.of(9, 0), null, followsRepeat = false)
+        val weekly = reminder(who = listOf(mia, sam), time = LocalTime.of(8, 15), schedule = weeklyOn(DayOfWeek.SATURDAY), event = event)
         val f = form(original = weekly)
         assertThat(f.words).isEqualTo("PE kit")
         assertThat(f.who).containsExactly(mia, sam).inOrder()
-        assertThat(f.repeats).isTrue()
-        assertThat(f.days).containsExactly(DayOfWeek.SATURDAY)
+        assertThat(f.repeat.choice).isEqualTo(RepeatChoice.Weekly)
+        assertThat(f.date).isEqualTo(weekly.schedule.first)
         assertThat(f.time).isEqualTo(LocalTime.of(8, 15))
-        assertThat(f.toDraft()).isEqualTo(ReminderDraft("PE kit", listOf(mia, sam), LocalTime.of(8, 15), weekly.schedule))
+        assertThat(f.toDraft()).isEqualTo(ReminderDraft("PE kit", listOf(mia, sam), LocalTime.of(8, 15), weekly.schedule, event))
         val once = form(original = reminder())
-        assertThat(once.repeats).isFalse()
+        assertThat(once.repeat.repeats).isFalse()
         assertThat(once.date).isEqualTo(today.plusDays(2))
     }
 
@@ -176,5 +201,8 @@ class ReminderFormTest {
         f.step(ClockField.Hour, up = true)
         assertThat(f.edited).isTrue()
         assertThat(form().edited).isFalse()
+        val picked = form(original = reminder())
+        picked.repeat.choose(RepeatChoice.Never)
+        assertThat(picked.edited).isTrue()
     }
 }

@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -83,7 +82,7 @@ class RemindersActionsTest {
         ReminderDraft(words, who, time, Schedule.Once(on))
 
     private fun weekly(who: List<PersonId>, vararg days: DayOfWeek) =
-        ReminderDraft("Swimming bag", who, LocalTime.of(8, 0), Schedule.Weekly(days.toSet()))
+        ReminderDraft("Swimming bag", who, LocalTime.of(8, 0), weeklyOn(*days))
 
     private suspend fun stored() = store.reminders.first()
 
@@ -113,7 +112,7 @@ class RemindersActionsTest {
         assertThat(actions.save(null, weekly(listOf(access.mia.id), DayOfWeek.MONDAY, DayOfWeek.FRIDAY))).isEqualTo(SaveResult.Saved)
         val saved = stored().single()
         assertThat(saved.madeBy).isEqualTo(access.mia.id)
-        assertThat(saved.schedule).isEqualTo(Schedule.Weekly(setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)))
+        assertThat(saved.schedule).isEqualTo(weeklyOn(DayOfWeek.MONDAY, DayOfWeek.FRIDAY))
     }
 
     @Test
@@ -326,12 +325,11 @@ class RemindersActionsTest {
             once(mia, words = "a".repeat(WORDS_MAX + 1)),
             once(emptyList()),
             once(mia, on = today.plusYears(2)),
+            weekly(mia, DayOfWeek.MONDAY).copy(schedule = weeklyOn(DayOfWeek.MONDAY, from = today.plusYears(1).plusDays(5))),
         )
         refused.forEach { assertThat(actions.save(null, it)).isEqualTo(SaveResult.Invalid) }
         assertThat(access.requests).isEmpty()
         assertThat(stored()).isEmpty()
-        // A repeat with no weekday can't be built, so no draft reaches save, or repeatWords, without one.
-        assertThrows(IllegalArgumentException::class.java) { Schedule.Weekly(emptySet()) }
 
         access.answer(TestAccess.ALEX)
         assertThat(actions.save(null, once(mia, words = "a".repeat(WORDS_MAX), on = today.plusYears(1)))).isEqualTo(SaveResult.Saved)
@@ -493,5 +491,17 @@ class RemindersActionsTest {
         access.answer(TestAccess.SAM)
         assertThat(actions.saveBins(false, LocalTime.of(22, 30))).isEqualTo(BinsSave.Saved)
         assertThat(store.state.first().binsOn).isFalse()
+    }
+
+    @Test
+    fun aRepeatingReminderForEarlierTodayIsAccepted() = runTest {
+        val access = access()
+        val actions = actions(access)
+        access.answer(TestAccess.ALEX)
+        val earlier = ReminderDraft("Vitamins", listOf(access.alex.id), LocalTime.of(8, 0), weeklyOn(DayOfWeek.WEDNESDAY, from = today.minusDays(2)))
+        assertThat(actions.save(null, earlier)).isEqualTo(SaveResult.Saved)
+        val saved = stored().single()
+        assertThat(saved.due(nowMillis, london)).isNull()
+        assertThat(saved.nextDue(nowMillis, london)).isEqualTo(at("2026-11-25T08:00:00"))
     }
 }

@@ -3,11 +3,11 @@ package uk.co.siland.culvery.capability.reminders
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ClockField
+import uk.co.siland.culvery.core.ui.RepeatPick
 import uk.co.siland.culvery.core.ui.toggledWho
 
 private const val MINUTES_A_DAY = 24 * 60
@@ -18,11 +18,10 @@ private const val STEP = 5
  * Family. [time] starts at [now] rounded up to a five-minute mark.
  */
 class ReminderForm(original: Reminder?, val today: LocalDate, now: LocalTime, val childOnly: PersonId?) {
+    private val event = original?.event
     private val openingWords = original?.words.orEmpty()
     private val openingWho = original?.forPeople ?: listOf(childOnly ?: PersonId.FAMILY)
-    private val openingRepeats = original?.schedule is Schedule.Weekly
-    private val openingDate = (original?.schedule as? Schedule.Once)?.date ?: if (wrapsToTomorrow(now)) today.plusDays(1) else today
-    private val openingDays = (original?.schedule as? Schedule.Weekly)?.days.orEmpty()
+    private val openingDate = original?.schedule?.first ?: if (wrapsToTomorrow(now)) today.plusDays(1) else today
     private val openingTime = original?.time ?: roundedUp(now)
 
     private var typed by mutableStateOf(openingWords)
@@ -37,12 +36,10 @@ class ReminderForm(original: Reminder?, val today: LocalDate, now: LocalTime, va
     var who: List<PersonId> by mutableStateOf(openingWho)
         private set
 
-    var repeats by mutableStateOf(openingRepeats)
-
     var date: LocalDate by mutableStateOf(openingDate)
 
-    var days: Set<DayOfWeek> by mutableStateOf(openingDays)
-        private set
+    /** Read from the original's rule against its first day. */
+    val repeat: RepeatPick = RepeatPick.read((original?.schedule as? Schedule.Repeating)?.rule, openingDate)
 
     var time: LocalTime by mutableStateOf(openingTime)
 
@@ -50,10 +47,6 @@ class ReminderForm(original: Reminder?, val today: LocalDate, now: LocalTime, va
     fun toggleWho(person: PersonId) {
         if (childOnly != null) return
         who = toggledWho(who, person, PersonId.FAMILY)
-    }
-
-    fun toggleDay(day: DayOfWeek) {
-        days = if (day in days) days - day else days + day
     }
 
     /** The hour moves by one, the minute to the next or last multiple of five; both wrap the day. */
@@ -70,17 +63,17 @@ class ReminderForm(original: Reminder?, val today: LocalDate, now: LocalTime, va
     /** Today to a year ahead. */
     fun allowedDay(day: LocalDate): Boolean = day >= today && day <= today.plusYears(1)
 
-    val canSave: Boolean get() = tidyWords(words).isNotEmpty() && who.isNotEmpty() && (!repeats || days.isNotEmpty())
+    val canSave: Boolean get() = tidyWords(words).isNotEmpty() && who.isNotEmpty()
 
-    /** Anything differs from how the form opened. */
+    /** Anything differs from how the form opened, or the repeat has been tapped. */
     val edited: Boolean
-        get() = words != openingWords || who != openingWho || repeats != openingRepeats || date != openingDate ||
-            days != openingDays || time != openingTime
+        get() = words != openingWords || who != openingWho || date != openingDate || time != openingTime || repeat.touched
 
-    /** Only for a form that [canSave]: a repeat with no weekday can't be made. */
+    /** Only for a form that [canSave]. Carries the original's event. */
     fun toDraft(): ReminderDraft {
         check(canSave) { "The form can't be saved yet" }
-        return ReminderDraft(tidyWords(words), who, time, if (repeats) Schedule.Weekly(days) else Schedule.Once(date))
+        val schedule = repeat.rule(date)?.let { Schedule.Repeating(date, it) } ?: Schedule.Once(date)
+        return ReminderDraft(tidyWords(words), who, time, schedule, event)
     }
 }
 

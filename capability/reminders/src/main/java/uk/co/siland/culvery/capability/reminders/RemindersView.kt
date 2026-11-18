@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.reminders
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.TextStyle
@@ -24,6 +25,7 @@ import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
+import uk.co.siland.culvery.core.repeat.repeatWords
 import uk.co.siland.culvery.core.ui.clockText
 
 /** A person's [colour], or a bin's [inkId]; neither draws as an unknown bin. */
@@ -97,6 +99,12 @@ private fun backAt(due: Due, nowMillis: Long, zone: ZoneId): String? {
     return "Back at ${clockText(Instant.ofEpochMilli(until).atZone(zone).toLocalTime())}"
 }
 
+/** `Once`, else the repeat as the calendar's detail card words it. */
+internal fun repeatNote(schedule: Schedule, zone: ZoneId, today: LocalDate): String = when (schedule) {
+    is Schedule.Once -> "Once"
+    is Schedule.Repeating -> repeatWords(schedule.rule, schedule.first, zone, today)
+}
+
 /** A waiting repeat is under Waiting only; the others sit under Today or Coming up by their next time. */
 internal fun tabOf(
     dues: List<Due>,
@@ -129,7 +137,7 @@ internal fun tabOf(
         .mapNotNull { r -> r.nextDue(nowMillis, zone)?.let { r to it } }
         .sortedWith(compareBy({ it.second }, { it.first.id }))
     val (todays, later) = next.partition { Instant.ofEpochMilli(it.second).atZone(zone).toLocalDate() == today }
-    fun rows(list: List<Pair<Reminder, Long>>) = list.map { (r, at) -> row(r, dueText(at, nowMillis, zone), null, repeatWords(r.schedule)) }
+    fun rows(list: List<Pair<Reminder, Long>>) = list.map { (r, at) -> row(r, dueText(at, nowMillis, zone), null, repeatNote(r.schedule, zone, today)) }
     val binsRow = bins?.takeIf { it.connected }?.let { BinsRowUi(state.binsOn, state.binsTime, it.readFailed) }
     return TabUi(waiting, rows(todays), rows(later), binsRow)
 }

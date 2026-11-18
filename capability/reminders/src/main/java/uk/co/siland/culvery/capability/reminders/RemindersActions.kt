@@ -105,12 +105,11 @@ class RemindersActions @Inject constructor(
 
     private suspend fun find(id: Long): Reminder? = store.reminders.first().firstOrNull { it.id == id }
 
-    /** A day more than a year ahead is refused; one before today (a form left open past midnight) is [SaveResult.Past], and a waiting one-off keeps the day it has. */
+    /** A first day more than a year ahead is refused unless the reminder already has it. */
     private fun acceptable(draft: ReminderDraft, tidy: String, today: LocalDate, existing: Reminder?): Boolean {
         if (tidy.length !in 1..WORDS_MAX || draft.forPeople.isEmpty()) return false
-        val once = draft.schedule as? Schedule.Once ?: return true
-        val kept = (existing?.schedule as? Schedule.Once)?.date == once.date
-        return kept || once.date <= today.plusYears(1)
+        val first = draft.schedule.first
+        return existing?.schedule?.first == first || first <= today.plusYears(1)
     }
 
     private suspend fun authoriseAdd(draft: ReminderDraft): Authorised? = access.authorise(
@@ -141,7 +140,7 @@ class RemindersActions @Inject constructor(
         val now = clock.nowMillis()
         val once = draft.schedule as? Schedule.Once
         val moved = existing == null || draft.time != existing.time || draft.schedule != existing.schedule
-        if (moved && once != null && timeOn(once.date, draft.time, zone.current()) <= now) return SaveResult.Past
+        if (moved && once != null && timeOn(once.first, draft.time, zone.current()) <= now) return SaveResult.Past
         if (editing == null) {
             store.add(draft, madeBy, now) ?: return SaveResult.Full
         } else if (!store.change(editing, draft, now)) {

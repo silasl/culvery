@@ -178,7 +178,7 @@ class RemindersEngineTest {
     @Test
     fun aNewerTimeOnAWaitingReminderWakesAndChimesAgain() = runTest {
         val rig = Rig().also { it.start() }
-        store.add(ReminderDraft("Swimming bag", listOf(alex), LocalTime.of(7, 30), Schedule.Weekly(DayOfWeek.entries.toSet())), alex, nowMillis)
+        store.add(ReminderDraft("Swimming bag", listOf(alex), LocalTime.of(7, 30), weeklyOn(*DayOfWeek.entries.toTypedArray())), alex, nowMillis)
         rig.tick("2026-11-18T07:30:00")
         assertThat(rig.chimes).hasSize(1)
         val wakes = rig.fake.wakes

@@ -1,6 +1,5 @@
 package uk.co.siland.culvery.capability.reminders
 
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 import uk.co.siland.culvery.core.house.BinCollection
@@ -10,23 +9,33 @@ const val WORDS_MAX = 60
 const val REMINDERS_MAX = 50
 const val LATER_MS = 1_800_000L
 
+/** A first day, and for a repeat its rule from that day (22 §10.3). [toString] prints the kind only. */
 sealed interface Schedule {
-    data class Once(val date: LocalDate) : Schedule {
+    val first: LocalDate
+
+    data class Once(override val first: LocalDate) : Schedule {
         override fun toString() = "Schedule.Once"
     }
 
-    /** [days] is never empty. */
-    data class Weekly(val days: Set<DayOfWeek>) : Schedule {
-        init {
-            require(days.isNotEmpty())
-        }
-
-        override fun toString() = "Schedule.Weekly"
+    /** [rule] is an RRULE line with no first-date line. */
+    data class Repeating(override val first: LocalDate, val rule: String) : Schedule {
+        override fun toString() = "Schedule.Repeating"
     }
 }
 
-/** What the form hands the store. [toString] leaves out the words, the people and the time. */
-data class ReminderDraft(val words: String, val forPeople: List<PersonId>, val time: LocalTime, val schedule: Schedule) {
+/** The event a reminder was added from (22 §10.5). [toString] prints nothing. */
+data class EventLink(val key: String, val day: LocalDate?, val time: LocalTime?, val rule: String?, val followsRepeat: Boolean) {
+    override fun toString() = "EventLink"
+}
+
+/** What the form hands the store. [toString] leaves out the words, the people, the time and the event. */
+data class ReminderDraft(
+    val words: String,
+    val forPeople: List<PersonId>,
+    val time: LocalTime,
+    val schedule: Schedule,
+    val event: EventLink? = null,
+) {
     override fun toString() = "ReminderDraft"
 }
 
@@ -41,6 +50,7 @@ data class Reminder(
     val answeredAtMillis: Long,
     val snoozedUntilMillis: Long?,
     val chimedAtMillis: Long?,
+    val event: EventLink? = null,
 ) {
     override fun toString() = "Reminder($id)"
 }

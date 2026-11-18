@@ -27,17 +27,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
-import java.time.format.TextStyle
-import java.util.Locale
+import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -61,10 +58,10 @@ import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
-import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhDateGrid
-import uk.co.siland.culvery.core.ui.HhSegmented
+import uk.co.siland.culvery.core.ui.HhRepeatPicker
+import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.HhTimeSteppers
@@ -82,7 +79,8 @@ private const val SHOWS_AS_FAMILYS = "Shows as Family’s"
 private const val ADD_REMINDER_BUTTON = "Add reminder"
 private const val SAVE_CHANGES = "Save changes"
 private const val DELETE_REMINDER = "Delete reminder"
-private val REPEAT_OPTIONS = listOf("Once", "Repeats")
+private const val REPEATS = "Repeats"
+private const val OWN_DAY = "The reminder’s own day"
 
 /**
  * Loads what the form needs, then shows it as a sheet with no PIN pad: Save and Delete ask who's there (22 §4.6). [id] null
@@ -94,7 +92,7 @@ internal suspend fun OverlayHost.openReminder(id: Long?, actions: RemindersActio
     val opened = try {
         val original = id?.let { actions.openExisting(it) ?: return }
         val at = actions.openedAt()
-        Opened(original, at.toLocalDate(), at.toLocalTime(), actions.childHere(), members.first())
+        Opened(original, at.toLocalDate(), at.toLocalTime(), at.zone, actions.childHere(), members.first())
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
@@ -112,6 +110,7 @@ internal suspend fun OverlayHost.openReminder(id: Long?, actions: RemindersActio
             editing = id,
             people = people,
             childName = childName,
+            zone = opened.zone,
             save = actions::save,
             delete = actions::delete,
             onRefusedWho = { childName?.let(actions::refuseOtherWho) },
@@ -125,13 +124,14 @@ private class Opened(
     val original: Reminder?,
     val today: LocalDate,
     val now: LocalTime,
+    val zone: ZoneId,
     val child: PersonId?,
     val people: List<Member>,
 )
 
 /**
  * Runs Save and Delete one at a time. Past and Full show their line and keep the sheet open; so does a cancelled PIN pad.
- * A saved reminder, or one that has gone, closes it.
+ * A saved reminder, or one that has gone, closes it, as does Save changes with nothing changed, with no PIN pad.
  */
 @Composable
 internal fun ReminderSheetHost(
@@ -139,6 +139,7 @@ internal fun ReminderSheetHost(
     editing: Long?,
     people: List<Member>,
     childName: String?,
+    zone: ZoneId,
     save: suspend (Long?, ReminderDraft) -> SaveResult,
     delete: suspend (Long) -> Boolean,
     onRefusedWho: () -> Unit,
@@ -164,10 +165,13 @@ internal fun ReminderSheetHost(
         people = people,
         editing = editing != null,
         childName = childName,
+        zone = zone,
         line = line,
         busy = action.busy,
         onSave = {
-            if (!action.busy && form.canSave) {
+            if (!action.busy && editing != null && !form.edited) {
+                onClose()
+            } else if (!action.busy && form.canSave) {
                 line = null
                 deleting = false
                 action.run {
@@ -192,13 +196,14 @@ internal fun ReminderSheetHost(
     )
 }
 
-/** Add reminder, and Change reminder with Delete: the words, who, Once or Repeats, a day or seven day chips, and the time. */
+/** Add reminder, and Change reminder with Delete: the words, who, the day, the time, and Repeats with the shared picker. */
 @Composable
 internal fun ReminderSheet(
     form: ReminderForm,
     people: List<Member>,
     editing: Boolean,
     childName: String?,
+    zone: ZoneId,
     line: String?,
     busy: Boolean,
     onSave: () -> Unit,
@@ -228,9 +233,10 @@ internal fun ReminderSheet(
                 readOnly = busy,
             )
             WhoPart(form, people, childName, busy, onRefusedWho)
-            HhSegmented(REPEAT_OPTIONS, if (form.repeats) 1 else 0, { if (!busy) form.repeats = it == 1 }, "reminder_repeat")
-            if (form.repeats) DayChips(form, busy) else DayGrid(form, busy)
+            DayGrid(form, busy)
             TimePart(form, busy)
+            HhSectionLabel(REPEATS)
+            HhRepeatPicker(form.repeat, form.date, form.today, zone, ownDayLine = OWN_DAY, busy = busy)
         }
         if (line != null) {
             Text(
@@ -289,21 +295,6 @@ private fun DayGrid(form: ReminderForm, busy: Boolean) {
         onPick = { form.date = it },
         modifier = Modifier.testTag("reminder_date"),
     )
-}
-
-@Composable
-private fun DayChips(form: ReminderForm, busy: Boolean) {
-    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().testTag("reminder_days")) {
-        DayOfWeek.entries.forEach { day ->
-            HhChoiceChip(
-                label = day.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
-                selected = day in form.days,
-                tag = "reminder_day_${day.name}",
-                onClick = { if (!busy) form.toggleDay(day) },
-                role = Role.Checkbox,
-            )
-        }
-    }
 }
 
 @Composable

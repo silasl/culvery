@@ -6,12 +6,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -22,6 +27,7 @@ import com.google.common.truth.Truth.assertThat
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import org.junit.Rule
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -45,6 +51,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.reminders.LIST_FULL
 import uk.co.siland.culvery.capability.reminders.PICK_A_LATER_TIME
 import uk.co.siland.culvery.capability.reminders.ReminderDraft
+import uk.co.siland.culvery.capability.reminders.Reminder
 import uk.co.siland.culvery.capability.reminders.ReminderForm
 import uk.co.siland.culvery.capability.reminders.SaveResult
 import uk.co.siland.culvery.capability.reminders.Schedule
@@ -55,7 +62,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role as HouseholdRole
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 @RunWith(AndroidJUnit4::class)
@@ -77,7 +84,7 @@ class ReminderSheetTest {
     private var result = SaveResult.Saved
     private var failure: Exception? = null
 
-    private fun form(childOnly: PersonId? = null) = ReminderForm(null, today, LocalTime.of(10, 0), childOnly)
+    private fun form(childOnly: PersonId? = null, original: Reminder? = null) = ReminderForm(original, today, LocalTime.of(10, 0), childOnly)
 
     private var editing by mutableStateOf<Long?>(null)
 
@@ -90,6 +97,7 @@ class ReminderSheetTest {
                     editing = editing,
                     people = household,
                     childName = childName,
+                    zone = ZoneId.of("Europe/London"),
                     save = { id, draft -> failure?.let { throw it }; saved += id to draft; result },
                     delete = { id -> failure?.let { throw it }; deleted += id; true },
                     onRefusedWho = { refused++ },
@@ -118,37 +126,42 @@ class ReminderSheetTest {
     }
 
     @Test
-    fun repeatsSwapsTheDayForSevenChips() {
+    fun theDayStaysAndTheSharedPickerSitsUnderRepeats() {
         val form = form()
         show(form)
         compose.onNodeWithTag("reminder_date").assertExists()
-        assertThat(count("reminder_day_MONDAY")).isEqualTo(0)
+        compose.onNodeWithContentDescription("Repeats").assert(isHeading())
+        assertThat(count("repeat_day_MONDAY")).isEqualTo(0)
 
-        compose.onNodeWithTag("reminder_repeat_1").performClick()
-        assertThat(count("reminder_date")).isEqualTo(0)
-        DayOfWeek.entries.forEach { compose.onNodeWithTag("reminder_day_${it.name}").assert(isCheckbox) }
-        listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach { compose.onNodeWithText(it).assertExists() }
-
-        compose.onNodeWithTag("reminder_day_MONDAY").performClick()
-        compose.onNodeWithTag("reminder_day_FRIDAY").performClick()
-        assertThat(form.days).containsExactly(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)
-
-        compose.onNodeWithTag("reminder_repeat_0").performClick()
+        compose.onNodeWithTag("repeat_Weekly").performScrollTo().performClick()
         compose.onNodeWithTag("reminder_date").assertExists()
-        assertThat(count("reminder_day_MONDAY")).isEqualTo(0)
+        DayOfWeek.entries.forEach { compose.onNodeWithTag("repeat_day_${it.name}").assert(isCheckbox) }
+        compose.onNodeWithTag("repeat_day_FRIDAY").performScrollTo().performClick()
+        assertThat(form.repeat.daysOn(form.date)).containsExactly(DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY)
+
+        compose.onNodeWithTag("repeat_Never").performScrollTo().performClick()
+        assertThat(count("repeat_day_MONDAY")).isEqualTo(0)
+        assertThat(form.repeat.repeats).isFalse()
     }
 
     @Test
-    fun addNeedsWordsAndARepeatNeedsADay() {
-        val form = form()
-        show(form)
+    fun addNeedsWords() {
+        show(form())
         compose.onNodeWithTag("reminder_save").assertIsNotEnabled()
         compose.onNodeWithTag("reminder_words").performTextInput("PE kit")
         compose.onNodeWithTag("reminder_save").assertIsEnabled()
-        compose.onNodeWithTag("reminder_repeat_1").performClick()
-        compose.onNodeWithTag("reminder_save").assertIsNotEnabled()
-        compose.onNodeWithTag("reminder_day_MONDAY").performClick()
+        compose.onNodeWithTag("repeat_Weekly").performScrollTo().performClick()
         compose.onNodeWithTag("reminder_save").assertIsEnabled()
+    }
+
+    @Test
+    fun saveChangesWithNothingChangedClosesWithNoPin() {
+        val original = Reminder(7, "PE kit", listOf(mia.person.id), alex.person.id, LocalTime.of(8, 0), Schedule.Once(today.plusDays(1)), 0, null, null)
+        show(form(original = original), existing = 7)
+        compose.onNodeWithTag("reminder_save").performClick()
+        compose.waitForIdle()
+        assertThat(saved).isEmpty()
+        assertThat(closed).isEqualTo(1)
     }
 
     @Test
@@ -236,13 +249,20 @@ class ReminderSheetTest {
         assertThat(refused).isEqualTo(1)
     }
 
+    // The date grid is core's: its day cells are left to core's tests.
+    private val outsideTheGrid = object : SemanticsNodeInteractionsProvider by compose {
+        override fun onAllNodes(matcher: SemanticsMatcher, useUnmergedTree: Boolean) =
+            compose.onAllNodes(matcher and !hasTestTag("reminder_date") and !hasAnyAncestor(hasTestTag("reminder_date")), useUnmergedTree)
+    }
+
     @Test
     fun theSheetIsAccessible() {
         show(form())
         compose.assertClickablesHaveRoleAndLabel()
-        // The date grid is core's; its day cells are checked there.
-        compose.onNodeWithTag("reminder_repeat_1").performClick()
-        compose.assertAccessible()
+        outsideTheGrid.assertNothingReadTwice()
+        compose.onNodeWithTag("repeat_Weekly").performScrollTo().performClick()
+        compose.assertClickablesHaveRoleAndLabel()
+        outsideTheGrid.assertNothingReadTwice()
     }
 
     @Test

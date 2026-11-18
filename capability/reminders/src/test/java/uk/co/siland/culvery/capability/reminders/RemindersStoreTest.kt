@@ -6,7 +6,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -25,6 +27,9 @@ class RemindersStoreTest {
     private val alex = PersonId("alex")
     private val sam = PersonId("sam")
     private val day = LocalDate.of(2026, 11, 20)
+    private val zone = ZoneId.of("Europe/London")
+
+    private fun at(text: String) = LocalDateTime.parse(text).atZone(zone).toInstant().toEpochMilli()
 
     @Before
     fun setUp() {
@@ -41,7 +46,7 @@ class RemindersStoreTest {
         ReminderDraft(words, who, at, Schedule.Once(on))
 
     private fun weekly(vararg days: DayOfWeek) =
-        ReminderDraft("Swimming bag", listOf(PersonId.FAMILY), LocalTime.of(8, 0), Schedule.Weekly(days.toSet()))
+        ReminderDraft("Swimming bag", listOf(PersonId.FAMILY), LocalTime.of(8, 0), weeklyOn(*days))
 
     @Test
     fun aOneOffAndARepeatRoundTrip() = runTest {
@@ -51,7 +56,7 @@ class RemindersStoreTest {
             Reminder(a, "PE kit", listOf(alex, sam), sam, LocalTime.of(7, 30), Schedule.Once(day), 1_000, null, null),
             Reminder(
                 b, "Swimming bag", listOf(PersonId.FAMILY), alex, LocalTime.of(8, 0),
-                Schedule.Weekly(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.SUNDAY)), 2_000, null, null,
+                weeklyOn(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.SUNDAY), 2_000, null, null,
             ),
         )
     }
@@ -68,8 +73,8 @@ class RemindersStoreTest {
         val a = store.add(once(), alex, 0)!!
         val b = store.add(weekly(DayOfWeek.FRIDAY), alex, 0)!!
         store.later(b, 100)
-        store.done(a, 5_000)
-        store.done(b, 6_000)
+        store.done(a, 5_000, zone)
+        store.done(b, 6_000, zone)
         val left = store.reminders.first()
         assertThat(left.map { it.id }).containsExactly(b)
         assertThat(left.single().answeredAtMillis).isEqualTo(6_000)
@@ -77,11 +82,11 @@ class RemindersStoreTest {
     }
 
     @Test
-    fun aChangeOfTimeDayOrWeekdaysResetsAnsweredAtAndClearsTheSnooze() = runTest {
+    fun aChangeOfTimeDayOrRepeatResetsAnsweredAtAndClearsTheSnooze() = runTest {
         val changes = listOf(
             once(at = LocalTime.of(9, 0)),
             once(on = day.plusDays(1)),
-            ReminderDraft("PE kit", listOf(alex), LocalTime.of(7, 30), Schedule.Weekly(setOf(DayOfWeek.MONDAY))),
+            ReminderDraft("PE kit", listOf(alex), LocalTime.of(7, 30), weeklyOn(DayOfWeek.FRIDAY, from = LocalDate.of(2026, 11, 16))),
         )
         for (changed in changes) {
             val id = store.add(once(), alex, 1_000)!!
@@ -95,7 +100,7 @@ class RemindersStoreTest {
     }
 
     @Test
-    fun aChangeOfWeekdaysOnARepeatResetsAnsweredAtAndClearsTheSnooze() = runTest {
+    fun aChangeOfDaysOnARepeatResetsAnsweredAtAndClearsTheSnooze() = runTest {
         val id = store.add(weekly(DayOfWeek.MONDAY), alex, 1_000)!!
         store.later(id, 100)
         assertThat(store.change(id, weekly(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY), 9_000)).isTrue()
@@ -188,5 +193,45 @@ class RemindersStoreTest {
         assertThat(store.state.first().heldEndedAtMillis).isEqualTo(2_000)
         store.markHeld(false, 3_000)
         assertThat(store.state.first().heldEndedAtMillis).isEqualTo(2_000)
+    }
+
+    @Test
+    fun doneOnTheLastTimeDeletesARepeat() = runTest {
+        val twoFridays = ReminderDraft("PE kit", listOf(alex), LocalTime.of(7, 30), Schedule.Repeating(day, "RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=2"))
+        val id = store.add(twoFridays, alex, 0)!!
+        store.done(id, at("2026-11-20T08:00:00"), zone)
+        assertThat(store.reminders.first().single().answeredAtMillis).isEqualTo(at("2026-11-20T08:00:00"))
+        store.done(id, at("2026-11-27T08:00:00"), zone)
+        assertThat(store.reminders.first()).isEmpty()
+    }
+
+    @Test
+    fun aNewRuleRestartsTheReminder() = runTest {
+        val id = store.add(weekly(DayOfWeek.FRIDAY), alex, 1_000)!!
+        store.later(id, 100)
+        val first = weeklyOn(DayOfWeek.FRIDAY).first
+        val fortnightly = weekly(DayOfWeek.FRIDAY).copy(schedule = Schedule.Repeating(first, "RRULE:FREQ=WEEKLY;INTERVAL=2"))
+        assertThat(store.change(id, fortnightly, 9_000)).isTrue()
+        val r = store.reminders.first().single()
+        assertThat(r.schedule).isEqualTo(fortnightly.schedule)
+        assertThat(r.answeredAtMillis).isEqualTo(9_000)
+        assertThat(r.snoozedUntilMillis).isNull()
+    }
+
+    @Test
+    fun theLinkSurvivesAChangeOfWords() = runTest {
+        val friday = weeklyOn(DayOfWeek.FRIDAY)
+        val event = EventLink("event-1", friday.first, LocalTime.of(9, 0), friday.rule, followsRepeat = true)
+        val draft = ReminderDraft("Swimming", listOf(alex), LocalTime.of(8, 0), friday, event)
+        val id = store.add(draft, alex, 1_000)!!
+        assertThat(store.reminders.first().single().event).isEqualTo(event)
+
+        store.change(id, draft.copy(words = "Swimming bag"), 9_000)
+        val renamed = store.reminders.first().single()
+        assertThat(renamed.event).isEqualTo(event)
+        assertThat(renamed.answeredAtMillis).isEqualTo(1_000)
+
+        store.change(id, draft.copy(schedule = friday.copy(rule = "RRULE:FREQ=WEEKLY;INTERVAL=2")), 9_000)
+        assertThat(store.reminders.first().single().event).isEqualTo(event.copy(followsRepeat = false))
     }
 }

@@ -3,9 +3,9 @@ package uk.co.siland.culvery.capability.reminders
 import androidx.room.withTransaction
 import java.net.URLDecoder
 import java.net.URLEncoder
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -35,19 +35,28 @@ class RemindersStore @Inject constructor(private val db: RemindersDatabase) {
         }
     }
 
-    /** False when the reminder has gone. A new time, day or weekdays restart it; new words or people keep its marks. */
+    /**
+     * False when the reminder has gone. A new time, first day or rule restarts it, and a new first day or rule stops it
+     * following its event's repeat; new words or people keep its marks. The form hands back an untouched rule as it was.
+     */
     suspend fun change(id: Long, draft: ReminderDraft, nowMillis: Long): Boolean = db.withTransaction {
         val old = dao.byId(id) ?: return@withTransaction false
         val fresh = draft.toEntity(PersonId(old.madeBy), old.answeredAtMillis, old.snoozedUntilMillis, old.chimedAtMillis).copy(id = id)
-        val restarted = fresh.minuteOfDay != old.minuteOfDay || fresh.onDate != old.onDate || fresh.weekdays != old.weekdays
-        dao.put(if (restarted) fresh.copy(answeredAtMillis = nowMillis, snoozedUntilMillis = null) else fresh)
+        val newWhen = fresh.firstDate != old.firstDate || fresh.rule != old.rule
+        val restarted = newWhen || fresh.minuteOfDay != old.minuteOfDay
+        val kept = if (newWhen) fresh.copy(followsRepeat = false) else fresh
+        dao.put(if (restarted) kept.copy(answeredAtMillis = nowMillis, snoozedUntilMillis = null) else kept)
         true
     }
 
-    /** A one-off is deleted; a repeat starts again from [nowMillis]. */
-    suspend fun done(id: Long, nowMillis: Long) = db.withTransaction {
+    /** A one-off, or a repeat with no time after [nowMillis], is deleted; a repeat otherwise starts again from [nowMillis]. */
+    suspend fun done(id: Long, nowMillis: Long, zone: ZoneId) = db.withTransaction {
         val row = dao.byId(id) ?: return@withTransaction
-        if (row.weekdays == 0) dao.delete(id) else dao.put(row.copy(answeredAtMillis = nowMillis, snoozedUntilMillis = null))
+        if (row.rule == null || row.toReminder().nextDue(nowMillis, zone) == null) {
+            dao.delete(id)
+        } else {
+            dao.put(row.copy(answeredAtMillis = nowMillis, snoozedUntilMillis = null))
+        }
     }
 
     suspend fun later(id: Long, nowMillis: Long) = db.withTransaction {
@@ -87,21 +96,22 @@ class RemindersStore @Inject constructor(private val db: RemindersDatabase) {
     }
 }
 
-private fun weekdayMask(days: Set<DayOfWeek>) = days.fold(0) { mask, day -> mask or (1 shl (day.value - 1)) }
-
-private fun weekdaysOf(mask: Int) = DayOfWeek.entries.filter { mask and (1 shl (it.value - 1)) != 0 }.toSet()
-
 private fun ReminderDraft.toEntity(madeBy: PersonId, answeredAtMillis: Long, snoozedUntilMillis: Long?, chimedAtMillis: Long?) =
     ReminderEntity(
         words = words,
         forPeople = forPeople.joinToString(",") { it.value },
         madeBy = madeBy.value,
-        minuteOfDay = time.hour * 60 + time.minute,
-        onDate = (schedule as? Schedule.Once)?.date?.toString(),
-        weekdays = (schedule as? Schedule.Weekly)?.let { weekdayMask(it.days) } ?: 0,
+        minuteOfDay = time.minuteOfDay(),
+        firstDate = schedule.first.toString(),
+        rule = (schedule as? Schedule.Repeating)?.rule,
         answeredAtMillis = answeredAtMillis,
         snoozedUntilMillis = snoozedUntilMillis,
         chimedAtMillis = chimedAtMillis,
+        eventKey = event?.key,
+        eventDay = event?.day?.toString(),
+        eventMinute = event?.time?.minuteOfDay(),
+        eventRule = event?.rule,
+        followsRepeat = event?.followsRepeat ?: false,
     )
 
 private fun ReminderEntity.toReminder() = Reminder(
@@ -109,16 +119,21 @@ private fun ReminderEntity.toReminder() = Reminder(
     words = words,
     forPeople = forPeople.split(',').filter { it.isNotEmpty() }.map(::PersonId),
     madeBy = PersonId(madeBy),
-    time = LocalTime.of(minuteOfDay / 60, minuteOfDay % 60),
-    schedule = onDate?.let { Schedule.Once(LocalDate.parse(it)) } ?: Schedule.Weekly(weekdaysOf(weekdays)),
+    time = timeOfMinute(minuteOfDay),
+    schedule = LocalDate.parse(firstDate).let { first -> rule?.let { Schedule.Repeating(first, it) } ?: Schedule.Once(first) },
     answeredAtMillis = answeredAtMillis,
     snoozedUntilMillis = snoozedUntilMillis,
     chimedAtMillis = chimedAtMillis,
+    event = eventKey?.let { EventLink(it, eventDay?.let(LocalDate::parse), eventMinute?.let(::timeOfMinute), eventRule, followsRepeat) },
 )
+
+private fun LocalTime.minuteOfDay() = hour * 60 + minute
+
+private fun timeOfMinute(minute: Int): LocalTime = LocalTime.of(minute / 60, minute % 60)
 
 private fun ReminderStateEntity.toState() = ReminderState(
     binsOn = binsOn,
-    binsTime = LocalTime.of(binsMinuteOfDay / 60, binsMinuteOfDay % 60),
+    binsTime = timeOfMinute(binsMinuteOfDay),
     binsDoneFor = binsDoneFor?.let(LocalDate::parse),
     binsSnoozedUntilMillis = binsSnoozedUntilMillis,
     binsChimedAtMillis = binsChimedAtMillis,
@@ -129,7 +144,7 @@ private fun ReminderStateEntity.toState() = ReminderState(
 
 private fun ReminderState.toEntity() = ReminderStateEntity(
     binsOn = binsOn,
-    binsMinuteOfDay = binsTime.hour * 60 + binsTime.minute,
+    binsMinuteOfDay = binsTime.minuteOfDay(),
     binsDoneFor = binsDoneFor?.toString(),
     binsSnoozedUntilMillis = binsSnoozedUntilMillis,
     binsChimedAtMillis = binsChimedAtMillis,

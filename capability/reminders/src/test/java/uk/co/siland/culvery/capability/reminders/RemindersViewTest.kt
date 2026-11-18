@@ -170,7 +170,7 @@ class RemindersViewTest {
     }
 
     private suspend fun addWeekly(time: String, words: String, who: List<PersonId>, vararg days: DayOfWeek) =
-        store.add(ReminderDraft(words, who, java.time.LocalTime.parse(time), Schedule.Weekly(days.toSet())), alex.id, nowMillis)!!
+        store.add(ReminderDraft(words, who, java.time.LocalTime.parse(time), weeklyOn(*days)), alex.id, nowMillis)!!
 
     @Test
     fun waitingRowsShowTheDueTimeOrBackAt() = runTest {
@@ -288,5 +288,19 @@ class RemindersViewTest {
         val clock = HouseholdClock(HouseholdZone(household).zone, WallClock { nowMillis }, scope, ticks)
         val bare = RemindersView(store, engine, household, clock, HouseholdZone(household), Optional.empty(), scope)
         assertThat(bare.tab.first().bins).isNull()
+    }
+
+    @Test
+    fun aRepeatIsWordedAsTheCalendarWordsIt() = runTest {
+        addWeekly("08:00", "Packed lunch", listOf(mia.id), DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY)
+        addWeekly("10:00", "Water the plants", listOf(alex.id), DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
+        val fourthSaturday = Schedule.Repeating(LocalDate.of(2026, 11, 28), "RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4SA;COUNT=6")
+        store.add(ReminderDraft("Car boot sale", listOf(sam.id), java.time.LocalTime.of(9, 0), fourthSaturday), alex.id, nowMillis)
+        val tab = view.tab.first { it.today.size + it.comingUp.size == 3 }
+        assertThat((tab.today + tab.comingUp).associate { it.words to it.note }).containsExactly(
+            "Packed lunch", "Every week, on Mon to Fri",
+            "Water the plants", "Every week, on Sat, Sun",
+            "Car boot sale", "Every month, on the 4th Saturday · 6 times",
+        )
     }
 }
