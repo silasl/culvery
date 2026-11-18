@@ -52,20 +52,21 @@ internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, peopl
     // An all-day date has started only once it is over (22 §10.5).
     fun started(day: LocalDate, at: LocalTime?) = if (at == null) day.isBefore(today) else !day.atTime(at).atZone(zone).toInstant().isAfter(now)
     val tapped = event.start.dayIn(zone)
+    val tappedStarted = started(tapped, time)
     val rule = seriesRule(event, siblings, zone, today)?.takeIf { workable(it, zone) }
     val (day, left) = if (rule == null) {
-        if (started(tapped, time)) return null
+        if (tappedStarted) return null
         tapped to null
     } else {
         val from = when {
-            !started(tapped, time) -> tapped
+            !tappedStarted -> tapped
             started(today, times.time) -> today.plusDays(1)
             else -> today
         }
         startedFrom(rule, seriesStart(rule) ?: tapped, from, zone) ?: return null
     }
-    // Another date keeps the series' usual time, not the one this date may have been moved to.
-    return EventSeed(eventKey(event), event.title, people, day, if (day == tapped) time else times.time, left, times)
+    // Past the date tapped, the series' usual time, not the one that date may have been moved to.
+    return EventSeed(eventKey(event), event.title, people, day, if (tappedStarted) times.time else time, left, times)
 }
 
 // A date whose own rule wasn't read takes its series' from another stored date: the earliest coming one's, else the latest.

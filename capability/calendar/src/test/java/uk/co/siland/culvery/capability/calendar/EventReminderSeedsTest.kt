@@ -122,6 +122,16 @@ class EventReminderSeedsTest {
     }
 
     @Test
+    fun aDateTodayMovedEarlierOpensAtTheUsualTime() {
+        val rule = withSeriesStart("RRULE:FREQ=WEEKLY;INTERVAL=1", today.minusWeeks(3))
+        val moved = occurrence(today, rule, hour = 9)
+        val siblings = listOf(moved, occurrence(today.plusWeeks(1), rule), occurrence(today.plusWeeks(2), rule))
+        val seed = seed(moved, siblings)!!
+        assertThat(seed.day).isEqualTo(today)
+        assertThat(seed.time).isEqualTo(LocalTime.of(17, 0))
+    }
+
+    @Test
     fun aMovedDateOfASeriesSeedsTheNextRuleDate() {
         // Mondays; this week's moved to today, Wednesday, and not yet started. Moved dates aren't followed.
         val monday = LocalDate.of(2026, 10, 26)
