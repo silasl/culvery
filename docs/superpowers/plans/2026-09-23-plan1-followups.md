@@ -26,6 +26,7 @@ The open work, one number each; the details are in the sections below. Numbers n
 38. Tidy-up: one shared set of test certificates for Home Assistant and Hue (two copies today).
 39. Tidy-up: Undo's bookkeeping in the calendar is kept in several places at once; fold it into one.
 40. Opening Culvery from outside the home screen (seen with `am start` after a force-stop on the emulator) can leave the app that was open before in front; Home brings Culvery back. Culvery starts its home screen and closes the other copy, and that hand-over is older than Plans 19 and 20. Check on the tablet whether a launcher or Settings' Open does the same.
+42. Birthdays often show twice in the calendar. Find out why; it probably needs the tablet plugged in, to read what its calendars hold.
 
 **To check on the tablet** (see "To check when the tablet is next plugged in")
 18. Taps that seemed lost on the emulator.
@@ -479,6 +480,7 @@ For the end-of-v1 design review:
 Test flakes seen across the build (timing, not Plan 9a's code; each passed on a rerun):
 - `LightsActionsTest` and `LightsCapabilityTest`: "Timed out waiting for 5000 ms" on DataStore and StateFlow reads.
 - `DoorCapabilityTest.theTabAppearsOnceRingIsConnected`.
+- `SampleHouseTest.sampleTrueKeepsTheSavedConnectionsAndSampleFalseBringsThemBack` (Plan 22's gate, 2026-11-17: failed once in the full-repo run, passed alone and in a fresh run of the app's tests).
 - `SonosSystemTest` after a clock jump.
 - "Database connection closed" (a Room database closed in teardown while a flow still reads it, wrong thread) in `DoorTabTest`, `PeopleUiTest`, `DoorRecorderTest` and `EventDetailHostTest`.
 - `CalendarMigrationTest`.
@@ -1067,6 +1069,37 @@ Spec `docs/superpowers/specs/2026-11-17-culvery-22-reminders-design.md`. Item 41
 - Anything drawn on the night clock or the dark screen (Plan 8's ruling stands).
 - Reminders shown on the calendar or on a Home card.
 - Night-holding in the alert layer for every capability (see "From Plan 8"). Reminders applies its own rules.
+
+## Plan 22 (Reminders): emulator walk-through (2026-11-18)
+- **Set-up:** the debug build of df912e2e on `culvery-5` with `install -r` and the debug sample household; the debug sample PINs; the clock moved with `DebugClockReceiver` (`--es at HH:mm`); each step waited on its log line (`Reminders` and `DisplayState` tags).
+- **Worked, all 11 checks of the plan:**
+  1. A one-off: `due 1`, `card up 1 of 1`, `chime`, and the card.
+  2. Later, then 30 minutes on the card and `chime` again; Done cleared the row.
+  3. Weekly: the card and `chime` on two Thursdays a week apart.
+  4. Bins, with the sample council: `bins due`, "Bins out tonight" with Food and one stripe, `chime`; the night clock and `held night` at 00:01; "Bins out today" and `chime` at 07:00, after the morning's read no longer listed that day; `bins cleared` at 12:00 with no card. The Bins row switched off and on again with an adult's PIN at Save changes.
+  5. Night: `due 1`, `held night`, the night clock untouched; a tap showed the card with no chime; the clock came back a minute later; the card and `chime` at 07:00.
+  6. Door quiet hours (21:00–07:00): the card at 21:15 with no chime.
+  7. Day, dark screen: `Screen AWAKE`, the card and `chime`; `Screen ASLEEP` two minutes later with the card unanswered; a tap showed the card with no new chime.
+  8. A ring over the card: `held ring`; Got it brought the card back with no chime.
+  9. A child: "Mia can add reminders for Mia only." when saving for Sam; saved for Mia; the next form had every other tile locked; "Mia can only change reminders they made." on an adult's reminder.
+  10. Holiday mode: `due 1`, `held holiday`, a dark screen; turning it off showed the card with `chime`.
+  11. A restart with the card up: `due 1`, `card up 1 of 1`, no chime.
+- **Also seen:** a save within two minutes of a PIN asked for none; a time already passed is refused with "Pick a time that hasn’t passed."; Delete reminder asked for a PIN and showed "Reminder deleted.".
+- **Note:** the emulator's night hours were saved as 15:00–15:30 from an earlier walk-through, so the first pass at check 4 saw no night at 00:01. They were set to 22:00–07:00 for the checks and put back. Settings left open also holds the wall awake, so close it before a step that needs the night clock.
+- **Note:** after Later the log shows `card up` and `chime` but no second `due 1`: a snoozed reminder still counts as waiting, so the count never dropped. The plan's check 2 expected the line.
+- **Note:** the door card's time is the real time, not the moved clock's (the ring's own stamp).
+- **Put back:** the clock, the reminders made, the Bins row on at 18:00, the sample council disconnected, night hours 15:00–15:30. Quiet hours and Holiday mode were left as found. One sample ring stays in the Door history.
+
+## From Plan 22
+Left by the final review (2026-11-17), none blocking:
+- The music's volume isn't put back if the chime's caller is cancelled while it waits for the music to lower (schedule the restore in a `finally`).
+- The card can show the plain "Reminder" fallback for one frame before its words arrive.
+- No test that an alert's wake is ignored when Culvery isn't in front.
+- `tools/fonts/README.md`'s size figure is stale.
+- Tests to strengthen: the waiting-bins branch of `tabOf`, the midnight case, `anErrorInAPass`'s assertion, the save fallback's log line.
+- A signed-in session can outlive its two minutes across a sleep; it fails closed.
+- The form's screenshot baselines are 1330 dp tall, not the tablet's 800 dp.
+- The debug clock: `at` wins silently over `add` when both are given.
 
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
