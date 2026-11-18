@@ -203,4 +203,11 @@ class TimingTest {
             assertThat(r.nextDue(at("2026-11-20T08:00:00"), zone)).isNull()
         }
     }
+
+    @Test
+    fun aTimeEqualToAnsweredAtIsNotDue() {
+        val now = at("2026-11-18T12:00:00")
+        assertThat(reminder(weeklyOn(DayOfWeek.WEDNESDAY), half7, at("2026-11-18T07:30:00")).due(now, zone)).isNull()
+        assertThat(reminder(Schedule.Once(LocalDate.of(2026, 11, 18)), half7, at("2026-11-18T07:30:00")).due(now, zone)).isNull()
+    }
 }

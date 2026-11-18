@@ -504,4 +504,28 @@ class RemindersActionsTest {
         assertThat(saved.due(nowMillis, london)).isNull()
         assertThat(saved.nextDue(nowMillis, london)).isEqualTo(at("2026-11-25T08:00:00"))
     }
+
+    @Test
+    fun aRepeatWithNoTimeLeftIsRefused() = runTest {
+        nowMillis = at("2026-11-18T10:00:00")
+        val access = access()
+        val actions = actions(access)
+        val twoDays = ReminderDraft("Vitamins", listOf(access.alex.id), LocalTime.of(9, 0), Schedule.Repeating(today.minusDays(1), "RRULE:FREQ=DAILY;INTERVAL=1;COUNT=2"))
+        val id = seed(twoDays, access.alex.id, madeAt = at("2026-11-16T12:00:00"))
+        assertThat(stored().single().due(nowMillis, london)).isNotNull()
+        access.answer(TestAccess.ALEX)
+        assertThat(actions.save(id, twoDays.copy(time = LocalTime.of(9, 30)))).isEqualTo(SaveResult.Past)
+        assertThat(stored().single().time).isEqualTo(LocalTime.of(9, 0))
+        assertThat(stored().single().answeredAtMillis).isEqualTo(at("2026-11-16T12:00:00"))
+    }
+
+    @Test
+    fun aNewRepeatWhoseRuleHasEndedIsRefused() = runTest {
+        val access = access()
+        val actions = actions(access)
+        access.answer(TestAccess.ALEX)
+        val ended = ReminderDraft("Vitamins", listOf(access.alex.id), LocalTime.of(10, 0), Schedule.Repeating(today.minusDays(10), "RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20261115"))
+        assertThat(actions.save(null, ended)).isEqualTo(SaveResult.Past)
+        assertThat(stored()).isEmpty()
+    }
 }

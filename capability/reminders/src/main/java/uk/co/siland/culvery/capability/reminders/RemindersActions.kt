@@ -135,12 +135,14 @@ class RemindersActions @Inject constructor(
         )
     }
 
-    /** Reads the clock after the PIN pad has closed, so a time that passed while it was up is caught. */
+    /**
+     * Reads the clock after the PIN pad has closed, so a time that passed while it was up is caught. A new or moved
+     * reminder with no time left (a one-off already past, a repeat whose rule has run out) is [SaveResult.Past].
+     */
     private suspend fun write(editing: Long?, existing: Reminder?, draft: ReminderDraft, madeBy: PersonId): SaveResult {
         val now = clock.nowMillis()
-        val once = draft.schedule as? Schedule.Once
         val moved = existing == null || draft.time != existing.time || draft.schedule != existing.schedule
-        if (moved && once != null && timeOn(once.first, draft.time, zone.current()) <= now) return SaveResult.Past
+        if (moved && draft.schedule.nextAt(draft.time, now, zone.current()) == null) return SaveResult.Past
         if (editing == null) {
             store.add(draft, madeBy, now) ?: return SaveResult.Full
         } else if (!store.change(editing, draft, now)) {

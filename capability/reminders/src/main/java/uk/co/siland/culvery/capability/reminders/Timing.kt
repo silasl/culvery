@@ -36,13 +36,15 @@ internal fun Reminder.due(nowMillis: Long, zone: ZoneId): Due? {
     return Due(DueKey.Mine(id), latest, snoozedUntilMillis, chimedAtMillis)
 }
 
-/** A rule [RepeatRule.parse] refuses has no next time. */
-internal fun Reminder.nextDue(afterMillis: Long, zone: ZoneId): Long? = when (schedule) {
-    is Schedule.Once -> timeOn(schedule.first, time, zone).takeIf { it > afterMillis }
-    is Schedule.Repeating -> RepeatRule.parse(schedule.rule, zone)?.let { rule ->
-        val onOrAfter = rule.firstAfter(schedule.first, dayOf(afterMillis, zone).minusDays(1))
+internal fun Reminder.nextDue(afterMillis: Long, zone: ZoneId): Long? = schedule.nextAt(time, afterMillis, zone)
+
+/** The first of this schedule's times at [time] after [afterMillis]; a rule [RepeatRule.parse] refuses has none. */
+internal fun Schedule.nextAt(time: LocalTime, afterMillis: Long, zone: ZoneId): Long? = when (this) {
+    is Schedule.Once -> timeOn(first, time, zone).takeIf { it > afterMillis }
+    is Schedule.Repeating -> RepeatRule.parse(rule, zone)?.let { parsed ->
+        val onOrAfter = parsed.firstAfter(first, dayOf(afterMillis, zone).minusDays(1))
         onOrAfter?.let { timeOn(it, time, zone) }?.takeIf { it > afterMillis }
-            ?: onOrAfter?.let { rule.firstAfter(schedule.first, it) }?.let { timeOn(it, time, zone) }
+            ?: onOrAfter?.let { parsed.firstAfter(first, it) }?.let { timeOn(it, time, zone) }
     }
 }
 
