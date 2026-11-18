@@ -15,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
+import uk.co.siland.culvery.capability.calendar.ReminderButton
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.ui.PinPadSheet
 import uk.co.siland.culvery.core.household.PersonId
@@ -36,6 +37,7 @@ class DetailScreenshotTest {
         mode: DetailMode = DetailMode.Idle,
         fontScale: Float = 1f,
         saving: PersonId? = null,
+        reminder: ReminderButton = ReminderButton.Add,
         over: @Composable () -> Unit = {},
     ) {
         compose.setContent {
@@ -44,7 +46,7 @@ class DetailScreenshotTest {
                     Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
                         Box(Modifier.fillMaxSize().background(ShellTokens.sheetScrim))
                         Box(Modifier.align(Alignment.CenterEnd)) {
-                            EventDetailSheet(detail, SampleUi.household, mode, busy = saving != null, {}, {}, {}, {}, {}, {}, {}, {}, saving = saving)
+                            EventDetailSheet(detail, SampleUi.household, mode, busy = saving != null, {}, {}, {}, {}, {}, {}, {}, {}, saving = saving, reminder = reminder)
                         }
                         over()
                     }
@@ -71,6 +73,7 @@ class DetailScreenshotTest {
     @Test fun syncingDark() = snap("detail_syncing_dark", true, SampleUi.detailSyncing)
     @Test fun syncingLight() = snap("detail_syncing_light", false, SampleUi.detailSyncing)
     @Test fun fontScale15() = snap("detail_fs15", false, SampleUi.detailLongTitle, fontScale = 1.5f)
+    @Test fun changeReminderDark() = snap("detail_change_reminder_dark", true, SampleUi.detailEditable, reminder = ReminderButton.Change)
     @Test fun deleteConfirmDark() = snap("detail_delete_confirm_dark", true, SampleUi.detailEditable, DetailMode.ConfirmingDelete)
     @Test fun deleteConfirmLight() = snap("detail_delete_confirm_light", false, SampleUi.detailEditable, DetailMode.ConfirmingDelete)
 

@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
+import uk.co.siland.culvery.capability.calendar.ReminderButton
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
@@ -59,23 +61,66 @@ class EventDetailSheetTest {
     private var busy by mutableStateOf(false)
     private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
 
-    private fun show(detail: EventDetailUi) = compose.setContent {
-        CulveryTheme(dark = true) {
-            EventDetailSheet(
-                detail = detail,
-                people = SampleUi.household,
-                mode = mode,
-                busy = busy,
-                onClose = { calls += "close" },
-                onDelete = { calls += "delete" },
-                onKeep = { calls += "keep" },
-                onConfirmDelete = { calls += "confirm" },
-                onChoosePerson = { calls += "choose" },
-                onAssign = { p: Person -> calls += "assign:${p.name}" },
-                onEdit = { calls += "edit" },
-                onChangeWho = { calls += "who" },
-            )
+    private var reminder by mutableStateOf<ReminderButton?>(null)
+
+    private fun show(detail: EventDetailUi) = compose.setContent { CulveryTheme(dark = true) { Sheet(detail) } }
+
+    @Composable
+    private fun Sheet(detail: EventDetailUi) = EventDetailSheet(
+        detail = detail,
+        people = SampleUi.household,
+        mode = mode,
+        busy = busy,
+        onClose = { calls += "close" },
+        onDelete = { calls += "delete" },
+        onKeep = { calls += "keep" },
+        onConfirmDelete = { calls += "confirm" },
+        onChoosePerson = { calls += "choose" },
+        onAssign = { p: Person -> calls += "assign:${p.name}" },
+        onEdit = { calls += "edit" },
+        onChangeWho = { calls += "who" },
+        reminder = reminder,
+        onReminder = { calls += "reminder" },
+    )
+
+    @Test
+    fun everyEventHasTheReminderButton() {
+        reminder = ReminderButton.Add
+        var detail by mutableStateOf(SampleUi.detailEditable)
+        compose.setContent { CulveryTheme(dark = true) { Sheet(detail) } }
+        val delete = compose.onNodeWithTag("detail_delete").getUnclippedBoundsInRoot()
+        assertThat(compose.onNodeWithTag("detail_reminder").getUnclippedBoundsInRoot().bottom).isAtMost(delete.top)
+        listOf(SampleUi.detailRecurring, SampleUi.detailReadOnlyFeed, SampleUi.detailNotMaster, SampleUi.detailEditable).forEach {
+            detail = it
+            compose.onNodeWithTag("detail_reminder").assert(isButton).assert(hasText("Add reminder")).assertHeightIsEqualTo(60.dp)
+            compose.assertAccessible()
         }
+        compose.onNodeWithTag("detail_reminder").performClick()
+        assertThat(calls).containsExactly("reminder")
+        mode = DetailMode.ConfirmingDelete
+        compose.onNodeWithTag("detail_reminder").assertDoesNotExist()
+        mode = DetailMode.Idle
+        busy = true
+        compose.onNodeWithTag("detail_reminder").assertIsNotEnabled()
+    }
+
+    @Test
+    fun itReadsChangeReminderOnceThereIsOne() {
+        reminder = ReminderButton.Change
+        show(SampleUi.detailRecurring)
+        compose.onNodeWithTag("detail_reminder").assert(hasText("Change reminder")).performClick()
+        assertThat(calls).containsExactly("reminder")
+        compose.onNodeWithText("Add reminder").assertDoesNotExist()
+    }
+
+    @Test
+    fun withNoRemindersThereIsNoButton() {
+        var detail by mutableStateOf(SampleUi.detailEditable)
+        compose.setContent { CulveryTheme(dark = true) { Sheet(detail) } }
+        compose.onNodeWithTag("detail_reminder").assertDoesNotExist()
+        compose.onNodeWithTag("detail_delete").assertExists()
+        detail = SampleUi.detailRecurring
+        compose.onNodeWithTag("detail_reminder").assertDoesNotExist()
     }
 
     @Test

@@ -5,21 +5,31 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.Refusal
+import uk.co.siland.culvery.core.house.EventReminders
+import uk.co.siland.culvery.core.house.EventSeed
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
@@ -27,6 +37,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -121,6 +132,7 @@ class CalendarEditor internal constructor(
     private val undone: UndoneKeys,
     private val shown: () -> WeeksShown,
     private val updates: UpdateRequests,
+    private val reminders: EventReminders? = null,
 ) {
     @Inject
     constructor(
@@ -138,10 +150,11 @@ class CalendarEditor internal constructor(
         undone: UndoneKeys,
         repo: CalendarRepository,
         updates: UpdateRequests,
+        reminders: Optional<EventReminders> = Optional.empty(),
     ) : this(
         store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS, writeLock,
         household::person, providers::displayNameOf, { household.people.first().map { it.id } }, undone,
-        repo.shown::value, updates,
+        repo.shown::value, updates, reminders.orElse(null),
     )
 
     /** The week's Update now: a sync pass at once. It changes nothing, so it asks for no PIN. */
@@ -174,6 +187,31 @@ class CalendarEditor internal constructor(
 
     /** The editor's Delete failed before it could ask to confirm (a store failure): the detail sheet's delete wording. */
     internal fun couldNotDelete(label: String) = toaster.show(couldNotDelete(label, WriteProblem.Tablet), urgent = true)
+
+    /** [ref]'s reminder button as it is now; null when no reminder can be added, or there is no Reminders. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun reminderButton(ref: EventRef): Flow<ReminderButton?> {
+        val reminders = reminders ?: return flowOf(null)
+        return combine(store.event(ref), store.pending()) { stored, pending -> seedFor(ref, stored, pending) }
+            .flatMapLatest { seed -> seed?.let { s -> reminders.has(s.key).map { if (it) ReminderButton.Change else ReminderButton.Add } } ?: flowOf(null) }
+            .distinctUntilChanged()
+    }
+
+    /** Opens [ref]'s reminder in [host], or the form for a new one; nothing once none can be added. */
+    suspend fun openReminder(host: OverlayHost, ref: EventRef) {
+        val reminders = reminders ?: return
+        seedFor(ref, store.eventNow(ref), store.pendingNow())?.let { reminders.open(host, it) }
+    }
+
+    /** [ref] as the detail card shows it, a queued create included, and what the reminder form opens with for it. */
+    private suspend fun seedFor(ref: EventRef, stored: StoredEvent?, queued: List<PendingChange>): EventSeed? {
+        val pending = queued.filter { it.ref == ref }
+        if (pending.any { it.kind == ChangeKind.DELETE }) return null
+        val z = zone.current()
+        val event = asShown(stored ?: queuedCreate(pending, PersonId.FAMILY, z) ?: return null, pending, z)
+        val siblings = event.seriesId?.let { store.seriesRows(event.connectionId, event.sourceId, it) }.orEmpty()
+        return reminderSeed(event, siblings, peopleIn(event.forPerson), clock.nowMillis(), z)
+    }
 
     /** A tap would have cleared an event's last person: nothing is written, and the toast says why. */
     internal fun needsAPerson() = toaster.show(NEEDS_A_PERSON, urgent = true)

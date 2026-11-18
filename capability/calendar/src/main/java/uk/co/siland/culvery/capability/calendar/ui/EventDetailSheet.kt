@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
+import uk.co.siland.culvery.capability.calendar.ReminderButton
 import uk.co.siland.culvery.capability.calendar.whoLine
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -63,6 +64,8 @@ enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 internal const val CANT_CHANGE_HERE = "Can’t change here"
 internal const val CHOOSE_WHO = "Choose who it’s for"
 internal const val CHANGE_WHO = "Change who"
+internal const val ADD_REMINDER = "Add reminder"
+internal const val CHANGE_REMINDER = "Change reminder"
 
 /** The Calendar row's value: the source's name, said to be out of reach when the tablet can't change it (4d-2 Decision 2g). */
 internal fun calendarLabel(event: EventUi): String = when (event.readOnlyReason) {
@@ -74,7 +77,7 @@ internal fun calendarLabel(event: EventUi): String = when (event.readOnlyReason)
  * Hand-off §7 "Sheet 1 — Event detail". Stateless: the host decides [mode] and [busy]. Buttons are never hidden
  * for permission reasons; the checks happen when they are tapped. Delete runs the guard ([onDelete]); only the
  * confirmation's "Delete event" deletes ([onConfirmDelete]). Change ([onEdit]) shows exactly where Delete does and
- * opens the editor without a PIN (2b-2 design D12); [chosen] is the set the chips show (the host passes the one just tapped, before it is written) and [saving] the chip being written; on an event it can change, the For row opens it on Who ([onChangeWho], 9 §3.3).
+ * opens the editor without a PIN (2b-2 design D12); [reminder], on any event, sits first and runs [onReminder] (22 §10.4); [chosen] is the set the chips show (the host passes the one just tapped, before it is written) and [saving] the chip being written; on an event it can change, the For row opens it on Who ([onChangeWho], 9 §3.3).
  */
 @Composable
 fun EventDetailSheet(
@@ -93,6 +96,8 @@ fun EventDetailSheet(
     modifier: Modifier = Modifier,
     chosen: List<PersonId> = chosenFor(detail.event),
     saving: PersonId? = null,
+    reminder: ReminderButton? = null,
+    onReminder: () -> Unit = {},
 ) {
     val c = Culvery.colors
     val e = detail.event
@@ -142,9 +147,9 @@ fun EventDetailSheet(
                 }
             }
         }
-        if (e.editable) {
+        if (e.editable || reminder != null) {
             KeepsToastsAbove {
-                if (mode == DetailMode.ConfirmingDelete) {
+                if (e.editable && mode == DetailMode.ConfirmingDelete) {
                     HhConfirmCard(
                         tag = "detail_confirm",
                         title = DELETE_QUESTION,
@@ -168,12 +173,23 @@ fun EventDetailSheet(
                         }
                     }
                 } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
-                        DeleteButton(enabled = !busy, busy = busy, tag = "detail_delete", onClick = onDelete)
-                        HhButton(
-                            "Change", onEdit, Modifier.weight(1f).testTag("detail_edit"),
-                            tone = ButtonTone.Primary, size = ButtonSize.Large, icon = Icons.EDIT, enabled = !busy, on = ButtonSurface.Bg, busy = busy,
-                        )
+                    Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap)) {
+                        if (reminder != null) {
+                            HhButton(
+                                if (reminder == ReminderButton.Change) CHANGE_REMINDER else ADD_REMINDER, onReminder,
+                                Modifier.fillMaxWidth().testTag("detail_reminder"),
+                                size = ButtonSize.Large, icon = Icons.ALARM, enabled = !busy, on = ButtonSurface.Bg,
+                            )
+                        }
+                        if (e.editable) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
+                                DeleteButton(enabled = !busy, busy = busy, tag = "detail_delete", onClick = onDelete)
+                                HhButton(
+                                    "Change", onEdit, Modifier.weight(1f).testTag("detail_edit"),
+                                    tone = ButtonTone.Primary, size = ButtonSize.Large, icon = Icons.EDIT, enabled = !busy, on = ButtonSurface.Bg, busy = busy,
+                                )
+                            }
+                        }
                     }
                 }
             }

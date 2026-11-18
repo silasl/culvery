@@ -15,6 +15,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
+import uk.co.siland.culvery.capability.calendar.ReminderButton
 import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.toggled
 import uk.co.siland.culvery.core.household.Person
@@ -32,7 +33,7 @@ private class Loaded(val detail: EventDetailUi?)
  * Only one action runs at a time; while one runs, further taps are ignored, and one that fails before the editor's
  * write (the tablet's store) is logged rather than crashing the app. The editor toasts each outcome; the host only
  * decides whether the sheet stays open. [initialMode] is ConfirmingDelete when the editor's Delete handed over
- * (2b-2 design D4); [onEdit] loads the editor and swaps to it, and [onChangeWho] does so asking who it is for; each runs as the one action, so taps are ignored while it loads.
+ * (2b-2 design D4); [onEdit] loads the editor and swaps to it, and [onChangeWho] does so asking who it is for; [onReminder] opens the event's reminder; each runs as the one action, so taps are ignored while it loads.
  */
 @Composable
 internal fun EventDetailHost(
@@ -44,9 +45,11 @@ internal fun EventDetailHost(
     initialMode: DetailMode = DetailMode.Idle,
     onEdit: suspend () -> Unit,
     onChangeWho: suspend () -> Unit,
+    onReminder: suspend () -> Unit,
 ) {
     val loaded: Loaded? by remember(ref, today) { repo.event(ref, today).map { Loaded(it) } }.collectAsState(initial = null)
     val people: List<Person> by repo.people.collectAsState(initial = emptyList())
+    val reminder: ReminderButton? by remember(ref) { editor.reminderButton(ref) }.collectAsState(initial = null)
     var mode by remember(ref, initialMode) { mutableStateOf(initialMode) }
     val action = rememberSingleAction(ref) { e -> Log.w(TAG, "Couldn't change an event (${e::class.simpleName})") }
 
@@ -106,6 +109,8 @@ internal fun EventDetailHost(
         saving = saving,
         onEdit = { action.run { onEdit() } },
         onChangeWho = { action.run { onChangeWho() } },
+        reminder = reminder,
+        onReminder = { action.run { onReminder() } },
     )
 }
 

@@ -30,5 +30,7 @@ internal fun OverlayHost.showDetail(
         initialMode = mode,
         onEdit = { openEditor(EditorRequest.Edit(ref, from), today, repo, editor, weekFocus) },
         onChangeWho = { openEditor(EditorRequest.Edit(ref, from, start = EditorStep.Who), today, repo, editor, weekFocus) },
+        // Reminders shows its form in this overlay, in the card's place.
+        onReminder = { editor.openReminder(this@showDetail, ref) },
     )
 }

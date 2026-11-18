@@ -165,7 +165,7 @@ class EventDetailHostTest {
 
     private fun show(id: String) = compose.setContent {
         CulveryTheme(dark = true) {
-            if (shown) EventDetailHost(EventRef("c1", "s-family", id), today, repo, editor, onClose = { closed++ }, onEdit = {}, onChangeWho = {})
+            if (shown) EventDetailHost(EventRef("c1", "s-family", id), today, repo, editor, onClose = { closed++ }, onEdit = {}, onChangeWho = {}, onReminder = {})
         }
     }
 

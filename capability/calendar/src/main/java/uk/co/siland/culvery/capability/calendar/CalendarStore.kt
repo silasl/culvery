@@ -433,6 +433,10 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     suspend fun eventNow(ref: EventRef): StoredEvent? =
         dao.eventNow(ref.connectionId, ref.sourceId, ref.remoteId)?.toStored()
 
+    /** The stored dates of the series [seriesId]. */
+    suspend fun seriesRows(connectionId: String, sourceId: String, seriesId: String): List<StoredEvent> =
+        dao.seriesRows(connectionId, sourceId, seriesId).map { it.toStored() }
+
     /**
      * Puts a write the provider accepted into the mirror and, if it came from the outbox, completes it. Writes nothing
      * once the source is gone: its queued changes went with it, or once Undo dropped the change it came from.

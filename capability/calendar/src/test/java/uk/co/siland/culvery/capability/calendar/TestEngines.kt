@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.house.EventReminders
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -37,8 +38,9 @@ internal fun testEditor(
     undone: UndoneKeys = UndoneKeys(InMemoryUndoneCreates()),
     shown: () -> WeeksShown = { WeeksShown.EIGHT },
     updates: UpdateRequests = UpdateRequests(),
+    reminders: EventReminders? = null,
 ): CalendarEditor =
-    CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf, order, undone, shown, updates)
+    CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf, order, undone, shown, updates, reminders)
 
 /** The Calendar's setting, held in memory and read at once; [shown] is what it starts at. */
 internal fun testCalendarSettings(shown: WeeksShown = WeeksShown.EIGHT): CalendarSettings {

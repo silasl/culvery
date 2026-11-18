@@ -434,6 +434,15 @@ interface CalendarDao {
     )
     suspend fun eventNow(connectionId: String, sourceId: String, remoteId: String): EventRow?
 
+    @Query(
+        """
+        SELECT e.*, s.personId AS sourcePersonId FROM event e
+        JOIN source s ON s.connectionId = e.connectionId AND s.sourceId = e.sourceId
+        WHERE e.connectionId = :connectionId AND e.sourceId = :sourceId AND e.seriesId = :seriesId
+        """,
+    )
+    suspend fun seriesRows(connectionId: String, sourceId: String, seriesId: String): List<EventRow>
+
     @Query("SELECT * FROM sync_state WHERE connectionId = :connectionId AND sourceId = :sourceId")
     suspend fun syncState(connectionId: String, sourceId: String): SyncStateEntity?
 

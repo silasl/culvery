@@ -14,7 +14,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -24,8 +27,12 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.capability.calendar.ui.RecordingOverlay
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.access.PinReason
+import uk.co.siland.culvery.core.house.EventReminders
+import uk.co.siland.culvery.core.house.EventSeed
+import uk.co.siland.culvery.core.house.EventTimes
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
@@ -37,6 +44,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.OUTBOX_BACKOFF_MS
+import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.repeat.Recurrence
 import uk.co.siland.culvery.core.ui.test.awaiting
@@ -95,11 +103,61 @@ class CalendarEditorTest {
      * write open use Dispatchers.Default, so its 10 s timeout runs on real time and runTest can't skip past it
      * while the test waits for Room.
      */
-    private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext, shown: WeeksShown = WeeksShown.EIGHT, updates: UpdateRequests = UpdateRequests()) = testEditor(
+    private fun TestScope.editor(
+        access: TestAccess,
+        io: CoroutineContext = EmptyCoroutineContext,
+        shown: WeeksShown = WeeksShown.EIGHT,
+        updates: UpdateRequests = UpdateRequests(),
+        reminders: EventReminders? = null,
+    ) = testEditor(
         store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { opened + testScheduler.currentTime },
         backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock, personOf = household::person,
-        order = { household.people.first().map { it.id } }, undone = undone, shown = { shown }, updates = updates,
+        order = { household.people.first().map { it.id } }, undone = undone, shown = { shown }, updates = updates, reminders = reminders,
     )
+
+    private class HeldReminders : EventReminders {
+        val keys = MutableStateFlow(emptySet<String>())
+        val opened = mutableListOf<EventSeed>()
+
+        override fun has(key: String): Flow<Boolean> = keys.map { key in it }
+
+        override suspend fun open(host: OverlayHost, seed: EventSeed) {
+            opened += seed
+        }
+
+        override suspend fun gone(keys: Collection<String>) = false
+
+        override suspend fun changed(key: String, now: EventTimes, startsAtMillis: Long?) = false
+    }
+
+    @Test
+    fun theCardOffersChangeOnceTheEventHasAReminder() = runTest {
+        val reminders = HeldReminders()
+        put(event("e1", createdBy = null))
+        val access = testAccess(household)
+        val editor = editor(access, reminders = reminders)
+        assertThat(editor.reminderButton(ref("e1")).first()).isEqualTo(ReminderButton.Add)
+        reminders.keys.value = setOf(eventKey("c1", "s-family", "e1"))
+        assertThat(editor.reminderButton(ref("e1")).first()).isEqualTo(ReminderButton.Change)
+        assertThat(editor(access).reminderButton(ref("e1")).first()).isNull()
+    }
+
+    @Test
+    fun aReminderOpensFromTheEventAsTheCardShowsIt() = runTest {
+        val reminders = HeldReminders()
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access, reminders = reminders)
+        writer.failWith = UnreachableException("offline")
+        assertThat(editor.create(draft("Swimming", access.sam.id.value))).isEqualTo(EditResult.Queued)
+        editor.openReminder(RecordingOverlay(), ref("key-1"))
+        val seed = reminders.opened.single()
+        assertThat(seed.key).isEqualTo(eventKey("c1", "s-family", "key-1"))
+        assertThat(seed.title).isEqualTo("Swimming")
+        assertThat(seed.people).containsExactly(access.sam.id)
+        assertThat(seed.day).isEqualTo(LocalDate.of(2026, 9, 27))
+        assertThat(seed.time).isEqualTo(LocalTime.of(18, 0))
+    }
 
     /** As the sheet chooses them: "key-1", "key-2"… in the order Save is tapped. */
     private suspend fun CalendarEditor.create(draft: EventDraft): EditResult = create(draft, "key-${++keys}")
