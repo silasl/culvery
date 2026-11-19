@@ -1029,7 +1029,7 @@ class CalendarStoreTest {
     fun aSeriesWithEveryDateRemovedIsGone() = runTest {
         connect("s1")
         sync(full(*swims()))
-        assertThat(sync(changes(removed = seriesDates.map { "swim_$it" }))).containsExactly(EventChange.Gone(key("swim")))
+        assertThat(sync(changes(removed = listOf("swim") + seriesDates.map { "swim_$it" }))).containsExactly(EventChange.Gone(key("swim")))
     }
 
     @Test
@@ -1038,6 +1038,21 @@ class CalendarStoreTest {
         sync(full(*swims()))
         assertThat(sync(changes(removed = listOf("swim_${seriesDates[1]}")))).isEmpty()
         assertThat(sync(full(swim(seriesDates[2], 17)))).isEmpty()
+    }
+
+    /** 22 §10.5: a series that repeats every few months may have one date stored; a phone skipping it keeps the series. */
+    @Test
+    fun skippingTheOnlyStoredDateOfASeriesIsNotARemoval() = runTest {
+        connect("s1")
+        sync(full(swim(seriesDates[0], 17)))
+        assertThat(sync(changes(removed = listOf("swim_${seriesDates[0]}")))).isEmpty()
+    }
+
+    @Test
+    fun aWholeSeriesRemovedIncrementallyIsStillGone() = runTest {
+        connect("s1")
+        sync(full(swim(seriesDates[0], 17)))
+        assertThat(sync(changes(removed = listOf("swim", "swim_${seriesDates[0]}")))).containsExactly(EventChange.Gone(key("swim")))
     }
 
     @Test

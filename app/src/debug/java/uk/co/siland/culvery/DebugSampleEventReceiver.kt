@@ -21,7 +21,7 @@ import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
 
-// Debug only: delete or move (+60 min) a Family sample event by title, as a phone would: `adb shell am broadcast -n uk.co.siland.culvery/.DebugSampleEventReceiver -a uk.co.siland.culvery.debug.SAMPLE_EVENT --es action delete --es title "<title>"` (`--es action move` to move it).
+// Debug only: delete or move (+60 min) a Family sample event by title, as a phone would: `adb shell "am broadcast -n uk.co.siland.culvery/.DebugSampleEventReceiver -a uk.co.siland.culvery.debug.SAMPLE_EVENT --es action delete --es title '<title>'"` (`--es action move` to move it).
 class DebugSampleEventReceiver : BroadcastReceiver() {
     @EntryPoint
     @InstallIn(SingletonComponent::class)

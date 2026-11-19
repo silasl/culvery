@@ -293,7 +293,8 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
      * Touches only the event mirror and the cursor; queued changes in the outbox are never affected. Writes nothing
      * once the source is gone. Returns what it did to the events a reminder may hang on (22 §10.5), as of [nowMillis]:
      * an event a full read no longer has inside its range is Gone, as is one whose last row an incremental result
-     * removes; one whose link times differ is Changed. An event with a change queued is left out.
+     * removes, a series only with its own id; one whose link times differ is Changed. An event with a change queued is
+     * left out.
      */
     suspend fun applySync(connectionId: String, sourceId: String, range: DateRange, result: SyncResult, today: LocalDate, nowMillis: Long): List<EventChange> =
         db.withTransaction {
@@ -331,19 +332,21 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
             // An incremental result keeps what the full sync read: only a full sync reads a new range (4c ruling 1).
             val key = if (result.fullReplace) range.cursorKey() else dao.syncState(connectionId, sourceId)?.rangeStart ?: range.cursorKey()
             dao.upsertSyncState(SyncStateEntity(connectionId, sourceId, result.cursor?.value, key))
-            val changes = linkChanges(source, before, after, entities, range.zone, today, nowMillis)
+            val changes = linkChanges(source, before, after, entities, result.takeUnless { it.fullReplace }?.removedIds?.toSet(), range.zone, today, nowMillis)
             if (changes.isEmpty()) changes else withoutQueued(connectionId, sourceId, changes, before + after)
         }
 
     /**
      * Each key [before] had that [after] has no row of is Gone; one whose link times differ is Changed. A series' rule
-     * after comes from [fresh], this result's rows, when one of them has it.
+     * after comes from [fresh], this result's rows, when one of them has it. After an incremental read, [removed] is
+     * what it removed: a series is Gone only when its own id is among them, as its dates alone were only skipped.
      */
     private fun linkChanges(
         source: SourceEntity,
         before: List<EventEntity>,
         after: List<EventEntity>,
         fresh: List<EventEntity>,
+        removed: Set<String>?,
         zone: ZoneId,
         today: LocalDate,
         nowMillis: Long,
@@ -353,7 +356,9 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         val brought = fresh.groupBy { it.linkId }
         return before.groupBy { it.linkId }.mapNotNull { (id, was) ->
             val key = eventKey(source.connectionId, source.sourceId, id)
-            val rows = left[id] ?: return@mapNotNull EventChange.Gone(key)
+            val rows = left[id] ?: return@mapNotNull EventChange.Gone(key).takeUnless {
+                removed != null && id !in removed && was.any { it.seriesId != null }
+            }
             if (rows.toSet() == was.toSet()) return@mapNotNull null
             val (times, startsAt) = linkTimes(rows.stored(), brought[id].stored(), zone, today, nowMillis)
             EventChange.Changed(key, times, startsAt).takeIf { times != linkTimes(was.stored(), emptyList(), zone, today, nowMillis).first }

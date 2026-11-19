@@ -200,7 +200,7 @@ class CalendarEditor internal constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     fun reminderButton(ref: EventRef): Flow<ReminderButton?> {
         val reminders = reminders ?: return flowOf(null)
-        val seeds = combine(store.event(ref).distinctUntilChanged(), store.pending().distinctUntilChanged()) { stored, pending ->
+        val seeds = combine(store.event(ref), store.pending()) { stored, pending ->
             seedFor(ref, stored, pending)
         }
         return seeds
