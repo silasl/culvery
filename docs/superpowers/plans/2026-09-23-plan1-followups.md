@@ -1152,6 +1152,9 @@ The tablet ran the release from 9ca5850a. Everything was read over adb; nothing 
 - Ruled by the user 2026-11-19 ("all as suggested"): leave Google's own birthdays out. Built so that only birthdays go; anniversaries and other dates Google files under the same kind stay. Spec `docs/superpowers/specs/2026-11-19-culvery-23-duplicate-birthdays-design.md`.
 - Left by the plan review, none blocking: a reminder added from a Google birthday keeps its link after the event leaves the wall (as for a declined date of a series today); such an event's title can stay among the title suggestions for up to a year.
 
+- Built 2026-11-19 (11e24090, tidied in f65ac4a): the gate green; the final review said ready to merge. Left by it, none blocking: no test of a wall delete or change of a Google birthday the tablet still holds (it answers "gone" without calling Google; working locations have the same gap); the anniversary is tested on a full read only.
+- Emulator walk-through, 2026-11-19: the debug build on `culvery-5` with the sample household. Home's Today card and the Calendar tab's week read as before, and the filtered log (`Culvery`, `AndroidRuntime`) stayed empty. The sample household doesn't read Google, so this shows only that nothing else changed; the tests are the proof of the fix.
+
 **Item 18, lost taps:** 17 single taps (each rail tab, Later week seven times, Add reminder, the form's Close) each did their job first time, at the tablet's font scale of 1.1. Settings' Close wasn't tried: Settings needs a PIN. The real tablet has no sample list, so "Stop using the sample list" doesn't exist there.
 
 **Item 19, how long screens take to fill**
