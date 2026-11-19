@@ -1461,6 +1461,18 @@ class CalendarSyncTest {
         assertThat(store.eventsBetween(Long.MIN_VALUE, Long.MAX_VALUE).first().map { it.remoteId }).containsExactly("swim")
     }
 
+    /** An undone series that was already stored goes as a whole series, so its reminder goes too. */
+    @Test
+    fun aStoredStraySeriesIsGoneForReminders() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim(), at("2026-09-23T17:00:00Z", "Piano").copy(remoteId = "${key}_20260923T170000Z", recurring = true, seriesId = key)) }
+        remindingEngine().syncAll()
+        calendar.undoneCreateDao().upsert(UndoneCreateEntity(key, "c1", "s1", series = true, stray = true))
+        w.failWith = UnreachableException("offline")
+        engineWith(setOf(w), toaster, undone = UndoneKeys(calendar.undoneCreateDao()), reminders = reminders).syncAll()
+        assertThat(reminders.gone).containsExactly(listOf(linkKey(key)))
+    }
+
     /** Returns once [n] callers wait for [lock]. */
     private suspend fun awaitWaiting(lock: CalendarWriteLock, n: Int) =
         awaiting("$n callers to wait for the lock") { while (lock.waiting != n) yield() }
