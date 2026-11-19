@@ -26,7 +26,6 @@ The open work, one number each; the details are in the sections below. Numbers n
 38. Tidy-up: one shared set of test certificates for Home Assistant and Hue (two copies today).
 39. Tidy-up: Undo's bookkeeping in the calendar is kept in several places at once; fold it into one.
 40. Opening Culvery from outside the home screen (seen with `am start` after a force-stop on the emulator) can leave the app that was open before in front; Home brings Culvery back. Culvery starts its home screen and closes the other copy, and that hand-over is older than Plans 19 and 20. Checked on the tablet 2026-11-19: a launcher-style open brings Culvery to the front, because Culvery isn't the home app there and the hand-over never runs; Settings' Open wasn't tried. See "Plan 23" below.
-42. Birthdays often show twice in the calendar. Cause found 2026-11-19: Google holds two events for one person, the family's own and one of Google's "birthday" kind, and the wall shows both. The fix waits for the user's ruling. See "Plan 23" below.
 
 **To check on the tablet** (see "To check when the tablet is next plugged in")
 18. Taps that seemed lost on the emulator. Checked on the tablet 2026-11-19: none lost in 17 taps; Settings' Close wasn't tried (it needs a PIN). See "Plan 23" below.
@@ -1142,7 +1141,7 @@ Left by Part 2's simplify pass and whole-branch review (2026-11-19), none blocki
 ## Plan 23 (duplicate birthdays): the cause and the tablet checks (2026-11-19)
 The tablet ran the release from 9ca5850a. Everything was read over adb; nothing was changed on the tablet or at Google. What was read is in `culvery-notes/plan23/`.
 
-**Item 42, the cause**
+**Item 42 (birthdays often show twice in the calendar), the cause**
 - The house calendar holds two events for one person's birthday. One is the yearly all-day event the family made, tagged for that person. The other is Google's own "birthday" kind of event, made in Google Calendar in February 2025: private, starting in the birth year, with Google's "…'s birthday" title. The tablet's calendar store marks it as that kind.
 - Culvery shows both because it leaves out one kind of Google event only, working locations (`GoogleEvents.kt`, `isGone`). Nothing is drawn or synced twice.
 - It is the only such pair today: 35 yearly birthday events, one person with two. Another person's birthday falls on the same day, so that day showed three birthday chips. The next seven weeks on the wall show each birthday once.
@@ -1154,6 +1153,8 @@ The tablet ran the release from 9ca5850a. Everything was read over adb; nothing 
 
 - Built 2026-11-19 (11e24090, tidied in f65ac4a): the gate green; the final review said ready to merge. Left by it, none blocking: no test of a wall delete or change of a Google birthday the tablet still holds (it answers "gone" without calling Google; working locations have the same gap); the anniversary is tested on a full read only.
 - Emulator walk-through, 2026-11-19: the debug build on `culvery-5` with the sample household. Home's Today card and the Calendar tab's week read as before, and the filtered log (`Culvery`, `AndroidRuntime`) stayed empty. The sample household doesn't read Google, so this shows only that nothing else changed; the tests are the proof of the fix.
+
+- **Item 42 is ruled and done (2026-11-19):** the release built from f65ac4a is on the tablet (mapping `culvery-notes/mappings/mapping-f65ac4a.txt`), installed with `install -r` with the user there to unlock it; Culvery came back in front and pinned. The item is off the numbered list. Nothing shows the fix on the wall today: the doubled birthday's next date is a year away.
 
 **Item 18, lost taps:** 17 single taps (each rail tab, Later week seven times, Add reminder, the form's Close) each did their job first time, at the tablet's font scale of 1.1. Settings' Close wasn't tried: Settings needs a PIN. The real tablet has no sample list, so "Stop using the sample list" doesn't exist there.
 
