@@ -312,7 +312,7 @@ class GoogleReadTest {
         dates.forEach { (id, type) -> google.putEvent(family.id, birthday(id, type)) }
         assertThat(provider.sync(conn, family, range, first.cursor).removedIds).containsExactly("bday_1", "bday_2", "bday_3")
         // Nothing asked about the series: its rule is never needed.
-        assertThat(google.requests.count { it.requestUrl!!.pathSegments.last() == "bday" }).isEqualTo(0)
+        assertThat(asksFor("bday")).isEqualTo(0)
         assertThat(provider.find(conn, family, "bday_1")).isNull()
     }
 

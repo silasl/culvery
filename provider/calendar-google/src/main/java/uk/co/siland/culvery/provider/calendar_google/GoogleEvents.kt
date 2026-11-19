@@ -34,15 +34,15 @@ private const val BIRTHDAY = "birthday"
 private const val OWN_BIRTHDAY = "self"
 
 /**
- * One of Google's own birthday events: they double the ones the family keeps and can't be tagged for a person (23 §3).
+ * One of Google's own birthday events: they double the ones the family keeps and can't be tagged for a person (23 §3, §4).
  * The kind also holds anniversaries and other dates, which stay; one with no type is a birthday.
  */
 private val GoogleEvent.isGoogleBirthday: Boolean
-    get() = eventType == BIRTHDAY && (birthdayProperties?.type ?: BIRTHDAY).let { it == BIRTHDAY || it == OWN_BIRTHDAY }
+    get() = eventType == BIRTHDAY && birthdayProperties?.type.let { it == null || it == BIRTHDAY || it == OWN_BIRTHDAY }
 
 /**
- * Deleted; a working location, which isn't an event people plan around; one of Google's own birthdays; or an invitation
- * the account itself declined (3a design §3.5).
+ * Deleted; a working location, which isn't an event people plan around; or an invitation the account itself declined
+ * (3a design §3.5). Also one of Google's own birthdays (23 §3).
  */
 internal val GoogleEvent.isGone: Boolean
     get() = status == CANCELLED || eventType == WORKING_LOCATION || isGoogleBirthday ||
