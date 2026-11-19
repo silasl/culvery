@@ -5,10 +5,12 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,6 +27,7 @@ import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
+import uk.co.siland.culvery.core.repeat.SHORT_DAY
 import uk.co.siland.culvery.core.repeat.repeatWords
 import uk.co.siland.culvery.core.ui.clockText
 
@@ -71,12 +74,16 @@ fun binsRowTitle(time: LocalTime) = "Bins · The evening before a collection, ${
 
 data class TabUi(val waiting: List<RowUi>, val today: List<RowUi>, val comingUp: List<RowUi>, val bins: BinsRowUi?)
 
-/** `16:30` for today, else `Mon 16:30`. */
+/** `16:30` for today, `Mon 16:30` within six days either side, else `Fri 15 Jan 16:30`. */
 internal fun dueText(dueAtMillis: Long, nowMillis: Long, zone: ZoneId): String {
     val due = Instant.ofEpochMilli(dueAtMillis).atZone(zone)
     val time = clockText(due.toLocalTime())
     val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
-    return if (due.toLocalDate() == today) time else "${due.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)} $time"
+    return when (abs(ChronoUnit.DAYS.between(today, due.toLocalDate()))) {
+        0L -> time
+        in 1L..6L -> "${due.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)} $time"
+        else -> "${due.format(SHORT_DAY)} $time"
+    }
 }
 
 /** The bins card for [key]'s collection, [kept] being what Reminders holds of it; null when it holds none. */

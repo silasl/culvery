@@ -157,6 +157,15 @@ class RemindersViewTest {
     }
 
     @Test
+    fun dueTextGivesTheDateOnceTheWeekdayAloneCouldMeanTwoDays() {
+        val now = at("2026-11-18T08:00:00")
+        assertThat(dueText(at("2026-11-24T09:40:00"), now, zone)).isEqualTo("Tue 09:40")
+        assertThat(dueText(at("2026-11-25T09:40:00"), now, zone)).isEqualTo("Wed 25 Nov 09:40")
+        assertThat(dueText(at("2027-01-15T09:40:00"), now, zone)).isEqualTo("Fri 15 Jan 09:40")
+        assertThat(dueText(at("2026-11-11T09:40:00"), now, zone)).isEqualTo("Wed 11 Nov 09:40")
+    }
+
+    @Test
     fun aBinsCardNamesTheBinsAndReadsTonightUntilMidnight() {
         val kept = BinCollection(LocalDate.of(2026, 11, 19), listOf(HouseBin("Food", "green"), HouseBin("Recycling", null)))
         val key = DueKey.Bins(kept.date)

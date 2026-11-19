@@ -1107,7 +1107,7 @@ Spec `docs/superpowers/specs/2026-11-17-culvery-22-reminders-design.md`. Item 41
   - 18. Signed out, a one-off for an hour ago: "Pick a time that hasn’t passed." and no PIN pad. A child's own tile shows its tick and no padlock; the others keep theirs.
   - 1 and 2. A one-off: the card and `chime`; Later, 30 minutes on, the card and `chime` again; Done.
   - 9. The child: refused for everyone ("... can add reminders for ... only."), saved for themself, and refused on the family's reminder ("... can only change reminders they made.").
-- **Seen, not a check:** a repeat whose next time is weeks away reads as a weekday and a time ("Fri 09:40" for a date four weeks off).
+- **Seen, not a check:** a repeat whose next time is weeks away reads as a weekday and a time ("Fri 09:40" for a date four weeks off). Fixed the same day: a time more than six days from today shows its date ("Fri 15 Jan 09:40").
 
 ## From Plan 22
 Left by the final review (2026-11-17), none blocking:
