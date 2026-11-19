@@ -482,6 +482,7 @@ Test flakes seen across the build (timing, not Plan 9a's code; each passed on a 
 - `DoorCapabilityTest.theTabAppearsOnceRingIsConnected`.
 - `SampleHouseTest.sampleTrueKeepsTheSavedConnectionsAndSampleFalseBringsThemBack` (Plan 22's gate, 2026-11-17: failed once in the full-repo run, passed alone and in a fresh run of the app's tests).
 - Plan 22's gate, 2026-11-18, fail only when the machine is busy and pass alone: `MusicSettingsPageTest.connectingByAddressClearsTheFindLine`, `ShoppingSettingsTest.twoAccountsAskWhich`, `MusicCardTest.theCardWatchesOnlyWhileItShows` and `DoorSettingsPageTest.aShorterKeepConfirmsThenAsksAFreshPin`.
+- Plan 22's gate, 2026-11-19, the same way: `AppSettingsPageTest.homeLocationRowShowsThePlaceAndOpens`.
 - `SonosSystemTest` after a clock jump.
 - "Database connection closed" (a Room database closed in teardown while a flow still reads it, wrong thread) in `DoorTabTest`, `PeopleUiTest`, `DoorRecorderTest` and `EventDetailHostTest`.
 - `CalendarMigrationTest`.
@@ -1094,6 +1095,20 @@ Spec `docs/superpowers/specs/2026-11-17-culvery-22-reminders-design.md`. Item 41
 - **Note:** the door card's time is the real time, not the moved clock's (the ring's own stamp).
 - **Put back:** the clock, the reminders made, the Bins row on at 18:00, the sample council disconnected, night hours 15:00–15:30. Quiet hours and Holiday mode were left as found. One sample ring stays in the Door history.
 
+## Plan 22 (Reminders): second emulator walk-through (2026-11-19)
+- **Set-up:** the debug build of 7283bfdd on `culvery-5` with `install -r`, after deleting the emulator's `reminders.db` (its tables were redefined at version 1); the debug sample household and PINs; the clock moved with `DebugClockReceiver`; the sample calendar changed with `DebugSampleEventReceiver` (a title with a space needs quoting for the device's shell: `adb shell "am broadcast ... --es title 'Two words'"`).
+- **Worked, checks 12 to 18 of spec 10.8, and 1, 2 and 9 again:**
+  - 12. A reminder every week on Thursday and Friday: the card and `chime` on Thursday, again on Friday, then "Thu 09:35" as its next.
+  - 13. A reminder every month on the 3rd Friday: a month on, `due 3` was three reminders with one card each; the monthly one showed once.
+  - 14. An event made on the wall, every week on Thursday and Saturday: on the week on both days; the toast read "Added ..., every week, on Thu, Sat."
+  - 15. Add reminder from a one-off event; the event moved an hour: "Changes saved. Its reminder moved too.", `event moved`, the row at the new time. The event deleted: "Event and its reminder deleted.", `event gone`, the row gone.
+  - 16. Add reminder from the repeating sample event: the form opened with its name, its time and "Every Thursday" chosen; the card then read "Change reminder".
+  - 17. A sample event deleted from the calendar's side: `event gone` and the row gone within seconds.
+  - 18. Signed out, a one-off for an hour ago: "Pick a time that hasn’t passed." and no PIN pad. A child's own tile shows its tick and no padlock; the others keep theirs.
+  - 1 and 2. A one-off: the card and `chime`; Later, 30 minutes on, the card and `chime` again; Done.
+  - 9. The child: refused for everyone ("... can add reminders for ... only."), saved for themself, and refused on the family's reminder ("... can only change reminders they made.").
+- **Seen, not a check:** a repeat whose next time is weeks away reads as a weekday and a time ("Fri 09:40" for a date four weeks off).
+
 ## From Plan 22
 Left by the final review (2026-11-17), none blocking:
 - The music's volume isn't put back if the chime's caller is cancelled while it waits for the music to lower (schedule the restore in a `finally`).
@@ -1112,6 +1127,17 @@ Left by the second pass (2026-11-18), none blocking:
 - A reminder whose event's connection is removed stays, and no longer follows anything.
 - A sync cut off by a restart can leave a reminder that no longer matches its event.
 - A reminder with its own monthly-by-date repeat keeps its day of the month when its event moves.
+
+Left by Part 2's simplify pass and whole-branch review (2026-11-19), none blocking:
+- A full read can't tell a series whose only stored date was skipped on a phone from a deleted series, so its reminder goes. (An incremental read can, and keeps it.)
+- A yearly or other widely spaced series whose times change on a phone after this year's date has passed loses its reminder: "no start time" means both "no date left" and "the next date isn't stored".
+- A reminder form left open while a phone moves its event writes the old times back when saved.
+- With two coming dates stored, moving the earlier one on a phone can change the series' usual time, and a following reminder moves with it.
+- A reminder with its own repeat and a phone's "last weekday of the month" rule keeps its weekday when its event moves a day.
+- The Add reminder button doesn't go as time passes, only on the next read of the calendar; a tap after the start gets the toast.
+- Moving an event into the past says "Changes saved." though its reminder was deleted.
+- A change saved on the wall and then cut off by a crash before Reminders hears of it is lost to the reminder.
+- Code, not seen at the wall: one "how the event stands now" function for the editor, the sync and the queue; one guard for a read that began before a wall write, shared by the stored copy and Reminders; "gone" only for a real delete (an accepted new repeating event is an exception today); "first date not yet started" and "an all-day event starts at its day's end" are each written on both sides of the seam; the shared picker carries three calendar-only parameters and a fixed "As the event:" line; no index on the series id (needs a migration); `RecordingReminders.Changed.toString` hides what differs; a Kotlin annotation-target warning in `RemindersActions.kt`.
 
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
