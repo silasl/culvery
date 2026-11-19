@@ -25,12 +25,12 @@ The open work, one number each; the details are in the sections below. Numbers n
 37. The chime's Play button in Settings should report what happened the same way Preview does (one wording for "Couldn't play" and "The doorbell is playing").
 38. Tidy-up: one shared set of test certificates for Home Assistant and Hue (two copies today).
 39. Tidy-up: Undo's bookkeeping in the calendar is kept in several places at once; fold it into one.
-40. Opening Culvery from outside the home screen (seen with `am start` after a force-stop on the emulator) can leave the app that was open before in front; Home brings Culvery back. Culvery starts its home screen and closes the other copy, and that hand-over is older than Plans 19 and 20. Check on the tablet whether a launcher or Settings' Open does the same.
-42. Birthdays often show twice in the calendar. Find out why; it probably needs the tablet plugged in, to read what its calendars hold.
+40. Opening Culvery from outside the home screen (seen with `am start` after a force-stop on the emulator) can leave the app that was open before in front; Home brings Culvery back. Culvery starts its home screen and closes the other copy, and that hand-over is older than Plans 19 and 20. Checked on the tablet 2026-11-19: a launcher-style open brings Culvery to the front, because Culvery isn't the home app there and the hand-over never runs; Settings' Open wasn't tried. See "Plan 23" below.
+42. Birthdays often show twice in the calendar. Cause found 2026-11-19: Google holds two events for one person, the family's own and one of Google's "birthday" kind, and the wall shows both. The fix waits for the user's ruling. See "Plan 23" below.
 
 **To check on the tablet** (see "To check when the tablet is next plugged in")
-18. Taps that seemed lost on the emulator.
-19. How long Home and the other screens take to fill.
+18. Taps that seemed lost on the emulator. Checked on the tablet 2026-11-19: none lost in 17 taps; Settings' Close wasn't tried (it needs a PIN). See "Plan 23" below.
+19. How long Home and the other screens take to fill. Timed on the tablet 2026-11-19: Home about 1.7 s after a restart, the Calendar tab about 0.6 s; the Settings pages weren't timed (they need a PIN). See "Plan 23" below.
 
 **Feature ideas** (see "Feature ideas")
 21. A family slideshow.
@@ -1138,6 +1138,36 @@ Left by Part 2's simplify pass and whole-branch review (2026-11-19), none blocki
 - Moving an event into the past says "Changes saved." though its reminder was deleted.
 - A change saved on the wall and then cut off by a crash before Reminders hears of it is lost to the reminder.
 - Code, not seen at the wall: one "how the event stands now" function for the editor, the sync and the queue; one guard for a read that began before a wall write, shared by the stored copy and Reminders; "gone" only for a real delete (an accepted new repeating event is an exception today); "first date not yet started" and "an all-day event starts at its day's end" are each written on both sides of the seam; the shared picker carries three calendar-only parameters and a fixed "As the event:" line; no index on the series id (needs a migration); `RecordingReminders.Changed.toString` hides what differs; a Kotlin annotation-target warning in `RemindersActions.kt`.
+
+## Plan 23 (duplicate birthdays): the cause and the tablet checks (2026-11-19)
+The tablet ran the release from 9ca5850a. Everything was read over adb; nothing was changed on the tablet or at Google. What was read is in `culvery-notes/plan23/`.
+
+**Item 42, the cause**
+- The house calendar holds two events for one person's birthday. One is the yearly all-day event the family made, tagged for that person. The other is Google's own "birthday" kind of event, made in Google Calendar in February 2025: private, starting in the birth year, with Google's "…'s birthday" title. The tablet's calendar store marks it as that kind.
+- Culvery shows both because it leaves out one kind of Google event only, working locations (`GoogleEvents.kt`, `isGone`). Nothing is drawn or synced twice.
+- It is the only such pair today: 35 yearly birthday events, one person with two. Another person's birthday falls on the same day, so that day showed three birthday chips. The next seven weeks on the wall show each birthday once.
+- It comes back for any birthday added with Google Calendar's Birthday button.
+- Recommended: leave Google's birthday kind out of the wall, as working locations are. A birthday that exists only as that kind would then not show (none does today). Google refuses most changes to that kind, so the wall can't tag one anyway. The other choices: hide one only when the same day has another birthday event for the same first name (needs the kind stored, so a database change, and name matching); or no code, and the extra event is deleted in Google Calendar.
+
+**Item 18, lost taps:** 17 single taps (each rail tab, Later week seven times, Add reminder, the form's Close) each did their job first time, at the tablet's font scale of 1.1. Settings' Close wasn't tried: Settings needs a PIN. The real tablet has no sample list, so "Stop using the sample list" doesn't exist there.
+
+**Item 19, how long screens take to fill**
+- Home after a restart, from the lock screen clearing: the splash until 1.3 s; Home drawn at 1.4 s with Today empty and Lights and Music still looking; Today and Music filled by 1.6 s; Lights by 1.8 s. Culvery had been started about 8 s earlier behind the lock screen, so this is the least a cold start takes, not a fresh measurement of it. October's figure was 2.2 to 2.9 s.
+- Home to the Calendar tab: drawn within about 0.6 s. Back to Home: about 0.1 s.
+- Not timed: the Calendar tab straight after a restart, and Settings › Calendars, Home location and People (Settings needs a PIN).
+
+**Item 40, opening Culvery from outside the home screen**
+- On the tablet Culvery is not the home app: Samsung's launcher is, and Culvery runs as an ordinary pinned app. So the hand-over to the home screen's Culvery (`KioskLifecycle.handOverToHome`) never runs there.
+- With Samsung's launcher in front, an open as a launcher sends it brought Culvery to the front. Settings' Open wasn't tried; it takes the same path.
+- The emulator's fault needs Culvery as the home app, so it can't show on the tablet as it is set up.
+
+**Seen on the way (item 32)**
+- Stopping the pinned Culvery over adb unpins it and puts the tablet on Android's lock screen. Culvery opened behind the lock screen isn't drawn until the tablet is unlocked (51 s in one run).
+- After the unlock, Samsung's pin request showed in one run and not in the other, which left Culvery in front and unpinned. A normal open after that showed "App is pinned" and pinned it. So an update over adb needs someone at the tablet to unlock it, and a check that it pinned.
+
+**Plan 22's first walk-through, W2 and W5**
+- W2, today's date below the fold in the reminder form: the same on the tablet. With four people and Everyone, the form shows the month's name and the weekday letters; the whole date grid is below the fold.
+- W5, a refusal toast over the form's button: not tried. The toast needs a child's PIN at Save.
 
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. Settings' Close overlapped Tablet lock (Plan 15a's fault 3). 15b's shorter list should clear it; not re-checked at font 1.3. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
