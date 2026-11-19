@@ -295,6 +295,48 @@ class GoogleReadTest {
         assertThat(provider.sync(conn, family, range, first.cursor).removedIds).containsExactly("office")
     }
 
+    /** 23 §3: Google's own birthday events double the ones the family keeps, so the wall leaves them out. */
+    @Test
+    fun aGoogleBirthdayIsSkippedInAFullSyncAndRemovedInAnIncrementalOne() = runTest {
+        // As Google sends one: a date of a yearly series, with or without its type.
+        fun birthday(id: String, type: String?) = google.allDay(id, "Sam's birthday", today, today.plusDays(1)) {
+            put("recurringEventId", "bday")
+            put("eventType", "birthday")
+            type?.let { putJsonObject("birthdayProperties") { put("type", it) } }
+        }
+        val dates = listOf("bday_1" to "birthday", "bday_2" to "self", "bday_3" to null)
+        google.putEvent(family.id, google.allDay("bday", "Sam's birthday", today, today.plusDays(1)) { putJsonArray("recurrence") { add("RRULE:FREQ=YEARLY") } })
+        dates.forEach { (id, type) -> google.putEvent(family.id, birthday(id, type)) }
+        val first = provider.sync(conn, family, range, null)
+        assertThat(first.upserts).isEmpty()
+        dates.forEach { (id, type) -> google.putEvent(family.id, birthday(id, type)) }
+        assertThat(provider.sync(conn, family, range, first.cursor).removedIds).containsExactly("bday_1", "bday_2", "bday_3")
+        // Nothing asked about the series: its rule is never needed.
+        assertThat(google.requests.count { it.requestUrl!!.pathSegments.last() == "bday" }).isEqualTo(0)
+        assertThat(provider.find(conn, family, "bday_1")).isNull()
+    }
+
+    /** Google files anniversaries and other dates under the birthday kind; nothing doubles those, so they stay. */
+    @Test
+    fun anAnniversaryOfGooglesBirthdayKindIsStillRead() = runTest {
+        google.putEvent(
+            family.id,
+            google.allDay("wed", "Anniversary", today, today.plusDays(1)) {
+                put("eventType", "birthday")
+                putJsonObject("birthdayProperties") { put("type", "anniversary") }
+            },
+        )
+        assertThat(provider.sync(conn, family, range, null).upserts.map { it.remoteId }).containsExactly("wed")
+    }
+
+    /** 23's anti-goal: only the kind decides, never the title. */
+    @Test
+    fun aBirthdayTheFamilyMadeIsStillRead() = runTest {
+        google.putEvent(family.id, google.allDay("plain", "Sam birthday", today, today.plusDays(1)))
+        google.putEvent(family.id, google.allDay("default", "Mia birthday", today, today.plusDays(1)) { put("eventType", "default") })
+        assertThat(provider.sync(conn, family, range, null).upserts.map { it.remoteId }).containsExactly("plain", "default")
+    }
+
     @Test
     fun instancesOfASeriesAreRecurringWithTheSeriesRuleFetchedOnce() = runTest {
         google.putEvent(family.id, google.timed("piano", "Piano", at(22, 15), at(22, 16)) { putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY;BYDAY=TU") } })

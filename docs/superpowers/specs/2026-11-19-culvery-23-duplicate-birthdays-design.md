@@ -6,7 +6,7 @@ Written on 2026-11-19 from the user's ruling of the same day ("all as suggested"
 
 A birthday shows once on the wall.
 
-Success: an event of Google's "birthday" kind is never stored or shown, with a test that fails without the fix. Every other event reads as it does today.
+Success: one of Google's own birthday events is never stored or shown, with a test that fails without the fix. Every other event reads as it does today.
 
 ### Non-goals
 - Matching events by name or date to find doubles. The kind decides, nothing else.
@@ -24,7 +24,9 @@ The household's calendar holds one of these beside the family's own yearly event
 
 ## 3. The change
 
-`GoogleEvent.isGone` is also true for `eventType == "birthday"`. That one property already decides all of these, so no other code changes:
+`GoogleEvent.isGone` is also true for one of Google's own birthdays: `eventType == "birthday"` whose `birthdayProperties.type` is `birthday`, `self` (the account's own birthday) or missing. Google files anniversaries and other dates under the same kind with another type; nothing doubles those, so they stay (plan ruling 4, from the plan review). The events list asks for `birthdayProperties/type` as well.
+
+That one property already decides all of these, so no other code changes:
 
 - A full read skips the event.
 - An incremental read lists its id as removed, so a copy the tablet already holds goes when Google next reports the event. A copy Google doesn't report again goes at the next full read, which comes at least every six weeks.
@@ -40,7 +42,8 @@ A birthday that exists only as Google's kind doesn't show on the wall. None does
 
 In `GoogleReadTest`, beside the working-location test:
 
-- A birthday-kind event is skipped by a full read and listed as removed by an incremental one. It fails before the change.
+- A Google birthday, shaped as Google sends it (a date of a yearly series; type `birthday`, `self` or none), is skipped by a full read, listed as removed by an incremental one, answers "gone" to a look-up, and its series is never asked about. It fails before the change.
+- An anniversary of the same kind is still read.
 - A hand-made yearly all-day event titled as a birthday, with no kind or with `default`, is still read. It guards the anti-goal.
 
 ## 6. Checking it

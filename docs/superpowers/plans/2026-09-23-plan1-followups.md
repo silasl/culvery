@@ -1149,6 +1149,9 @@ The tablet ran the release from 9ca5850a. Everything was read over adb; nothing 
 - It comes back for any birthday added with Google Calendar's Birthday button.
 - Recommended: leave Google's birthday kind out of the wall, as working locations are. A birthday that exists only as that kind would then not show (none does today). Google refuses most changes to that kind, so the wall can't tag one anyway. The other choices: hide one only when the same day has another birthday event for the same first name (needs the kind stored, so a database change, and name matching); or no code, and the extra event is deleted in Google Calendar.
 
+- Ruled by the user 2026-11-19 ("all as suggested"): leave Google's own birthdays out. Built so that only birthdays go; anniversaries and other dates Google files under the same kind stay. Spec `docs/superpowers/specs/2026-11-19-culvery-23-duplicate-birthdays-design.md`.
+- Left by the plan review, none blocking: a reminder added from a Google birthday keeps its link after the event leaves the wall (as for a declined date of a series today); such an event's title can stay among the title suggestions for up to a year.
+
 **Item 18, lost taps:** 17 single taps (each rail tab, Later week seven times, Add reminder, the form's Close) each did their job first time, at the tablet's font scale of 1.1. Settings' Close wasn't tried: Settings needs a PIN. The real tablet has no sample list, so "Stop using the sample list" doesn't exist there.
 
 **Item 19, how long screens take to fill**

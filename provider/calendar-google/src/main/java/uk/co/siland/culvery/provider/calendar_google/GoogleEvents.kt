@@ -25,15 +25,27 @@ internal const val CREATED_BY_KEY = "culvery.createdBy"
 internal const val NO_TITLE = "(No title)"
 
 private const val CANCELLED = "cancelled"
-private const val WORKING_LOCATION = "workingLocation"
 private const val DECLINED = "declined"
 
+private const val WORKING_LOCATION = "workingLocation"
+private const val BIRTHDAY = "birthday"
+
+/** The account's own birthday, which Google files under the same kind. */
+private const val OWN_BIRTHDAY = "self"
+
 /**
- * Deleted; a working location, which isn't an event people plan around; or an invitation the account itself declined
- * (3a design §3.5).
+ * One of Google's own birthday events: they double the ones the family keeps and can't be tagged for a person (23 §3).
+ * The kind also holds anniversaries and other dates, which stay; one with no type is a birthday.
+ */
+private val GoogleEvent.isGoogleBirthday: Boolean
+    get() = eventType == BIRTHDAY && (birthdayProperties?.type ?: BIRTHDAY).let { it == BIRTHDAY || it == OWN_BIRTHDAY }
+
+/**
+ * Deleted; a working location, which isn't an event people plan around; one of Google's own birthdays; or an invitation
+ * the account itself declined (3a design §3.5).
  */
 internal val GoogleEvent.isGone: Boolean
-    get() = status == CANCELLED || eventType == WORKING_LOCATION ||
+    get() = status == CANCELLED || eventType == WORKING_LOCATION || isGoogleBirthday ||
         attendees.orEmpty().any { it.self == true && it.responseStatus == DECLINED }
 
 /** A start or end: a dateTime with Google's offset, or an all-day date (Google's end date is already exclusive). */

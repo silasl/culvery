@@ -42,7 +42,7 @@ private val WRITE_ROLES = setOf("owner", "writer")
 
 /** What events.list returns (4c §6.1, ruling 4): only what the provider parses; the same on full and incremental lists. */
 internal const val EVENT_FIELDS =
-    "items(id,status,summary,start,end,recurringEventId,recurrence,eventType,attendees(self,responseStatus)," +
+    "items(id,status,summary,start,end,recurringEventId,recurrence,eventType,birthdayProperties/type,attendees(self,responseStatus)," +
         "extendedProperties/private,colorId),nextPageToken,nextSyncToken"
 
 /** What calendarList.list returns (4c §6.1). */

@@ -26,3 +26,6 @@ Steps:
 1. (The user, 2026-11-19) Leave Google's birthday kind out of the wall. A birthday that exists only as that kind doesn't show.
 2. (Mine) No simplify pass: the change is under the size the user's rule sets for one.
 3. (Mine) One reviewer for the plan and one for the diff, instead of three, for a one-task plan.
+4. (Mine, from the plan review) Only birthdays are left out. Google's birthday kind also holds anniversaries and other dates, told apart by `birthdayProperties.type`; those stay on the wall. Costs one more field asked of Google. If the user wants the whole kind gone, it is a one-line change.
+5. (Mine, from the plan review) The test's event is a date of a yearly series, as Google sends a birthday, and it also checks the look-up and that the series is never fetched. Steps 1, 3 and 4 above were built that way.
+6. (Mine) Two low findings go to the follow-ups list rather than being fixed: a reminder added from a Google birthday can outlive it, and its title can stay as a suggestion for up to a year.

@@ -36,6 +36,7 @@ internal data class GoogleEvent(
     val recurringEventId: String? = null,
     val recurrence: List<String>? = null,
     val eventType: String? = null,
+    val birthdayProperties: BirthdayProperties? = null,
     val extendedProperties: ExtendedProperties? = null,
     val colorId: String? = null,
     val attendees: List<GoogleAttendee>? = null,
@@ -50,6 +51,10 @@ internal data class GoogleTime(val dateTime: String? = null, val date: String? =
 
 @Serializable
 internal data class ExtendedProperties(@SerialName("private") val privateProperties: Map<String, String>? = null)
+
+/** [type] tells a birthday from the anniversaries and other dates that share Google's "birthday" kind. */
+@Serializable
+internal data class BirthdayProperties(val type: String? = null)
 
 @Serializable
 internal data class CalendarResource(val id: String)
