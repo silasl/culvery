@@ -1,17 +1,20 @@
 package uk.co.siland.culvery.capability.calendar
 
+import android.util.Log
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.CancellationException
+import uk.co.siland.culvery.core.house.EventReminders
 import uk.co.siland.culvery.core.house.EventSeed
 import uk.co.siland.culvery.core.house.EventTimes
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.repeat.RepeatRule
-import uk.co.siland.culvery.core.repeat.ruleParts
 import uk.co.siland.culvery.core.repeat.seriesStart
+import uk.co.siland.culvery.core.repeat.startable
 import uk.co.siland.culvery.core.repeat.startedFrom
 import uk.co.siland.culvery.core.repeat.withoutSeriesStart
 
@@ -46,8 +49,7 @@ internal fun startsAtMillis(event: StoredEvent, zone: ZoneId): Long = when (val 
 /**
  * What the reminder form opens with for [event]; null when no reminder can be added: a bin collection, a one-off that
  * has started, a series with no date left. A series opens on the date tapped, or the next one if that has passed, at its
- * usual time. A rule
- * the shared code can't work out, or a count with no first day, gives a one-off for [event]'s own date.
+ * usual time. A rule the shared code can't work out, or a count with no first day, gives a one-off for [event]'s own date.
  */
 internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, people: List<PersonId>, nowMillis: Long, zone: ZoneId): EventSeed? {
     if (event.bins != null) return null
@@ -55,11 +57,10 @@ internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, peopl
     val today = now.atZone(zone).toLocalDate()
     val time = event.start.timeIn(zone)
     val times = eventTimes(event, siblings, zone, today)
-    // An all-day date has started only once it is over (22 §10.5).
     fun started(day: LocalDate, at: LocalTime?) = if (at == null) day.isBefore(today) else !day.atTime(at).atZone(zone).toInstant().isAfter(now)
     val tapped = event.start.dayIn(zone)
     val tappedStarted = started(tapped, time)
-    val rule = seriesRule(event, siblings, zone, today)?.takeIf { workable(it, zone) }
+    val rule = seriesRule(event, siblings, zone, today)?.takeIf { startable(it, seriesStart(it) != null, zone) }
     val (day, left) = if (rule == null) {
         if (tappedStarted) return null
         tapped to null
@@ -73,6 +74,19 @@ internal fun reminderSeed(event: StoredEvent, siblings: List<StoredEvent>, peopl
     }
     // Any other date, or one already started, opens at the series' usual time, not the one this date may have been moved to.
     return EventSeed(eventKey(event), event.title, people, day, if (day == tapped && !tappedStarted) time else times.time, left, times)
+}
+
+/** [call]'s answer, or [default] with no Reminders; a failure there, logged under [tag], never fails the calendar's own work. */
+internal suspend fun <T> EventReminders?.guarded(tag: String, default: T, call: suspend EventReminders.() -> T): T {
+    val reminders = this ?: return default
+    return try {
+        reminders.call()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w(tag, "Couldn't tell Reminders (${e::class.simpleName})")
+        default
+    }
 }
 
 /** What one sync did to events a reminder may hang on. [toString] prints neither the key nor the times. */
@@ -120,10 +134,6 @@ private fun firstComing(rows: List<StoredEvent>, zone: ZoneId, today: LocalDate)
     val sorted = rows.sortedBy { it.startSort }
     return sorted.firstOrNull { !it.start.dayIn(zone).isBefore(today) } ?: sorted.last()
 }
-
-// A COUNT can be reduced only from the series' true first day.
-private fun workable(rule: String, zone: ZoneId): Boolean =
-    RepeatRule.parse(rule, zone) != null && (seriesStart(rule) != null || ruleParts(rule)?.containsKey("COUNT") != true)
 
 private fun EventTime.dayIn(zone: ZoneId): LocalDate = when (this) {
     is EventTime.AllDay -> date

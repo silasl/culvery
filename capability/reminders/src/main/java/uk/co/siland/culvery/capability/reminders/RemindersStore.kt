@@ -156,7 +156,7 @@ private fun ReminderEntity.toReminder() = Reminder(
     event = eventKey?.let { EventLink(it, eventDay?.let(LocalDate::parse), eventMinute?.let(::timeOfMinute), eventRule, followsRepeat) },
 )
 
-private fun LocalTime.minuteOfDay() = hour * 60 + minute
+internal fun LocalTime.minuteOfDay() = hour * 60 + minute
 
 private fun timeOfMinute(minute: Int): LocalTime = LocalTime.of(minute / 60, minute % 60)
 

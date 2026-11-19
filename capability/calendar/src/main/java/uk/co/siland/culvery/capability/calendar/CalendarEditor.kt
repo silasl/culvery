@@ -200,8 +200,13 @@ class CalendarEditor internal constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     fun reminderButton(ref: EventRef): Flow<ReminderButton?> {
         val reminders = reminders ?: return flowOf(null)
-        return combine(store.event(ref), store.pending()) { stored, pending -> seedFor(ref, stored, pending) }
-            .flatMapLatest { seed -> seed?.let { s -> reminders.has(s.key).map { if (it) ReminderButton.Change else ReminderButton.Add } } ?: flowOf(null) }
+        val seeds = combine(store.event(ref).distinctUntilChanged(), store.pending().distinctUntilChanged()) { stored, pending ->
+            seedFor(ref, stored, pending)
+        }
+        return seeds
+            .flatMapLatest { seed ->
+                if (seed == null) flowOf(null) else reminders.has(seed.key).map { if (it) ReminderButton.Change else ReminderButton.Add }
+            }
             .flowOn(io)
             .distinctUntilChanged()
     }
@@ -446,14 +451,7 @@ class CalendarEditor internal constructor(
         )
     }
 
-    /**
-     * Runs [block] on the application scope under [writeLock], so closing the sheet mid-write can't lose the change or its toast, then
-     * tells the outcome through [say] and nudges the sync loop. A store failure (disk full, corruption) becomes
-     * Rejected(Tablet) instead of reaching the sheet's scope and killing the app. A save's refusal is the sheet's
-     * to show; if the sheet stops waiting (it was closed), the editor toasts it instead. Once the change is saved or
-     * queued, and before the lock is let go, [key] is stamped as the wall's and Reminders is told through [tell], so
-     * two quick writes reach Reminders in order; [say] hears whether a reminder went or moved.
-     */
+    /** Reminders is told through [tell] before [writeLock] is let go, so two quick writes reach it in order. */
     private suspend fun onAppScope(
         kind: ChangeKind,
         label: String,
@@ -469,7 +467,7 @@ class CalendarEditor internal constructor(
                     block().also { result ->
                         if (result == EditResult.Done || result == EditResult.Queued) {
                             key?.let(::stamp)
-                            if (tell != null) reminderToo = tellReminders(tell)
+                            if (tell != null) reminderToo = reminders.guarded(TAG, false, tell)
                         }
                     }
                 }
@@ -508,16 +506,12 @@ class CalendarEditor internal constructor(
         edit: EventDraft? = null,
         fields: Set<EventField>? = null,
     ): EditResult {
-        val key = eventKey(target.event).takeUnless { kind.isAssign }
         var moved: StoredEvent? = null
-        val tell: (suspend EventReminders.() -> Boolean)? = when {
-            key == null -> null
-            kind == ChangeKind.DELETE -> { { gone(listOf(key)) } }
-            EventField.TIMES in fields.orEmpty() -> { { moved?.let { movedTo(key, it) } == true } }
-            else -> null
-        }
         // A title or people change can't put old times back on a reminder, and must not hide a phone's move.
-        val stampKey = key.takeIf { kind == ChangeKind.DELETE || EventField.TIMES in fields.orEmpty() }
+        val stampKey = eventKey(target.event).takeIf { !kind.isAssign && (kind == ChangeKind.DELETE || EventField.TIMES in fields.orEmpty()) }
+        val tell: (suspend EventReminders.() -> Boolean)? = stampKey?.let { key ->
+            if (kind == ChangeKind.DELETE) { { gone(listOf(key)) } } else { { moved?.let { movedTo(key, it) } == true } }
+        }
         return onAppScope(kind, serviceNameOf(target.to.connection, serviceOf), stampKey, tell) {
             val ref = target.event.ref
             val queued = store.pendingNow()
@@ -551,8 +545,8 @@ class CalendarEditor internal constructor(
 
     /** Tells Reminders the one-off with [key] is now [event]; true when its reminder moved. */
     private suspend fun EventReminders.movedTo(key: String, event: StoredEvent): Boolean {
-        val z = zone.current()
-        return changed(key, eventTimes(event, emptyList(), z, today()), startsAtMillis(event, z))
+        val (times, startsAt) = linkTimes(listOf(event), emptyList(), zone.current(), today(), clock.nowMillis())
+        return changed(key, times, startsAt)
     }
 
     /**
@@ -681,19 +675,6 @@ class CalendarEditor internal constructor(
 
     /** Marks [key] as written on the wall now, for a sync that read the provider before this write. */
     private fun stamp(key: String) = store.stampWallWrite(key, clock.nowMillis())
-
-    /** True when Reminders answered true; a failure there never fails the event's own write. */
-    private suspend fun tellReminders(call: suspend EventReminders.() -> Boolean): Boolean {
-        val reminders = reminders ?: return false
-        return try {
-            reminders.call()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.w(TAG, "Couldn't tell Reminders (${e::class.simpleName})")
-            false
-        }
-    }
 
     private companion object {
         const val TAG = "CalendarEditor"

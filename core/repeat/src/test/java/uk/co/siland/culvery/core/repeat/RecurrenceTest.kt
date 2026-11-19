@@ -251,4 +251,36 @@ class RecurrenceTest {
         assertThat(RepeatChoice.Fortnightly.fitsLength(Duration.ofDays(2), two)).isFalse()
         assertThat(RepeatChoice.Fortnightly.fitsLength(Duration.ofDays(10))).isTrue()
     }
+
+    // Monday 16 November 2026, the 3rd Monday; Tuesday 17th; Tuesday 24th, the 4th Tuesday.
+    private val mon16 = LocalDate.of(2026, 11, 16)
+    private val tue17 = LocalDate.of(2026, 11, 17)
+    private val tue24 = LocalDate.of(2026, 11, 24)
+
+    @Test
+    fun aWeeklyRuleOnOneDayMovesToTheNewDay() {
+        assertThat(movedTo("RRULE:FREQ=WEEKLY;BYDAY=MO", mon16, tue17)).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1")
+    }
+
+    @Test
+    fun aWeeklyRuleOnSeveralDaysMovesThemAllAsFar() {
+        assertThat(movedTo("RRULE:FREQ=WEEKLY;BYDAY=MO,WE", mon16, tue17)).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TU,TH")
+    }
+
+    @Test
+    fun aMonthlyRuleByWeekdayTakesTheNewDaysPlace() {
+        assertThat(movedTo("RRULE:FREQ=MONTHLY;BYDAY=3MO", mon16, tue24)).isEqualTo("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4TU")
+    }
+
+    @Test
+    fun aMovedRuleKeepsItsCount() {
+        assertThat(movedTo("RRULE:FREQ=WEEKLY;BYDAY=MO,WE;COUNT=6", mon16, tue17)).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TU,TH;COUNT=6")
+    }
+
+    @Test
+    fun aRuleNoChoiceWritesIsNotMoved() {
+        assertThat(movedTo("RRULE:FREQ=WEEKLY;BYDAY=MO;UNTIL=20261231", mon16, tue17)).isNull()
+        assertThat(movedTo("RRULE:FREQ=MONTHLY;INTERVAL=3", mon16, tue17)).isNull()
+        assertThat(movedTo("RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=60", mon16, tue17)).isNull()
+    }
 }

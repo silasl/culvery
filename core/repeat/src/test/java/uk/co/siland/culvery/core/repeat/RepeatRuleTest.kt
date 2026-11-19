@@ -166,6 +166,14 @@ class RepeatRuleTest {
     }
 
     @Test
+    fun aCountCanBeCutShortOnlyFromAKnownFirstDay() {
+        assertThat(startable("RRULE:FREQ=WEEKLY;COUNT=10", firstKnown = true, london)).isTrue()
+        assertThat(startable("RRULE:FREQ=WEEKLY;COUNT=10", firstKnown = false, london)).isFalse()
+        assertThat(startable("RRULE:FREQ=WEEKLY", firstKnown = false, london)).isTrue()
+        assertThat(startable("RRULE:FREQ=HOURLY", firstKnown = true, london)).isFalse()
+    }
+
+    @Test
     fun aRuleItCannotWorkOutIsRefused() {
         val refused = listOf(
             "RRULE:FREQ=MONTHLY;BYDAY=MO,TU;BYSETPOS=1",

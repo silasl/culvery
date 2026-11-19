@@ -11,14 +11,10 @@ import uk.co.siland.culvery.core.repeat.MIN_TIMES
 import uk.co.siland.culvery.core.repeat.RepeatChoice
 import uk.co.siland.culvery.core.repeat.RepeatEnd
 import uk.co.siland.culvery.core.repeat.SHORT_DAY
-import uk.co.siland.culvery.core.repeat.choiceOf
-import uk.co.siland.culvery.core.repeat.code
-import uk.co.siland.culvery.core.repeat.daysOf
+import uk.co.siland.culvery.core.repeat.choiceRule
 import uk.co.siland.culvery.core.repeat.lastOccurrence
-import uk.co.siland.culvery.core.repeat.nthOf
 import uk.co.siland.culvery.core.repeat.nthWeekday
 import uk.co.siland.culvery.core.repeat.recurrenceRule
-import uk.co.siland.culvery.core.repeat.ruleParts
 
 /** What the repeat picker's taps do: [RepeatPick] does them itself; a form that guards its repeat passes its own. */
 interface RepeatPickActions {
@@ -140,19 +136,8 @@ class RepeatPick(
         /** [rule] read against [first]: a choice with its days and a count of 2 to 52 when the picker can show all of it, else kept. Null rule is Never. */
         fun read(rule: String?, first: LocalDate): RepeatPick {
             if (rule == null) return RepeatPick()
-            val parts = ruleParts(rule) ?: return RepeatPick(kept = rule)
-            val choice = choiceOf(rule, first)
-            val end = when (val count = parts["COUNT"]) {
-                null -> RepeatEnd.Never
-                else -> count.toIntOrNull()?.takeIf { it in MIN_TIMES..MAX_TIMES }?.let(RepeatEnd::After)
-            }
-            val shown = choice != null && end != null && "UNTIL" !in parts &&
-                parts["WKST"].let { it == null || it == DayOfWeek.MONDAY.code() } &&
-                nthOf(rule, first) == nthWeekday(first)
-            if (!shown) return RepeatPick(kept = rule)
-            return RepeatPick(checkNotNull(choice), checkNotNull(end), daysOf(rule, first) - first.dayOfWeek).also {
-                it.readFrom = rule to first
-            }
+            val read = choiceRule(rule, first) ?: return RepeatPick(kept = rule)
+            return RepeatPick(read.choice, read.end, read.extraDays).also { it.readFrom = rule to first }
         }
     }
 }

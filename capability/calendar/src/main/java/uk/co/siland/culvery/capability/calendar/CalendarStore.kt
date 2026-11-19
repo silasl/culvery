@@ -354,6 +354,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         return before.groupBy { it.linkId }.mapNotNull { (id, was) ->
             val key = eventKey(source.connectionId, source.sourceId, id)
             val rows = left[id] ?: return@mapNotNull EventChange.Gone(key)
+            if (rows.toSet() == was.toSet()) return@mapNotNull null
             val (times, startsAt) = linkTimes(rows.stored(), brought[id].stored(), zone, today, nowMillis)
             EventChange.Changed(key, times, startsAt).takeIf { times != linkTimes(was.stored(), emptyList(), zone, today, nowMillis).first }
         }

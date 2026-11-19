@@ -26,7 +26,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -44,6 +43,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.RecordingReminders
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.ScriptedWriter
 import uk.co.siland.culvery.capability.calendar.SyncResult
@@ -59,16 +59,12 @@ import uk.co.siland.culvery.capability.calendar.testAccess
 import uk.co.siland.culvery.capability.calendar.testEditor
 import uk.co.siland.culvery.capability.calendar.testBinColours
 import uk.co.siland.culvery.capability.calendar.testCalendarSettings
-import uk.co.siland.culvery.core.house.EventReminders
-import uk.co.siland.culvery.core.house.EventSeed
-import uk.co.siland.culvery.core.house.EventTimes
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
-import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
@@ -178,12 +174,7 @@ class EventDetailHostTest {
     @Test
     fun tappingAfterTheEventHasStartedSaysSo() {
         var now = today.atTime(9, 0).atZone(london).toInstant().toEpochMilli()
-        val reminders = object : EventReminders {
-            override fun has(key: String) = flowOf(false)
-            override suspend fun open(host: OverlayHost, seed: EventSeed) = Unit
-            override suspend fun gone(keys: Collection<String>) = false
-            override suspend fun changed(key: String, now: EventTimes, startsAtMillis: Long?) = false
-        }
+        val reminders = RecordingReminders()
         val timed = testEditor(
             store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { now }, scope, reminders = reminders,
         )

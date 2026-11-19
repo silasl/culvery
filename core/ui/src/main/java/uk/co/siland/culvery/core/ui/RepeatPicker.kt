@@ -156,7 +156,8 @@ private fun Stepper(pick: RepeatPick, actions: RepeatPickActions, times: Int, da
                 .background(c.surf2)
                 .padding(horizontal = RepeatPickerTokens.stepperPaddingH),
         ) {
-            Text(pick.stepperLabel(day, nth).orEmpty(), style = RepeatPickerType.count, color = c.ink, maxLines = 1)
+            val label = remember(pick.choice, pick.end, pick.extraDays, day, nth) { pick.stepperLabel(day, nth).orEmpty() }
+            Text(label, style = RepeatPickerType.count, color = c.ink, maxLines = 1)
         }
         StepButton(Icons.ADD, MORE_TIMES, "ends_more", enabled = times < MAX_TIMES) { if (!busy) actions.moreTimes() }
     }

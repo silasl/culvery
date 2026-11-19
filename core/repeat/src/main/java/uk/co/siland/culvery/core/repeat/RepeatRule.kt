@@ -140,14 +140,6 @@ class RepeatRule private constructor(
             return RepeatRule(freq, interval, weekdays, nth, monthDay, count, until)
         }
 
-        private fun untilDay(text: String, zone: ZoneId): LocalDate? = runCatching {
-            if (text.length == UNTIL_DATE_LENGTH) {
-                LocalDate.parse(text, UNTIL_DATE)
-            } else {
-                LocalDateTime.parse(text, UNTIL_UTC).atOffset(ZoneOffset.UTC).atZoneSameInstant(zone).toLocalDate()
-            }
-        }.getOrNull()
-
         private fun weekdayOf(code: String): DayOfWeek? = DayOfWeek.entries.firstOrNull { it.code() == code }
 
         // "4SA" as 4 and Saturday, "-1TH" as −1 and Thursday.
@@ -157,6 +149,19 @@ class RepeatRule private constructor(
         }
     }
 }
+
+/** UNTIL as a date, or as a UTC time (Google's form for a timed series) read in [zone]; null when neither. */
+internal fun untilDay(text: String, zone: ZoneId): LocalDate? = runCatching {
+    if (text.length == UNTIL_DATE_LENGTH) {
+        LocalDate.parse(text, UNTIL_DATE)
+    } else {
+        LocalDateTime.parse(text, UNTIL_UTC).atOffset(ZoneOffset.UTC).atZoneSameInstant(zone).toLocalDate()
+    }
+}.getOrNull()
+
+/** Whether [rule] can be started part-way: it parses, and a COUNT in it can be cut short only when the series' first day is known. */
+fun startable(rule: String, firstKnown: Boolean, zone: ZoneId): Boolean =
+    RepeatRule.parse(rule, zone) != null && (firstKnown || "COUNT" !in ruleParts(rule).orEmpty())
 
 /**
  * [rule] started from its first date on or after [day]: that date, and the rule with COUNT reduced by the dates before it
@@ -168,6 +173,7 @@ fun startedFrom(rule: String, first: LocalDate, day: LocalDate, zone: ZoneId): P
     val start = parsed.firstAfter(first, day.minusDays(1)) ?: return null
     val total = parsed.count ?: return start to withoutSeriesStart(rule)
     val remaining = total - parsed.dates(first).takeWhile { it.isBefore(start) }.count()
-    val reduced = withoutSeriesStart(rule).split(';').joinToString(";") { if (it.uppercase().removePrefix("RRULE:").startsWith("COUNT=")) it.replaceAfter('=', remaining.toString()) else it }
+    fun isCount(part: String) = part.uppercase().removePrefix("RRULE:").startsWith("COUNT=")
+    val reduced = withoutSeriesStart(rule).split(';').joinToString(";") { if (isCount(it)) it.replaceAfter('=', remaining.toString()) else it }
     return start to reduced.takeIf { remaining > 1 }
 }

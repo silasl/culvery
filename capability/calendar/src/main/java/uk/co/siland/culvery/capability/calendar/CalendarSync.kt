@@ -181,7 +181,6 @@ class CalendarSync internal constructor(
                     drop(change, label, null, linkOf(change))
                     continue
                 }
-                // Read before it is sent: an accepted delete takes the row that says which series it was.
                 val link = linkOf(change)
                 val sent = if (aged) {
                     // C9: its reply may have been lost after the provider made it; ask before dropping it.
@@ -449,8 +448,8 @@ class CalendarSync internal constructor(
             val written = store.wallWrittenSince(readBegan)
             val told = changes.filter { it.key !in written }
             val goneKeys = told.filterIsInstance<EventChange.Gone>().map { it.key }
-            if (goneKeys.isNotEmpty()) reminding { gone(goneKeys) }
-            told.filterIsInstance<EventChange.Changed>().forEach { reminding { changed(it.key, it.now, it.startsAtMillis) } }
+            if (goneKeys.isNotEmpty()) reminders.guarded(TAG, Unit) { gone(goneKeys) }
+            told.filterIsInstance<EventChange.Changed>().forEach { reminders.guarded(TAG, Unit) { changed(it.key, it.now, it.startsAtMillis) } }
         }
     }
 
@@ -458,18 +457,13 @@ class CalendarSync internal constructor(
      * [change]'s event by its link id, the series' for a date of one, read before it settles: an accepted delete takes
      * its row. Null with no Reminders, or when the store can't say.
      */
-    private suspend fun linkOf(change: PendingChange): EventRef? {
-        if (reminders == null) return null
-        var link: EventRef? = null
-        reminding {
-            val id = when (change.kind) {
-                ChangeKind.CREATE -> change.clientKey
-                ChangeKind.ASSIGN_SERIES -> change.remoteId
-                else -> change.remoteId?.let { store.eventNow(EventRef(change.connectionId, change.sourceId, it))?.seriesId ?: it }
-            }
-            link = id?.let { EventRef(change.connectionId, change.sourceId, it) }
+    private suspend fun linkOf(change: PendingChange): EventRef? = reminders.guarded(TAG, null) {
+        val id = when (change.kind) {
+            ChangeKind.CREATE -> change.clientKey
+            ChangeKind.ASSIGN_SERIES -> change.remoteId
+            else -> change.remoteId?.let { store.eventNow(EventRef(change.connectionId, change.sourceId, it))?.seriesId ?: it }
         }
-        return link
+        id?.let { EventRef(change.connectionId, change.sourceId, it) }
     }
 
     /**
@@ -480,8 +474,8 @@ class CalendarSync internal constructor(
     private suspend fun settled(change: PendingChange, link: EventRef?, zone: ZoneId) {
         if (link == null) return
         writeLock.withLock {
-            reminding {
-                if (store.pendingNow().any { it.ref == change.ref }) return@reminding
+            reminders.guarded(TAG, Unit) {
+                if (store.pendingNow().any { it.ref == change.ref }) return@guarded
                 val key = eventKey(link.connectionId, link.sourceId, link.remoteId)
                 val rows = store.linkRows(link)
                 if (rows.isEmpty()) {
@@ -491,18 +485,6 @@ class CalendarSync internal constructor(
                     changed(key, times, startsAt)
                 }
             }
-        }
-    }
-
-    /** A failure here, in Reminders or in the store reads [call] makes, never fails the sync or the drain. */
-    private suspend fun reminding(call: suspend EventReminders.() -> Unit) {
-        val reminders = reminders ?: return
-        try {
-            reminders.call()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.w(TAG, "Couldn't tell Reminders (${e::class.simpleName})")
         }
     }
 

@@ -65,8 +65,6 @@ import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.FULL_DATE
 import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
-import uk.co.siland.culvery.core.repeat.RepeatChoice
-import uk.co.siland.culvery.core.repeat.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.Suggestion
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.couldNotSave
@@ -75,14 +73,16 @@ import uk.co.siland.culvery.capability.calendar.whoValue
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.repeat.RepeatChoice
+import uk.co.siland.culvery.core.repeat.SHORT_DAY
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhFooterButton
-import uk.co.siland.culvery.core.ui.KeepsToastsAbove
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.KeepsToastsAbove
 import uk.co.siland.culvery.core.ui.clockText
 
 /** A save that failed: where it was going ([service]) and why ([problem]); the card says both. */

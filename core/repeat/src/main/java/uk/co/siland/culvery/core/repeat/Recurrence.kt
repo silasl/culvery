@@ -3,12 +3,12 @@ package uk.co.siland.culvery.core.repeat
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalDate
-import java.time.MonthDay
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
@@ -133,21 +133,8 @@ internal fun nthWeekdayIn(month: YearMonth, n: Int, weekday: DayOfWeek): LocalDa
  * month, −1 for last; a phone may say last where the editor says 4th. The one place a series' last date is worked out (9 §3.1).
  */
 fun occurrences(choice: RepeatChoice, day: LocalDate, count: Int, nth: Int = nthWeekday(day), days: Set<DayOfWeek> = emptySet()): List<LocalDate> {
-    severalDays(choice, day, nth, days)?.let { return it.dates(day).take(count).toList() }
-    val step = choice.interval.toLong()
-    val month = YearMonth.from(day)
-    val candidate: (Long) -> LocalDate? = when (choice) {
-        RepeatChoice.Never -> return listOf(day).take(count)
-        RepeatChoice.Daily -> { k -> day.plusDays(k * step) }
-        RepeatChoice.Weekly, RepeatChoice.Fortnightly -> { k -> day.plusWeeks(k * step) }
-        RepeatChoice.Monthly -> { k -> month.plusMonths(k * step).takeIf { it.isValidDay(day.dayOfMonth) }?.atDay(day.dayOfMonth) }
-        RepeatChoice.MonthlyOnWeekday -> { k -> nthWeekdayIn(month.plusMonths(k * step), nth, day.dayOfWeek) }
-        RepeatChoice.Yearly -> { k ->
-            val year = Math.toIntExact(day.year + k * step)
-            MonthDay.from(day).takeIf { it.isValidYear(year) }?.atYear(year)
-        }
-    }
-    return generateSequence(0L) { it + 1 }.mapNotNull(candidate).take(count).toList()
+    val rule = recurrenceRule(choice, RepeatEnd.Never, day, nth, days) ?: return listOf(day).take(count)
+    return checkNotNull(RepeatRule.parse(rule, ZoneOffset.UTC)).dates(day).take(count).toList()
 }
 
 // The shared rule for a weekly choice on several days; null for anything else.
@@ -292,6 +279,30 @@ fun daysOf(rule: String, start: LocalDate): Set<DayOfWeek> = ruleParts(rule)?.le
 /** The editor's choice that [rule] is, read from the series' [start]; null for anything the editor can't make. */
 fun choiceOf(rule: String, start: LocalDate): RepeatChoice? =
     ruleParts(rule)?.let { readChoice(it, start) }?.takeIf { it in EDITOR_REPEATS }
+
+/** A rule as the picker shows it: its choice, its end and the days beyond the first day's own. [toString] prints nothing of it. */
+class ChoiceRule(val choice: RepeatChoice, val end: RepeatEnd, val extraDays: Set<DayOfWeek>) {
+    override fun toString(): String = "ChoiceRule"
+}
+
+/** [rule] read against [first] when a choice with its days and a count of 2 to 52 writes all of it; else null. */
+fun choiceRule(rule: String, first: LocalDate): ChoiceRule? {
+    val parts = ruleParts(rule) ?: return null
+    val choice = choiceOf(rule, first) ?: return null
+    val end = when (val count = parts["COUNT"]) {
+        null -> RepeatEnd.Never
+        else -> count.toIntOrNull()?.takeIf { it in MIN_TIMES..MAX_TIMES }?.let(RepeatEnd::After) ?: return null
+    }
+    val shown = "UNTIL" !in parts && parts["WKST"].let { it == null || it == DayOfWeek.MONDAY.code() } && nthOf(rule, first) == nthWeekday(first)
+    return if (shown) ChoiceRule(choice, end, daysOf(rule, first) - first.dayOfWeek) else null
+}
+
+/** [rule] written again from [to] instead of [from], its other days moved as far; null when no choice writes it. */
+fun movedTo(rule: String, from: LocalDate, to: LocalDate): String? {
+    val read = choiceRule(rule, from) ?: return null
+    val days = ChronoUnit.DAYS.between(from, to)
+    return recurrenceRule(read.choice, read.end, to, days = read.extraDays.map { it.plus(days) }.toSet() + to.dayOfWeek)
+}
 
 // A phone says "last" for a 4th weekday that is also the last of its month; the editor says 4th.
 fun isLastOfWeekday(day: LocalDate): Boolean = day.plusWeeks(1).month != day.month

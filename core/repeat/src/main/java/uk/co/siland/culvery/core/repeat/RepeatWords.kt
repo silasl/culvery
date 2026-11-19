@@ -1,9 +1,7 @@
 package uk.co.siland.culvery.core.repeat
 
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -48,11 +46,6 @@ private fun otherInterval(parts: Map<String, String>, day: LocalDate): String? {
     }
     return if (simple && interval > 1) "Every $interval ${unit}s" else null
 }
-
-/** UNTIL as a date, or as a UTC time (Google's form for a timed series) read in [zone]; null when neither. */
-private fun untilDay(value: String, zone: ZoneId): LocalDate? =
-    runCatching { LocalDate.parse(value, UNTIL_DATE) }.getOrNull()
-        ?: runCatching { LocalDateTime.parse(value, UNTIL_UTC).toInstant(ZoneOffset.UTC) }.getOrNull()?.atZone(zone)?.toLocalDate()
 
 // ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
 val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)

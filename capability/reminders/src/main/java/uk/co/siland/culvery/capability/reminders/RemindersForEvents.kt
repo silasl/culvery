@@ -22,11 +22,10 @@ import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
-import uk.co.siland.culvery.core.repeat.RepeatRule
-import uk.co.siland.culvery.core.repeat.recurrenceRule
+import uk.co.siland.culvery.core.repeat.movedTo
 import uk.co.siland.culvery.core.repeat.ruleParts
+import uk.co.siland.culvery.core.repeat.startable
 import uk.co.siland.culvery.core.repeat.startedFrom
-import uk.co.siland.culvery.core.ui.RepeatPick
 
 private const val TAG = "Reminders"
 private const val LAST_MINUTE = 23 * 60 + 55
@@ -108,9 +107,10 @@ internal fun Reminder.afterEvent(now: EventTimes, startsAtMillis: Long?, nowMill
                 first = now.day ?: shifted.toLocalDate()
                 rule = null
             }
-            RepeatRule.parse(newRule, zone) == null || (now.day == null && "COUNT" in ruleParts(newRule).orEmpty()) -> Unit
+            !startable(newRule, now.day != null, zone) -> Unit
             else -> {
-                val (from, left) = startedFrom(newRule, now.day ?: first, Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate(), zone) ?: return EventMove.Delete
+                val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+                val (from, left) = startedFrom(newRule, now.day ?: first, today, zone) ?: return EventMove.Delete
                 first = from
                 rule = left
             }
@@ -143,21 +143,14 @@ private fun shiftBetween(link: EventLink, now: EventTimes): Duration {
 
 /** Minutes between two times of day; none when either is all day. */
 private fun timeShift(from: LocalTime?, to: LocalTime?): Int =
-    if (from == null || to == null) 0 else to.toMinuteOfDay() - from.toMinuteOfDay()
+    if (from == null || to == null) 0 else to.minuteOfDay() - from.minuteOfDay()
 
 /** A reminder that follows the repeat keeps its day: its time moves as the event's did, stopping at 00:00 or 23:55. */
 private fun followerTime(time: LocalTime, from: LocalTime?, to: LocalTime?): LocalTime {
-    val minutes = time.toMinuteOfDay() + timeShift(from, to)
+    val minutes = time.minuteOfDay() + timeShift(from, to)
     return minutes.coerceIn(0, LAST_MINUTE).let { LocalTime.of(it / 60, it % 60) }
 }
 
 /** A rule the picker can show, with its weekdays in it, written again from [to]; its other days move as far. */
-private fun movedRule(rule: String, from: LocalDate, to: LocalDate): String {
-    if (ruleParts(rule)?.containsKey("BYDAY") != true) return rule
-    val pick = RepeatPick.read(rule, from)
-    if (pick.kept != null) return rule
-    val days = ChronoUnit.DAYS.between(from, to)
-    return recurrenceRule(pick.choice, pick.end, to, days = pick.extraDays.map { it.plus(days) }.toSet() + to.dayOfWeek) ?: rule
-}
-
-private fun LocalTime.toMinuteOfDay() = hour * 60 + minute
+private fun movedRule(rule: String, from: LocalDate, to: LocalDate): String =
+    if (ruleParts(rule)?.containsKey("BYDAY") != true) rule else movedTo(rule, from, to) ?: rule

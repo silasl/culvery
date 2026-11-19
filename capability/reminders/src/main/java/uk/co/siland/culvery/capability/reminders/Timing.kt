@@ -42,9 +42,10 @@ internal fun Reminder.nextDue(afterMillis: Long, zone: ZoneId): Long? = schedule
 internal fun Schedule.nextAt(time: LocalTime, afterMillis: Long, zone: ZoneId): Long? = when (this) {
     is Schedule.Once -> timeOn(first, time, zone).takeIf { it > afterMillis }
     is Schedule.Repeating -> RepeatRule.parse(rule, zone)?.let { parsed ->
-        val onOrAfter = parsed.firstAfter(first, dayOf(afterMillis, zone).minusDays(1))
-        onOrAfter?.let { timeOn(it, time, zone) }?.takeIf { it > afterMillis }
-            ?: onOrAfter?.let { parsed.firstAfter(first, it) }?.let { timeOn(it, time, zone) }
+        parsed.firstAfter(first, dayOf(afterMillis, zone).minusDays(1))?.let { onOrAfter ->
+            val thatDay = timeOn(onOrAfter, time, zone)
+            if (thatDay > afterMillis) thatDay else parsed.firstAfter(first, onOrAfter)?.let { timeOn(it, time, zone) }
+        }
     }
 }
 

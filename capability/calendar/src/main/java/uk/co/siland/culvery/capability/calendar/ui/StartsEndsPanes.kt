@@ -28,9 +28,9 @@ import uk.co.siland.culvery.capability.calendar.EventWhen
 import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.MAX_SPAN_DAYS
-import uk.co.siland.culvery.core.repeat.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.spokenWho
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.repeat.SHORT_DAY
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
