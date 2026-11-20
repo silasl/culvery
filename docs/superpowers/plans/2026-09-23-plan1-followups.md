@@ -1191,7 +1191,7 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **TalkBack checks from 9c-2:** dropped; the user will raise them if they show in use.
 - **Accented letters broken on the Music card (seen 2026-10-30):** on the tablet, Home's Lounge card showed a Polish track title with Ż and ą as stray marks (the Ż's dot above the line, ą as an apostrophe). Either Sonos sends the text mangled, or the card's font or line height clips marks above and below the letters. Compare the raw title from Sonos with what's drawn before fixing.
 
-- **Music card volume squashed (seen 2026-11-03):** when nothing plays, Home's Lounge card shows "Shuffle everything" in Next's place and the volume pill (`MusicCard.kt:61`, `weight(1f)`) is squeezed to a green stripe. The user suggests a mute button instead; Culvery sends no mute to Sonos yet. Waiting on the user: hide the pill while nothing plays, a mute button, or both.
+- **Music card volume squashed (seen 2026-11-03):** when nothing plays, Home's Lounge card shows "Shuffle everything" in Next's place and the volume pill (`MusicCard.kt:61`, `weight(1f)`) is squeezed to a green stripe. The user suggests a mute button instead; Culvery sends no mute to Sonos yet. **Fixed 2026-11-04 (51766191), ruled 2026-11-09 (Plan 20, item 16):** the pill is hidden while nothing plays, with no mute button; "Shuffle everything" has its full padding (1e4583ad).
 
 ## Feature ideas (2026-10-02, after v1)
 
